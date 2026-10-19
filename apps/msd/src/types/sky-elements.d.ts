@@ -71,13 +71,23 @@ declare module 'react' {
         imageAlt?: string;
         gallery?: string[];
         variant?: 'plain' | 'outlined';
+        /** M3 colour role (same vocabulary as sky-feature-card); unset keeps the default look. */
+        color?: 'none' | 'surface' | 'surface-high' | 'primary' | 'secondary' | 'tertiary' | 'inverse';
         badge?: string;
+        /** Theme role for the badge (sky-badge variant); unset keeps the default primary pill. */
+        badgeColor?: 'primary' | 'secondary' | 'tertiary' | 'error';
+        /** `tonal`: the role's container colours (default: filled). */
+        badgeTone?: 'filled' | 'tonal';
         favorite?: boolean;
         favoriteActive?: boolean;
         tag?: string;
         tagIcon?: string;
         eyebrow?: string;
         heading?: string;
+        /** Supporting text under the heading. */
+        description?: string;
+        /** Offer order: price + rating row first, member and location after the text. */
+        priceFirst?: boolean;
         location?: string;
         distance?: string;
         rating?: number;

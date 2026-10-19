@@ -5,22 +5,28 @@ import '@skylabs-monorepo/shared-ui/carousel';
 import type { CatalogDeal, CatalogHomeHeroSlide } from '../../../api/catalog';
 import { getCatalogHomeHero } from '../../../api/catalog';
 import { useCustomEvent } from '../../../hooks/use-custom-event';
+import { useMediaQuery } from '../../../hooks/use-media-query';
 import { useVisitorLocation } from '../../../location/location-context';
 import { formatINR } from '../../../utils/format';
-import { imageSrcSet, toDealCardDeal, toProductCardDeal } from './home-data';
-import { SkyProductCardWC } from '../../components/sky-product-card-wc';
+import { imageSrcSet, toDealCardDeal } from './home-data';
 import { PageSection } from '../../components/page-section/page-section';
+import { OfferCard, type OfferItem, type OfferTag } from '../../components/offer-card/offer-card';
 import content from '../../../content.json';
 import type { DealCardDeal } from '../../components/deal-card';
 
 const { home } = content;
 const heroSrcSet = imageSrcSet(home.hero.image, [640, 960, 1400]);
+const AUTOPLAY_MS = 6000;
+/** Swiper Element host: options are set as properties, then `initialize()` (its `init="false"`
+ *  mode), because the dots live outside the carousel and must be handed over as an element. */
+type SwiperHost = HTMLElement & {
+  swiper?: { slidePrev: () => void; slideNext: () => void };
+  initialize?: () => void;
+  [option: string]: unknown;
+};
 
-/** Same card markup as the single-spotlight fallback below — used for every slide of the
- *  Admin-managed Home Hero slider AND the fallback spotlight, so there is exactly one visual
- *  style regardless of which data source is active (no redesign). Fixes the broken-thumbnail
- *  bug: `spotlightCard.image` had no failure handling before — a 404/broken URL rendered a
- *  visibly broken image icon. Now it swaps to a neutral placeholder frame on error. */
+/** The single best-discount deal shown over the hero photo when no slider is live. A broken
+ *  thumbnail swaps to a neutral placeholder frame. */
 function SpotlightCard({ dealId, card }: { dealId: string; card: DealCardDeal }) {
   const [imgFailed, setImgFailed] = useState(false);
   const showImage = Boolean(card.image) && !imgFailed;
@@ -58,40 +64,22 @@ function SpotlightCard({ dealId, card }: { dealId: string; card: DealCardDeal })
           ) : null}
         </span>
       </span>
-      <Icon className="home-spotlight__arrow" aria-hidden="true">arrow_forward</Icon>
+      <Icon className="home-spotlight__arrow" aria-hidden="true">
+        arrow_forward
+      </Icon>
     </Link>
   );
 }
 
-/** One hero slide: the shared product card plus its own Book / Buy button. The button sits
- *  outside the card because the card is already one stretched link (no nested interactives). */
-function HeroSlide({ slide }: { slide: CatalogHomeHeroSlide }) {
-  const isDeal = slide.type === 'deal';
-  const card = isDeal ? toDealCardDeal(slide.deal) : toProductCardDeal(slide.product);
-  const href = isDeal ? `/deal/${slide.deal.id}` : `/products/${slide.product.id}`;
-  return (
-    <div className="home-hero__slide">
-      <SkyProductCardWC
-        variant="outlined"
-        gallery={card.gallery ?? (card.image ? [card.image] : undefined)}
-        imageAlt={card.imageAlt}
-        eyebrow={card.providerName}
-        heading={card.title}
-        location={card.location}
-        price={formatINR(card.price)}
-        originalPrice={card.originalPrice ? formatINR(card.originalPrice) : undefined}
-        discount={card.discount ? `${card.discount}% OFF` : undefined}
-        priceNote={card.priceNote}
-        href={href}
-      />
-      {createElement(
-        'md-filled-button',
-        { href, 'aria-label': (isDeal ? home.hero.bookAria : home.hero.buyAria).replace('{title}', card.title) },
-        isDeal ? home.hero.bookLabel : home.hero.buyLabel,
-      )}
-    </div>
-  );
-}
+/** Service / Product tag on each slide, so the type is named in words, not only by the card. */
+const SLIDE_TAGS: Record<CatalogHomeHeroSlide['type'], OfferTag> = {
+  deal: { label: content.offerCard.serviceTag, color: 'primary' },
+  product: { label: content.offerCard.productTag, color: 'tertiary', tone: 'tonal' },
+};
+
+/** A hero slide as the offer card's item. */
+const slideItem = (slide: CatalogHomeHeroSlide): OfferItem =>
+  slide.type === 'deal' ? { type: 'deal', deal: slide.deal } : { type: 'product', product: slide.product };
 
 /**
  * Hero (docs/msd/PLANNING.md §7, D26): the page's only h1 and site search on the left; on the
@@ -102,6 +90,9 @@ function HeroSlide({ slide }: { slide: CatalogHomeHeroSlide }) {
 export function HomeHero({ spotlight }: { spotlight?: CatalogDeal }) {
   const navigate = useNavigate();
   const fieldRef = useRef<HTMLElement>(null);
+  const carouselRef = useRef<SwiperHost>(null);
+  const paginationRef = useRef<HTMLDivElement>(null);
+  const reduceMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
   const { status: locationStatus, state: locationState } = useVisitorLocation();
   const [heroSlides, setHeroSlides] = useState<CatalogHomeHeroSlide[] | null>(null);
 
@@ -127,13 +118,33 @@ export function HomeHero({ spotlight }: { spotlight?: CatalogDeal }) {
 
   const slides = heroSlides ?? [];
   const usingSlider = slides.length > 0;
+  const hasControls = slides.length > 1;
+
+  // Start the carousel once its slides and the dots element are in the page.
+  useEffect(() => {
+    const host = carouselRef.current;
+    if (!host?.initialize || host.swiper) return;
+    Object.assign(host, {
+      slidesPerView: 'auto',
+      // The gap lives in home.css (--hero-slide-gap), which also sizes the slides.
+      spaceBetween: parseFloat(getComputedStyle(host).getPropertyValue('--hero-slide-gap')) || 0,
+      // Rewind (not loop): two cards are on screen, so loop would need duplicate slides.
+      rewind: hasControls,
+      keyboard: { enabled: true },
+      autoplay: reduceMotion ? false : { delay: AUTOPLAY_MS, pauseOnMouseEnter: true },
+      pagination: hasControls && paginationRef.current ? { el: paginationRef.current, clickable: true } : false,
+    });
+    host.initialize();
+  }, [usingSlider, hasControls, reduceMotion]);
   const fallbackCard = spotlight ? toDealCardDeal(spotlight) : null;
 
   return (
     <PageSection className="home-hero" aria-labelledby="hero-heading">
       <div className="home-hero__inner">
         <div className="home-hero__copy">
-          <h1 id="hero-heading" className="home-hero__title">{home.hero.heading}</h1>
+          <h1 id="hero-heading" className="home-hero__title">
+            {home.hero.heading}
+          </h1>
           <p className="home-hero__sub">{home.hero.subheading}</p>
           <sky-action-field
             ref={fieldRef}
@@ -149,22 +160,50 @@ export function HomeHero({ spotlight }: { spotlight?: CatalogDeal }) {
         </div>
 
         {usingSlider ? (
-          <div className="home-hero__visual" role="region" aria-roledescription="carousel" aria-label={home.hero.sliderLabel}>
+          <div
+            className="home-hero__visual home-hero__visual--slider"
+            role="region"
+            aria-roledescription="carousel"
+            aria-label={home.hero.sliderLabel}
+          >
+            {/* Two cards at a time; slide widths come from CSS (container query), so the carousel
+                shows one card and a peek on a narrow column. */}
             <swiper-container
-              slides-per-view="1"
-              space-between="16"
-              loop={slides.length > 1}
-              autoplay-delay="5000"
-              autoplay-pause-on-mouse-enter="true"
-              pagination={slides.length > 1}
-              pagination-clickable="true"
+              ref={carouselRef}
+              className="home-hero__carousel"
+              init="false"
             >
               {slides.map((slide) => (
-                <swiper-slide key={slide.id}>
-                  <HeroSlide slide={slide} />
+                <swiper-slide key={slide.id} className="home-hero__slide">
+                  <OfferCard item={slideItem(slide)} tag={SLIDE_TAGS[slide.type]} color="surface-high" variant="plain" />
                 </swiper-slide>
               ))}
             </swiper-container>
+            {/* Dots on the left, Previous / Next on the right. The buttons call Swiper directly
+                (not its navigation module, which would add a second tab stop to each button). */}
+            {hasControls && (
+              <div className="home-hero__controls">
+                <div ref={paginationRef} className="home-hero__pagination" />
+                <div className="home-hero__nav">
+                  {createElement(
+                    'md-icon-button',
+                    {
+                      'aria-label': home.hero.prevSlide,
+                      onClick: () => carouselRef.current?.swiper?.slidePrev(),
+                    },
+                    createElement('md-icon', { 'aria-hidden': 'true' }, 'chevron_left'),
+                  )}
+                  {createElement(
+                    'md-icon-button',
+                    {
+                      'aria-label': home.hero.nextSlide,
+                      onClick: () => carouselRef.current?.swiper?.slideNext(),
+                    },
+                    createElement('md-icon', { 'aria-hidden': 'true' }, 'chevron_right'),
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="home-hero__visual">

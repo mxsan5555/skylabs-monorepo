@@ -40,16 +40,16 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 1 | Admin and staff | 2 | 31 | 6 |
 | 2 | Members | 32 | 87 | 37 |
 | 3 | Customers and orders | 2 | 12 | 17 |
-| 4 | Storefront | 1 | 30 | 3 |
+| 4 | Storefront | 2 | 32 | 6 |
 | 5 | Static content | 0 | 5 | 0 |
 | 6 | CTA banners | 4 | 5 | 80 |
-| 7 | Home slider | 6 | 7 | 86 |
+| 7 | Home slider | 7 | 8 | 88 |
 | 8 | Masters | 0 | 1 | 0 |
 | 9 | Payments, payouts and reports | 0 | 11 | 0 |
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
 | 12 | Platform, security and release | 7 | 69 | 10 |
-| | **Total** | **54** | **262** | **21** |
+| | **Total** | **56** | **265** | **21** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -239,6 +239,8 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | ST-27 | OPS | Before traffic grows, move `VITE_MAP_TILE_URL` off `tile.openstreetmap.org` to a free-tier tile provider (OSM tile policy) | S | - | Env changed on Vercel |
 | [ ] | ST-28 | BE | Newsletter backend (msd-api table and endpoint) for the footer signup, which is UI only today | M | - | Signup stored; footer copy updated |
 | [x] | ST-29 | SEC | JSON-LD on deal, product, products and member pages goes through `<JsonLd>` (escapes `</script>`); a member-supplied name could run script before | S | - | Merged: guard test `seo/json-ld-usage.test.ts` fails on any raw `application/ld+json` |
+| [x] | ST-30 | FE | Offer card (`OfferCard` in `app/components/offer-card`, used by the home hero with `color="surface-high"` `variant="plain"` and the showcase): `sky-product-card` `price-first`, `description`, `badge-color`/`badge-tone` (theme-role tags), `color` (M3 roles, shared `actionRoles` for slotted buttons), shared `lineClamp` and `mediaCorner` styles; real deal and product with Add to cart (`showCartAdded`), wishlist and the shared `useRequireSignIn` guard; grid and list | M | - | Merged: `sky-product-card.test.ts`, `offer-card.test.tsx`, `home.test.tsx` hero, `use-require-sign-in.test.tsx`; checked at 1440 and 390 px |
+| [ ] | ST-31 | FE | Replace listing cards with the offer card page by page (home, category, explore, search, member, wishlist) and move the ~40 inline sign-in redirects onto `useRequireSignIn` | L | ST-30 | Each page's tests; no visual regressions |
 
 ## 5. Static content
 
@@ -270,6 +272,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [x] | SL-05 | FE | Home hero console: State first, `StateItemPicker`, Type column | M | SL-04 | Merged: `masters/home-hero.tsx`, `state-picker.tsx`, `state-item-picker.tsx` with tests |
 | [x] | SL-06 | FE | Storefront hero: mixed deal and product card carousel, split layout kept | M | SL-04 | Merged: `pages/home/home-hero.tsx`, hero test in `home.test.tsx` |
 | [x] | SL-07 | FE | Home hero console revamp (D28): overview table of every slider, then a two-pane builder (ordered slide cards with drag and move buttons, Undo on remove, inline browse-and-add panel); `GET /home-hero/overview`, `PUT /home-hero/slides/order`, `eligibleOnly` search | L | SL-05 | Merged: `home-hero.tsx`, `home-hero-builder.tsx`, `state-item-picker.tsx` with tests; service tests for overview and reorder |
+| [x] | SL-08 | FE | Hero slider: two outlined feature cards at a time, no fill (container query, one and a peek on phones), action in the card slot (Book now / Add to cart), autoplay off for reduced motion; shared-ui `sky-product-card` media fills its frame and shows a placeholder for a broken image, `sky-feature-card` too (one shared `media-placeholder`), and the feature card tints slotted action buttons to its accent; one `useAddProductToCart` hook and `cartToast` copy for the hero and category cards; `fillTemplate` for content placeholders; Service / Product badge (`sky-feature-card` `badge`) and a wishlist toggle in each hero card's actions, equal-height slides with aligned buttons (`headline-lines`/`text-lines` clamp) (existing wishlist context through one `useWishlistToggle` hook, shared with the home cards) | S | SL-06 | Merged: `home.test.tsx` hero tests, `use-wishlist-toggle.test.tsx`, `sky-feature-card.test.ts` badge tests, `sky-product-card.test.ts` media tests; checked at 1440 and 390 px |
 | [ ] | SL-01 | BIZ | Write the home slider rules in PLANNING.md §7 (slide count, schedule, image sizes, alt text) and review the existing Home Hero screen against them | S | - | Rules approved; gaps added here as tasks; partly: built behaviour written in PLANNING.md §7 (state picker, deal slides, 5-slide rule, Global fallback); own banner image, schedule and image rules open |
 
 ## 8. Masters

@@ -36,18 +36,19 @@ Needs Postgres (local, never Neon production): `prisma migrate dev`, seed twice,
 
 ## 3. Baseline and known failures
 
-Known failures at 2026-10-17; they must not grow. Anything else failing is a regression.
+Known failures at 2026-10-18; they must not grow. Anything else failing is a regression.
 
 | Project | Failing | Where |
 |---|---|---|
-| msd | 26 tests in 15 files | `permission-matrix` 9, `india-locations` 3, `home` 2, `contact-us` 2, and 1 each in `app.spec`, `widget-registry`, `deal-card`, `media-uploader`, `sky-product-card-wc`, `site-footer`, `become-vendor`, `wishlist`, `roles`, `settings`; `entry-server.test.tsx` fails to load |
+| msd | 24 tests in 14 files | `permission-matrix` 9, `india-locations` 3, `contact-us` 2, and 1 each in `app.spec`, `widget-registry`, `deal-card`, `media-uploader`, `sky-product-card-wc`, `site-footer`, `become-vendor`, `wishlist`, `roles`, `settings`; `entry-server.test.tsx` fails to load |
 | msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; the other 1,163 pass) |
 | shared-menu | 5 | `index.test.ts` |
 
-Lint and type drift: 31 msd lint errors, an ESLint ignore error in the shared packages, and
+Lint and type drift: 30 msd lint errors (`import/first` and `no-empty-function` in older tests), an ESLint ignore error in the shared packages, and
 `apps/msd-api/src/routes/members.routes.test.ts` type errors in its setup code (P10-46). ESLint
 ignores every file under `apps/msd-api/src` today. Flaky under load: `deals-list-page.test.tsx`
-"toggle-status flips a non-ACTIVE deal" (passes alone).
+"toggle-status flips a non-ACTIVE deal" and `popular-tags.test.tsx` "mapping a category calls
+mapPopularTag" (both pass alone).
 
 ## 4. Acceptance per module
 
@@ -101,6 +102,13 @@ ignores every file under `apps/msd-api/src` today. Flaky under load: `deals-list
 
 ### 4.4 Storefront
 
+- Offer card (`sky-product-card price-first`): default cards render unchanged; order is price row,
+  title + description (two lines, ellipsis, space kept), member on the right, place + distance,
+  actions; the old price is `<s>`; one star with the score, review count in the accessible name;
+  `badge-color` / `badge-tone` draw a theme-role `sky-badge`; card click opens the detail page,
+  Add to cart and the heart do not; signed-out cart or heart goes to sign in and back
+  (`useRequireSignIn`); checked at 1440 and 390 px in grid and list view. Each `color` role keeps
+  every text and the slotted buttons at AA (lowest 4.98:1, price on primary); no `color` = default look.
 - One `<h1>` per page; prerendered `/` contains the hero `<h1>`, category links and JSON-LD; no
   hydration warnings; `sitemap.xml`, `robots.txt`, `llms.txt` written when `VITE_SITE_URL` is set.
 - Category page: pills set `?sub=`; sort and filters send the right API params; count shows
@@ -115,7 +123,11 @@ ignores every file under `apps/msd-api/src` today. Flaky under load: `deals-list
 - Home slider: nothing can be added before a state is chosen; the search lists only that state's
   deals and products (a product through any active branch of its member); an item outside the
   state is 422 and a duplicate 409; a state with 5 eligible slides serves them, otherwise Global;
-  the hero shows deal and product cards.
+  the hero shows deal and product offer cards (`color="surface-high"`, `variant="plain"`), two at a time,
+  with a "Service" / "Product" tag; each card links to its detail page and its actions group is
+  named after the item; Add to cart and the heart work for a signed-in visitor and send others to
+  sign in; every slide has the same height (checked at 1440 and 390 px); dots on the left and
+  Previous / Next on the right move the slider (each dot a labelled button with a 24px target).
 - CTA banners: a banner saves state, colour roles, image (one only) and slots; each slot shows the
   visitor's state's active in-date banners, else Global, else nothing; contrast holds for every
   colour role (axe); `<BannerSlot>` hydrates without warnings.

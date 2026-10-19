@@ -332,7 +332,7 @@
 @media (min-width: 840px) {
   .home-hero__inner {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-    gap: 48px;
+    gap: 60px;
   }
 
   .home-steps {
@@ -371,9 +371,84 @@
   }
 }
 
-/* Hero slider (PLANNING §7): card plus its own Book / Buy button. */
+/* Hero slider (PLANNING §7): two offer cards at a time, sized from the hero column itself, so the
+   same rule holds beside the copy on desktop and full width on phones. --hero-slide-gap is the one
+   gap value: the slide width uses it here and home-hero.tsx hands it to Swiper. */
+.home-hero__visual--slider {
+  container-type: inline-size;
+  align-self: center;
+}
+
+.home-hero__carousel {
+  --hero-slide-gap: 16px;
+}
+
 .home-hero__slide {
-  display: grid;
-  gap: 12px;
-  justify-items: start;
+  display: flex;
+  inline-size: calc((100% - var(--hero-slide-gap)) / 2);
+  block-size: auto;
+}
+
+/* Controls under the cards: dots on the left, Previous / Next on the right, on every width. */
+.home-hero__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-block-start: 16px;
+}
+
+.home-hero__nav {
+  display: flex;
+  gap: 8px;
+}
+
+/* Swiper renders the dots here, outside its shadow DOM, so they are styled here. Each dot is 8px
+   but sits in a 24px hit area (WCAG 2.2 target size) with a visible focus ring. */
+.home-hero__pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-inline-size: 0;
+}
+
+.home-hero__pagination .swiper-pagination-bullet {
+  box-sizing: content-box;
+  inline-size: 8px;
+  block-size: 8px;
+  padding: 8px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background-color: var(--md-sys-color-outline-variant);
+  background-clip: content-box;
+  cursor: pointer;
+  transition:
+    background-color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
+    inline-size var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+}
+
+.home-hero__pagination .swiper-pagination-bullet:hover {
+  background-color: var(--md-sys-color-outline);
+}
+
+.home-hero__pagination .swiper-pagination-bullet-active {
+  inline-size: 24px;
+  background-color: var(--md-sys-color-primary);
+}
+
+.home-hero__pagination .swiper-pagination-bullet:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-hero__pagination .swiper-pagination-bullet {
+    transition: none;
+  }
+}
+
+/* Too narrow for two readable cards: one card and a peek of the next, so it still reads as a row. */
+@container (max-width: 480px) {
+  .home-hero__slide {
+    inline-size: 82%;
+  }
 }

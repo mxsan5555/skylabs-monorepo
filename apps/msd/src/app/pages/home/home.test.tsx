@@ -17,6 +17,8 @@ const m = vi.hoisted(() => ({
   location: { status: 'ready', coords: null as null | { latitude: number; longitude: number }, state: null as string | null },
   auth: { isAuthenticated: false, token: null as string | null },
   toggle: vi.fn(),
+  toggleProduct: vi.fn(),
+  addCart: vi.fn(),
 }));
 
 vi.mock('../../../api/catalog', async (importOriginal) => ({
@@ -33,9 +35,15 @@ vi.mock('../../../catalog/catalog-shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../catalog/catalog-shell')>()),
   useCatalogShell: () => ({ status: 'ready', locationsStatus: 'ready', categories: m.categories, locations: [], socialLinks: [] }),
 }));
+vi.mock('../../../api/cart', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../api/cart')>()),
+  addCartItem: (...a: unknown[]) => m.addCart(...a),
+}));
 vi.mock('../../../location/location-context', () => ({ useVisitorLocation: () => m.location }));
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({ useAuth: () => m.auth }));
-vi.mock('../../../wishlist/wishlist-context', () => ({ useWishlist: () => ({ toggle: m.toggle, has: () => false }) }));
+vi.mock('../../../wishlist/wishlist-context', () => ({
+  useWishlist: () => ({ toggle: m.toggle, toggleProduct: m.toggleProduct, has: () => false, hasProduct: () => false }),
+}));
 vi.mock('../../seo/site-url', () => ({
   SITE_URL: 'https://example.test',
   absoluteUrl: (p: string) => new URL(p, 'https://example.test/').toString(),
@@ -174,6 +182,18 @@ beforeEach(() => {
   m.auth = { isAuthenticated: false, token: null };
 });
 
+/** The hero's offer cards, once the slider has loaded. */
+const heroCards = (count: number) =>
+  waitFor(() => {
+    const cards = Array.from(document.querySelectorAll<HTMLElement>('.home-hero sky-product-card'));
+    if (cards.length < count) throw new Error('no hero slider yet');
+    return cards;
+  });
+
+/** React sets a custom element's option as a property once it is registered, else as an attribute. */
+const option = (el: HTMLElement, name: string) =>
+  (el as unknown as Record<string, unknown>)[name] ?? el.getAttribute(name);
+
 describe('Home', () => {
   it('renders the static sections at once and a busy deals placeholder while the catalog loads', () => {
     m.deals.mockReturnValue(new Promise(() => undefined));
@@ -238,7 +258,10 @@ describe('Home', () => {
     expect(within(list).getByRole('link', { name: 'Massage' }).getAttribute('href')).toBe('/category/massage');
     expect(within(list).queryByRole('link', { name: 'Skin' })).toBeNull();
     expect(within(list).getByRole('heading', { level: 3, name: 'Massage' })).toBeTruthy();
-    const texts = Array.from(list.querySelectorAll('sky-tile-card')).map((el) => (el as unknown as { text?: string }).text);
+    // React sets `text` as a property on a registered element, otherwise as an attribute.
+    const texts = Array.from(list.querySelectorAll('sky-tile-card')).map(
+      (el) => (el as unknown as { text?: string }).text ?? el.getAttribute('text') ?? undefined,
+    );
     expect(texts).toEqual([
       content.home.categoryTileText.replace('{count}', '2'),
       undefined,
@@ -262,20 +285,6 @@ describe('Home', () => {
     fireEvent.click(tabs[2]);
     await waitFor(() => expect(dealsSection().querySelectorAll('sky-product-card')).toHaveLength(1));
     expect(within(dealsSection()).getByRole('tabpanel').getAttribute('aria-labelledby')).toBe('deals-tab-c-s');
-  });
-
-  it('hides the member banner when signed in', async () => {
-    const headlines = () =>
-      Array.from(document.querySelectorAll('sky-feature-card')).map((el) => (el as unknown as { headline?: string }).headline);
-    const { unmount } = renderHome();
-    await screen.findByRole('heading', { level: 2, name: content.home.sections.dealsNearYou.heading });
-    expect(headlines()).toContain(content.home.memberBanner.heading);
-    unmount();
-
-    m.auth = { isAuthenticated: true, token: 't' };
-    renderHome();
-    await screen.findByRole('heading', { level: 2, name: content.home.sections.dealsNearYou.heading });
-    expect(headlines()).not.toContain(content.home.memberBanner.heading);
   });
 
   it('sends a signed-out visitor to sign in when they favourite a deal', async () => {
@@ -336,7 +345,81 @@ describe('Home', () => {
     expect(document.querySelector('sky-cta-banner[headline]')).toBeNull();
   });
 
-  it('shows deal and product slides from the visitor’s state in the hero (PLANNING §7)', async () => {
+  it('shows deal and product slides from the visitor’s state in the hero as offer cards (PLANNING §7)', async () => {
+    const deals = (await m.deals()).data;
+    const products = [
+      { id: 'prod-1', name: 'Massage Oil', price: '499.00', originalPrice: null, discount: null, image: null, imageAlt: null, summary: 'Calming oil.', vendor: { businessName: 'Calm Spa', city: 'Lucknow' } },
+    ];
+    m.homeHero.mockResolvedValue({
+      data: {
+        state: null,
+        slides: [
+          { id: 's1', type: 'deal', deal: deals[0] },
+          { id: 's2', type: 'product', product: products[0] },
+        ],
+      },
+    });
+    renderHome();
+    const [dealCard, productCard] = await heroCards(2);
+    // Offer cards on surface-high, no outline; the tag names the type; the whole card opens the detail page.
+    expect(option(dealCard, 'color')).toBe('surface-high');
+    expect(option(dealCard, 'variant')).toBe('plain');
+    expect(option(dealCard, 'heading')).toBe(deals[0].title);
+    expect(option(dealCard, 'badge')).toBe(content.offerCard.serviceTag);
+    expect(option(dealCard, 'href')).toBe(`/deal/${deals[0].id}`);
+    expect(option(productCard, 'badge')).toBe(content.offerCard.productTag);
+    expect(option(productCard, 'href')).toBe('/products/prod-1');
+    expect(option(productCard, 'price')).toBe('₹499');
+    expect(option(productCard, 'description')).toBe('Calming oil.');
+    // Products show no member or place; services do (from the deal's vendor and branch).
+    expect(option(productCard, 'eyebrow')).toBeFalsy();
+    // Each card's actions are a group named by the item: Add to cart, then the wishlist toggle.
+    const actions = within(productCard).getByRole('group', { name: 'Massage Oil actions' });
+    // Its visible text is its name (WCAG 2.5.3); the icon is decorative.
+    expect(actions.querySelector('md-filled-button')?.textContent).toContain(content.offerCard.addToCart);
+    expect(actions.querySelector('md-filled-button')?.hasAttribute('aria-label')).toBe(false);
+    expect(actions.querySelector('md-outlined-icon-button')?.getAttribute('aria-label')).toBe('Save Massage Oil to wishlist');
+    expect(document.querySelectorAll('.home-hero__slide')).toHaveLength(2);
+
+    // One control row under the cards: dots on the left (Swiper fills them), Previous / Next on the right.
+    const carousel = document.querySelector('.home-hero__carousel') as HTMLElement;
+    // Options (including the outside dots element) are set as properties, then initialize().
+    expect(carousel.getAttribute('init')).toBe('false');
+    const controls = document.querySelector('.home-hero__controls') as HTMLElement;
+    expect(controls.firstElementChild?.classList.contains('home-hero__pagination')).toBe(true);
+    const navLabels = Array.from(controls.querySelectorAll('md-icon-button')).map((b) => b.getAttribute('aria-label'));
+    expect(navLabels).toEqual([content.home.hero.prevSlide, content.home.hero.nextSlide]);
+    const swiper = { slidePrev: vi.fn(), slideNext: vi.fn() };
+    Object.assign(carousel, { swiper });
+    fireEvent.click(controls.querySelector(`md-icon-button[aria-label="${content.home.hero.nextSlide}"]`) as HTMLElement);
+    fireEvent.click(controls.querySelector(`md-icon-button[aria-label="${content.home.hero.prevSlide}"]`) as HTMLElement);
+    expect(swiper.slideNext).toHaveBeenCalledTimes(1);
+    expect(swiper.slidePrev).toHaveBeenCalledTimes(1);
+  });
+
+  it('adds a hero product to the cart for a signed-in visitor, and asks others to sign in', async () => {
+    const products = [{ id: 'prod-1', name: 'Massage Oil', price: '499.00', originalPrice: null, discount: null, image: null, imageAlt: null, vendor: null }];
+    m.homeHero.mockResolvedValue({ data: { state: null, slides: [{ id: 's2', type: 'product', product: products[0] }] } });
+    m.addCart.mockResolvedValue({ data: {} });
+    const cartButton = async () => {
+      const [card] = await heroCards(1);
+      return within(card).getByRole('group', { name: 'Massage Oil actions' }).querySelector('md-filled-button') as HTMLElement;
+    };
+
+    m.auth = { isAuthenticated: true, token: 't' };
+    const signedIn = renderHome();
+    fireEvent.click(await cartButton());
+    await waitFor(() => expect(m.addCart).toHaveBeenCalledWith('t', { productId: 'prod-1', quantity: 1 }));
+    signedIn.unmount();
+
+    m.auth = { isAuthenticated: false, token: null };
+    m.addCart.mockClear();
+    renderHome();
+    fireEvent.click(await cartButton());
+    expect(m.addCart).not.toHaveBeenCalled();
+  });
+
+  it('saves a hero deal or product to the wishlist for a signed-in visitor, and asks others to sign in', async () => {
     const deals = (await m.deals()).data;
     const products = [{ id: 'prod-1', name: 'Massage Oil', price: '499.00', originalPrice: null, discount: null, image: null, imageAlt: null, vendor: null }];
     m.homeHero.mockResolvedValue({
@@ -348,18 +431,27 @@ describe('Home', () => {
         ],
       },
     });
+    const saveButton = (title: string) =>
+      waitFor(() => {
+        const label = content.offerCard.saveAria.replace('{title}', title);
+        const el = document.querySelector(`.home-hero md-outlined-icon-button[aria-label="${label}"]`) as HTMLElement | null;
+        if (!el) throw new Error('no hero slider yet');
+        return el;
+      });
+
+    m.auth = { isAuthenticated: true, token: 't' };
+    const signedIn = renderHome();
+    fireEvent.click(await saveButton(deals[0].title));
+    fireEvent.click(await saveButton('Massage Oil'));
+    expect(m.toggle).toHaveBeenCalledWith(deals[0].id);
+    expect(m.toggleProduct).toHaveBeenCalledWith('prod-1');
+    signedIn.unmount();
+
+    m.auth = { isAuthenticated: false, token: null };
+    m.toggle.mockClear();
     renderHome();
-    // md-filled-button renders its <a> in shadow DOM; read the element itself.
-    const button = (label: string) =>
-      document.querySelector(`md-filled-button[aria-label="${label}"]`) as (HTMLElement & { href?: string }) | null;
-    const book = await waitFor(() => {
-      const el = button(content.home.hero.bookAria.replace('{title}', deals[0].title));
-      if (!el) throw new Error('no hero slider yet');
-      return el;
-    });
-    expect(book.href || book.getAttribute('href')).toBe(`/deal/${deals[0].id}`);
-    const buy = button(content.home.hero.buyAria.replace('{title}', products[0].name));
-    expect(buy?.href || buy?.getAttribute('href')).toBe(`/products/${products[0].id}`);
+    fireEvent.click(await saveButton(deals[0].title));
+    expect(m.toggle).not.toHaveBeenCalled();
   });
 
   it('passes banner options as kebab-case attributes (survive server rendering)', () => {

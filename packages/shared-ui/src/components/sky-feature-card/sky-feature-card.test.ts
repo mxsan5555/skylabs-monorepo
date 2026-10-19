@@ -95,3 +95,32 @@ describe('sky-feature-card image and cta-color (CTA banners)', () => {
     expect(el.getAttribute('cta-color')).toBe('tertiary');
   });
 });
+
+describe('sky-feature-card broken image', () => {
+  it('swaps a broken image for a neutral placeholder, and retries a new one', async () => {
+    const el = await create<SkyFeatureCard>('sky-feature-card', { image: '/missing.jpg' });
+    const query = (selector: string) => el.shadowRoot?.querySelector(selector) ?? null;
+    query('.media img')?.dispatchEvent(new Event('error'));
+    await el.updateComplete;
+    expect(query('.media img')).toBeNull();
+    expect(query('.media__placeholder')).not.toBeNull();
+    el.image = '/ok.jpg';
+    await el.updateComplete;
+    expect(query('.media img')?.getAttribute('src')).toBe('/ok.jpg');
+  });
+});
+
+describe('sky-feature-card slotted actions', () => {
+  it("tints buttons in the actions slot with the card's accent role, like the built-in CTA", () => {
+    const css = SkyFeatureCard.styles.toString();
+    expect(css).toMatch(/slot\[name='actions'\]::slotted\(\*\)\s*\{[^}]*--md-filled-button-container-color: var\(--_accent\)/);
+    expect(css).toMatch(/--md-text-button-label-text-color: var\(--_accent\)/);
+  });
+});
+
+describe('sky-feature-card media', () => {
+  it('renders no media frame without an image', async () => {
+    const el = await create<SkyFeatureCard>('sky-feature-card', { headline: 'Gift cards' });
+    expect(el.shadowRoot?.querySelector('.media')).toBeNull();
+  });
+});

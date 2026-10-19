@@ -83,6 +83,43 @@ export const colorRoles = css`
   }
 `;
 
+/**
+ * Material button tokens for buttons a card receives through a slot, so they follow the card's
+ * `color` role: filled buttons and the selected toggle take the accent pair, text buttons the
+ * accent, icon buttons the on-variant role with the role's outline. Declarations only: put them
+ * in a `::slotted(*)` rule (custom properties inherit into the buttons inside the wrapper).
+ */
+export const actionRoles = css`
+  --md-filled-button-container-color: var(--_accent);
+  --md-filled-button-label-text-color: var(--_on-accent);
+  --md-filled-button-hover-label-text-color: var(--_on-accent);
+  --md-filled-button-focus-label-text-color: var(--_on-accent);
+  --md-filled-button-pressed-label-text-color: var(--_on-accent);
+  --md-filled-button-icon-color: var(--_on-accent);
+  --md-filled-button-hover-icon-color: var(--_on-accent);
+  --md-filled-button-focus-icon-color: var(--_on-accent);
+  --md-filled-button-pressed-icon-color: var(--_on-accent);
+  --md-text-button-label-text-color: var(--_accent);
+  --md-text-button-hover-label-text-color: var(--_accent);
+  --md-text-button-focus-label-text-color: var(--_accent);
+  --md-text-button-pressed-label-text-color: var(--_accent);
+  --md-text-button-icon-color: var(--_accent);
+  --md-icon-button-icon-color: var(--_on-variant);
+  --md-icon-button-hover-icon-color: var(--_on-variant);
+  --md-icon-button-focus-icon-color: var(--_on-variant);
+  --md-icon-button-pressed-icon-color: var(--_on-variant);
+  --md-outlined-icon-button-icon-color: var(--_on-variant);
+  --md-outlined-icon-button-hover-icon-color: var(--_on-variant);
+  --md-outlined-icon-button-focus-icon-color: var(--_on-variant);
+  --md-outlined-icon-button-pressed-icon-color: var(--_on-variant);
+  --md-outlined-icon-button-outline-color: var(--_outline);
+  --md-outlined-icon-button-selected-container-color: var(--_accent);
+  --md-outlined-icon-button-selected-icon-color: var(--_on-accent);
+  --md-outlined-icon-button-selected-hover-icon-color: var(--_on-accent);
+  --md-outlined-icon-button-selected-focus-icon-color: var(--_on-accent);
+  --md-outlined-icon-button-selected-pressed-icon-color: var(--_on-accent);
+`;
+
 /** `shape` attribute → `--_shape` (M3 corner scale). Default: large. */
 export const shapeScale = css`
   :host {

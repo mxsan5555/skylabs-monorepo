@@ -206,6 +206,14 @@ one grouped Filter menu, with distinct tonal colours per status.
   then Vercel IP, then none. Coordinates map to the nearest partner city within 75 km.
 - **Home:** hero with search, shop by category, deals near you (category tabs, distance sorted),
   how it works, therapists, offers, products, popular treatments, FAQ, partner banner.
+- **Offer card** (`sky-product-card price-first`, showcase "Offer card", to replace listing cards
+  page by page in task ST-31): tag on the image (New, Deal, Hot, Expire soon, each a theme role
+  via `badge-color` / `badge-tone`), price, old price and discount with a one-star score, title
+  and description (two lines each, ellipsis), member (services, right-aligned), place and distance
+  from the visitor (services), Add to cart and wishlist. The whole card opens the detail page; Add
+  to cart (a deal asks for its package) and the heart act on their own, signed-out visitors go to
+  sign in first. Grid or list view. `color` takes the same M3 roles as the feature card (none,
+  surface, surface-high, primary, secondary, tertiary, inverse), slotted buttons included.
 - **Category page** (`/category/:slug`, `/category/:slug/:city`): h1 and total, clamped
   description, subcategory pills, Filters, List/Grid/Map, sort (Relevance, Price low to high, high
   to low, Distance when the visitor has coordinates), filter panel (Your location, Distance,
@@ -271,8 +279,15 @@ Home hero slider, managed under Masters → Home hero (`/account/masters/home-he
    slides (slide, item, branch and member all active); until then, and for visitors with no
    location, the Global/Default slider shows. The console shows progress ("3 of 5 to go live") as a
    draft, not an error.
-5. **Storefront hero (D26):** the h1 and search stay on the left; the right side becomes a carousel
-   of larger cards (image, title, member, price, Book or Buy button) mixing deals and products.
+5. **Storefront hero (D26):** the h1 and search stay on the left; the right side is a carousel of
+   offer cards (`OfferCard`, see §4) with `color="surface-high"` and `variant="plain"`, two at a time (one
+   and a peek on phones), mixing deals and products; a "Service" (primary) or "Product" (tertiary,
+   tonal) tag names the type. Each card has the offer card's parts and actions: price, old price
+   and discount, title and description (two lines each), member, place and distance for services,
+   Add to cart (a deal asks for its package) and the wishlist heart; the whole card opens the detail
+   page. No rating until reviews exist. Every slide has the same height and its actions at the
+   bottom. Under the cards: the slide dots on the left, Previous and Next on the right. Autoplay
+   pauses on hover and is off for reduced motion.
 
 Still open (SL-01): slide schedule (start and end dates) and image size and alt text rules.
 

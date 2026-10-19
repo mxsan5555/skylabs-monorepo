@@ -3,6 +3,7 @@ import '@material/web/icon/icon.js';
 import '@material/web/button/filled-button.js';
 import { hostBase } from '../shared-styles.js';
 import {
+  actionRoles,
   cardVariants,
   colorRoles,
   ctaButton,
@@ -14,6 +15,7 @@ import {
   type SkyShape,
   type SkyVariant,
 } from '../m3-surface.js';
+import { mediaPlaceholder, mediaPlaceholderStyles } from '../media-placeholder.js';
 
 /**
  * <sky-feature-card> — promotional M3 card: icon container, headline, supporting text and a
@@ -54,6 +56,7 @@ export class SkyFeatureCard extends LitElement {
     image: { type: String },
     imageAlt: { type: String, attribute: 'image-alt' },
     slottedActions: { state: true },
+    imageFailed: { state: true },
   };
 
   declare icon?: string;
@@ -72,6 +75,8 @@ export class SkyFeatureCard extends LitElement {
   declare image?: string;
   declare imageAlt?: string;
   declare slottedActions: boolean;
+  /** The image URL failed to load: show a neutral placeholder instead of a broken image. */
+  declare imageFailed: boolean;
 
   constructor() {
     super();
@@ -82,6 +87,12 @@ export class SkyFeatureCard extends LitElement {
     this.iconShape = 'medium';
     this.layout = 'vertical';
     this.slottedActions = false;
+    this.imageFailed = false;
+  }
+
+  protected override willUpdate(changed: Map<string, unknown>) {
+    // A new image gets a fresh try.
+    if (changed.has('image')) this.imageFailed = false;
   }
 
   static override styles = css`
@@ -92,6 +103,7 @@ export class SkyFeatureCard extends LitElement {
     ${iconContainer}
     ${typeRoles}
     ${ctaButton}
+    ${mediaPlaceholderStyles}
     :host {
       block-size: 100%;
       container-type: inline-size;
@@ -114,6 +126,7 @@ export class SkyFeatureCard extends LitElement {
       --_on-accent: var(--md-sys-color-inverse-on-surface);
     }
     .media {
+      position: relative;
       align-self: stretch;
       overflow: hidden;
       border-radius: var(--md-sys-shape-corner-medium);
@@ -151,6 +164,11 @@ export class SkyFeatureCard extends LitElement {
     .actions[hidden] {
       display: none;
     }
+    /* Buttons placed in the actions slot take the card's roles too, like the built-in CTA. With
+       the default colour this matches Material's own button colours. */
+    slot[name='actions']::slotted(*) {
+      ${actionRoles}
+    }
     :host([layout='horizontal']) .surface {
       flex-direction: row;
       align-items: center;
@@ -182,12 +200,26 @@ export class SkyFeatureCard extends LitElement {
     return html`
       <article class="surface">
         ${this.image
-          ? html`<div class="media"><img src=${this.image} alt=${this.imageAlt ?? ''} loading="lazy" decoding="async" /></div>`
+          ? html`<div class="media">
+              ${this.imageFailed
+                ? mediaPlaceholder
+                : html`<img
+                    src=${this.image}
+                    alt=${this.imageAlt ?? ''}
+                    loading="lazy"
+                    decoding="async"
+                    @error=${() => (this.imageFailed = true)}
+                  />`}
+            </div>`
           : nothing}
         ${this.icon ? html`<span class="icon"><md-icon aria-hidden="true">${this.icon}</md-icon></span>` : nothing}
         <div class="copy">
-          ${this.headline ? html`<h3 class="title-large">${this.headline}</h3>` : nothing}
-          ${this.text ? html`<p class="body-large">${this.text}</p>` : nothing}
+          ${this.headline
+            ? html`<h3 class="title-large">${this.headline}</h3>`
+            : nothing}
+          ${this.text
+            ? html`<p class="body-large">${this.text}</p>`
+            : nothing}
           <slot></slot>
         </div>
         <div class="actions" ?hidden=${!this.ctaLabel && !this.slottedActions}>
