@@ -1,0 +1,134 @@
+.cookies-page {
+  width: min(100% - 40px, 1120px);
+  margin-inline: auto;
+  padding-block: 40px 64px;
+  color: var(--md-sys-color-on-surface);
+}
+
+.cookies-page__hero {
+  padding: clamp(28px, 5vw, 52px);
+  margin-bottom: 24px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 24px;
+  background: var(--md-sys-color-surface-container-low);
+}
+
+.cookies-page__eyebrow {
+  color: var(--md-sys-color-primary);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.cookies-page__hero h1 {
+  max-width: 760px;
+  margin: 16px 0;
+  font-size: clamp(32px, 5vw, 48px);
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+
+.cookies-page__hero>p {
+  max-width: 680px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.cookies-page__updated {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 22px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 13px;
+}
+
+.cookies-page__updated md-icon {
+  font-size: 22px;
+}
+
+.cookies-page__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.cookies-page__grid sky-info-card {
+  min-width: 0;
+}
+
+.cookies-page__contact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 28px;
+  border-radius: 20px;
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+.cookies-page__contact h2 {
+  margin: 0 0 8px;
+  font-size: 21px;
+  line-height: 1.4;
+}
+
+.cookies-page__contact p {
+  max-width: 650px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.cookies-page__contact-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.cookies-page__contact-link:hover {
+  text-decoration: underline;
+}
+
+.cookies-page__contact-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+@media (max-width: 850px) {
+  .cookies-page__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .cookies-page {
+    width: calc(100% - 28px);
+    padding-block: 28px 40px;
+  }
+
+  .cookies-page__hero {
+    padding: 28px 22px;
+    border-radius: 20px;
+  }
+
+  .cookies-page__grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .cookies-page__contact {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 24px;
+  }
+}

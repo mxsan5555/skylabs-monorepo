@@ -1,79 +1,160 @@
+
 .contact {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 24px 16px 72px;
+  width: min(1180px, calc(100% - 48px));
+  margin-inline: auto;
+  padding: 36px 0 64px;
+  color: var(--md-sys-color-on-surface);
 }
 
-.contact h1 {
-  margin: 0 0 24px;
-  font-size: clamp(1.9rem, 5vw, 2.6rem);
-  line-height: 1.15;
-  letter-spacing: -0.01em;
-  color: var(--md-sys-color-on-surface, #1a1c19);
-}
-
-.contact__grid {
+.contact__layout {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 32px;
   align-items: start;
 }
 
-.contact__details {
-  display: flex;
-  flex-direction: column;
+.contact__form-section,
+.contact__map-section {
+  min-width: 0;
+  width: 100%;
+}
+
+.contact__form-copy {
+  margin-bottom: 20px;
+}
+
+.contact__form-copy h1 {
+  margin: 0 0 10px;
+  font-size: clamp(1.8rem, 3vw, 2.4rem);
+  line-height: 1.2;
+}
+
+.contact__form-section sky-tile-card,
+.contact__info-grid sky-tile-card {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.contact__fields {
+  display: grid;
   gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.contact__row {
-  display: flex;
-  align-items: center;
+.contact__fields-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  width: 100%;
+}
+
+.contact__fields-row > * {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.contact__fields > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.contact__map-section {
+  display: grid;
   gap: 12px;
-  min-height: 44px;
-  margin: 0;
-  font-size: 1rem;
-  color: var(--md-sys-color-on-surface, #1a1c19);
-}
-
-.contact__row a {
-  color: var(--md-sys-color-primary, #3a693c);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.contact__social {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 8px;
-}
-
-.contact__social-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 44px;
-  padding: 0 12px;
-  border-radius: 999px;
-  border: 1px solid var(--md-sys-color-outline-variant, #c1c9bd);
-  color: var(--md-sys-color-on-surface, #1a1c19);
-  text-decoration: none;
-  font-size: 0.9rem;
-}
-
-.contact__social-link:hover {
-  background-color: var(--md-sys-color-surface-container-high, #e7e8ee);
+  min-width: 0;
 }
 
 .contact__map {
-  border-radius: 16px;
   overflow: hidden;
-  background-color: var(--md-sys-color-surface-variant, #dde4d8);
+  border-radius: 12px;
 }
 
 .contact__map iframe {
-  width: 100%;
-  height: 320px;
-  border: 0;
   display: block;
+  width: 100%;
+  height: 340px;
+  border: 0;
+}
+
+
+.contact__info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.contact__info-grid sky-tile-card {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Long email/address ko card ke andar wrap kare */
+.contact__info-grid sky-tile-card,
+.contact__info-grid sky-tile-card * {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+
+.contact__info-grid a {
+  overflow-wrap: anywhere;
+}
+
+.contact__social {
+  margin-top: 28px;
+}
+
+.contact__social h3 {
+  margin: 0 0 12px;
+}
+
+.contact__social-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.contact__social-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Tablet and mobile */
+@media (max-width: 760px) {
+  .contact {
+    width: calc(100% - 32px);
+    padding-block: 28px 40px;
+  }
+
+  .contact__layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+
+  .contact__map iframe {
+    height: 260px;
+  }
+
+  .contact__info-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+}
+
+@media (max-width: 520px) {
+  .contact__fields-row,
+  .contact__info-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

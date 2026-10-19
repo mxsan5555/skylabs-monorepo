@@ -65,6 +65,10 @@ import Contact from './pages/contact/contact';
 import Careers from './pages/careers/careers';
 import { BecomeVendor } from './pages/become-vendor/become-vendor';
 import HowItWorks from './pages/how-it-works/how-it-works';
+import PrivacyPolicy from './pages/privacy-policy/privacy-policy';
+import TermsOfService from './pages/terms-of-service/terms-of-service';
+import Accessibility from './pages/accessibility/accessibility';
+import CookiesPolicy from './pages/cookies-policy/cookies-policy';
 import WebsitePage from './pages/website-page/website-page';
 import { Orders } from './pages/orders/orders';
 import { OrderDetail } from './pages/orders/order-detail';
@@ -268,10 +272,10 @@ export function AppRoutes() {
           <Route path="/how-it-works" element={<HowItWorks />} />
           {/* WebsitePage is one reusable component parameterized by `slug` — wired to all 4 fixed
             `WebsitePage` rows (see website-page.tsx's own doc comment), not 4 separate files. */}
-          <Route path="/privacy" element={<WebsitePage slug="privacy" />} />
-          <Route path="/terms" element={<WebsitePage slug="terms" />} />
-          <Route path="/accessibility" element={<WebsitePage slug="accessibility" />} />
-          <Route path="/cookies" element={<WebsitePage slug="cookies" />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsOfService />} />
+          <Route path="/accessibility" element={<Accessibility />} />
+          <Route path="/cookies" element={<CookiesPolicy/>} />
           <Route path="/products/:slug" element={<ProductDetail />} />
           <Route path="/showcase" element={<Showcase />} />
           {/* ── Catch-all 404, inside the shell so it keeps header/footer. ── */}
