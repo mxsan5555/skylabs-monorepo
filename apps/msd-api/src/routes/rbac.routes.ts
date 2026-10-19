@@ -3,6 +3,7 @@ import type { Request } from 'express';
 import { authenticate } from '../middleware/authenticate';
 import { requirePermission } from '../middleware/requirePermission';
 import { validateBody, validateParams, validateQuery } from '../middleware/validate';
+import { z } from 'zod';
 import { UuidParamSchema, PaginationQuerySchema } from '../schemas/common.schema';
 import {
   RoleCreateSchema,
@@ -21,11 +22,19 @@ import {
 import * as roleService from '../services/role.service';
 import * as widgetService from '../services/dashboard-widget.service';
 import * as userService from '../services/user.service';
+import {
+  assertCanAssignRole,
+  assertCanEditRole,
+  assertCanManageUser,
+  assertNotLastSuperAdmin,
+} from '../services/super-admin-guard.service';
 import { startImpersonation } from '../services/impersonation.service';
 import { getBootstrap } from '../services/bootstrap.service';
 import { writeAuditLog } from '../services/audit.service';
 import { prisma } from '../lib/prisma';
 import { sendData } from '../lib/http';
+
+const UserRoleParamsSchema = z.object({ id: z.string().uuid(), roleId: z.string().uuid() });
 
 const router = Router();
 router.use(authenticate);
@@ -85,6 +94,7 @@ router.patch(
   async (req, res, next) => {
     try {
       const before = await roleService.getRole(req.params.id);
+      await assertCanEditRole(req.user!.sub, req.params.id);
       const role = await roleService.updateRole(req.params.id, req.body);
       await writeAuditLog({
         actorUserId: req.user!.sub,
@@ -156,6 +166,7 @@ router.patch(
   validateBody(RoleStatusUpdateSchema),
   async (req, res, next) => {
     try {
+      await assertCanEditRole(req.user!.sub, req.params.id);
       const role = await roleService.setRoleStatus(req.params.id, req.body.isActive);
       await writeAuditLog({
         actorUserId: req.user!.sub,
@@ -207,6 +218,7 @@ router.put(
   async (req, res, next) => {
     try {
       const { permissions } = req.body;
+      await assertCanEditRole(req.user!.sub, req.params.id);
       const result = await roleService.setRolePermissions(req.params.id, permissions);
 
       await writeAuditLog({
@@ -247,6 +259,7 @@ router.put(
   validateBody(RoleWidgetsUpdateSchema),
   async (req, res, next) => {
     try {
+      await assertCanEditRole(req.user!.sub, req.params.id);
       const result = await roleService.setRoleWidgets(req.params.id, req.body.widgets);
       await writeAuditLog({
         actorUserId: req.user!.sub,
@@ -363,6 +376,7 @@ router.patch(
   validateBody(UserUpdateSchema),
   async (req, res, next) => {
     try {
+      await assertCanManageUser(req.user!.sub, req.params.id);
       const user = await userService.updateUser(req.params.id, req.body);
       await writeAuditLog({
         actorUserId: req.user!.sub,
@@ -385,6 +399,8 @@ router.delete(
   validateParams(UuidParamSchema),
   async (req, res, next) => {
     try {
+      await assertCanManageUser(req.user!.sub, req.params.id);
+      await assertNotLastSuperAdmin(req.params.id);
       await userService.softDeleteUser(req.params.id);
       await writeAuditLog({
         actorUserId: req.user!.sub,
@@ -407,6 +423,8 @@ router.patch(
   validateBody(UserStatusUpdateSchema),
   async (req, res, next) => {
     try {
+      await assertCanManageUser(req.user!.sub, req.params.id);
+      if (req.body.status !== 'active') await assertNotLastSuperAdmin(req.params.id);
       const user = await userService.setUserStatus(req.params.id, req.body.status);
       await writeAuditLog({
         actorUserId: req.user!.sub,
@@ -426,8 +444,11 @@ router.patch(
 router.post(
   '/users/:id/roles/:roleId',
   requirePermission('rbac.users', 'assign'),
+  validateParams(UserRoleParamsSchema),
   async (req, res, next) => {
     try {
+      await assertCanManageUser(req.user!.sub, req.params.id);
+      await assertCanAssignRole(req.user!.sub, req.params.roleId);
       await userService.assignRole(req.params.id, req.params.roleId);
       await writeAuditLog({
         actorUserId: req.user!.sub,
@@ -447,8 +468,11 @@ router.post(
 router.delete(
   '/users/:id/roles/:roleId',
   requirePermission('rbac.users', 'assign'),
+  validateParams(UserRoleParamsSchema),
   async (req, res, next) => {
     try {
+      await assertCanManageUser(req.user!.sub, req.params.id);
+      if (await assertCanAssignRole(req.user!.sub, req.params.roleId)) await assertNotLastSuperAdmin(req.params.id);
       await userService.unassignRole(req.params.id, req.params.roleId);
       await writeAuditLog({
         actorUserId: req.user!.sub,
@@ -471,6 +495,7 @@ router.post(
   validateParams(UuidParamSchema),
   async (req, res, next) => {
     try {
+      await assertCanManageUser(req.user!.sub, req.params.id);
       await userService.revokeAllSessionsForUser(req.params.id);
       await writeAuditLog({
         actorUserId: req.user!.sub,
@@ -492,6 +517,7 @@ router.post(
   validateParams(UuidParamSchema),
   async (req, res, next) => {
     try {
+      await assertCanManageUser(req.user!.sub, req.params.id);
       await userService.resetOtpForUser(req.params.id);
       await writeAuditLog({
         actorUserId: req.user!.sub,

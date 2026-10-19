@@ -1,4 +1,8 @@
 import { prisma } from '../lib/prisma';
+import { documentTypeList } from '../lib/document-number';
+import type { ReminderDelivery } from '../generated/prisma-client';
+import { REMINDER_COUNT } from './member-reminder-policy';
+import { REVIEW_FLAG_SUMMARY } from '../lib/member-messages';
 
 export async function getStatusHistory(memberId: string) {
   const rows = await prisma.memberStatusHistory.findMany({
@@ -24,14 +28,34 @@ export async function getStatusHistory(memberId: string) {
 }
 
 export interface ActivityItem {
-  kind: 'status' | 'document';
+  /** `detail` is the reason for status and document items, the documents asked for on reminders. */
+  kind: 'status' | 'document' | 'reminder' | 'review';
   at: Date;
   summary: string;
   detail: string | null;
 }
 
+const CHANNEL_NAME = { email: 'email', sms: 'SMS' } as const;
+
+function deliveredOn(emailStatus: ReminderDelivery | null, smsStatus: ReminderDelivery | null): string {
+  const channels = [emailStatus === 'SENT' && CHANNEL_NAME.email, smsStatus === 'SENT' && CHANNEL_NAME.sms].filter(Boolean);
+  return channels.join(' and ');
+}
+
+/** "Reminder 2 of 3 sent by email and SMS", "Manual reminder by Priya sent by email", "... could not be delivered". */
+export function reminderSummary(row: {
+  sequence: number | null;
+  emailStatus: ReminderDelivery | null;
+  smsStatus: ReminderDelivery | null;
+  senderName?: string | null;
+}): string {
+  const what = row.sequence === null ? `Manual reminder${row.senderName ? ` by ${row.senderName}` : ''}` : `Reminder ${row.sequence} of ${REMINDER_COUNT}`;
+  const on = deliveredOn(row.emailStatus, row.smsStatus);
+  return on ? `${what} sent by ${on}` : `${what} could not be delivered`;
+}
+
 export async function getMemberActivity(memberId: string): Promise<ActivityItem[]> {
-  const [history, docs] = await Promise.all([
+  const [history, docs, reminders, member] = await Promise.all([
     getStatusHistory(memberId),
     prisma.memberDocument.findMany({
       where: { vendorId: memberId },
@@ -44,7 +68,13 @@ export async function getMemberActivity(memberId: string): Promise<ActivityItem[
         uploadedOnBehalf: true,
       },
     }),
+    prisma.memberDocumentReminder.findMany({ where: { memberId }, orderBy: { createdAt: 'desc' }, take: 200 }),
+    prisma.member.findUnique({ where: { id: memberId }, select: { reviewFlaggedAt: true } }),
   ]);
+  const senderIds = [...new Set(reminders.map((r) => r.sentByUserId).filter((id): id is string => Boolean(id)))];
+  const senders =
+    senderIds.length > 0 ? await prisma.user.findMany({ where: { id: { in: senderIds } }, select: { id: true, name: true } }) : [];
+  const senderName = new Map(senders.map((u) => [u.id, u.name]));
 
   const items: ActivityItem[] = history.map((h) => ({
     kind: 'status',
@@ -68,6 +98,17 @@ export async function getMemberActivity(memberId: string): Promise<ActivityItem[
         detail: d.rejectionReason,
       });
     }
+  }
+  for (const r of reminders) {
+    items.push({
+      kind: 'reminder',
+      at: r.sentAt ?? r.updatedAt,
+      summary: reminderSummary({ ...r, senderName: r.sentByUserId ? senderName.get(r.sentByUserId) : null }),
+      detail: documentTypeList(r.missingTypes),
+    });
+  }
+  if (member?.reviewFlaggedAt) {
+    items.push({ kind: 'review', at: member.reviewFlaggedAt, summary: REVIEW_FLAG_SUMMARY, detail: null });
   }
   return items.sort((a, b) => b.at.getTime() - a.at.getTime());
 }

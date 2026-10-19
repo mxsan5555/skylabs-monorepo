@@ -1,7 +1,7 @@
 /* msd page band. Colour split: surface = 60 (page base), tint = 30 (surface-container);
    primary (10) stays on actions inside the band. 840px = M3 expanded window class. */
 .page-section {
-  padding-block: 32px;
+  padding-block: 60px;
 }
 .page-section--surface {
   background-color: var(--md-sys-color-surface);

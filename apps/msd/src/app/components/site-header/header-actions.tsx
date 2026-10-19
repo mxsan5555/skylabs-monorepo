@@ -63,7 +63,7 @@ export function HeaderActions() {
             positioning="popover"
             onClosed={() => setMenuOpen(false)}
           >
-            <MenuItem onClick={() => go('/my-dashboard')}>
+            <MenuItem onClick={() => go(accountPath)}>
               <Icon slot="start" aria-hidden="true">
                 person
               </Icon>

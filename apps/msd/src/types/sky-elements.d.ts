@@ -39,6 +39,13 @@ type SkyFeatureProps = SkySurface &
     'cta-href'?: string;
     'cta-icon'?: string;
     layout?: 'vertical' | 'horizontal';
+    /** Button role (CTA banners); default is the card's accent. */
+    ctaColor?: 'primary' | 'secondary' | 'tertiary' | 'inverse';
+    'cta-color'?: 'primary' | 'secondary' | 'tertiary' | 'inverse';
+    /** Leading media; without alt text the image is decorative. */
+    image?: string;
+    imageAlt?: string;
+    'image-alt'?: string;
   };
 
 declare module 'react' {
@@ -49,6 +56,8 @@ declare module 'react' {
       'sky-badge': SkyEl<{
         variant?: 'primary' | 'secondary' | 'tertiary' | 'error' | string;
         size?: 'small' | 'medium' | 'large' | string;
+        /** Tonal status chip; replaces `variant`. */
+        status?: 'success' | 'warning' | 'error' | 'info' | 'neutral';
       }>;
 
       // ── sky-card ───────────────────────────────────────────────────────────
@@ -62,13 +71,23 @@ declare module 'react' {
         imageAlt?: string;
         gallery?: string[];
         variant?: 'plain' | 'outlined';
+        /** M3 colour role (same vocabulary as sky-feature-card); unset keeps the default look. */
+        color?: 'none' | 'surface' | 'surface-high' | 'primary' | 'secondary' | 'tertiary' | 'inverse';
         badge?: string;
+        /** Theme role for the badge (sky-badge variant); unset keeps the default primary pill. */
+        badgeColor?: 'primary' | 'secondary' | 'tertiary' | 'error';
+        /** `tonal`: the role's container colours (default: filled). */
+        badgeTone?: 'filled' | 'tonal';
         favorite?: boolean;
         favoriteActive?: boolean;
         tag?: string;
         tagIcon?: string;
         eyebrow?: string;
         heading?: string;
+        /** Supporting text under the heading. */
+        description?: string;
+        /** Offer order: price + rating row first, member and location after the text. */
+        priceFirst?: boolean;
         location?: string;
         distance?: string;
         rating?: number;

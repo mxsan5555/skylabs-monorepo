@@ -60,7 +60,8 @@ export function ProductCardGallery({
         }}
         slides-per-view="1"
         grab-cursor="true"
-        loop={hasMultipleImages ? 'true' : 'false'}
+        // Swiper reads any attribute string (even "false") as on, so set loop only when it applies.
+        {...(hasMultipleImages ? { loop: 'true' } : {})}
       >
         {images.map((image, index) => (
           <swiper-slide key={`${image}-${index}`}>

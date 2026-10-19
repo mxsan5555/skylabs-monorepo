@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma';
-import { deleteMediaFile, writeMediaFile } from '../lib/media-storage';
+import { deleteMediaFile, signedFileUrl, writeMediaFile } from '../lib/media-storage';
+import { bucketForKey, storageFolder } from '../lib/storage-layout';
 import { validateMediaFile } from './media-validation.service';
 import { ApiError } from '../lib/http';
 import { Prisma } from '../generated/prisma-client';
@@ -13,7 +14,6 @@ import { encryptField, hashDocumentNumber } from '../lib/field-crypto';
 import { REASON_MAX, REASON_MIN } from './member-status-machine';
 import type { MediaFile } from './media.service';
 
-const STORAGE_SUBDIR = 'vendor-documents';
 export const REQUIRED_DOCUMENT_TYPES: readonly DocumentTypeKey[] = ['AADHAAR', 'PAN', 'GST'];
 const PROVIDED_STATUSES = ['SUBMITTED', 'APPROVED'];
 const NUMBER_IN_USE_MESSAGE = 'This document number already belongs to another member.';
@@ -48,7 +48,7 @@ type DocumentRow = Pick<Prisma.MemberDocumentGetPayload<Record<string, never>>, 
  * `includeFiles` is true (viewers with members:edit or members:approve, or the member itself),
  * and so is the masked number. Support and Marketing see the type and the status only.
  */
-export function toDocumentView(row: DocumentRow, opts: { includeFiles: boolean }) {
+export async function toDocumentView(row: DocumentRow, opts: { includeFiles: boolean }) {
   return {
     id: row.id,
     documentType: row.documentType,
@@ -61,14 +61,20 @@ export function toDocumentView(row: DocumentRow, opts: { includeFiles: boolean }
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     ...(opts.includeFiles
-      ? { numberMasked: row.numberMasked, storageKey: row.storageKey, originalFilename: row.originalFilename, mimeType: row.mimeType, sizeBytes: row.sizeBytes }
+      ? {
+          numberMasked: row.numberMasked,
+          fileUrl: row.storageKey ? await signedFileUrl(row.storageKey, bucketForKey(row.storageKey)) : null,
+          originalFilename: row.originalFilename,
+          mimeType: row.mimeType,
+          sizeBytes: row.sizeBytes,
+        }
       : {}),
   };
 }
 
 export async function listMemberDocuments(memberId: string, opts: { includeFiles: boolean }) {
   const rows = await prisma.memberDocument.findMany({ where: { vendorId: memberId }, orderBy: { documentType: 'asc' } });
-  return rows.map((row) => toDocumentView(row, opts));
+  return Promise.all(rows.map((row) => toDocumentView(row, opts)));
 }
 
 export interface UploadInput {
@@ -128,7 +134,12 @@ export async function uploadMemberDocument(input: UploadInput) {
   const existing = await prisma.memberDocument.findUnique({
     where: { vendorId_documentType: { vendorId: memberId, documentType } },
   });
-  const { storageKey, sizeBytes } = await writeMediaFile(STORAGE_SUBDIR, memberId, input.file.buffer, validated.extension);
+  const { storageKey, sizeBytes } = await writeMediaFile(
+    storageFolder.memberDocuments(memberId),
+    input.file.buffer,
+    validated.extension,
+    'private',
+  );
 
   const fileFields = {
     storageKey,
@@ -149,7 +160,7 @@ export async function uploadMemberDocument(input: UploadInput) {
     });
   } catch (err) {
     // The DB never got the new storageKey, so the just-written file is orphaned and safe to remove.
-    await deleteMediaFile(storageKey);
+    await deleteMediaFile(storageKey, 'private');
     // A concurrent upload of the same number lost the race on [documentType, numberHash].
     if (isNumberHashConflict(err)) throw new ApiError('DOCUMENT_NUMBER_IN_USE', NUMBER_IN_USE_MESSAGE);
     throw err;
@@ -158,7 +169,7 @@ export async function uploadMemberDocument(input: UploadInput) {
   // The upsert committed. Failing to delete the old file must not roll back the new pointer.
   if (existing) {
     try {
-      await deleteMediaFile(existing.storageKey);
+      await deleteMediaFile(existing.storageKey, bucketForKey(existing.storageKey));
     } catch (err) {
       console.error({ err, context: 'uploadMemberDocument: failed to delete old file', memberId, documentType });
     }
@@ -175,7 +186,7 @@ export async function deleteMemberDocument(memberId: string, documentType: Docum
     throw new ApiError('CONFLICT', 'An approved document cannot be removed. Upload a new file to replace it.');
   }
   await prisma.memberDocument.delete({ where: { id: existing.id } });
-  await deleteMediaFile(existing.storageKey);
+  await deleteMediaFile(existing.storageKey, bucketForKey(existing.storageKey));
 }
 
 export interface ReviewInput {

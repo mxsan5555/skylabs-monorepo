@@ -110,15 +110,160 @@ input[type='checkbox'] {
   flex-wrap: wrap;
 }
 
+/* Dashboard (dashboard.tsx, dashboard-groups.tsx). Mobile first: one column, then from 900px
+   two rows of two columns: Members | Customers, then Admin | Quick actions.
+   Stat cards fill each column at 200px minimum, so wide screens fit 3 across. */
 .dashboard-page {
-  gap: 24px;
+  gap: 40px;
+}
+
+.dashboard-page .page-head {
+  margin-bottom: 0;
+}
+
+.dashboard-group h2 {
+  margin: 0 0 16px;
+  color: var(--md-sys-color-on-surface);
+}
+
+.dashboard-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 40px 32px;
+  align-items: start;
+}
+
+.dashboard-stats,
+.dashboard-links {
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .dashboard-stats {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 16px;
-  width: 100%;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+  gap: 12px;
+}
+
+/* One outline for stat cards and link lists. */
+.dashboard-stat,
+.dashboard-links {
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-large);
+  background-color: var(--md-sys-color-surface);
+}
+
+.dashboard-stat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+
+/* The whole card is the link: hover tint and focus ring sit on the card itself. */
+a.dashboard-stat:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--md-sys-color-on-surface) calc(var(--md-sys-state-hover-state-layer-opacity) * 100%),
+    transparent
+  );
+}
+
+a.dashboard-stat:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
+.dashboard-stat__text {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.dashboard-stat__value,
+.dashboard-stat__label {
+  margin: 0;
+}
+
+.dashboard-stat__value {
+  color: var(--md-sys-color-on-surface);
+}
+
+.dashboard-stat__label {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* 40px tiles: the icon badge and the arrow (decorative; the whole card is the link). */
+.dashboard-stat__icon,
+.dashboard-stat__go {
+  display: grid;
+  place-items: center;
+  flex: none;
+  inline-size: 40px;
+  block-size: 40px;
+}
+
+.dashboard-stat__icon {
+  border-radius: var(--md-sys-shape-corner-medium);
+  background-color: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+.dashboard-stat__go {
+  border-radius: var(--md-sys-shape-corner-full);
+}
+
+.dashboard-links {
+  overflow: hidden;
+}
+
+.dashboard-links li + li {
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.dashboard-links a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-block-size: 52px;
+  padding: 0 16px;
+  color: var(--md-sys-color-on-surface);
+  text-decoration: none;
+}
+
+.dashboard-links__go {
+  margin-inline-start: auto;
+}
+
+.dashboard-stat__go,
+.dashboard-links__go {
+  color: var(--md-sys-color-primary);
+}
+
+.dashboard-links a:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--md-sys-color-on-surface) calc(var(--md-sys-state-hover-state-layer-opacity) * 100%),
+    transparent
+  );
+}
+
+.dashboard-links a:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
+/* The list clips overflow, so its focus ring sits inside the row. */
+.dashboard-links a:focus-visible {
+  outline-offset: -2px;
+}
+
+@media (min-width: 900px) {
+  .dashboard-pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .two-pane {
@@ -774,17 +919,9 @@ input[type='checkbox'] {
   .summary-layout {
     grid-template-columns: 1fr;
   }
-
-  .dashboard-stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
 }
 
 @media (max-width: 600px) {
-  .dashboard-stats {
-    grid-template-columns: 2fr;
-  }
    .form-actions {
     flex-direction: column-reverse;
     align-items: stretch;

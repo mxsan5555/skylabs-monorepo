@@ -6,8 +6,15 @@ vi.mock('../lib/prisma', async () => {
   return { prisma: createPrismaMock() };
 });
 vi.mock('../services/permission-resolver.service', () => ({ resolveGrantedPermissionKeys: vi.fn() }));
-vi.mock('../services/member-notice.service', () => ({
+// Signed links need no R2 credentials in tests.
+vi.mock('../lib/media-storage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/media-storage')>()),
+  signedFileUrl: vi.fn(async (key: string) => `https://signed.example/${key}`),
+}));
+vi.mock('../services/member-notice.service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../services/member-notice.service')>()),
   sendMemberNotice: vi.fn().mockResolvedValue({ email: true, sms: true }),
+  sendOnChannel: vi.fn().mockResolvedValue(true),
 }));
 
 import { prisma } from '../lib/prisma';
@@ -141,6 +148,31 @@ describe('POST /api/v1/members', () => {
     );
   });
 
+  it('reviewFlag=true lists only flagged members', async () => {
+    grants.mockResolvedValue(['members:view']);
+    prismaMock.member.findMany.mockResolvedValue([]);
+    prismaMock.member.count.mockResolvedValue(0);
+    const res = await request(app).get('/api/v1/members?reviewFlag=true').set('Authorization', ADMIN);
+    expect(res.status).toBe(200);
+    const { where } = prismaMock.member.findMany.mock.calls[0][0];
+    expect(where).toMatchObject({ reviewFlaggedAt: { not: null } });
+    expect(where).not.toHaveProperty('status');
+  });
+
+  it('422 for a reviewFlag value other than true', async () => {
+    grants.mockResolvedValue(['members:view']);
+    const res = await request(app).get('/api/v1/members?reviewFlag=false').set('Authorization', ADMIN);
+    expect(res.status).toBe(422);
+  });
+
+  it('returns reviewFlaggedAt on the member so the detail page can show the badge', async () => {
+    grants.mockResolvedValue(['members:view']);
+    prismaMock.member.findUnique.mockResolvedValue({ ...MEMBER_ROW, reviewFlaggedAt: new Date('2026-10-14T00:00:00Z') });
+    const res = await request(app).get(`/api/v1/members/${MEMBER_ID}`).set('Authorization', ADMIN);
+    expect(res.status).toBe(200);
+    expect(res.body.data.reviewFlaggedAt).toBe('2026-10-14T00:00:00.000Z');
+  });
+
   it('422 for a sort field outside the allowlist', async () => {
     grants.mockResolvedValue(['members:view']);
     const res = await request(app).get('/api/v1/members?sort=ownerMobile').set('Authorization', ADMIN);
@@ -254,7 +286,9 @@ describe('GET /api/v1/members/:id/documents', () => {
     prismaMock.memberDocument.findMany.mockResolvedValue([row]);
     const res = await request(app).get(`/api/v1/members/${MEMBER_ID}/documents`).set('Authorization', ADMIN);
     expect(res.status).toBe(200);
-    expect(res.body.data[0].storageKey).toBe(row.storageKey);
+    // An expiring signed link, never the object key (P5-14).
+    expect(res.body.data[0].fileUrl).toBe(`https://signed.example/${row.storageKey}`);
+    expect(res.body.data[0]).not.toHaveProperty('storageKey');
     expect(res.body.data[0]).not.toHaveProperty('numberEncrypted');
   });
 });
@@ -470,5 +504,45 @@ describe('legacy /vendors alias', () => {
     expect(prismaMock.member.findUnique).toHaveBeenCalledWith(
       expect.objectContaining({ where: { ownerUserId: OWNER_ID } }),
     );
+  });
+});
+
+describe('POST /api/v1/members/:id/documents/reminders', () => {
+  const path = `/api/v1/members/${MEMBER_ID}/documents/reminders`;
+
+  beforeEach(() => {
+    prismaMock.member.findUnique.mockResolvedValue({ ...MEMBER_ROW, documentsDueAt: new Date('2026-10-15T00:00:00Z'), reviewFlaggedAt: null });
+    prismaMock.memberDocumentReminder.findFirst.mockResolvedValue(null);
+    prismaMock.memberDocumentReminder.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({ id: 'rm1', sentAt: null, ...data }));
+    prismaMock.memberDocumentReminder.update.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({ id: 'rm1', ...data }));
+  });
+
+  it('403 without members:status_change', async () => {
+    grants.mockResolvedValue(['members:view', 'members:edit']);
+    const res = await request(app).post(path).set('Authorization', ADMIN);
+    expect(res.status).toBe(403);
+    expect(prismaMock.memberDocumentReminder.create).not.toHaveBeenCalled();
+  });
+
+  it('201 sends the reminder and returns the result per channel', async () => {
+    grants.mockResolvedValue(['members:status_change']);
+    const res = await request(app).post(path).set('Authorization', ADMIN);
+    expect(res.status).toBe(201);
+    expect(res.body.data).toMatchObject({ emailStatus: 'SENT', smsStatus: 'SENT' });
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith({ data: expect.objectContaining({ action: 'member.reminder.sent', actorUserId: 'admin-1' }) });
+  });
+
+  it('429 for a second reminder inside the cooldown', async () => {
+    grants.mockResolvedValue(['members:status_change']);
+    prismaMock.memberDocumentReminder.findFirst.mockResolvedValue({ createdAt: new Date() });
+    const res = await request(app).post(path).set('Authorization', ADMIN);
+    expect(res.status).toBe(429);
+  });
+
+  it('409 for a suspended member', async () => {
+    grants.mockResolvedValue(['members:status_change']);
+    prismaMock.member.findUnique.mockResolvedValue({ ...MEMBER_ROW, status: 'SUSPENDED', documentsDueAt: null, reviewFlaggedAt: null });
+    const res = await request(app).post(path).set('Authorization', ADMIN);
+    expect(res.status).toBe(409);
   });
 });

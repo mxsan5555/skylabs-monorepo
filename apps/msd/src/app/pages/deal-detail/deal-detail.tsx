@@ -1,3 +1,4 @@
+import { JsonLd } from '../../seo/json-ld';
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { DealCard, type DealCardDeal } from '../../components/deal-card';
@@ -24,6 +25,7 @@ import { formatINR, formatTime12h } from '../../../utils/format';
 import { resolveDealMedia } from '../../../utils/media';
 import content from '../../../content.json';
 import './deal-detail.css';
+import { BannerSlot } from '../../components/banner-slot/banner-slot';
 
 const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
 
@@ -227,10 +229,8 @@ showSnackbar(`Added "${deal.title}" to your cart.`, {
         name="description"
         content={`${description || `Book ${name} at MSD.`} ${formatINR(salePrice)}${deal.branch?.city ? ` in ${deal.branch.city}` : ''}.`}
       />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+      <JsonLd
+        data={{
             '@context': 'https://schema.org', '@type': 'Service',
             name,
             description,
@@ -241,8 +241,7 @@ showSnackbar(`Added "${deal.title}" to your cart.`, {
               priceCurrency: 'INR',
               availability: 'https://schema.org/InStock',
             },
-          }),
-        }}
+          }}
       />
       <Breadcrumb
         className="deal-detail__breadcrumb"
@@ -522,6 +521,7 @@ showSnackbar(`Added "${deal.title}" to your cart.`, {
           </div>
         </section>
       )}
+      <BannerSlot slot="DEAL_BOTTOM" />
     </div>
   );
 }

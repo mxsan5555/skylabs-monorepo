@@ -73,3 +73,14 @@ describe('MemberActivityTab', () => {
     await waitFor(() => expect(activityMock).toHaveBeenCalledTimes(2));
   });
 });
+
+describe('MemberActivityTab reminders', () => {
+  it('labels a reminder detail as the documents asked for', async () => {
+    activityMock.mockResolvedValue({
+      data: [{ kind: 'reminder', at: '2026-10-15T04:30:00.000Z', summary: 'Reminder 1 of 3 sent by email', detail: 'PAN card, GST number' }],
+    });
+    render(<MemberActivityTab token="t" memberId="m1" refreshKey={0} />);
+    expect(await screen.findByText('Reminder 1 of 3 sent by email')).toBeTruthy();
+    expect(screen.getByText('Documents asked for: PAN card, GST number')).toBeTruthy();
+  });
+});

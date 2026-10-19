@@ -1,6 +1,7 @@
 import { apiGet } from './rbac/client';
 import type { MediaImage, MediaVideo } from './media';
 import type { BlogBlock } from '../types';
+import type { BannerColorRole, BannerSlot } from './rbac/promotions';
 
 /**
  * Public, unauthenticated customer catalogue client — mirrors msd-api's `/catalog/*` routes.
@@ -204,34 +205,32 @@ export function listCatalogPopularTreatments() {
   return apiGet<CatalogPopularTreatmentGroup[]>('/catalog/popular-treatments', null);
 }
 
-/** One active Home page promotion card — server-filtered to `isActive` + within its (optional)
- *  visibility window (see msd-api's `promotion.service.ts#getPublicPromotions`). `image` is a raw
- *  `storageKey` (or `null`) — pass it through `resolveMediaUrl` from `api/media.ts` before
- *  rendering, same as every other media-backed entity. */
-export interface CatalogPromotion {
+/** One CTA banner for a slot (docs/msd/PLANNING.md §6): the visitor's state's banners, else the
+ *  Global/Default ones (msd-api `promotion.service.ts#getPublicBanners`). `image` is a raw
+ *  `storageKey` (or `null`) — pass it through `resolveMediaUrl` from `api/media.ts`. `href` is an
+ *  in-app path built by the server. */
+export interface CatalogBanner {
   id: string;
   title: string;
   description: string | null;
   buttonLabel: string | null;
-  destinationType: 'ROUTE' | 'CATEGORY' | 'DEAL';
-  destinationRoute: string | null;
-  category: { id: string; name: string; slug: string } | null;
-  deal: { id: string; title: string; slug: string } | null;
+  backgroundRole: BannerColorRole;
+  buttonRole: BannerColorRole;
+  href: string;
   image: string | null;
 }
 
-export function listCatalogPromotions() {
-  return apiGet<CatalogPromotion[]>('/catalog/promotions', null);
+export function listCatalogBanners(slot: BannerSlot, state?: string | null) {
+  const qs = new URLSearchParams({ slot, ...(state ? { state } : {}) });
+  return apiGet<CatalogBanner[]>(`/catalog/banners?${qs}`, null);
 }
 
-/** Public Home Hero Deal slider — `state: null` means the Global/Default slider served (either
- *  because the requested state has no publishable slider of its own yet, or none was requested).
- *  `slides` is empty when even the Global/Default slider isn't publishable yet (fewer than 5
- *  eligible Deals) — the frontend degrades gracefully, never crashes on an empty list. */
-export interface CatalogHomeHeroSlide {
-  id: string;
-  deal: CatalogDeal;
-}
+/** Public Home Hero slider of deals and products — `state: null` means the Global/Default slider
+ *  served (the requested state has no publishable slider yet, or none was requested). `slides` is
+ *  empty when even the Global/Default slider isn't publishable (fewer than 5 eligible items). */
+export type CatalogHomeHeroSlide =
+  | { id: string; type: 'deal'; deal: CatalogDeal }
+  | { id: string; type: 'product'; product: CatalogProduct };
 
 export interface CatalogHomeHero {
   state: string | null;

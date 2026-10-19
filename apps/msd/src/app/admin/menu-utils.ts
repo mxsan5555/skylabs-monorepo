@@ -12,3 +12,11 @@ export function findMenuNodeByRoute(menu: MenuNode[], pathname: string): MenuNod
   }
   return undefined;
 }
+
+/** True when any route under `node` (at any depth) is the current page or one of its sub-pages. */
+export function menuContainsRoute(node: MenuNode, pathname: string): boolean {
+  return Boolean(
+    (node.route && pathname.startsWith(node.route)) ||
+      node.children?.some((child) => menuContainsRoute(child, pathname)),
+  );
+}

@@ -8,8 +8,10 @@ export type ErrorCode =
   | 'VALIDATION_ERROR'
   | 'RATE_LIMITED'
   | 'SERVER_ERROR'
+  | 'SERVICE_UNAVAILABLE'
   | 'CONFLICT'
   | 'BAD_REQUEST'
+  | 'PAYLOAD_TOO_LARGE'
   | 'MEMBER_SUSPENDED'
   | 'MEMBER_INACTIVE_READ_ONLY'
   | 'MEMBER_NOT_SUSPENDED'
@@ -23,11 +25,13 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   MEMBER_INACTIVE_READ_ONLY: 403,
   NOT_FOUND: 404,
   CONFLICT: 409,
+  PAYLOAD_TOO_LARGE: 413,
   MEMBER_NOT_SUSPENDED: 409,
   DOCUMENT_NUMBER_IN_USE: 409,
   VALIDATION_ERROR: 422,
   RATE_LIMITED: 429,
   SERVER_ERROR: 500,
+  SERVICE_UNAVAILABLE: 503,
 };
 
 /** Thrown from services/routes; caught by middleware/errorHandler.ts and translated to the envelope. */

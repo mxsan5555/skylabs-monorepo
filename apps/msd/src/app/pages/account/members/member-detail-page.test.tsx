@@ -5,10 +5,13 @@ import type { Vendor } from '../../../../api/rbac/vendors';
 import { BreadcrumbProvider } from '../../../admin/breadcrumb-context';
 import { SnackbarHost } from '../../../../snackbar/snackbar';
 import { MemberDetailPage } from './member-detail-page';
+import { REVIEW_FLAG_LABEL, REVIEW_FLAG_REASON, REVIEW_FLAG_TONE } from './member-status';
+import { ApiRequestError } from '../../../../api/rbac/client';
 
 const getMemberMock = vi.fn();
 const changeStatusMock = vi.fn();
 const deleteMemberMock = vi.fn();
+const sendReminderMock = vi.fn();
 const useAuthMock = vi.fn();
 const headerProps = vi.fn();
 const documentsProps = vi.fn();
@@ -20,6 +23,7 @@ vi.mock('../../../../api/rbac/members', () => ({
   getMember: (...a: unknown[]) => getMemberMock(...a),
   changeMemberStatus: (...a: unknown[]) => changeStatusMock(...a),
   deleteMember: (...a: unknown[]) => deleteMemberMock(...a),
+  sendMemberReminder: (...a: unknown[]) => sendReminderMock(...a),
 }));
 vi.mock('./branches-list-page', () => ({ BranchesListPage: () => <p>branches-tab</p> }));
 vi.mock('./deals-list-page', () => ({ DealsListPage: () => <p>deals-tab</p> }));
@@ -185,15 +189,23 @@ describe('MemberDetailPage', () => {
   it('shows the review badge and prefills the suspend reason only when flagged', async () => {
     getMemberMock.mockResolvedValue({ data: { ...MEMBER, reviewFlaggedAt: '2026-10-14T00:00:00Z' } });
     renderAt('/account/members/m1');
-    await waitFor(() => expect(screen.getByText('Ready for suspension review')).toBeTruthy());
-    expect(headerProps).toHaveBeenLastCalledWith(expect.objectContaining({ reasonPrefill: 'Documents not completed' }));
+    const badge = await screen.findByText(REVIEW_FLAG_LABEL);
+    expect(badge.closest('sky-badge')?.getAttribute('status')).toBe(REVIEW_FLAG_TONE);
+    expect(headerProps).toHaveBeenLastCalledWith(expect.objectContaining({ reasonPrefill: REVIEW_FLAG_REASON }));
   });
 
   it('passes no reason prefill when the member is not flagged', async () => {
     renderAt('/account/members/m1');
     await waitFor(() => expect(headerProps).toHaveBeenCalled());
-    expect(screen.queryByText('Ready for suspension review')).toBeNull();
+    expect(screen.queryByText(REVIEW_FLAG_LABEL)).toBeNull();
     expect(headerProps).toHaveBeenLastCalledWith(expect.objectContaining({ reasonPrefill: '' }));
+  });
+
+  it('drops the review badge once the flagged member is suspended', async () => {
+    getMemberMock.mockResolvedValue({ data: { ...MEMBER, status: 'SUSPENDED', reviewFlaggedAt: '2026-10-14T00:00:00Z' } });
+    renderAt('/account/members/m1');
+    await waitFor(() => expect(headerProps).toHaveBeenCalled());
+    expect(screen.queryByText(REVIEW_FLAG_LABEL)).toBeNull();
   });
 
   it('refetches the member and bumps the activity key after a status change', async () => {
@@ -243,5 +255,51 @@ describe('MemberDetailPage', () => {
     getMemberMock.mockRejectedValue(new Error('boom'));
     renderAt('/account/members/m1');
     expect((await screen.findByRole('alert')).textContent).toMatch(/Could not load this member/);
+  });
+});
+
+describe('MemberDetailPage Remind now', () => {
+  type HeaderProps = { onRemind?: () => Promise<void> };
+  const lastHeader = () => headerProps.mock.lastCall?.[0] as HeaderProps;
+  const asStaff = (granted: string[]) =>
+    useAuthMock.mockReturnValue({ token: 't', can: (key: string, action: string) => key === 'members' && granted.includes(action) });
+
+  it('offers Remind now to members:status_change while documents are incomplete', async () => {
+    asStaff(['view', 'status_change']);
+    renderAt('/account/members/m1');
+    await waitFor(() => expect(lastHeader()?.onRemind).toBeTypeOf('function'));
+  });
+
+  it.each([
+    ['without members:status_change', ['view'], MEMBER],
+    ['once documents are complete', ['view', 'status_change'], { ...MEMBER, documentsSummary: { complete: true, missing: [], rejected: [], dueAt: null, overdue: false } }],
+    ['for a suspended member', ['view', 'status_change'], { ...MEMBER, status: 'SUSPENDED' }],
+  ])('hides Remind now %s', async (_label, granted, found) => {
+    asStaff(granted as string[]);
+    getMemberMock.mockResolvedValue({ data: found });
+    renderAt('/account/members/m1');
+    await waitFor(() => expect(headerProps).toHaveBeenCalled());
+    expect(lastHeader()).not.toHaveProperty('onRemind');
+  });
+
+  it('sends the reminder, shows what reached the member and refreshes Activity', async () => {
+    asStaff(['view', 'status_change']);
+    sendReminderMock.mockResolvedValue({ data: { emailStatus: 'SENT', smsStatus: 'SENT', sentAt: '2026-10-17T04:30:00Z' } });
+    renderAt('/account/members/m1/activity');
+    await waitFor(() => expect(lastHeader()?.onRemind).toBeTypeOf('function'));
+    const before = activityProps.mock.lastCall?.[0].refreshKey;
+    await lastHeader().onRemind?.();
+    expect(sendReminderMock).toHaveBeenCalledWith('t', 'm1');
+    expect(await screen.findByText('Reminder sent by email and SMS.')).toBeTruthy();
+    await waitFor(() => expect(activityProps.mock.lastCall?.[0].refreshKey).toBe(before + 1));
+  });
+
+  it('shows the server reason when the reminder is refused', async () => {
+    asStaff(['view', 'status_change']);
+    sendReminderMock.mockRejectedValue(new ApiRequestError('RATE_LIMITED', 'A reminder already went to this member in the last 24 hours.', 429));
+    renderAt('/account/members/m1');
+    await waitFor(() => expect(lastHeader()?.onRemind).toBeTypeOf('function'));
+    await lastHeader().onRemind?.();
+    expect(await screen.findByText('A reminder already went to this member in the last 24 hours.')).toBeTruthy();
   });
 });
