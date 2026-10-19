@@ -1,3 +1,4 @@
+import { JsonLd } from '../../seo/json-ld';
 import {
   useEffect,
   useMemo,
@@ -357,11 +358,8 @@ export function ProductListing() {
 
       {/* Breadcrumb structured data */}
 
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html:
-            JSON.stringify({
+      <JsonLd
+        data={{
               '@context':
                 'https://schema.org',
 
@@ -390,19 +388,15 @@ export function ProductListing() {
                   item: `${SITE_URL}/products`,
                 },
               ],
-            }),
-        }}
+            }}
       />
 
       {/* Product list structured data */}
 
       {sortedProducts.length >
         0 && (
-          <script
-            type="application/ld+json"
-            dangerouslySetInnerHTML={{
-              __html:
-                JSON.stringify({
+          <JsonLd
+            data={{
                   '@context':
                     'https://schema.org',
 
@@ -436,8 +430,7 @@ export function ProductListing() {
                         url: `${SITE_URL}/products/${product.id}`,
                       }),
                     ),
-                }),
-            }}
+                }}
           />
         )}
 

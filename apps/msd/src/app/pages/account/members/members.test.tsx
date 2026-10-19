@@ -1,7 +1,9 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemberManagement } from './members';
+import { listMembers } from '../../../../api/rbac/members';
+import { FILTER_OPTIONS, type MemberTableParams } from './member-list';
 
 const useAuthMock = vi.fn();
 const getMyVendorMock = vi.fn();
@@ -18,7 +20,14 @@ vi.mock('./vendor-profile-form', () => ({
   extractVendorFieldErrors: () => null,
 }));
 vi.mock('./vendor-branches', () => ({ VendorBranches: () => <p>branches</p> }));
-vi.mock('./member-list', () => ({ MemberList: () => <p>member-list</p> }));
+const memberListProps = vi.fn();
+vi.mock('./member-list', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./member-list')>()),
+  MemberList: (props: unknown) => {
+    memberListProps(props);
+    return <p>member-list</p>;
+  },
+}));
 
 function Where() {
   const { pathname, search } = useLocation();
@@ -89,5 +98,43 @@ describe('MemberManagement self service', () => {
     asMember(undefined);
     renderAt('/account/members');
     await waitFor(() => expect(screen.getByText('profile-form canEdit=true')).toBeTruthy());
+  });
+});
+
+describe('MemberManagement list filter', () => {
+  beforeEach(() => {
+    useAuthMock.mockReturnValue({ token: 't', can: (key: string, action: string) => key === 'members' && action === 'view' });
+  });
+
+  /** The only list-query keys a filter choice may set. */
+  const FILTER_KEYS = ['status', 'documents', 'reviewFlag'] as const;
+
+  /** Picks the filter value in the (mocked) table and returns the filter keys of the next list call. */
+  async function queryFor(filter: string) {
+    renderAt('/account/members');
+    await waitFor(() => expect(listMembers).toHaveBeenCalled());
+    const { onParamsChange } = memberListProps.mock.lastCall?.[0] as { onParamsChange: (p: MemberTableParams) => void };
+    vi.mocked(listMembers).mockClear();
+    act(() => onParamsChange({ page: 1, pageSize: 10, search: '', filter, dir: 'asc' }));
+    await waitFor(() => expect(listMembers).toHaveBeenCalled());
+    const query = vi.mocked(listMembers).mock.lastCall?.[1] ?? {};
+    return Object.fromEntries(FILTER_KEYS.filter((key) => query[key] !== undefined).map((key) => [key, query[key]]));
+  }
+
+  it.each([
+    ['ACTIVE', { status: 'ACTIVE' }],
+    ['INACTIVE', { status: 'INACTIVE' }],
+    ['SUSPENDED', { status: 'SUSPENDED' }],
+    ['documents', { documents: 'incomplete' }],
+    ['review', { reviewFlag: 'true' }],
+    ['', {}],
+  ])('filter "%s" sends %o', async (filter, expected) => {
+    expect(await queryFor(filter)).toEqual(expected);
+  });
+
+  it('maps every option in the Filter select to exactly one list filter', async () => {
+    for (const option of FILTER_OPTIONS) {
+      expect(Object.keys(await queryFor(option.value))).toHaveLength(1);
+    }
   });
 });

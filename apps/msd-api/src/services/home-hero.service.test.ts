@@ -6,7 +6,15 @@ vi.mock('../lib/prisma', async () => {
 });
 
 import { prisma } from '../lib/prisma';
-import { getPublicHomeHero, countEligibleSlides, MIN_ELIGIBLE_SLIDES } from './home-hero.service';
+import {
+  getPublicHomeHero,
+  countEligibleSlides,
+  createSlide,
+  ineligibleReason,
+  listSliderOverview,
+  reorderSlides,
+  MIN_ELIGIBLE_SLIDES,
+} from './home-hero.service';
 
 const prismaMock = vi.mocked(prisma, true);
 
@@ -71,13 +79,25 @@ describe('getPublicHomeHero — publish gate + fallback', () => {
     expect(prismaMock.homeHeroSlide.findMany).toHaveBeenCalledTimes(1);
   });
 
-  it('every query includes the eligibility filter (isActive + VISIBLE_DEAL_WHERE on the linked deal) — never trusts a caller override', async () => {
+  it('every query includes the eligibility filter (an active deal or an active product) — never trusts a caller override', async () => {
     prismaMock.homeHeroSlide.findMany.mockResolvedValueOnce(slideRows(5, 'up'));
     await getPublicHomeHero('Uttar Pradesh');
     const call = prismaMock.homeHeroSlide.findMany.mock.calls[0][0];
     expect(call.where.isActive).toBe(true);
-    expect(call.where.deal.is.status).toBe('ACTIVE');
-    expect(call.where.deal.is.approvalStatus).toBe('APPROVED');
+    const [dealBranch, productBranch] = call.where.OR;
+    expect(dealBranch.deal.is.status).toBe('ACTIVE');
+    expect(dealBranch.deal.is.approvalStatus).toBe('APPROVED');
+    expect(productBranch.product.is.isActive).toBe(true);
+  });
+
+  it('returns deal and product slides with their type', async () => {
+    prismaMock.homeHeroSlide.findMany.mockResolvedValueOnce([
+      ...slideRows(4, 'd').map((s) => ({ ...s, product: null })),
+      { id: 'p0', sortOrder: 9, deal: null, product: { id: 'prod-1', name: 'Massage Oil' } },
+    ]);
+    const result = await getPublicHomeHero('Uttar Pradesh');
+    expect(result.slides.map((s) => s.type)).toEqual(['deal', 'deal', 'deal', 'deal', 'product']);
+    expect(result.slides[4]).toEqual({ id: 'p0', type: 'product', product: { id: 'prod-1', name: 'Massage Oil' } });
   });
 });
 
@@ -96,5 +116,99 @@ describe('countEligibleSlides', () => {
     await countEligibleSlides(null);
     const call = prismaMock.homeHeroSlide.findMany.mock.calls[0][0];
     expect(call.where.state).toBeNull();
+  });
+});
+
+describe('createSlide (PLANNING §7)', () => {
+  const PRODUCT_ID = 'a1a1a1a1-0000-4000-8000-000000000001';
+
+  it('adds a product slide when the product belongs to the state', async () => {
+    prismaMock.product.findFirst.mockResolvedValue({ id: PRODUCT_ID } as never);
+    prismaMock.homeHeroSlide.findFirst.mockResolvedValue(null);
+    prismaMock.homeHeroSlide.create.mockResolvedValue({ id: 's1', productId: PRODUCT_ID, deal: null, product: { isActive: true, vendor: { status: 'ACTIVE' } } } as never);
+    await createSlide({ itemType: 'product', itemId: PRODUCT_ID, state: 'Uttar Pradesh', sortOrder: 0 });
+    expect(prismaMock.product.findFirst.mock.calls[0][0]!.where).toMatchObject({
+      id: PRODUCT_ID,
+      vendor: { is: { branches: { some: { state: 'Uttar Pradesh', isActive: true } } } },
+    });
+    expect(prismaMock.homeHeroSlide.create.mock.calls[0][0].data).toMatchObject({ productId: PRODUCT_ID, dealId: null, state: 'Uttar Pradesh' });
+  });
+
+  it('refuses an item from another state with 422', async () => {
+    prismaMock.deal.findFirst.mockResolvedValue(null);
+    await expect(createSlide({ itemType: 'deal', itemId: PRODUCT_ID, state: 'Delhi', sortOrder: 0 })).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    expect(prismaMock.homeHeroSlide.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses the same item twice in one slider with 409', async () => {
+    prismaMock.deal.findFirst.mockResolvedValue({ id: PRODUCT_ID } as never);
+    prismaMock.homeHeroSlide.findFirst.mockResolvedValue({ id: 'existing' } as never);
+    await expect(createSlide({ itemType: 'deal', itemId: PRODUCT_ID, state: null, sortOrder: 0 })).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(prismaMock.homeHeroSlide.findFirst.mock.calls[0][0]!.where).toEqual({ state: null, dealId: PRODUCT_ID });
+  });
+});
+
+describe('listSliderOverview (D28)', () => {
+  const at = new Date('2026-10-18T10:00:00Z');
+  const deal = (ok: boolean) => ({
+    status: ok ? 'ACTIVE' : 'INACTIVE',
+    approvalStatus: 'APPROVED',
+    vendor: { status: 'ACTIVE' },
+    branch: { isActive: true },
+  });
+  const product = { isActive: true, vendor: { status: 'ACTIVE' } };
+
+  it('lists Global first, then each state, with status, progress and counts', async () => {
+    prismaMock.homeHeroSlide.findMany.mockResolvedValue([
+      ...Array.from({ length: 5 }, (_, i) => ({ state: null, isActive: true, updatedAt: at, deal: deal(true), product: null, id: `g${i}` })),
+      { state: 'Delhi', isActive: true, updatedAt: at, deal: deal(true), product: null, id: 'd1' },
+      { state: 'Delhi', isActive: true, updatedAt: at, deal: null, product, id: 'd2' },
+      { state: 'Delhi', isActive: true, updatedAt: at, deal: deal(false), product: null, id: 'd3' },
+    ] as never);
+    const rows = await listSliderOverview();
+    expect(rows).toEqual([
+      { state: null, status: 'LIVE', eligibleCount: 5, minimumRequired: 5, deals: 5, products: 0, updatedAt: at },
+      { state: 'Delhi', status: 'DRAFT', eligibleCount: 2, minimumRequired: 5, deals: 2, products: 1, updatedAt: at },
+    ]);
+  });
+
+  it('always lists Global, even with no slides', async () => {
+    prismaMock.homeHeroSlide.findMany.mockResolvedValue([]);
+    expect(await listSliderOverview()).toEqual([
+      { state: null, status: 'EMPTY', eligibleCount: 0, minimumRequired: 5, deals: 0, products: 0, updatedAt: null },
+    ]);
+  });
+});
+
+describe('reorderSlides', () => {
+  const ID = (n: number) => `a1a1a1a1-0000-4000-8000-00000000000${n}`;
+
+  it('saves the new order in one transaction', async () => {
+    prismaMock.homeHeroSlide.findMany.mockResolvedValue([{ id: ID(1) }, { id: ID(2) }, { id: ID(3) }] as never);
+    prismaMock.homeHeroSlide.update.mockImplementation(((args: unknown) => args) as never);
+    prismaMock.$transaction.mockResolvedValue([] as never);
+    await reorderSlides('Delhi', [ID(3), ID(1), ID(2)]);
+    expect(prismaMock.homeHeroSlide.findMany.mock.calls[0][0]!.where).toEqual({ state: 'Delhi' });
+    expect(prismaMock.homeHeroSlide.update.mock.calls.map((c) => c[0])).toEqual([
+      { where: { id: ID(3) }, data: { sortOrder: 0 } },
+      { where: { id: ID(1) }, data: { sortOrder: 1 } },
+      { where: { id: ID(2) }, data: { sortOrder: 2 } },
+    ]);
+  });
+
+  it('refuses an order that is not exactly this slider’s slides', async () => {
+    prismaMock.homeHeroSlide.findMany.mockResolvedValue([{ id: ID(1) }, { id: ID(2) }] as never);
+    await expect(reorderSlides(null, [ID(1)])).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    await expect(reorderSlides(null, [ID(1), ID(9)])).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+  });
+});
+
+describe('admin slide rows', () => {
+  it('say why an item is hidden from customers', () => {
+    expect(ineligibleReason({ deal: { status: 'ACTIVE', approvalStatus: 'APPROVED', vendor: { status: 'ACTIVE' }, branch: { isActive: false } }, product: null })).toBe('Branch paused');
+    expect(ineligibleReason({ deal: { status: 'DRAFT', approvalStatus: 'APPROVED', vendor: { status: 'ACTIVE' }, branch: { isActive: true } }, product: null })).toBe('Deal is draft');
+    expect(ineligibleReason({ deal: null, product: { isActive: true, vendor: { status: 'SUSPENDED' } } })).toBe('Member is suspended');
+    expect(ineligibleReason({ deal: null, product: { isActive: false, vendor: { status: 'ACTIVE' } } })).toBe('Product is paused');
+    expect(ineligibleReason({ deal: null, product: { isActive: true, vendor: { status: 'ACTIVE' } } })).toBeNull();
   });
 });

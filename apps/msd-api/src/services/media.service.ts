@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
 import { deleteMediaFile, writeMediaFile } from '../lib/media-storage';
+import { storageFolder } from '../lib/storage-layout';
 import { validateMediaFile, MAX_IMAGES_PER_ENTITY } from './media-validation.service';
 
 /** `category` covers all three Category depth tiers (Category/Subcategory/Type are all just
@@ -18,7 +19,6 @@ export interface MediaFile {
 }
 
 interface ImageAdapter {
-  storageSubdir: string;
   parentIdColumn: string;
   delegate: {
     findMany: (args: unknown) => Promise<Array<{ id: string; isPrimary: boolean; sortOrder: number; storageKey: string }>>;
@@ -32,7 +32,6 @@ interface ImageAdapter {
 }
 
 interface VideoAdapter {
-  storageSubdir: string;
   parentIdColumn: string;
   delegate: {
     findUnique: (args: unknown) => Promise<{ id: string; storageKey: string } | null>;
@@ -45,19 +44,18 @@ interface VideoAdapter {
 // image/video shape but aren't a common Prisma type — cast once, at the boundary, rather than
 // scattering `as any` through every function below.
 function imageAdapter(entityType: MediaEntityType): ImageAdapter {
-  const config: Record<MediaEntityType, { subdir: string; column: string; delegate: string }> = {
-    deal: { subdir: 'deals', column: 'dealId', delegate: 'dealImage' },
-    product: { subdir: 'products', column: 'productId', delegate: 'productImage' },
-    therapist: { subdir: 'therapists', column: 'therapistId', delegate: 'therapistImage' },
-    vendor: { subdir: 'vendors', column: 'vendorId', delegate: 'vendorImage' },
-    category: { subdir: 'categories', column: 'categoryId', delegate: 'categoryImage' },
-    blog: { subdir: 'blog-posts', column: 'blogPostId', delegate: 'blogPostImage' },
-    'about-us': { subdir: 'about-us', column: 'aboutUsId', delegate: 'aboutUsImage' },
-    promotion: { subdir: 'promotions', column: 'promotionId', delegate: 'promotionImage' },
+  const config: Record<MediaEntityType, { column: string; delegate: string }> = {
+    deal: { column: 'dealId', delegate: 'dealImage' },
+    product: { column: 'productId', delegate: 'productImage' },
+    therapist: { column: 'therapistId', delegate: 'therapistImage' },
+    vendor: { column: 'vendorId', delegate: 'vendorImage' },
+    category: { column: 'categoryId', delegate: 'categoryImage' },
+    blog: { column: 'blogPostId', delegate: 'blogPostImage' },
+    'about-us': { column: 'aboutUsId', delegate: 'aboutUsImage' },
+    promotion: { column: 'promotionId', delegate: 'promotionImage' },
   };
-  const { subdir, column, delegate } = config[entityType];
+  const { column, delegate } = config[entityType];
   return {
-    storageSubdir: subdir,
     parentIdColumn: column,
     delegate: (prisma as unknown as Record<string, ImageAdapter['delegate']>)[delegate],
   };
@@ -68,20 +66,48 @@ function imageAdapter(entityType: MediaEntityType): ImageAdapter {
  *  `replaceVideo`/`deleteVideo` with `'category'` throws a clear error instead of crashing on an
  *  undefined Prisma delegate. */
 function videoAdapter(entityType: MediaEntityType): VideoAdapter {
-  const config: Partial<Record<MediaEntityType, { subdir: string; column: string; delegate: string }>> = {
-    deal: { subdir: 'deals', column: 'dealId', delegate: 'dealVideo' },
-    product: { subdir: 'products', column: 'productId', delegate: 'productVideo' },
-    therapist: { subdir: 'therapists', column: 'therapistId', delegate: 'therapistVideo' },
-    vendor: { subdir: 'vendors', column: 'vendorId', delegate: 'vendorVideo' },
+  const config: Partial<Record<MediaEntityType, { column: string; delegate: string }>> = {
+    deal: { column: 'dealId', delegate: 'dealVideo' },
+    product: { column: 'productId', delegate: 'productVideo' },
+    therapist: { column: 'therapistId', delegate: 'therapistVideo' },
+    vendor: { column: 'vendorId', delegate: 'vendorVideo' },
   };
   const entry = config[entityType];
   if (!entry) throw new ApiError('VALIDATION_ERROR', `${entityType} does not support video uploads.`);
-  const { subdir, column, delegate } = entry;
+  const { column, delegate } = entry;
   return {
-    storageSubdir: subdir,
     parentIdColumn: column,
     delegate: (prisma as unknown as Record<string, VideoAdapter['delegate']>)[delegate],
   };
+}
+
+/** The folder for a new file (lib/storage-layout.ts): a member's deals, therapists and products
+ *  sit under that member's folder, so their owner is looked up once per upload. */
+async function folderFor(entityType: MediaEntityType, parentId: string): Promise<string> {
+  const owner = async (row: Promise<{ vendorId: string } | null>) => {
+    const found = await row;
+    if (!found) throw new ApiError('NOT_FOUND', 'Record not found');
+    return found.vendorId;
+  };
+  const select = { vendorId: true } as const;
+  switch (entityType) {
+    case 'deal':
+      return storageFolder.memberDeal(await owner(prisma.deal.findUnique({ where: { id: parentId }, select })), parentId);
+    case 'therapist':
+      return storageFolder.memberTherapist(await owner(prisma.therapist.findUnique({ where: { id: parentId }, select })), parentId);
+    case 'product':
+      return storageFolder.memberProduct(await owner(prisma.product.findUnique({ where: { id: parentId }, select })), parentId);
+    case 'vendor':
+      return storageFolder.memberProfile(parentId);
+    case 'category':
+      return storageFolder.master('categories', parentId);
+    case 'blog':
+      return storageFolder.staticContent('blog', parentId);
+    case 'about-us':
+      return storageFolder.staticContent('about-us', parentId);
+    case 'promotion':
+      return storageFolder.ctaBanner(parentId);
+  }
 }
 
 export async function addImage(entityType: MediaEntityType, parentId: string, file: MediaFile) {
@@ -91,7 +117,7 @@ export async function addImage(entityType: MediaEntityType, parentId: string, fi
     throw new ApiError('VALIDATION_ERROR', `You can upload at most ${MAX_IMAGES_PER_ENTITY} images.`);
   }
   const validated = validateMediaFile(file.buffer, 'image');
-  const { storageKey, sizeBytes } = await writeMediaFile(adapter.storageSubdir, parentId, file.buffer, validated.extension);
+  const { storageKey, sizeBytes } = await writeMediaFile(await folderFor(entityType, parentId), file.buffer, validated.extension);
   const isPrimary = existingCount === 0;
   try {
     const created = await adapter.delegate.create({
@@ -171,7 +197,7 @@ export async function replaceVideo(entityType: MediaEntityType, parentId: string
   const adapter = videoAdapter(entityType);
   const validated = validateMediaFile(file.buffer, 'video');
   const existing = await adapter.delegate.findUnique({ where: { [adapter.parentIdColumn]: parentId } as never });
-  const { storageKey, sizeBytes } = await writeMediaFile(adapter.storageSubdir, parentId, file.buffer, validated.extension);
+  const { storageKey, sizeBytes } = await writeMediaFile(await folderFor(entityType, parentId), file.buffer, validated.extension);
   let upserted;
   try {
     upserted = await adapter.delegate.upsert({

@@ -18,6 +18,7 @@ import * as mediaService from './media.service';
 import type { MediaFile } from './media.service';
 import * as notificationService from './notification.service';
 import { documentsSummary } from './member-document.service';
+import { documentsDueAt } from './member-reminder-policy';
 import { sendMemberNotice } from './member-notice.service';
 import { ROLE_KEYS } from '../lib/role-keys';
 import {
@@ -165,8 +166,6 @@ export async function attachLiveCounts<T extends { id: string }>(vendors: T[]): 
   }));
 }
 
-/** Members get 14 days from creation to provide all three documents. */
-const DOCUMENTS_DUE_MS = 14 * 24 * 60 * 60 * 1000;
 
 interface RawOwner {
   id: string;
@@ -397,7 +396,7 @@ async function buildAndInsertVendor(
       status,
       createdByUserId,
       statusChangedAt: new Date(now),
-      documentsDueAt: new Date(now + DOCUMENTS_DUE_MS),
+      documentsDueAt: documentsDueAt(new Date(now)),
     } as Prisma.MemberUncheckedCreateInput,
     include: OWNER_INCLUDE,
   });

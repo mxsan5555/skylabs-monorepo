@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useRef, type RefObject } from 'react';
-import type { SkyDataTableParamsDetail } from '@skylabs-monorepo/shared-ui';
-import type { Vendor } from '../../../../api/rbac/vendors';
-import { MEMBER_STATUS_LABEL, documentsChipLabel, dueDateLabel } from './member-status';
+import type { SkyDataTableFilterOption, SkyDataTableParamsDetail } from '@skylabs-monorepo/shared-ui';
+import type { MemberStatus, Vendor } from '../../../../api/rbac/vendors';
+import {
+  DOCUMENTS_LABEL,
+  DOCUMENTS_TONE,
+  MEMBER_STATUS_LABEL,
+  MEMBER_STATUS_TONE,
+  REVIEW_FLAG_LABEL,
+  documentsChipLabel,
+  dueDateLabel,
+} from './member-status';
 
 export type MemberSortField = 'businessName' | 'status' | 'documentsDueAt';
 
@@ -9,7 +17,7 @@ export interface MemberTableParams {
   page: number;
   pageSize: number;
   search: string;
-  /** Value of the table's filter select; '' means All. See FILTER_OPTIONS. */
+  /** Value of the table's Filter select; '' means All. See FILTER_OPTIONS. */
   filter: string;
   sort?: MemberSortField;
   dir: 'asc' | 'desc';
@@ -22,13 +30,18 @@ const SORT_FIELD_BY_COLUMN: Record<string, MemberSortField> = {
   Due: 'documentsDueAt',
 };
 
-/** The table's single filter select. Each value maps to one list query in members.tsx. */
-export const FILTER_OPTIONS = [
-  { label: 'Active', value: 'ACTIVE' },
-  { label: 'Inactive', value: 'INACTIVE' },
-  { label: 'Suspended', value: 'SUSPENDED' },
-  { label: 'Documents incomplete', value: 'documents' },
-  { label: 'Ready for suspension review', value: 'review' },
+/** Lifecycle states staff can filter by. Archived members are hidden everywhere, so not listed. */
+export const FILTERABLE_STATUSES = ['ACTIVE', 'INACTIVE', 'SUSPENDED'] as const satisfies readonly MemberStatus[];
+
+/** Non-status filter values; members.tsx maps each one to its list query. */
+export const DOCUMENTS_FILTER = 'documents';
+export const REVIEW_FILTER = 'review';
+
+/** The table's one Filter select, grouped by what it filters on. One choice at a time. */
+export const FILTER_OPTIONS: SkyDataTableFilterOption[] = [
+  ...FILTERABLE_STATUSES.map((value) => ({ group: 'Status', label: MEMBER_STATUS_LABEL[value], value })),
+  { group: 'Documents', label: DOCUMENTS_LABEL.incomplete, value: DOCUMENTS_FILTER },
+  { group: 'Review', label: REVIEW_FLAG_LABEL, value: REVIEW_FILTER },
 ];
 const FILTER_OPTIONS_JSON = JSON.stringify(FILTER_OPTIONS);
 
@@ -50,23 +63,19 @@ export function formatCount(live: number | undefined, total: number | undefined)
   return `${live} of ${all}`;
 }
 
-const STATUS_MAP: Record<string, 'success' | 'warning' | 'error'> = {
-  Active: 'success',
-  Inactive: 'warning',
-  Suspended: 'error',
-  Archived: 'error',
-};
-
-const DOCUMENTS_MAP: Record<string, 'success' | 'warning' | 'error'> = {
-  'Documents complete': 'success',
-  'Documents incomplete': 'warning',
-};
+/** Cell label to tone, built from the same label and tone tables the detail page uses. */
+const STATUS_MAP = Object.fromEntries(
+  (Object.keys(MEMBER_STATUS_LABEL) as MemberStatus[]).map((status) => [MEMBER_STATUS_LABEL[status], MEMBER_STATUS_TONE[status]]),
+);
+const DOCUMENTS_MAP = Object.fromEntries(
+  (Object.keys(DOCUMENTS_LABEL) as (keyof typeof DOCUMENTS_LABEL)[]).map((state) => [DOCUMENTS_LABEL[state], DOCUMENTS_TONE[state]]),
+);
 
 const COLUMNS = JSON.stringify([
   { key: 'Business Name', label: 'Business', sortable: true },
   { key: 'Owner', label: 'Owner' },
-  { key: 'Status', label: 'Status', type: 'status', statusMap: STATUS_MAP, sortable: true },
-  { key: 'Documents', label: 'Documents', type: 'status', statusMap: DOCUMENTS_MAP },
+  { key: 'Status', label: 'Status', type: 'status', statusStyle: 'tonal', statusMap: STATUS_MAP, sortable: true },
+  { key: 'Documents', label: 'Documents', type: 'status', statusStyle: 'tonal', statusMap: DOCUMENTS_MAP },
   { key: 'Due', label: 'Due', sortable: true },
   { key: 'Branch Count', label: 'Branches' },
   { key: 'Deal Count', label: 'Deals' },
@@ -139,7 +148,7 @@ export function MemberList({ members, onSelect, total, page, pageSize, loading, 
       loading={loading}
       searchable
       search-placeholder="Search members…"
-      filter-label="Filter by status"
+      filter-label="Filter"
       filter-options={FILTER_OPTIONS_JSON}
       actions={ACTIONS}
     />

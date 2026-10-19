@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatINR, pluralize, inputValue, formatTime12h } from './format';
+import { fillTemplate, formatINR, pluralize, inputValue, formatTime12h } from './format';
 
 describe('formatINR', () => {
   it('formats a number as INR', () => {
@@ -85,5 +85,11 @@ describe('inputValue', () => {
     });
 
     expect(inputValue(event)).toBe('');
+  });
+});
+describe('fillTemplate', () => {
+  it('fills every {key} it has a value for and leaves the rest', () => {
+    expect(fillTemplate('Add {title} to cart', { title: 'Massage Oil' })).toBe('Add Massage Oil to cart');
+    expect(fillTemplate('{a} and {a}, not {b}', { a: 'x' })).toBe('x and x, not {b}');
   });
 });

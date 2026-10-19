@@ -6,7 +6,6 @@ import { VISIBLE_DEAL_WHERE, VISIBLE_PRODUCT_WHERE, VISIBLE_THERAPIST_WHERE } fr
 import { listActiveCategories, getActiveCategoryBySlugOrThrow } from './category.service';
 import { getActiveTagNamesFor } from './popular-tag.service';
 import { getPublicTreatmentDirectory } from './popular-treatment.service';
-import { getPublicPromotions as getPublicPromotionsList } from './promotion.service';
 // Home Hero's public read is NOT wrapped here — home-hero.service.ts imports
 // `VISIBLE_DEAL_WHERE`/`PUBLIC_DEAL_SELECT` FROM this file, so importing it back here would be a
 // circular module dependency. `catalog.routes.ts` calls `homeHeroService.getPublicHomeHero`
@@ -217,7 +216,7 @@ const PUBLIC_VENDOR_DETAIL_SELECT = {
 /** Product is a fully independent, directly-purchasable catalog entity (see Product's own schema
  *  doc comment) — unlike PUBLIC_DEAL_SELECT this carries its own price fields directly, since
  *  there is no wrapping Deal to price it. No branch/location fields — Product has no branchId. */
-const PUBLIC_PRODUCT_SELECT = {
+export const PUBLIC_PRODUCT_SELECT = {
   id: true,
   name: true,
   slug: true,
@@ -317,12 +316,6 @@ function buildPublicChildren<T extends { id: string; parentId: string | null; na
  *  slug) and filters to active groups/treatments server-side. */
 export async function getPublicPopularTreatments() {
   return getPublicTreatmentDirectory();
-}
-
-/** Public Home page "Promotions" read — thin pass-through to `promotion.service.ts`'s own public
- *  function, which already filters to active + within its visibility window server-side. */
-export async function getPublicPromotions() {
-  return getPublicPromotionsList();
 }
 
 export async function getPublicCategoryTree() {

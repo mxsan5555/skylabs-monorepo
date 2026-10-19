@@ -1,3 +1,4 @@
+import { JsonLd } from '../../seo/json-ld';
 import { useEffect, useState } from 'react';
 import { showSnackbar } from '../../../snackbar/snackbar';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -15,6 +16,7 @@ import { formatINR } from '../../../utils/format';
 import { resolveProductMedia, primaryImage } from '../../../utils/media';
 import content from '../../../content.json';
 import './product-detail.css';
+import { BannerSlot } from '../../components/banner-slot/banner-slot';
 
 const { products, productDetail } = content;
 const SITE_URL = (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
@@ -274,10 +276,8 @@ export function ProductDetail() {
         />
       )}
 
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+      <JsonLd
+        data={{
             '@context': 'https://schema.org',
             '@type': 'Product',
             name,
@@ -304,14 +304,11 @@ export function ProductDetail() {
                   'MySpaDeal',
               },
             },
-          }),
-        }}
+          }}
       />
 
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+      <JsonLd
+        data={{
             '@context': 'https://schema.org',
             '@type': 'BreadcrumbList',
             itemListElement: [
@@ -334,8 +331,7 @@ export function ProductDetail() {
                 item: canonicalUrl,
               },
             ],
-          }),
-        }}
+          }}
       />
 
       {/* Breadcrumb */}
@@ -732,6 +728,7 @@ export function ProductDetail() {
           </div>
         </section>
       )}
+      <BannerSlot slot="PRODUCT_BOTTOM" />
     </div>
   );
 }

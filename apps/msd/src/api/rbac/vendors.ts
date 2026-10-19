@@ -33,7 +33,8 @@ export interface MemberDocumentSummary {
 export interface VendorDocument {
   id: string;
   documentType: VendorDocumentType;
-  storageKey: string;
+  /** Signed link to the private file; expires after 5 minutes, so lists are refetched to reopen. */
+  fileUrl: string | null;
   originalFilename: string | null;
   mimeType: string;
   sizeBytes: number;

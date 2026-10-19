@@ -5,7 +5,10 @@ vi.mock('../lib/prisma', async () => {
   return { prisma: createPrismaMock() };
 });
 const sendMemberNotice = vi.fn().mockResolvedValue({ email: true, sms: true });
-vi.mock('./member-notice.service', () => ({ sendMemberNotice: (...a: unknown[]) => sendMemberNotice(...a) }));
+vi.mock('./member-notice.service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./member-notice.service')>()),
+  sendMemberNotice: (...a: unknown[]) => sendMemberNotice(...a),
+}));
 const clearMemberAccessCache = vi.fn();
 vi.mock('./member-access.service', () => ({ clearMemberAccessCache: (...a: unknown[]) => clearMemberAccessCache(...a) }));
 const deleteMediaFile = vi.fn().mockResolvedValue(undefined);
@@ -84,6 +87,24 @@ describe('changeMemberStatus', () => {
       expect.objectContaining({ data: expect.objectContaining({ status: 'ACTIVE', statusReason: null, reviewFlaggedAt: null }) }),
     );
     expect(sendMemberNotice).toHaveBeenCalledWith('REACTIVATED', expect.anything(), undefined);
+  });
+
+  it.each([
+    ['ACTIVE', 'INACTIVE'],
+    ['ACTIVE', 'SUSPENDED'],
+    ['INACTIVE', 'SUSPENDED'],
+  ] as const)('%s to %s keeps the review flag for the admin who decides next', async (from, to) => {
+    prismaMock.member.findUnique.mockResolvedValue({ ...MEMBER, status: from } as never);
+    await changeMemberStatus('m1', to, 'Documents not completed', ACTOR);
+    const { data } = prismaMock.member.updateMany.mock.lastCall?.[0] as { data: Record<string, unknown> };
+    expect(data).not.toHaveProperty('reviewFlaggedAt');
+  });
+
+  it('reactivating from inactive also clears the review flag', async () => {
+    prismaMock.member.findUnique.mockResolvedValue({ ...MEMBER, status: 'INACTIVE' } as never);
+    await changeMemberStatus('m1', 'ACTIVE', 'Back from the long holiday', ACTOR);
+    const { data } = prismaMock.member.updateMany.mock.lastCall?.[0] as { data: Record<string, unknown> };
+    expect(data.reviewFlaggedAt).toBeNull();
   });
 
   it('a failing notice never throws into the caller', async () => {
@@ -195,7 +216,7 @@ describe('hard delete removes the member files from storage', () => {
     prismaMock.member.findUnique.mockResolvedValue({ ...MEMBER, status: 'SUSPENDED' } as never);
     prismaMock.orderItem.count.mockResolvedValue(0 as never);
     prismaMock.user.update.mockResolvedValue({} as never);
-    prismaMock.memberDocument.findMany.mockResolvedValue([{ storageKey: 'vendor-documents/m1/a.pdf' }] as never);
+    prismaMock.memberDocument.findMany.mockResolvedValue([{ storageKey: 'vendor-documents/m1/a.pdf' }, { storageKey: 'members/m1/documents/b.pdf' }] as never);
     prismaMock.vendorImage.findMany.mockResolvedValue([
       { storageKey: 'vendors/m1/1.jpg' },
       { storageKey: 'vendors/m1/2.jpg' },
@@ -205,10 +226,12 @@ describe('hard delete removes the member files from storage', () => {
 
   it('deletes every key once, after the transaction commits', async () => {
     await deleteMember('m1', 'Cleanup after suspension', ACTOR);
-    expect(deleteMediaFile).toHaveBeenCalledTimes(4);
+    expect(deleteMediaFile).toHaveBeenCalledTimes(5);
     for (const key of ['vendor-documents/m1/a.pdf', 'vendors/m1/1.jpg', 'vendors/m1/2.jpg', 'vendors/m1/v.mp4']) {
-      expect(deleteMediaFile).toHaveBeenCalledWith(key);
+      expect(deleteMediaFile).toHaveBeenCalledWith(key, 'public');
     }
+    // Documents uploaded since the private bucket are removed from the private bucket.
+    expect(deleteMediaFile).toHaveBeenCalledWith('members/m1/documents/b.pdf', 'private');
     const committedAt = prismaMock.$transaction.mock.invocationCallOrder[0];
     expect(deleteMediaFile.mock.invocationCallOrder.every((order) => order > committedAt)).toBe(true);
   });
@@ -232,10 +255,11 @@ describe('hard delete removes the member files from storage', () => {
     deleteMediaFile.mockRejectedValue(new Error('r2 down'));
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(vi.fn());
     await expect(deleteMember('m1', 'Cleanup after suspension', ACTOR)).resolves.toEqual({ outcome: 'DELETED' });
-    expect(deleteMediaFile).toHaveBeenCalledTimes(4);
+    expect(deleteMediaFile).toHaveBeenCalledTimes(5);
     const logged = JSON.stringify(errorSpy.mock.calls.map((c) => c.map((a) => (a instanceof Error ? a.message : a))));
     expect(logged).not.toContain('vendors/m1');
     expect(logged).not.toContain('vendor-documents');
+    expect(logged).not.toContain('members/m1');
     errorSpy.mockRestore();
   });
 });

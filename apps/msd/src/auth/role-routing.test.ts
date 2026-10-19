@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { extractReturnUrl, sanitizeReturnUrl, signInPathWithNext, signInPathWithReturnTo } from './role-routing';
+import type { BootstrapResponse } from '@skylabs-monorepo/shared-types';
+import { extractReturnUrl, isCustomerAccountUser, sanitizeReturnUrl, signInPathWithNext, signInPathWithReturnTo } from './role-routing';
 
 describe('extractReturnUrl', () => {
   it('reads a plain ?next= path', () => {
@@ -112,5 +113,25 @@ describe('signInPathWithReturnTo', () => {
   it('preserves a multi-value query string exactly, per requirement 1\'s /explore example', () => {
     const location = { pathname: '/explore', search: '?q=Swedish%20Massage', hash: '' };
     expect(signInPathWithReturnTo(location)).toBe(`/sign-in?next=${encodeURIComponent('/explore?q=Swedish%20Massage')}`);
+  });
+});
+
+describe('isCustomerAccountUser', () => {
+  const withRoles = (...keys: string[]) => ({ roles: keys.map((key) => ({ key })) }) as unknown as BootstrapResponse;
+
+  it('is true for a customer', () => {
+    expect(isCustomerAccountUser(withRoles('customer'))).toBe(true);
+  });
+
+  it('is true for a customer who is also a member (dual role)', () => {
+    expect(isCustomerAccountUser(withRoles('customer', 'member'))).toBe(true);
+  });
+
+  it('is false for staff, even with the customer role', () => {
+    expect(isCustomerAccountUser(withRoles('super_admin', 'customer'))).toBe(false);
+  });
+
+  it('is false for a member without the customer role', () => {
+    expect(isCustomerAccountUser(withRoles('member'))).toBe(false);
   });
 });
