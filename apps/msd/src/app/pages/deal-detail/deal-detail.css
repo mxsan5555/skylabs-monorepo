@@ -418,13 +418,19 @@
   font-weight: 600;
   color: var(--md-sys-color-on-surface);
 }
-
 .deal-detail__related-carousel {
+  display: block;
+  width: 100%;
   margin: 0 -20px;
   padding: 4px 20px 8px;
-  overflow: hidden;
+  overflow: visible;
 }
 
+.deal-detail__related-slide {
+  width: 260px;
+  height: auto;
+  box-sizing: border-box;
+}
 /* ─── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 960px) {
   .deal-detail__hero-grid,

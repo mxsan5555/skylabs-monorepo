@@ -1,203 +1,65 @@
 ﻿import { useNavigate } from 'react-router-dom';
-import { ProductCardGallery } from '../../components/product-card-gallery';
-import {
-  FilledButton,
-  OutlinedButton,
-  Icon,
-} from '@skylabs-monorepo/shared-ui/react';
-
+import { FilledButton, Icon } from '@skylabs-monorepo/shared-ui/react';
+import { OfferCard } from '../../components/offer-card/offer-card';
 import { useWishlist } from '../../../wishlist/wishlist-context';
-
-import type {
-  CatalogDeal,
-} from '../../../api/catalog';
-
-import type {
-  WishlistProduct,
-} from '../../../api/wishlist';
-import { Breadcrumb } from '../../components/breadcrumb';
-import { resolveDealMedia, resolveProductMedia } from '../../../utils/media';
-
+import type { CatalogProduct } from '../../../api/catalog';
+import type { WishlistProduct } from '../../../api/wishlist';
 import content from '../../../content.json';
-
 import './wishlist.css';
-import { DealCard, type DealCardDeal } from '../../components/deal-card';
+
 const { wishlist: wishlistContent } = content;
 
-/**
- * Convert a backend Deal into the common DealCard format.
- */
-function toDealCardDeal(
-  deal: CatalogDeal,
-): DealCardDeal {
-  const title = deal.title;
-
-  const salePrice =
-    Number(deal.salePrice);
-
-  const originalPrice =
-    deal.originalPrice
-      ? Number(deal.originalPrice)
-      : undefined;
-
-  const media =
-    resolveDealMedia(deal);
-
-  return {
-    id: deal.id,
-
-    title,
-
-    image:
-      media.images[0] ?? '',
-
-    imageAlt: title,
-
-    gallery:
-      media.images.length > 0
-        ? media.images
-        : undefined,
-
-    video: media.video,
-    badge: 'Service',
-    providerName:
-      deal.vendor?.businessName ??
-      undefined,
-
-    location:
-      deal.branch?.city ??
-      undefined,
-
-    price: salePrice,
-
-    originalPrice:
-      originalPrice &&
-        originalPrice !== salePrice
-        ? originalPrice
-        : undefined,
-
-    discount:
-      deal.discountPercent ??
-      undefined,
-
-    priceNote:
-      deal.durationMinutes
-        ? `${deal.durationMinutes} min`
-        : undefined,
-
-    tag:
-      deal.popularTags?.[0]?.name,
-  };
-}
-
-/**
- * Convert Product into the same DealCard structure.
- *
- * DealCard is only being reused as the visual card.
- * The underlying wishlist entity is still a Product.
- */
-function toProductCardDeal(
+function toCatalogProduct(
   product: WishlistProduct,
-): DealCardDeal {
-  const price =
-    Number(product.price);
-
-  const originalPrice =
-    product.originalPrice !== null
-      ? Number(product.originalPrice)
-      : undefined;
-  const media = resolveProductMedia(product);
-
+): CatalogProduct {
   return {
-    id: product.id,
-
-    title: product.name,
-
-    image:
-      media.images[0] ?? '',
-
-    imageAlt:
-      product.imageAlt ??
-      product.name,
-
-    gallery:
-      media.images.length > 0
-        ? media.images
-        : undefined,
-
-    badge: 'Product',
-
-    providerName:
-      product.vendor?.businessName ??
-      product.brand ??
-      undefined,
-
-    price,
-
+    ...product,
+    price: String(product.price),
     originalPrice:
-      originalPrice !== undefined &&
-        originalPrice !== price
-        ? originalPrice
-        : undefined,
-
-    discount:
-      product.discount ??
-      undefined,
+      product.originalPrice == null
+        ? null
+        : String(product.originalPrice),
+    description: product.description,
+    summary: product.summary,
+    category: product.category,
+    subcategory: product.subcategory,
+   mediaImages: product.mediaImages as CatalogProduct['mediaImages'],
+    vendor: product.vendor
+      ? {
+          ...product.vendor,
+          city: product.vendor.city ?? null,
+          logoUrl: product.vendor.logoUrl ?? null,
+        }
+      : null,
   };
 }
-
 export function Wishlist() {
-  const {
-    items,
-    itemCount,
-    loading,
-    remove,
-    removeProduct,
-  } = useWishlist();
-
-  const navigate =
-    useNavigate();
+  const { items, loading } = useWishlist();
+               console.log(
+  'Wishlist descriptions:',
+  items.map((item) => ({
+    name: item.product?.name,
+    description: item.product?.description,
+    summary: item.product?.summary,
+  })),
+);
+  const navigate = useNavigate();
 
   return (
     <div className="wishlist-page">
-      <title>
-        {content.meta.wishlist.title}
-      </title>
+      <title>{content.meta.wishlist.title}</title>
 
       <meta
         name="description"
-        content={
-          content.meta.wishlist
-            .description
-        }
+        content={content.meta.wishlist.description}
       />
 
-      <meta
-        name="robots"
-        content="noindex"
-      />
+      <meta name="robots" content="noindex" />
 
       <div className="wishlist-page__inner">
-        {/* <Breadcrumb
-    items={[
-      { label: 'Home', to: '/' },
-      { label: 'Wishlist' },
-    ]}
-  /> */}
-
-        {/* <h1 className="wishlist-page__title">
+        <h1 className="wishlist-page__title">
           {wishlistContent.title}
-
-          {itemCount > 0 && (
-            <span className="wishlist-page__count">
-              ({itemCount}{' '}
-              {itemCount === 1
-                ? wishlistContent.itemSingular
-                : wishlistContent.itemPlural}
-              )
-            </span>
-          )}
-        </h1> */}
+        </h1>
 
         {loading ? (
           <p className="loading-state">
@@ -207,29 +69,15 @@ export function Wishlist() {
           <div className="wishlist-page__empty">
             <sky-info-card
               icon="favorite_border"
-              heading={
-                wishlistContent.emptyHeading
-              }
-              subheading={
-                wishlistContent.emptySubheading
-              }
+              heading={wishlistContent.emptyHeading}
+              subheading={wishlistContent.emptySubheading}
             />
 
-            <FilledButton
-              onClick={() =>
-                navigate('/explore')
-              }
-            >
-              <Icon
-                slot="icon"
-                aria-hidden="true"
-              >
+            <FilledButton onClick={() => navigate('/explore')}>
+              <Icon slot="icon" aria-hidden="true">
                 explore
               </Icon>
-
-              {
-                wishlistContent.emptyCtaLabel
-              }
+              {wishlistContent.emptyCtaLabel}
             </FilledButton>
           </div>
         ) : (
@@ -238,84 +86,39 @@ export function Wishlist() {
             aria-label="Saved wishlist items"
           >
             {items.map((item) => {
-              /**
-               * DEAL
-               */
-              if (
-                item.deal &&
-                item.dealId
-              ) {
-                const deal =
-                  item.deal;
-
+ 
+              if (item.deal && item.dealId) {
                 return (
-                  <li
-                    key={item.id}
-                    className="wishlist-grid__item"
-                  >
-
-                    <DealCard
-                      deal={toDealCardDeal(deal)}
-                      favoriteActive={true}
-                      onFavorite={() => void remove(item.dealId!)}
-                      eyebrowHref={
-                        deal.vendor?.slug
-                          ? `/vendor/${deal.vendor.slug}`
-                          : undefined
-                      }
-                      actions={
-                        <FilledButton
-                          onClick={() => navigate(`/deal/${deal.id}`)}
-                        >
-                          <Icon slot="icon" aria-hidden="true">
-                            event_available
-                          </Icon>
-                          {wishlistContent.bookLabel}
-                        </FilledButton>
-                      }
+                  <li key={item.id} className="wishlist-grid__item">
+                    <OfferCard
+                      item={{
+                        type: 'deal',
+                        deal: item.deal,
+                      }}
+                      variant="outlined"
+                      layout="vertical"
                     />
-
                   </li>
                 );
               }
 
-              /**
-               * PRODUCT
-               */
-              if (
-                item.product &&
-                item.productId
-              ) {
-                const product =
-                  item.product;
-
+              // Saved product
+              if (item.product && item.productId) {
                 return (
-                  <li
-                    key={item.id}
-                    className="wishlist-grid__item"
-                  >
-
-<DealCard
-  deal={toProductCardDeal(product)}
-  favoriteActive={true}
-  onFavorite={() => void removeProduct(item.productId!)}
-  href={`/products/${product.id}`}
-  actions={
-    <FilledButton
-      onClick={() => navigate(`/products/${product.id}`)}
-    >
-      <Icon slot="icon" aria-hidden="true">
-        shopping_bag
-      </Icon>
-      Add to cart
-    </FilledButton>
-  }
-/>
-
+                  <li key={item.id} className="wishlist-grid__item">
+                    <OfferCard
+                      item={{
+                        type: 'product',
+                        product: toCatalogProduct(item.product),
+                      }}
+                      variant="outlined"
+                      layout="vertical"
+                    />
                   </li>
                 );
               }
 
+              // Ignore incomplete wishlist entries
               return null;
             })}
           </ul>

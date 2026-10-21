@@ -8,6 +8,8 @@ import { showSnackbar } from '../../../snackbar/snackbar';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { signInPathWithReturnTo } from '../../../auth/role-routing';
 import { addCartItem } from '../../../api/cart';
+import { OfferCard } from '../../components/offer-card/offer-card';
+import { CardRail } from '../../components/card-rail/card-rail';
 import {
   getCatalogDeal,
   getCatalogVendor,
@@ -474,50 +476,32 @@ showSnackbar(`Added "${deal.title}" to your cart.`, {
           )}
         </div>
       </PageSection>
-
-      {related.length > 0 && (
-        <section className="deal-detail__related" aria-labelledby="related-heading">
-          <div className="deal-detail__related-inner">
-            <h2 id="related-heading" className="deal-detail__related-heading">{dealDetail.relatedDeals}</h2>
-            <div className="deal-detail__related-carousel">
-              <swiper-container
-                slides-per-view="auto"
-                space-between={16}
-                free-mode="true"
-                grab-cursor="true"
-              >
-                {related.map((item) => {
-                  const media = resolveDealMedia(item);
-                  const relatedDeal: DealCardDeal = {
-                    id: item.id,
-                    title: item.title,
-                    image: media.images[0] ?? '',
-                    imageAlt: item.title,
-                    gallery: media.images.length ? media.images : undefined,
-                    video: media.video,
-                    badge: dealDetail.serviceType.service,
-                    providerName: item.vendor?.businessName ?? undefined,
-                    price: Number(item.salePrice),
-                    originalPrice: item.originalPrice != null && Number(item.originalPrice) !== Number(item.salePrice) ? Number(item.originalPrice) : undefined, discount: item.discountPercent ?? undefined,
-                  };
-                  return (
-                    <swiper-slide key={item.id} style={{ width: '260px', height: 'auto' }}>
-                      <DealCard
-                        deal={relatedDeal}
-                        eyebrowHref={item.vendor?.slug ? `/vendor/${item.vendor.slug}` : undefined}
-                        favoriteActive={isWishlisted(item.id)}
-                        onFavorite={() => {
-                          if (!requireAuthOrRedirect()) return; void toggleWishlist(item.id);
-                        }}
-                      />
-                    </swiper-slide>
-                  );
-                })}
-              </swiper-container>
-            </div>
-          </div>
-        </section>
-      )}
+{related.length > 0 && (
+  <section
+    className="deal-detail__related"
+    aria-labelledby="related-heading"
+  >
+    <div className="deal-detail__related-inner">
+      <CardRail
+        id="related-heading"
+        heading={dealDetail.relatedDeals}
+      >
+        {related.map((deal) => (
+          <swiper-slide
+            key={deal.id}
+            className="card-rail__slide"
+          >
+            <OfferCard
+              item={{ type: 'deal', deal }}
+              variant="outlined"
+              layout="vertical"
+            />
+          </swiper-slide>
+        ))}
+      </CardRail>
+    </div>
+  </section>
+)}
       <BannerSlot slot="DEAL_BOTTOM" />
     </div>
   );

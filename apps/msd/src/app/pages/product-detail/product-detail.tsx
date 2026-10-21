@@ -1,5 +1,6 @@
 import { JsonLd } from '../../seo/json-ld';
 import { useEffect, useState } from 'react';
+import { CardRail } from '../../components/card-rail/card-rail';
 import { showSnackbar } from '../../../snackbar/snackbar';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { FilledButton, Icon, OutlinedIconButton, } from '@skylabs-monorepo/shared-ui/react';
@@ -17,7 +18,7 @@ import { resolveProductMedia, primaryImage } from '../../../utils/media';
 import content from '../../../content.json';
 import './product-detail.css';
 import { BannerSlot } from '../../components/banner-slot/banner-slot';
-
+import { OfferCard } from '../../components/offer-card/offer-card';
 const { products, productDetail } = content;
 const SITE_URL = (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
 /**
@@ -179,32 +180,32 @@ export function ProductDetail() {
 
       <JsonLd
         data={{
-            '@context': 'https://schema.org',
-            '@type': 'Product',
-            name,
-            description,
-            image: gallery,
-            brand: product.brand ? { '@type': 'Brand', name: product.brand, } : undefined,
-            sku: product.id,
-            offers: {
-              '@type': 'Offer', price: salePrice, priceCurrency: 'INR',
-              availability: 'https://schema.org/InStock',
-              url: canonicalUrl,
-              seller: { '@type': 'Organization', name: product.vendor?.businessName ?? 'MySpaDeal', },
-            },
-          }}
+          '@context': 'https://schema.org',
+          '@type': 'Product',
+          name,
+          description,
+          image: gallery,
+          brand: product.brand ? { '@type': 'Brand', name: product.brand, } : undefined,
+          sku: product.id,
+          offers: {
+            '@type': 'Offer', price: salePrice, priceCurrency: 'INR',
+            availability: 'https://schema.org/InStock',
+            url: canonicalUrl,
+            seller: { '@type': 'Organization', name: product.vendor?.businessName ?? 'MySpaDeal', },
+          },
+        }}
       />
 
       <JsonLd
         data={{
-            '@context': 'https://schema.org',
-            '@type': 'BreadcrumbList',
-            itemListElement: [
-              { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE_URL}/`, },
-              { '@type': 'ListItem', position: 2, name: 'Products', item: `${SITE_URL}/products`, },
-              { '@type': 'ListItem', position: 3, name, item: canonicalUrl, },
-            ],
-          }}
+          '@context': 'https://schema.org',
+          '@type': 'BreadcrumbList',
+          itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE_URL}/`, },
+            { '@type': 'ListItem', position: 2, name: 'Products', item: `${SITE_URL}/products`, },
+            { '@type': 'ListItem', position: 3, name, item: canonicalUrl, },
+          ],
+        }}
       />
       <Breadcrumb
         className="product-detail__breadcrumb"
@@ -394,41 +395,29 @@ export function ProductDetail() {
           </aside>
         </div>
       </PageSection>
-      {related.length > 0 && (
-        <section className="product-detail__related" aria-labelledby="related-products-heading">
-          <div className="product-detail__related-inner">
-            <h2 id="related-products-heading" className="product-detail__related-heading">{products.detail.relatedProducts}</h2>
-            <div className="product-detail__related-carousel">
-              <swiper-container
-                slides-per-view="auto"
-                space-between={16}
-                free-mode="true"
-                grab-cursor="true"
-              >
-                {related.map((item) => (
-                  <swiper-slide key={item.id} style={{ width: '260px', height: 'auto', }}>
-                    <SkyProductCardWC
-                      variant="outlined"
-                      heading={item.name}
-                      eyebrow={item.brand ?? item.vendor?.businessName ?? undefined}
-                      eyebrowHref={!item.brand && item.vendor?.slug ? `/vendor/${item.vendor.slug}` : undefined}
-                      image={primaryImage(resolveProductMedia(item))}
-                      imageAlt={item.imageAlt ?? undefined}
-                      price={formatINR(Number(item.price),)}
-                      originalPrice={
-                        item.originalPrice && Number(item.originalPrice) !== Number(item.price) ? formatINR(
-                          Number(item.originalPrice,),
-                        ) : undefined}
-                      discount={item.discount ? `${item.discount}% OFF` : undefined}
-                      href={`/products/${item.id}`}
-                    />
-                  </swiper-slide>
-                ))}
-              </swiper-container>
-            </div>
-          </div>
-        </section>
-      )}
+{related.length > 0 && (
+  <section
+    className="product-detail__related"
+    aria-labelledby="related-products-heading"
+  >
+    <div className="product-detail__related-inner">
+      <CardRail
+        id="related-products-heading"
+        heading={products.detail.relatedProducts}
+      >
+        {related.map((item) => (
+          <swiper-slide key={item.id} className="card-rail__slide">
+            <OfferCard
+              item={{ type: 'product', product: item }}
+              variant="outlined"
+              layout="vertical"
+            />
+          </swiper-slide>
+        ))}
+      </CardRail>
+    </div>
+  </section>
+)}
       <BannerSlot slot="PRODUCT_BOTTOM" />
     </div>
   );

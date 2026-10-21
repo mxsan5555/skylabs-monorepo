@@ -318,11 +318,17 @@
 }
 
 .product-detail__related-carousel {
-  margin: 0 -20px;
-  padding: 4px 20px 8px;
+  display: block;
+  width: 100%;
+  min-width: 0;
   overflow: hidden;
 }
 
+.product-detail__related-slide {
+  width: 260px;
+  height: auto;
+  box-sizing: border-box;
+}
 /* ─── Product Actions ────────────────────────────────────────────────────── */
 .product-detail__actions {
   display: flex;
