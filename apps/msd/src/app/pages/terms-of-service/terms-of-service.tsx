@@ -1,6 +1,8 @@
+
 import '@skylabs-monorepo/shared-ui';
+import { Icon } from '@skylabs-monorepo/shared-ui/react';
 import './terms-of-service.css';
-import { Icon, FilledButton, OutlinedTextField, } from '@skylabs-monorepo/shared-ui/react';
+
 const termsSections = [
   {
     icon: 'handshake',
@@ -56,7 +58,7 @@ export function TermsOfService() {
         </p>
 
         <div className="terms-page__updated">
-          <Icon>description</Icon>
+          <Icon aria-hidden="true">description</Icon>
           <span>Last updated: [publication date]</span>
         </div>
       </section>
@@ -71,23 +73,24 @@ export function TermsOfService() {
             icon={section.icon}
             heading={section.heading}
             subheading={section.subheading}
-          ></sky-info-card>
+          />
         ))}
       </section>
 
-      <section className="terms-page__contact">
-        <div>
-          <h2>Questions about our terms?</h2>
-          <p>
-            Contact our team for clarification about your booking,
-            order or use of the platform.
-          </p>
-        </div>
-
-        <a href="/contact" className="terms-page__contact-link">
-          Contact Us
-          <Icon>arrow_forward</Icon>
-        </a>
+      <section
+        className="terms-page__contact"
+        aria-label="Terms support"
+      >
+        <sky-cta-banner
+          color="primary"
+          icon="support_agent"
+          iconStyle="surface"
+          headline="Questions about our terms?"
+          text="Contact our team for clarification about your booking, order or use of the platform."
+          ctaLabel="Contact Us"
+          ctaHref="/contact"
+          ctaIcon="arrow_forward"
+        />
       </section>
     </main>
   );

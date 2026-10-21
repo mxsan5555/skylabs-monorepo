@@ -1,135 +1,132 @@
 
 .accessibility-page {
-  width: min(100% - 40px, 1120px);
+  width: min(100% - 3rem, 1200px);
   margin-inline: auto;
-  padding-block: 40px 64px;
-  color: var(--md-sys-color-on-surface);
+  padding-block: 2.5rem 3rem;
 }
 
+/* Hero layout */
+
 .accessibility-page__hero {
-  padding: clamp(28px, 5vw, 52px);
-  margin-bottom: 24px;
-  border: 1px solid var(--md-sys-color-outline-variant);
-  border-radius: 24px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
+  align-items: center;
+  gap: 2rem;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  border-radius: 28px;
   background: var(--md-sys-color-surface-container-low);
 }
 
+.accessibility-page__hero-content {
+  min-width: 0;
+}
+
 .accessibility-page__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-block-end: 1rem;
   color: var(--md-sys-color-primary);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
+}
+
+.accessibility-page__eyebrow > * {
+  flex-shrink: 0;
 }
 
 .accessibility-page__hero h1 {
-  max-width: 760px;
-  margin: 16px 0;
-  font-size: clamp(32px, 5vw, 48px);
+  margin: 0;
+  color: var(--md-sys-color-on-surface);
+  font-size: clamp(2rem, 4vw, 3.25rem);
   line-height: 1.15;
-  letter-spacing: -0.03em;
 }
 
-.accessibility-page__hero > p {
-  max-width: 680px;
+.accessibility-page__hero-content p {
+  max-width: 540px;
+  margin-block: 1rem 0;
   color: var(--md-sys-color-on-surface-variant);
-  font-size: 16px;
-  line-height: 1.8;
+  line-height: 1.75;
 }
 
-.accessibility-page__note {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 22px;
-  color: var(--md-sys-color-on-surface-variant);
-  font-size: 13px;
+.accessibility-page__hero > sky-feature-card {
+  display: block;
+  min-width: 0;
 }
 
-.accessibility-page__note md-icon {
-  font-size: 22px;
-}
+/* Accessibility information cards */
 
 .accessibility-page__grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
-  margin-bottom: 24px;
+  gap: 1.25rem;
+  margin-block-start: 2rem;
+  align-items: stretch;
 }
 
-.accessibility-page__grid sky-info-card {
+.accessibility-page__grid > sky-info-card {
+  display: block;
   min-width: 0;
+  height: 100%;
 }
+
+/* Contact banner */
 
 .accessibility-page__contact {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 28px;
-  border-radius: 20px;
-  background: var(--md-sys-color-primary-container);
-  color: var(--md-sys-color-on-primary-container);
+  margin-block-start: 2rem;
 }
 
-.accessibility-page__contact h2 {
-  margin: 0 0 8px;
-  font-size: 21px;
-  line-height: 1.4;
+.accessibility-page__contact > sky-cta-banner {
+  display: block;
+  width: 100%;
 }
 
-.accessibility-page__contact p {
-  max-width: 650px;
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.8;
-}
-
-.accessibility-page__contact-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-  color: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.accessibility-page__contact-link:hover {
-  text-decoration: underline;
-}
-
-.accessibility-page__contact-link:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: 4px;
-  border-radius: 4px;
-}
+/* Tablet */
 
 @media (max-width: 850px) {
+  .accessibility-page {
+    padding-block-start: 2rem;
+  }
+
   .accessibility-page__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
   }
 }
+
+/* Mobile */
 
 @media (max-width: 600px) {
   .accessibility-page {
-    width: calc(100% - 28px);
-    padding-block: 28px 40px;
+    width: calc(100% - 2rem);
+    padding-block: 1.25rem 2.5rem;
   }
 
   .accessibility-page__hero {
-    padding: 28px 22px;
-    border-radius: 20px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+    padding: 1.5rem;
+    border-radius: 22px;
+  }
+
+  .accessibility-page__hero h1 {
+    font-size: clamp(1.9rem, 8vw, 2.5rem);
+    line-height: 1.15;
+  }
+
+  .accessibility-page__hero-content p {
+    font-size: 0.95rem;
+    line-height: 1.7;
   }
 
   .accessibility-page__grid {
-    grid-template-columns: 1fr;
-    gap: 14px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+    margin-block-start: 1.5rem;
   }
 
   .accessibility-page__contact {
-    align-items: flex-start;
-    flex-direction: column;
-    padding: 24px;
+    margin-block-start: 1.5rem;
   }
 }

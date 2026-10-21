@@ -1,8 +1,3 @@
-
-/* ========================================
-   Careers Page
-======================================== */
-
 .careers-page {
   width: 100%;
 }
@@ -21,10 +16,6 @@
   text-transform: uppercase;
 }
 
-/* ========================================
-   Section Headings
-======================================== */
-
 .careers-section-heading h2,
 .careers-roadmap-heading h2,
 .careers-enquiry-copy h2 {
@@ -34,10 +25,6 @@
   letter-spacing: -0.03em;
   line-height: 1.3;
 }
-
-/* ========================================
-   Careers Roadmap
-======================================== */
 
 .careers-roadmap {
   padding-block: clamp(30px, 5vw, 30px);
@@ -54,14 +41,10 @@
   gap: 20px;
 }
 
-.careers-roadmap-grid > sky-feature-card {
+.careers-roadmap-grid>sky-feature-card {
   display: block;
   min-width: 0;
 }
-
-/* ========================================
-   Current Openings
-======================================== */
 
 .careers-openings {
   padding-block: clamp(30px, 5vw, 30px);
@@ -82,7 +65,7 @@
   gap: 16px;
 }
 
-.careers-static-job-grid > sky-cta-banner {
+.careers-static-job-grid>sky-cta-banner {
   display: block;
   width: 100%;
   min-width: 0;
@@ -106,10 +89,6 @@
   min-width: 0;
 }
 
-/* ========================================
-   Enquiry Section
-======================================== */
-
 .careers-enquiry {
   padding-block: clamp(32px, 5vw, 32px);
   scroll-margin-top: 80px;
@@ -132,22 +111,18 @@
   color: var(--md-sys-color-primary, #386b40);
 }
 
-.careers-enquiry-copy > p:last-child {
+.careers-enquiry-copy>p:last-child {
   max-width: 440px;
   margin: 20px 0 0;
   line-height: 1.8;
 }
 
-/* Shared tile card used as the form container */
-
-.careers-enquiry-grid > sky-tile-card {
+.careers-enquiry-grid>sky-tile-card {
   display: block;
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
 }
-
-/* Form layout only; shared components style the fields and button */
 
 .careers-enquiry-form {
   display: grid;
@@ -163,22 +138,14 @@
   min-width: 0;
 }
 
-.careers-enquiry-fields > *,
-.careers-enquiry-form > * {
+.careers-enquiry-fields>*,
+.careers-enquiry-form>* {
   min-width: 0;
 }
-
-/* ========================================
-   Smooth Scrolling
-======================================== */
 
 html {
   scroll-behavior: smooth;
 }
-
-/* ========================================
-   Tablet
-======================================== */
 
 @media (max-width: 900px) {
   .careers-roadmap-grid {
@@ -195,10 +162,6 @@ html {
     grid-template-columns: minmax(0, 1fr);
   }
 }
-
-/* ========================================
-   Mobile
-======================================== */
 
 @media (max-width: 600px) {
   .careers-section-heading {
@@ -232,10 +195,6 @@ html {
     grid-template-columns: minmax(0, 1fr);
   }
 }
-
-/* ========================================
-   Reduced Motion Accessibility
-======================================== */
 
 @media (prefers-reduced-motion: reduce) {
   html {

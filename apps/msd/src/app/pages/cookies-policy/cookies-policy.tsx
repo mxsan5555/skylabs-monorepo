@@ -1,4 +1,5 @@
-import { Icon, FilledButton, OutlinedTextField, } from '@skylabs-monorepo/shared-ui/react';
+
+import { Icon } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui';
 import './cookies-policy.css';
 
@@ -39,8 +40,8 @@ export function CookiesPolicy() {
         </p>
 
         <div className="cookies-page__updated">
-          <Icon>cookie</Icon>
-          <span>Last updated: [publication date]</span>
+          <Icon aria-hidden="true">cookie</Icon>
+          <span>Last updated: 21/10/2026</span>
         </div>
       </section>
 
@@ -54,26 +55,24 @@ export function CookiesPolicy() {
             icon={section.icon}
             heading={section.heading}
             subheading={section.subheading}
-          ></sky-info-card>
+          />
         ))}
       </section>
 
-      <section className="cookies-page__contact">
-        <div>
-          <h2>Questions about cookies?</h2>
-          <p>
-            Contact our team if you have questions about cookies
-            or how information is used on MySpaDeal.
-          </p>
-        </div>
-
-        <a
-          href="/contact"
-          className="cookies-page__contact-link"
-        >
-          Contact Us
-          <Icon>arrow_forward</Icon>
-        </a>
+      <section
+        className="cookies-page__contact"
+        aria-label="Cookie policy support"
+      >
+        <sky-cta-banner
+          color="primary"
+          icon="support_agent"
+          iconStyle="surface"
+          headline="Questions about cookies?"
+          text="Contact our team if you have questions about cookies or how information is used on MySpaDeal."
+          ctaLabel="Contact Us"
+          ctaHref="/contact"
+          ctaIcon="arrow_forward"
+        />
       </section>
     </main>
   );

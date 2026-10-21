@@ -165,12 +165,6 @@ export function DealDetail() {
   const branchAddress = branch
     ? [branch.name, [branch.address, branch.city].filter(Boolean).join(', ')].filter(Boolean)
     : [];
-  function showPrevImage() {
-    setActiveImg((current) => (current - 1 + gallery.length) % gallery.length);
-  }
-  function showNextImage() {
-    setActiveImg((current) => (current + 1) % gallery.length);
-  }
   function toggleFavorite() {
     if (!requireAuthOrRedirect()) {
       return;
@@ -274,17 +268,6 @@ showSnackbar(`Added "${deal.title}" to your cart.`, {
                 <span className="deal-detail__badge" aria-label={`${discountPct}% ${dealDetail.labels.off}`}>
                   {discountPct}% {dealDetail.labels.off}
                 </span>
-              )}
-              {gallery.length > 1 && (
-                <>
-                  <button type="button" className="deal-detail__nav deal-detail__nav--prev" aria-label="Previous image" onClick={showPrevImage}>
-                    <Icon aria-hidden="true">chevron_left</Icon>
-                  </button>
-                  <button type="button" className="deal-detail__nav deal-detail__nav--next" aria-label="Next image" onClick={showNextImage}>
-                    <Icon aria-hidden="true">chevron_right</Icon>
-                  </button>
-                  <span className="deal-detail__counter">{activeImg + 1} / {gallery.length}</span>
-                </>
               )}
             </div>
             {gallery.length > 1 && (

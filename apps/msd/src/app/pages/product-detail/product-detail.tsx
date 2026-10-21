@@ -238,17 +238,8 @@ export function ProductDetail() {
                   {product.discount}% {products.detail.offSuffix}
                 </sky-badge>
               )}
-              {gallery.length > 1 && (
-                <>
-                  <button type="button" className="product-detail__nav product-detail__nav--prev" aria-label="Previous image" onClick={showPrevImage}>
-                    <Icon aria-hidden="true">chevron_left</Icon>
-                  </button>
-                  <button type="button" className="product-detail__nav product-detail__nav--next" aria-label="Next image" onClick={showNextImage}>
-                    <Icon aria-hidden="true">chevron_right</Icon>
-                  </button>
-                  <span className="product-detail__counter">{activeImg + 1} / {gallery.length}</span>
-                </>
-              )}
+    
+              
             </div>
             {gallery.length > 1 && (
               <div

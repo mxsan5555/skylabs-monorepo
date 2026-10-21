@@ -1,3 +1,4 @@
+
 .privacy-policy {
   width: min(100% - 40px, 1120px);
   margin-inline: auto;
@@ -46,8 +47,8 @@
   font-size: 13px;
 }
 
-.privacy-policy__updated md-icon {
-  font-size: 20px;
+.privacy-policy__updated > * {
+  flex-shrink: 0;
 }
 
 .privacy-policy__grid {
@@ -57,89 +58,33 @@
   margin-bottom: 28px;
 }
 
-/* Shared info cards fill their grid cells */
 .privacy-policy__grid sky-info-card {
+  display: block;
   min-width: 0;
 }
 
 .privacy-policy__rights {
-  display: flex;
-  align-items: flex-start;
-  gap: 18px;
-  padding: 28px;
   margin-bottom: 28px;
-  border: 1px solid var(--md-sys-color-outline-variant);
-  border-radius: 20px;
-  background: var(--md-sys-color-surface);
+  min-width: 0;
 }
 
-.privacy-policy__rights-icon {
-  display: grid;
-  flex: 0 0 48px;
-  width: 48px;
-  height: 48px;
-  place-items: center;
-  border-radius: 14px;
-  color: var(--md-sys-color-primary);
-  background: var(--md-sys-color-secondary-container);
-}
-
-.privacy-policy__rights-icon md-icon {
-  font-size: 25px;
-}
-
-.privacy-policy__rights-content h2,
-.privacy-policy__contact h2 {
-  margin: 0 0 10px;
-  font-size: 21px;
-  line-height: 1.35;
-}
-
-.privacy-policy__rights-content p,
-.privacy-policy__contact p {
-  margin: 0;
-  color: var(--md-sys-color-on-surface-variant);
-  font-size: 14px;
-  line-height: 1.8;
-}
-
-.privacy-policy__rights-content p + p {
-  margin-top: 10px;
+.privacy-policy__rights sky-feature-card {
+  display: block;
+  width: 100%;
 }
 
 .privacy-policy__contact {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 28px;
-  border-radius: 20px;
-  color: var(--md-sys-color-on-primary-container);
-  background: var(--md-sys-color-primary-container);
+  min-width: 0;
 }
 
-.privacy-policy__contact > div {
-  max-width: 650px;
-}
-
-.privacy-policy__contact-link {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 8px;
-  color: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.privacy-policy__contact-link:hover {
-  text-decoration: underline;
+.privacy-policy__contact sky-cta-banner {
+  display: block;
+  width: 100%;
 }
 
 @media (max-width: 700px) {
   .privacy-policy {
-    width: min(100% - 28px, 1120px);
+    width: calc(100% - 28px);
     padding-block: 28px 40px;
   }
 
@@ -152,24 +97,9 @@
     padding: 28px 22px;
     border-radius: 20px;
   }
-
-  .privacy-policy__rights {
-    padding: 22px;
-    gap: 14px;
-  }
-
-  .privacy-policy__contact {
-    align-items: flex-start;
-    flex-direction: column;
-    padding: 24px;
-  }
 }
 
 @media (max-width: 420px) {
-  .privacy-policy__rights {
-    flex-direction: column;
-  }
-
   .privacy-policy__hero h1 {
     font-size: 34px;
   }
