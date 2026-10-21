@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ToastProvider } from '../../../../toast/toast-context';
+import { SnackbarHost } from '../../../../snackbar/snackbar';
 import { OrdersAndVerify } from './orders-and-verify';
 
 const useAuthMock = vi.fn();
@@ -32,9 +32,10 @@ const LONG = { timeout: 5000 };
 
 function renderPage() {
   return render(
-    <ToastProvider>
+    <>
       <OrdersAndVerify />
-    </ToastProvider>,
+      <SnackbarHost />
+    </>,
   );
 }
 

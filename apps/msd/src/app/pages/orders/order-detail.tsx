@@ -3,22 +3,63 @@ import type { MdDialog } from '@material/web/dialog/dialog.js';
 import { useNavigate, useParams } from 'react-router-dom';
 import { FilledButton, CircularProgress, OutlinedButton, Divider, Icon, Dialog, OutlinedTextField, TextButton } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { getMyOrder, cancelMyOrder, type Order, } from '../../../api/orders';
+import { getMyOrder, cancelMyOrder, type Order, type OrderItem } from '../../../api/orders';
+import { raiseDispute } from '../../../api/rbac/disputes';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { formatINR } from '../../../utils/format';
 import content from '../../../content.json';
 import { groupOrderItemsByVendor } from '../../../utils/order-items';
-import { useToast } from '../../../toast/toast-context';
+import { showSnackbar } from '../../../snackbar/snackbar';
 import '../cart/cart.css';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { ProductOrderTimeline } from '../orders/product-order-timeline';
 import { OrderCancellationTimeline } from './order-cancellation-timeline';
 
+const ENTITLEMENT_STATUS_LABEL: Record<string, string> = {
+  ACTIVE: 'Not started yet',
+  STARTED: 'In progress',
+  OTP_REQUESTED: 'Completion in progress',
+  COMPLETED: 'Completed',
+  CANCELLED: 'Cancelled',
+  REFUNDED: 'Refunded',
+};
+
+/**
+ * Per-entitlement voucher display + "Raise Issue" — renders nothing when `item.entitlements` is
+ * absent (see `api/orders.ts`'s own doc comment on that field: the backend doesn't populate it
+ * yet, so this degrades to a no-op rather than showing broken/empty UI). No QR code — none
+ * exists in `shared-ui` (confirmed, zero hits) — just the opaque voucher code and its status.
+ */
+function PurchaseVerification({ item, onRaiseIssue }: { item: OrderItem; onRaiseIssue: (entitlementId: string) => void }) {
+  const { verification } = content.orderDetail;
+  if (!item.entitlements || item.entitlements.length === 0) return null;
+  return (
+    <div className="cart-vendor-group__entitlements">
+      <p className="field-hint">
+        <strong>{verification.heading}</strong>
+      </p>
+      {item.entitlements.map((e) => (
+        <p key={e.id} className="field-hint">
+          {verification.voucherLabel}: <code>{e.voucherCode}</code> · {verification.statusLabel}:{' '}
+          {ENTITLEMENT_STATUS_LABEL[e.entitlementStatus] ?? e.entitlementStatus}
+          {e.dispute ? (
+            <> · {verification.disputeStatus[e.dispute.status]}</>
+          ) : (
+            <>
+              {' '}
+              <TextButton onClick={() => onRaiseIssue(e.id)}>{verification.raiseIssue.cta}</TextButton>
+            </>
+          )}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 export function OrderDetail() {
   const { id = '' } = useParams<{ id: string }>();
   const { token } = useAuth();
   const navigate = useNavigate();
-  const { showToast } = useToast();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -50,7 +91,7 @@ export function OrderDetail() {
         description: raiseIssueDescription.trim() || undefined,
       });
       raiseIssueDialogRef.current?.close();
-      showToast(orderDetail.verification.raiseIssue.success);
+      showSnackbar(orderDetail.verification.raiseIssue.success);
       load();
     } catch (err) {
       setRaiseIssueError(err instanceof ApiRequestError ? err.message : orderDetail.verification.raiseIssue.error);
@@ -147,12 +188,19 @@ export function OrderDetail() {
                           </div>
                           <p className="cart-item__price"> {formatINR(Number(item.lineTotal),)}</p>
                         </div>
+                        {item.itemType === 'PRODUCT' &&
+                          !isCancelled && (
+                            <div className="cart-item__timeline"> <ProductOrderTimeline status={order.status} /></div>
+                          )}
+                        {isCancelled && (
                           <div className="cart-item__timeline"> <OrderCancellationTimeline order={order} /></div>
                         )}
+                        <PurchaseVerification item={item} onRaiseIssue={openRaiseIssue} />
                       </div>
                     </li>
                   ))}
                 </ul>
+                {isCancelled && isPaid && (
                   <sky-info-card
                     icon="info"
                     heading="Refund Information"

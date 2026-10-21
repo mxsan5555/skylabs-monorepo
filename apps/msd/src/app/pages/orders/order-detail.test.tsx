@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ToastProvider } from '../../../toast/toast-context';
+import { SnackbarHost } from '../../../snackbar/snackbar';
 import type { Order } from '../../../api/orders';
 
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
@@ -76,11 +76,10 @@ function baseOrder(overrides: Partial<Order> = {}): Order {
 function renderPage(order: Order = baseOrder()) {
   getMyOrderMock.mockResolvedValue({ data: order });
   return render(
-    <ToastProvider>
-      <MemoryRouter>
-        <OrderDetail />
-      </MemoryRouter>
-    </ToastProvider>,
+    <MemoryRouter>
+      <OrderDetail />
+      <SnackbarHost />
+    </MemoryRouter>,
   );
 }
 

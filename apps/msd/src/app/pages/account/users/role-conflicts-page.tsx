@@ -4,7 +4,7 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { listRoleConflicts, resolveRoleConflict, type RoleConflictAccount } from '../../../../api/rbac/users';
 import { listRoles, type Role } from '../../../../api/rbac/roles';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { useToast } from '../../../../toast/toast-context';
+import { showSnackbar } from '../../../../snackbar/snackbar';
 import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
 import { userDisplayName } from './user-list';
@@ -18,7 +18,6 @@ import { userDisplayName } from './user-list';
  */
 export function RoleConflictsPage() {
   const { token } = useAuth();
-  const { showToast } = useToast();
   const { confirm, ConfirmDialog } = useConfirmDialog();
   useSetBreadcrumbs([
     { label: 'Administration', to: '/account/administration/users' },
@@ -61,7 +60,7 @@ export function RoleConflictsPage() {
   const resolve = async (account: RoleConflictAccount) => {
     const roleId = choices[account.id];
     if (!roleId) {
-      showToast('Pick a final role before resolving.', 'error');
+      showSnackbar('Pick a final role before resolving.', { variant: 'error' });
       return;
     }
     const chosenRole = allRoles.find((r) => r.id === roleId);
@@ -71,10 +70,10 @@ export function RoleConflictsPage() {
     setResolvingId(account.id);
     try {
       await resolveRoleConflict(token, account.id, roleId);
-      showToast('Account role resolved.');
+      showSnackbar('Account role resolved.');
       await load();
     } catch (err) {
-      showToast(err instanceof ApiRequestError ? err.message : 'Could not resolve this account.', 'error');
+      showSnackbar(err instanceof ApiRequestError ? err.message : 'Could not resolve this account.', { variant: 'error' });
     } finally {
       setResolvingId(null);
     }

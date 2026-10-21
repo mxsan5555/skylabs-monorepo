@@ -1,7 +1,7 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ToastProvider } from '../../../../toast/toast-context';
+import { SnackbarHost } from '../../../../snackbar/snackbar';
 
 import { VoucherVerificationPage } from './voucher-verification-page';
 
@@ -89,13 +89,12 @@ function verifyResponse(
 
 function renderAt(code = CODE) {
   return render(
-    <ToastProvider>
-      <MemoryRouter initialEntries={[`/account/vendor-orders/verify/${code}`]}>
-        <Routes>
-          <Route path="/account/vendor-orders/verify/:code" element={<VoucherVerificationPage />} />
-        </Routes>
-      </MemoryRouter>
-    </ToastProvider>,
+    <MemoryRouter initialEntries={[`/account/vendor-orders/verify/${code}`]}>
+      <Routes>
+        <Route path="/account/vendor-orders/verify/:code" element={<VoucherVerificationPage />} />
+      </Routes>
+      <SnackbarHost />
+    </MemoryRouter>,
   );
 }
 

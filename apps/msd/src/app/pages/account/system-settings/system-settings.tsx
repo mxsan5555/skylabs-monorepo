@@ -3,7 +3,7 @@ import { FilledButton, OutlinedTextField } from '@skylabs-monorepo/shared-ui/rea
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getFinanceSettings, updateFinanceSettings, type FinanceSettings } from '../../../../api/rbac/accounts';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { useToast } from '../../../../toast/toast-context';
+import { showSnackbar } from '../../../../snackbar/snackbar';
 
 interface FormState {
   defaultCommissionRatePercent: string;
@@ -33,7 +33,6 @@ function toForm(s: FinanceSettings): FormState {
  */
 export function SystemSettingsPage() {
   const { token, can } = useAuth();
-  const { showToast } = useToast();
   const canEdit = can('system-settings', 'edit');
 
   const [form, setForm] = useState<FormState | null>(null);
@@ -70,7 +69,7 @@ export function SystemSettingsPage() {
         completionOtpResendCooldownSeconds: Number(form.completionOtpResendCooldownSeconds),
       });
       setForm(toForm(data));
-      showToast('Finance settings saved.');
+      showSnackbar('Finance settings saved.', { variant: 'success' });
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Could not save finance settings.');
     } finally {

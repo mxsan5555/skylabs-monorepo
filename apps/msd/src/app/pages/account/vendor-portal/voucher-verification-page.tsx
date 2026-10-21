@@ -15,7 +15,7 @@ import {
 } from '../../../../api/rbac/vouchers';
 import type { EntitlementStatus, FulfilmentKind } from '../../../../api/rbac/settlements';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { useToast } from '../../../../toast/toast-context';
+import { showSnackbar } from '../../../../snackbar/snackbar';
 import '../../cart/cart.css';
 import { formatINR } from '../../../../utils/format';
 
@@ -88,7 +88,6 @@ export function VoucherVerificationPage() {
   const { code = '' } = useParams<{ code: string }>();
   const { token } = useAuth();
   const navigate = useNavigate();
-  const { showToast } = useToast();
 
   const [verify, setVerify] = useState<VoucherVerifyResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -131,7 +130,7 @@ export function VoucherVerificationPage() {
     setActionError('');
     try {
       await fn();
-      showToast(successMessage);
+      showSnackbar(successMessage, { variant: 'success' });
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : 'Could not complete this action.');
     } finally {

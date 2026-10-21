@@ -1024,7 +1024,27 @@
    "messages": {
   "refundAfterCancellation": "Your refund will be credited to your original payment method within 5–7 business days.",
   "cancelledWithoutReason": "This order has been cancelled."
-}
+},
+    "verification": {
+      "heading": "Purchase verification",
+      "voucherLabel": "Voucher",
+      "statusLabel": "Status",
+      "disputeStatus": {
+        "OPEN": "Issue raised — pending review",
+        "UNDER_REVIEW": "Issue under review",
+        "RESOLVED": "Issue resolved"
+      },
+      "raiseIssue": {
+        "cta": "Raise Issue",
+        "dialogTitle": "Raise an issue",
+        "reasonLabel": "Reason",
+        "descriptionLabel": "Description (optional)",
+        "cancel": "Cancel",
+        "submit": "Submit",
+        "success": "Your issue has been raised. We'll get back to you soon.",
+        "error": "Could not raise this issue. Please try again."
+      }
+    }
   },
   "meta": {
     "home": {

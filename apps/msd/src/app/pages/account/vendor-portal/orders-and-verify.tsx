@@ -12,7 +12,7 @@ import {
 } from '../../../../api/rbac/vouchers';
 import type { EntitlementStatus, FulfilmentKind } from '../../../../api/rbac/settlements';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { useToast } from '../../../../toast/toast-context';
+import { showSnackbar } from '../../../../snackbar/snackbar';
 import { OrderManagement } from '../orders/orders';
 
 const RESULT_COPY: Record<VoucherVerifyResult, { icon: string; title: string; tone: 'success' | 'error' }> = {
@@ -87,7 +87,6 @@ function pushHistory(entry: HistoryEntry) {
  */
 export function OrdersAndVerify() {
   const { token } = useAuth();
-  const { showToast } = useToast();
 
   const [code, setCode] = useState('');
   const [verifying, setVerifying] = useState(false);
@@ -146,7 +145,7 @@ export function OrdersAndVerify() {
     setActionError('');
     try {
       await fn();
-      showToast(label);
+      showSnackbar(label, { variant: 'success' });
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : `Could not ${label.toLowerCase()}.`);
     } finally {

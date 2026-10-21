@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { UserRecord } from '../../../../api/rbac/users';
-import { ToastProvider } from '../../../../toast/toast-context';
+import { SnackbarHost } from '../../../../snackbar/snackbar';
 import { UserDetailPage } from './user-detail-page';
 
 const getUserMock = vi.fn();
@@ -35,7 +35,7 @@ vi.mock('../../../../api/rbac/roles', () => ({
     ],
   }),
   getPermissionCatalog: vi.fn().mockResolvedValue({ data: [] }),
-  getRolePermissionIds: vi.fn().mockResolvedValue({ data: { permissionIds: [] } }),
+  getRolePermissions: vi.fn().mockResolvedValue({ data: [] }),
 }));
 
 const SAMPLE_USER: UserRecord = {
@@ -59,15 +59,14 @@ function renderPage(url = '/account/administration/users/user-1') {
   getLoginHistoryMock.mockResolvedValue({ data: [] });
   getSessionsMock.mockResolvedValue({ data: [] });
   return render(
-    <ToastProvider>
-      <MemoryRouter initialEntries={[url]}>
-        <Routes>
-          <Route path="/account/administration/users/:userId" element={<UserDetailPage />} />
-          <Route path="/account/administration/users/:userId/:section" element={<UserDetailPage />} />
-          <Route path="/account/dashboard" element={<p>dashboard-stub</p>} />
-        </Routes>
-      </MemoryRouter>
-    </ToastProvider>,
+    <MemoryRouter initialEntries={[url]}>
+      <Routes>
+        <Route path="/account/administration/users/:userId" element={<UserDetailPage />} />
+        <Route path="/account/administration/users/:userId/:section" element={<UserDetailPage />} />
+        <Route path="/account/dashboard" element={<p>dashboard-stub</p>} />
+      </Routes>
+      <SnackbarHost />
+    </MemoryRouter>,
   );
 }
 
@@ -192,13 +191,12 @@ describe('UserDetailPage', () => {
     useAuthMock.mockReturnValue({ token: 'tok', can: () => true, bootstrap: VIEWER_SUPERADMIN_BOOTSTRAP, loginAsUser: loginAsUserMock });
     getUserMock.mockRejectedValue(new Error('not found'));
     render(
-      <ToastProvider>
-        <MemoryRouter initialEntries={['/account/administration/users/missing']}>
-          <Routes>
-            <Route path="/account/administration/users/:userId" element={<UserDetailPage />} />
-          </Routes>
-        </MemoryRouter>
-      </ToastProvider>,
+      <MemoryRouter initialEntries={['/account/administration/users/missing']}>
+        <Routes>
+          <Route path="/account/administration/users/:userId" element={<UserDetailPage />} />
+        </Routes>
+        <SnackbarHost />
+      </MemoryRouter>,
     );
     expect(await screen.findByText('Could not load this user.')).toBeTruthy();
   });

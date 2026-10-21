@@ -22,7 +22,7 @@ import {
 import { createRefund, listRefundsForOrderItem, type Refund } from '../../../../api/rbac/refunds';
 import { listVendors, type Vendor } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { useToast } from '../../../../toast/toast-context';
+import { showSnackbar } from '../../../../snackbar/snackbar';
 
 const STATUS_LABEL: Record<DisputeStatus, string> = { OPEN: 'Open', UNDER_REVIEW: 'Under review', RESOLVED: 'Resolved' };
 
@@ -43,7 +43,6 @@ const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 10, status: '' };
  */
 export function RefundsDisputesPage() {
   const { token, can } = useAuth();
-  const { showToast } = useToast();
   const canApprove = can('accounts.refunds-disputes', 'approve');
   const canReject = can('accounts.refunds-disputes', 'reject');
   const canStatusChange = can('accounts.refunds-disputes', 'status_change');
@@ -113,7 +112,7 @@ export function RefundsDisputesPage() {
       setResolveNotes('');
       resolveDialogRef.current?.show();
     } catch (err) {
-      showToast(err instanceof ApiRequestError ? err.message : 'Could not load this dispute.', 'error');
+      showSnackbar(err instanceof ApiRequestError ? err.message : 'Could not load this dispute.', { variant: 'error' });
     }
   };
 
@@ -124,7 +123,7 @@ export function RefundsDisputesPage() {
     try {
       await resolveDispute(token, resolveTarget.id, { resolutionType: resolveType, resolutionNotes: resolveNotes.trim() || undefined });
       resolveDialogRef.current?.close();
-      showToast('Dispute resolved.');
+      showSnackbar('Dispute resolved.', { variant: 'success' });
       if (resolveType === 'REFUNDED') {
         openRefund({ orderItemId: resolveTarget.orderItemId, entitlementId: resolveTarget.entitlementId ?? undefined, disputeId: resolveTarget.id });
       }
@@ -173,7 +172,7 @@ export function RefundsDisputesPage() {
         reason: refundReason.trim() || undefined,
       });
       refundDialogRef.current?.close();
-      showToast('Refund recorded.');
+      showSnackbar('Refund recorded.', { variant: 'success' });
     } catch (err) {
       setRefundError(err instanceof ApiRequestError ? err.message : 'Could not record this refund.');
     } finally {
@@ -191,7 +190,7 @@ export function RefundsDisputesPage() {
       setViewedRefunds(data);
       viewRefundsDialogRef.current?.show();
     } catch (err) {
-      showToast(err instanceof ApiRequestError ? err.message : 'Could not load refunds for this item.', 'error');
+      showSnackbar(err instanceof ApiRequestError ? err.message : 'Could not load refunds for this item.', { variant: 'error' });
     }
   };
 

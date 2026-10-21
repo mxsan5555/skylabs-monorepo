@@ -14,9 +14,9 @@ import {
   updateUser,
   type UserRecord,
 } from '../../../../api/rbac/users';
-import { getPermissionCatalog, getRolePermissionIds, listRoles, type PermissionCatalogRow, type Role } from '../../../../api/rbac/roles';
+import { getPermissionCatalog, getRolePermissions, listRoles, type PermissionCatalogRow, type Role } from '../../../../api/rbac/roles';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { useToast } from '../../../../toast/toast-context';
+import { showSnackbar } from '../../../../snackbar/snackbar';
 import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
 import { ChipNav } from '../../../components/chip-nav/chip-nav';
@@ -51,7 +51,6 @@ export function UserDetailPage() {
   const section = SECTIONS.some((s) => s.key === rawSection) ? (rawSection as SectionKey) : 'profile';
   const navigate = useNavigate();
   const { token, can, bootstrap, loginAsUser } = useAuth();
-  const { showToast } = useToast();
   const { confirm, ConfirmDialog } = useConfirmDialog();
 
   const canEdit = can('rbac.users', 'edit');
@@ -142,7 +141,7 @@ export function UserDetailPage() {
     setAccessLoading(true);
     Promise.all([
       getPermissionCatalog(token),
-      ...user.roles.map((r) => getRolePermissionIds(token, r.id).then(({ data }) => [r.id, data.permissionIds] as const)),
+      ...user.roles.map((r) => getRolePermissions(token, r.id).then(({ data }) => [r.id, data.map((p) => p.permissionId)] as const)),
     ])
       .then(([catalogResult, ...roleResults]) => {
         setCatalog(catalogResult.data);
@@ -174,11 +173,11 @@ export function UserDetailPage() {
     const phone = detailForm.phone.trim();
 
     if (email && !validateEmail(email)) {
-      showToast(content.validation.email.invalid, 'error');
+      showSnackbar(content.validation.email.invalid, { variant: 'error' });
       return;
     }
     if (phone && !validatePhone(phone)) {
-      showToast(content.validation.phone.invalid, 'error');
+      showSnackbar(content.validation.phone.invalid, { variant: 'error' });
       return;
     }
 
@@ -186,9 +185,9 @@ export function UserDetailPage() {
     try {
       const { data } = await updateUser(token, user.id, { name: detailForm.name, email: email || undefined, phone: phone || undefined });
       setUser(data);
-      showToast('User details saved.');
+      showSnackbar('User details saved.');
     } catch (err) {
-      showToast(err instanceof ApiRequestError ? err.message : 'Could not save user details.', 'error');
+      showSnackbar(err instanceof ApiRequestError ? err.message : 'Could not save user details.', { variant: 'error' });
     } finally {
       setSavingDetails(false);
     }
@@ -200,9 +199,9 @@ export function UserDetailPage() {
     try {
       const { data } = await setUserStatus(token, user.id, status);
       setUser(data);
-      showToast('Account status updated.');
+      showSnackbar('Account status updated.');
     } catch (err) {
-      showToast(err instanceof ApiRequestError ? err.message : 'Could not change account status.', 'error');
+      showSnackbar(err instanceof ApiRequestError ? err.message : 'Could not change account status.', { variant: 'error' });
     }
   };
 
@@ -219,9 +218,9 @@ export function UserDetailPage() {
       const { data } = await setUserRole(token, user.id, selectedRoleId);
       setUser(data);
       setSelectedRoleId(data.roles[0]?.id ?? '');
-      showToast('Role updated.');
+      showSnackbar('Role updated.');
     } catch (err) {
-      showToast(err instanceof ApiRequestError ? err.message : 'Could not update role.', 'error');
+      showSnackbar(err instanceof ApiRequestError ? err.message : 'Could not update role.', { variant: 'error' });
     } finally {
       setSavingRole(false);
     }
@@ -232,11 +231,11 @@ export function UserDetailPage() {
     if (!(await confirm(`Revoke every active session for ${name}? They'll be signed out everywhere.`))) return;
     try {
       await revokeAllSessions(token, user.id);
-      showToast('All sessions revoked.');
+      showSnackbar('All sessions revoked.', { variant: 'success' });
       const { data } = await getSessions(token, user.id);
       setSessions(data);
     } catch (err) {
-      showToast(err instanceof ApiRequestError ? err.message : 'Could not revoke sessions.', 'error');
+      showSnackbar(err instanceof ApiRequestError ? err.message : 'Could not revoke sessions.', { variant: 'error' });
     }
   };
 
@@ -246,7 +245,7 @@ export function UserDetailPage() {
       await loginAsUser(user.id);
       navigate('/account/dashboard');
     } catch {
-      showToast('Could not start preview session.', 'error');
+      showSnackbar('Could not start preview session.', { variant: 'error' });
     }
   };
 
@@ -254,9 +253,9 @@ export function UserDetailPage() {
     if (!user) return;
     try {
       await resetOtp(token, user.id);
-      showToast('Pending OTP challenges invalidated.');
+      showSnackbar('Pending OTP challenges invalidated.');
     } catch (err) {
-      showToast(err instanceof ApiRequestError ? err.message : 'Could not reset OTP.', 'error');
+      showSnackbar(err instanceof ApiRequestError ? err.message : 'Could not reset OTP.', { variant: 'error' });
     }
   };
 

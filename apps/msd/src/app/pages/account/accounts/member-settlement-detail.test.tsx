@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BreadcrumbProvider } from '../../../admin/breadcrumb-context';
-import { ToastProvider } from '../../../../toast/toast-context';
+import { SnackbarHost } from '../../../../snackbar/snackbar';
 import { MemberSettlementDetailPage } from './member-settlement-detail';
 import type { MemberSettlementDetail } from '../../../../api/rbac/settlements';
 import type { Vendor } from '../../../../api/rbac/vendors';
@@ -110,15 +110,14 @@ function detailFixture(overrides: Partial<MemberSettlementDetail> = {}): MemberS
 
 function renderPage() {
   return render(
-    <ToastProvider>
-      <BreadcrumbProvider>
-        <MemoryRouter initialEntries={['/account/accounts/member-settlements/v1']}>
-          <Routes>
-            <Route path="/account/accounts/member-settlements/:vendorId" element={<MemberSettlementDetailPage />} />
-          </Routes>
-        </MemoryRouter>
-      </BreadcrumbProvider>
-    </ToastProvider>,
+    <BreadcrumbProvider>
+      <MemoryRouter initialEntries={['/account/accounts/member-settlements/v1']}>
+        <Routes>
+          <Route path="/account/accounts/member-settlements/:vendorId" element={<MemberSettlementDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+      <SnackbarHost />
+    </BreadcrumbProvider>,
   );
 }
 

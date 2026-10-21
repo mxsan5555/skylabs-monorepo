@@ -23,7 +23,7 @@ import {
 } from '../../../../api/rbac/settlements';
 import { getVendor, type Vendor } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { useToast } from '../../../../toast/toast-context';
+import { showSnackbar } from '../../../../snackbar/snackbar';
 import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
 
 const ENTITLEMENT_STATUS_LABEL: Record<string, string> = {
@@ -60,7 +60,6 @@ function payable(e: PurchaseEntitlement): number {
 export function MemberSettlementDetailPage() {
   const { vendorId = '' } = useParams<{ vendorId: string }>();
   const { token, can, bootstrap } = useAuth();
-  const { showToast } = useToast();
 
   const canEditCommission = can('accounts.member-settlements', 'status_change');
   const canApprove = can('accounts.member-settlements', 'approve');
@@ -129,7 +128,7 @@ export function MemberSettlementDetailPage() {
       }
       await setVendorCommissionRate(token, vendorId, value);
       commissionDialogRef.current?.close();
-      showToast('Commission rate updated.');
+      showSnackbar('Commission rate updated.', { variant: 'success' });
       await load(true);
     } catch (err) {
       setCommissionError(err instanceof ApiRequestError ? err.message : 'Could not update the commission rate.');
@@ -183,7 +182,7 @@ export function MemberSettlementDetailPage() {
         idempotencyKey,
       });
       payoutDialogRef.current?.close();
-      showToast('Payout recorded.');
+      showSnackbar('Payout recorded.', { variant: 'success' });
       setSelected(new Set());
       await load(true);
     } catch (err) {

@@ -4,7 +4,7 @@ import { Divider, FilledButton, Icon, List, ListItem } from '@skylabs-monorepo/s
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getCustomer, setCustomerStatus, type Customer, type CustomerStatus } from '../../../../api/rbac/customers';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { useToast } from '../../../../toast/toast-context';
+import { showSnackbar } from '../../../../snackbar/snackbar';
 import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
 import { CardGrid } from '../../../components/card-grid/card-grid';
@@ -47,7 +47,6 @@ export function CustomerDetailPage() {
   const navigate = useNavigate();
   const { token, can } = useAuth();
   const canChangeStatus = can('customers', 'status_change');
-  const { showToast } = useToast();
   const { confirm, ConfirmDialog } = useConfirmDialog();
 
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -97,11 +96,11 @@ export function CustomerDetailPage() {
     try {
       const { data } = await setCustomerStatus(token, customer.id, status);
       setCustomer(data);
-      showToast(STATUS_SUCCESS_COPY[status]);
+      showSnackbar(STATUS_SUCCESS_COPY[status]);
     } catch (err) {
       const msg = err instanceof ApiRequestError ? err.message : 'Could not change customer status.';
       setStatusError(msg);
-      showToast(msg, 'error');
+      showSnackbar(msg, { variant: 'error' });
     }
   };
 

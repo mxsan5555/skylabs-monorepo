@@ -57,6 +57,7 @@ import { LegalPagesList } from './pages/account/cms/legal-pages-list';
 import { SocialMediaList } from './pages/account/cms/social-media-list';
 import { ProductManagement } from './pages/account/products/products';
 import { OrderManagement } from './pages/account/orders/orders';
+import { OrderDetailPage } from './pages/account/orders/order-detail-page';
 import { Reports } from './pages/account/reports/reports';
 import { AccountsOverviewPage } from './pages/account/accounts/accounts-overview';
 import { CustomerPaymentsPage } from './pages/account/accounts/customer-payments';

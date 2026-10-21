@@ -38,7 +38,6 @@ import {
   type PermissionCatalogRow,
   type PermissionScope,
   type Role,
-  updateRole,
 } from '../../../../api/rbac/roles';
 
 import { ApiRequestError } from '../../../../api/rbac/client';

@@ -14,6 +14,9 @@ import { OfferCard, type OfferItem, type OfferTag } from '../../components/offer
 import content from '../../../content.json';
 import type { DealCardDeal } from '../../components/deal-card';
 
+const dealPath = ({ id, slug }: { id: string; slug?: string }) =>
+  slug ? `/deals/${encodeURIComponent(slug)}` : `/deals/${encodeURIComponent(id)}`;
+
 const { home } = content;
 const heroSrcSet = imageSrcSet(home.hero.image, [640, 960, 1400]);
 const AUTOPLAY_MS = 6000;
