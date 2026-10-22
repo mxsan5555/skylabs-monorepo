@@ -394,9 +394,6 @@ showSnackbar(`Added "${deal.title}" to your cart.`, {
                 </div>
               </div>
             </div>
-            {actionMessage && (
-              <p className="field-hint" role="status"> {actionMessage} </p>
-            )}
             {actionError && (
               <p className="error-state" role="alert">{actionError} </p>
             )}

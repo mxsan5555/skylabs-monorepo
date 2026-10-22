@@ -41,6 +41,7 @@ export function ProductDetail() {
   const [activeImg, setActiveImg] = useState(0);
   const [qty, setQty] = useState(1);
   const [addError, setAddError] = useState('');
+  const [addedToCart, setAddedToCart] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -167,6 +168,7 @@ export function ProductDetail() {
 
     try {
       await addCartItem(token, { productId, quantity: qty });
+      setAddedToCart(true);
 
       showSnackbar(`Added "${product?.name ?? 'Product'}" to your cart.`, {
         variant: 'info',

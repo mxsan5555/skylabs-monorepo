@@ -53,6 +53,9 @@ PostgreSQL database `msd`, schema `apps/msd-api/prisma/schema.prisma` (67 models
   P4-09 renames it to `ADMIN | MEMBER`.
 - `AuditLog.actorUserId` is a required foreign key to `User`, so only actions by a person are
   audited.
+- `RefreshSession` stores only the refresh-token hash plus user, creation, expiry and revocation
+  metadata. Rotation carries the original `createdAt` forward to enforce the 90-day absolute
+  lifetime; no schema migration is required.
 
 ## 2. Members
 

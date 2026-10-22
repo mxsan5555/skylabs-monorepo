@@ -183,7 +183,7 @@
       },
       {
         "id": "customer-orders",
-        "title": "Order Hitory",
+        "title": "Order History",
         "route": "/account/orders",
         "permissionKey": "orders",
         "parent": "customers",
