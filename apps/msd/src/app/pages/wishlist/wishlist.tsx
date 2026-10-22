@@ -35,18 +35,16 @@ function toCatalogProduct(
 }
 export function Wishlist() {
   const { items, loading } = useWishlist();
-               console.log(
-  'Wishlist descriptions:',
-  items.map((item) => ({
-    name: item.product?.name,
-    description: item.product?.description,
-    summary: item.product?.summary,
-  })),
-);
   const navigate = useNavigate();
 
   return (
-    <div className="wishlist-page">
+    <div
+  className={`wishlist-page ${
+    window.location.pathname === '/my-account/wishlist'
+      ? 'wishlist-page--account'
+      : ''
+  }`}
+>
       <title>{content.meta.wishlist.title}</title>
 
       <meta

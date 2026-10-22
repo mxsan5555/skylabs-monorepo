@@ -1,13 +1,17 @@
+
 .wishlist-page {
   min-height: 60vh;
   padding: 22px 0 64px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .wishlist-page__inner {
   width: 100%;
-  max-width: 1280px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0 24px;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -31,11 +35,12 @@
 .wishlist-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 24px;
+  gap: 20px;
   align-items: stretch;
   list-style: none;
   margin: 0;
   padding: 0;
+  width: 100%;
 }
 
 .wishlist-grid__item {
@@ -44,13 +49,11 @@
   align-items: stretch;
 }
 
-/* Let the card wrapper fill the grid cell */
 .wishlist-grid__item > * {
   width: 100%;
   min-width: 0;
 }
 
-/* Support the existing OfferCard wrapper and shared product card */
 .wishlist-grid__item .deal-card,
 .wishlist-grid__item .sky-product-card-wc {
   display: flex;
@@ -63,15 +66,35 @@
   width: 100%;
   min-width: 0;
 }
+/* Wishlist inside My Account sidebar */
+.wishlist-page--account .wishlist-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
 
-@media (max-width: 1024px) {
-  .wishlist-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 20px;
+@media (max-width: 1100px) {
+  .wishlist-page--account .wishlist-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 768px) {
+  .wishlist-page--account .wishlist-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+}
+@media (max-width: 1100px) {
+  .wishlist-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .wishlist-page {
+    padding: 20px 0 40px;
+  }
+
   .wishlist-page__inner {
     padding: 0 16px;
   }
@@ -82,7 +105,7 @@
   }
 }
 
-@media (max-width: 360px) {
+@media (max-width: 400px) {
   .wishlist-page__inner {
     padding: 0 12px;
   }
