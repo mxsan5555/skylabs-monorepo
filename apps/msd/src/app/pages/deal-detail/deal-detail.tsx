@@ -1,7 +1,6 @@
 import { JsonLd } from '../../seo/json-ld';
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { DealCard, type DealCardDeal } from '../../components/deal-card';
 import { FilledButton, Icon, OutlinedButton, OutlinedIconButton } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import { showSnackbar } from '../../../snackbar/snackbar';
@@ -10,13 +9,7 @@ import { signInPathWithReturnTo } from '../../../auth/role-routing';
 import { addCartItem } from '../../../api/cart';
 import { OfferCard } from '../../components/offer-card/offer-card';
 import { CardRail } from '../../components/card-rail/card-rail';
-import {
-  getCatalogDeal,
-  getCatalogVendor,
-  listCatalogDeals,
-  type CatalogDeal,
-  type CatalogVendorBranch,
-} from '../../../api/catalog';
+import { getCatalogDeal, getCatalogVendor, listCatalogDeals, type CatalogDeal, type CatalogVendorBranch, } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { Breadcrumb } from '../../components/breadcrumb';
@@ -28,11 +21,7 @@ import { resolveDealMedia } from '../../../utils/media';
 import content from '../../../content.json';
 import './deal-detail.css';
 import { BannerSlot } from '../../components/banner-slot/banner-slot';
-
 const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
-
-/** Builds a Google Maps directions link from the branch's own coordinates, falling back to a
- *  text address search when coordinates are unavailable — never fabricated. */
 function directionsUrlFor(branch: CatalogDeal['branch']): string | undefined {
   if (!branch) return undefined;
   if (branch.latitude != null && branch.longitude != null) {
@@ -41,7 +30,6 @@ function directionsUrlFor(branch: CatalogDeal['branch']): string | undefined {
   const query = [branch.name, branch.address, branch.city].filter(Boolean).join(', ');
   return query ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(query)}` : undefined;
 }
-
 /**
  * A single Deal — GET /catalog/deals/:id. Deal is always a service offering (Product is a fully
  * independent catalog entity — see msd-api's Product schema doc comment) — Add to Cart always
@@ -80,30 +68,19 @@ export function DealDetail() {
       .then(({ data }) => { setDeal(data); })
       .catch((err: unknown) => {
         if (err instanceof ApiRequestError && err.status === 404) {
-          setDeal(null);
-          return;
+          setDeal(null); return;
         }
         setError(err instanceof ApiRequestError ? err.message : dealDetail.errors.loadDeal);
       })
       .finally(() => { setLoading(false); });
   }, [id]);
   useEffect(() => {
-    if (!deal?.category?.id) {
-      setRelated([]);
-      return;
-    }
-    listCatalogDeals({
-      categoryId: deal.category.id,
-      pageSize: 7,
-    })
+    if (!deal?.category?.id) { setRelated([]); return; }
+    listCatalogDeals({ categoryId: deal.category.id, pageSize: 7, })
       .then(({ data }) => {
-        setRelated(
-          data.filter((item) => item.id !== deal.id).slice(0, 6),
-        );
+        setRelated(data.filter((item) => item.id !== deal.id).slice(0, 6),);
       })
-      .catch(() => {
-        setRelated([]);
-      });
+      .catch(() => { setRelated([]); });
   }, [deal]);
   useEffect(() => {
     const slug = deal?.vendor?.slug;
@@ -122,11 +99,7 @@ export function DealDetail() {
       .finally(() => { setHoursLoaded(true); });
   }, [deal?.vendor?.slug, deal?.branch?.id]);
   const purchaseSelection = useDealPurchaseSelection(deal);
-  if (loading) {
-    return (
-      <p className="loading-state">{dealDetail.loading}</p>
-    );
-  }
+  if (loading) { return (<p className="loading-state">{dealDetail.loading}</p>); }
   if (error || !deal) {
     return (
       <div className="deal-detail deal-detail--empty">
@@ -162,64 +135,46 @@ export function DealDetail() {
   const dealId = deal.id;
   const branch = deal.branch;
   const directionsUrl = directionsUrlFor(branch);
-  const branchAddress = branch
-    ? [branch.name, [branch.address, branch.city].filter(Boolean).join(', ')].filter(Boolean)
-    : [];
+  const branchAddress = branch ? [branch.name, [branch.address, branch.city].filter(Boolean).join(', ')].filter(Boolean) : [];
   function toggleFavorite() {
-    if (!requireAuthOrRedirect()) {
-      return;
-    }
-    void toggleWishlist(dealId);
+    if (!requireAuthOrRedirect()) { return; } void toggleWishlist(dealId);
   }
   async function handleAddToCart() {
     if (!deal) return;
     if (!requireAuthOrRedirect()) return;
     const activePackage = purchaseSelection.activePackage;
     if (!activePackage) {
-      setActionError(
-        purchaseSelection.missingSelection ?? 'Please select a package.'
-      );
+      setActionError(purchaseSelection.missingSelection ?? 'Please select a package.');
       return;
     }
     setActionError('');
-
-
     try {
       await addCartItem(token, {
         dealId: deal.id,
         dealPackageId: activePackage.id,
         quantity,
       });
-
-showSnackbar(`Added "${deal.title}" to your cart.`, {
+      showSnackbar(`Added "${deal.title}" to your cart.`, {
         variant: 'info',
         actionLabel: 'View Cart',
         onAction: () => navigate('/cart'),
       });
     } catch (err) {
-      const message =
-        err instanceof ApiRequestError
-          ? err.message
-          : 'Unable to add item to cart.';
-
+      const message = err instanceof ApiRequestError ? err.message : 'Unable to add item to cart.';
       setActionError(message);
-
       showSnackbar(message, { variant: 'error' });
     }
-
   }
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(window.location.href);
       setCopied(true);
       setTimeout(() => { setCopied(false); }, 2000);
-    } catch {
-      setCopied(false);
     }
+    catch { setCopied(false); }
   }
   return (
     <div className="deal-detail">
-
       <title>{`${name} – ${deal.vendor?.businessName ?? 'MSD'} | MSD`}</title>
       <meta
         name="description"
@@ -227,17 +182,17 @@ showSnackbar(`Added "${deal.title}" to your cart.`, {
       />
       <JsonLd
         data={{
-            '@context': 'https://schema.org', '@type': 'Service',
-            name,
-            description,
-            provider: deal.vendor?.businessName ? { '@type': 'Organization', name: deal.vendor.businessName, } : undefined,
-            offers: {
-              '@type': 'Offer',
-              price: salePrice,
-              priceCurrency: 'INR',
-              availability: 'https://schema.org/InStock',
-            },
-          }}
+          '@context': 'https://schema.org', '@type': 'Service',
+          name,
+          description,
+          provider: deal.vendor?.businessName ? { '@type': 'Organization', name: deal.vendor.businessName, } : undefined,
+          offers: {
+            '@type': 'Offer',
+            price: salePrice,
+            priceCurrency: 'INR',
+            availability: 'https://schema.org/InStock',
+          },
+        }}
       />
       <Breadcrumb
         className="deal-detail__breadcrumb"
@@ -248,7 +203,6 @@ showSnackbar(`Added "${deal.title}" to your cart.`, {
           ] : []),
           { label: name, },]}
       />
-
       {/* Section 1 — 70/30: gallery left, buy box right */}
       <PageSection aria-labelledby="deal-title" className="deal-detail__hero">
         <div className="deal-detail__hero-grid">
@@ -271,10 +225,7 @@ showSnackbar(`Added "${deal.title}" to your cart.`, {
               )}
             </div>
             {gallery.length > 1 && (
-              <div
-                className="deal-detail__thumbs"
-                aria-label="Gallery thumbnails"
-              >
+              <div className="deal-detail__thumbs" aria-label="Gallery thumbnails">
                 {gallery.map((image, index) => (
                   <button
                     key={`${image}-${index}`}
@@ -284,13 +235,7 @@ showSnackbar(`Added "${deal.title}" to your cart.`, {
                     aria-label={`${dealDetail.gallery.viewImage} ${index + 1}`}
                     aria-pressed={index === activeImg}
                   >
-                    <img
-                      src={image}
-                      alt=""
-                      width={80}
-                      height={60}
-                      loading="lazy"
-                    />
+                    <img src={image} alt="" width={80} height={60} loading="lazy" />
                   </button>
                 ))}
               </div>
@@ -459,32 +404,23 @@ showSnackbar(`Added "${deal.title}" to your cart.`, {
           )}
         </div>
       </PageSection>
-{related.length > 0 && (
-  <section
-    className="deal-detail__related"
-    aria-labelledby="related-heading"
-  >
-    <div className="deal-detail__related-inner">
-      <CardRail
-        id="related-heading"
-        heading={dealDetail.relatedDeals}
-      >
-        {related.map((deal) => (
-          <swiper-slide
-            key={deal.id}
-            className="card-rail__slide"
-          >
-            <OfferCard
-              item={{ type: 'deal', deal }}
-              variant="outlined"
-              layout="vertical"
-            />
-          </swiper-slide>
-        ))}
-      </CardRail>
-    </div>
-  </section>
-)}
+      {related.length > 0 && (
+        <section className="deal-detail__related" aria-labelledby="related-heading">
+          <div className="deal-detail__related-inner">
+            <CardRail id="related-heading" heading={dealDetail.relatedDeals}>
+              {related.map((deal) => (
+                <swiper-slide key={deal.id} className="card-rail__slide">
+                  <OfferCard
+                    item={{ type: 'deal', deal }}
+                    variant="outlined"
+                    layout="vertical"
+                  />
+                </swiper-slide>
+              ))}
+            </CardRail>
+          </div>
+        </section>
+      )}
       <BannerSlot slot="DEAL_BOTTOM" />
     </div>
   );
