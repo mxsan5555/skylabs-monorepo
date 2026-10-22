@@ -1,24 +1,12 @@
 import { useParams, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useEffect, useState, useMemo, createElement } from 'react';
-import { ProductCardGallery } from '../../components/product-card-gallery';
 import { showSnackbar } from '../../../snackbar/snackbar';
 import { Icon, FilledButton } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { signInPathWithReturnTo } from '../../../auth/role-routing';
-import {
-  getCatalogCategory,
-  getCatalogDealFacets,
-  listCatalogDeals,
-  listCatalogProducts,
-  listCatalogTherapists,
-  type CatalogCategoryWithChildren,
-  type CatalogDeal,
-  type CatalogDealFacets,
-  type CatalogDealSort,
-  type CatalogProduct,
-  type CatalogTherapist,
-} from '../../../api/catalog';
+import { OfferCard } from '../../components/offer-card/offer-card';
+import { getCatalogCategory, getCatalogDealFacets, listCatalogDeals, listCatalogProducts, listCatalogTherapists, type CatalogCategoryWithChildren, type CatalogDeal, type CatalogDealFacets, type CatalogDealSort, type CatalogProduct, type CatalogTherapist, } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { useAddProductToCart } from '../../../hooks/use-add-product-to-cart';
@@ -26,6 +14,7 @@ import { useWishlist } from '../../../wishlist/wishlist-context';
 import { useHydrated } from '../../../hooks/use-hydrated';
 import { useMediaQuery } from '../../../hooks/use-media-query';
 import { Breadcrumb } from '../../components/breadcrumb';
+import { TherapistAddToCartDialog } from '../../components/therapist-add-to-cart-dialog';
 import { CardGrid } from '../../components/card-grid/card-grid';
 import { PageSection } from '../../components/page-section/page-section';
 import { SectionHead } from '../../components/section-head/section-head';
@@ -41,9 +30,8 @@ import { CityPickerDialog } from '../../components/city-picker-dialog/city-picke
 import type { PriceRange } from '../../components/price-range-field/price-range-field';
 import { DealMap, type DealMapPoint } from '../../components/deal-map/deal-map';
 import { usePagedList } from '../../../hooks/use-paged-list';
-import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
 import { formatINR } from '../../../utils/format';
-import { resolveDealMedia, resolveProductMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
+import { resolveTherapistMedia } from '../../../utils/media';
 import { useVisitorLocation } from '../../../location/location-context';
 import { citySlug, cityHref, categoryHref, useCatalogShell } from '../../../catalog/catalog-shell';
 import { categoryDataKey, usePrerenderedData } from '../../../prerender-data/prerender-data';
@@ -53,18 +41,15 @@ import { breadcrumbJsonLd } from '../../seo/jsonld';
 import { SITE_URL } from '../../seo/site-url';
 import content from '../../../content.json';
 import { BannerSlot } from '../../components/banner-slot/banner-slot';
-
 const t = content.category;
 
 /** msd-api's deal sort enum, minus `newest`/`discount` (superseded by price/distance sorts on
  *  this page; those two values are kept server-side only for other, unmigrated callers). */
 const SORTS = ['relevance', 'price_asc', 'price_desc', 'distance'] as const;
-
 /** SERVICE (or untyped, legacy) categories list deals; PRODUCT/THERAPY list their own entities. */
 function isDealCategory(category: CatalogCategoryWithChildren): boolean {
   return category.type !== 'PRODUCT' && category.type !== 'THERAPY';
 }
-
 /** Lowest active package price for a therapist listing card — mirrors `therapists.tsx`'s own
  *  `fromPrice` exactly (kept as a small local copy rather than a shared export, same as that
  *  file already does for its own single use). */
@@ -72,31 +57,25 @@ function therapistFromPrice(therapist: CatalogTherapist): number | null {
   if (therapist.packages.length === 0) return null;
   return Math.min(...therapist.packages.map((p) => Number(p.sellingPrice)));
 }
-
 /** A non-negative number from a query param, or undefined. */
 function toPrice(value: string | null): number | undefined {
   if (value == null || value === '') return undefined;
   const n = Number(value);
   return Number.isFinite(n) && n >= 0 ? n : undefined;
 }
-
 /** Distance filter options (km); must match the API's facet buckets. */
 const RADIUS_KM = [1, 5, 10, 20, 50, 100];
-
 /** A radius from the URL, only when it is one of the offered distances. */
 function toRadius(value: string | null): number | undefined {
   const n = toPrice(value);
   return n != null && RADIUS_KM.includes(n) ? n : undefined;
 }
-
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /** UUID-looking ids from a comma-joined query param (`?vendor=id,id`), invalid entries dropped. */
 function toIds(value: string | null): string[] {
   if (!value) return [];
   return value.split(',').filter((v) => UUID_RE.test(v));
 }
-
 /**
  * Category → Sub Category → (Deal | Product | Therapist) discovery page — the customer
  * catalogue's single canonical entry point. Composes PageSection, SectionHead and CardGrid with
@@ -117,20 +96,10 @@ export function Category() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated } = useAuth();
-  // Rendering decisions wait for hydration so they match the prerendered (signed-out) HTML.
-  const signedIn = useHydrated() && isAuthenticated;
-  const {
-    has: isWishlisted,
-    toggle: toggleWishlist,
-    hasProduct,
-    toggleProduct,
-    isProductPending,
-  } = useWishlist();
+  const { toggle: toggleWishlist, toggleProduct, } = useWishlist();
   const { coords, city: visitorCity } = useVisitorLocation();
   const { locationsStatus, locations } = useCatalogShell();
   const cityLocation = citySlugParam ? locations.find((l) => citySlug(l.city) === citySlugParam) : undefined;
-  // A prerendered page embeds this slug's (and resolved city's) category + "All" deals. The key
-  // includes both, so `initial` only exists when it describes exactly this route.
   const initial = usePrerenderedData<CategoryData>(categoryDataKey(slug, cityLocation?.city));
   const initialHasDeals = !!initial?.category && isDealCategory(initial.category);
   const [category, setCategory] = useState<CatalogCategoryWithChildren | null>(initial?.category ?? null);
@@ -138,15 +107,9 @@ export function Category() {
   const [categoryError, setCategoryError] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
   const cityUnresolved = !!citySlugParam && !cityLocation;
-  // Locations arrive with the catalog shell; until then a city URL can't be resolved.
   const cityPending = cityUnresolved && locationsStatus === 'loading';
-  // Only a successful locations fetch can prove a city doesn't exist. If it failed, the page
-  // falls back to the plain (noindexed) category page rather than 404ing a real city.
   const cityMissing = cityUnresolved && locationsStatus === 'ready';
-
   useEffect(() => {
-    // Still showing the prerendered (build-time) category for this slug: keep it on screen and
-    // refresh it once in the background. Only a 404 replaces it; any other failure keeps it.
     if (initial && category === initial.category) {
       let cancelled = false;
       getCatalogCategory(slug)
@@ -156,33 +119,25 @@ export function Category() {
         .catch((err) => {
           if (!cancelled && err instanceof ApiRequestError && err.status === 404) setCategory(null);
         });
-      return () => {
-        cancelled = true;
-      };
+      return () => { cancelled = true; };
     }
     setCategoryLoading(true);
     setCategoryError('');
     getCatalogCategory(slug)
       .then(({ data }) => setCategory(data))
       .catch((err) => {
-        // A 404 here just means "unknown/inactive category slug" — render as not-found, not an error banner.
-        if (err instanceof ApiRequestError && err.status === 404) {
-          setCategory(null);
-        } else {
+        if (err instanceof ApiRequestError && err.status === 404) { setCategory(null); }
+        else {
           setCategoryError(err instanceof ApiRequestError ? err.message : content.category.errors.loadCategory);
         }
       })
       .finally(() => setCategoryLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
-  // The subcategory tab lives in `?sub=<slug>` so header/sheet links can open a tab directly;
-  // an unknown slug falls back to "All" (index 0).
   const subSlug = searchParams.get('sub');
   const subcategoryIdx = (category?.children.findIndex((c) => c.slug === subSlug) ?? -1) + 1;
   const activeSubcategory = subcategoryIdx === 0 ? undefined : category?.children[subcategoryIdx - 1];
   const hasCoords = coords?.latitude != null && coords?.longitude != null;
   const sortParam = searchParams.get('sort');
-  // Distance sort needs the visitor's coordinates; without them it is plain relevance.
   const sort =
     (SORTS as readonly string[]).includes(sortParam ?? '') && sortParam !== 'relevance' && (sortParam !== 'distance' || hasCoords)
       ? (sortParam as CatalogDealSort)
@@ -196,7 +151,6 @@ export function Category() {
   const radius = toRadius(searchParams.get('radius'));
   const vendorIds = toIds(searchParams.get('vendor'));
   const branchIds = toIds(searchParams.get('branch'));
-  // Only filters the current listing can apply count toward the "Filters (n)" badge.
   const dealFilters = category?.type !== 'PRODUCT';
   const activeFilters = [
     dealFilters && hasCoords && radius != null,
@@ -204,7 +158,6 @@ export function Category() {
     dealFilters && vendorIds.length > 0,
     dealFilters && branchIds.length > 0,
   ].filter(Boolean).length;
-  /** Writes one query param (or removes it when empty), keeping the others. */
   const setParam = (key: string, value: string | undefined) => {
     setSearchParams(
       (prev) => {
@@ -212,11 +165,9 @@ export function Category() {
         if (value) next.set(key, value);
         else next.delete(key);
         return next;
-      },
-      { replace: true },
+      }, { replace: true },
     );
   };
-  /** Writes several query params at once (or removes ones set to `undefined`), keeping the others. */
   const setListParams = (patch: Record<string, string | undefined>) => {
     setSearchParams(
       (prev) => {
@@ -224,10 +175,8 @@ export function Category() {
         for (const [key, value] of Object.entries(patch)) {
           if (value) next.set(key, value);
           else next.delete(key);
-        }
-        return next;
-      },
-      { replace: true },
+        } return next;
+      }, { replace: true },
     );
   };
   const addToCart = useAddProductToCart();
@@ -236,23 +185,8 @@ export function Category() {
     navigate(signInPathWithReturnTo(location));
     return false;
   };
-  const addProductToCart = (product: CatalogProduct) => addToCart(product.id, product.name);
-  const toggleFavorite = (deal: CatalogDeal) => {
-    if (!requireAuthOrRedirect()) return;
-    void toggleWishlist(deal.id);
-  };
-  const toggleProductFavorite = async (productId: string) => {
-    if (!requireAuthOrRedirect()) return;
-
-    const success = await toggleProduct(productId);
-
-    if (!success) {
-      showSnackbar('Unable to update product wishlist. Please try again.', { variant: 'error' });
-    }
-  };
   const isTherapyCategory = category?.type === 'THERAPY';
   const isProductCategory = category?.type === 'PRODUCT';
-
   const lat = coords?.latitude ?? undefined;
   const lng = coords?.longitude ?? undefined;
   const common = {
@@ -260,7 +194,6 @@ export function Category() {
     subcategoryId: activeSubcategory?.id,
     pageSize: CATEGORY_PAGE_SIZE,
   };
-  // Any change here restarts the list at page 1.
   const listKey = JSON.stringify([
     category?.id,
     activeSubcategory?.id,
@@ -274,7 +207,12 @@ export function Category() {
     vendorIds.join(),
     branchIds.join(),
   ]);
-  // The prerendered first page only describes the default ("All", unsorted, no location) view.
+  const therapistListKey = JSON.stringify([
+    category?.id,
+    activeSubcategory?.id,
+    lat,
+    lng,
+  ]);
   const isDefaultView =
     !activeSubcategory &&
     !sort &&
@@ -311,31 +249,64 @@ export function Category() {
     },
   );
   const productList = usePagedList<CatalogProduct>(
-    // Products have no distance concept — a `distance` sort never reaches this call.
     (page) => listCatalogProducts({ ...common, page, sort: sort !== 'distance' ? sort : undefined, minPrice, maxPrice }),
     listKey,
-    {
-      enabled: category?.type === 'PRODUCT',
-      errorMessage: loadError,
-    },
+    { enabled: category?.type === 'PRODUCT', errorMessage: loadError, },
   );
   const therapistList = usePagedList<CatalogTherapist>(
-    (page) => listCatalogTherapists({ ...common, page, latitude: lat, longitude: lng }),
-    listKey,
-    { enabled: category?.type === 'THERAPY', errorMessage: loadError },
+    (page) =>
+      listCatalogTherapists({ ...common, page, latitude: lat, longitude: lng, }),
+    therapistListKey,
+    { enabled: category?.type === 'THERAPY', errorMessage: loadError, },
   );
   const list = isTherapyCategory ? therapistList : isProductCategory ? productList : dealList;
   const deals = dealList.items;
   const products = productList.items;
-  const therapists = therapistList.items;
+  const sortedTherapists = useMemo(() => {
+    const items = [...therapistList.items];
+    if (!sort || sort === 'relevance') {
+      return items;
+    }
+    const getDistance = (therapist: CatalogTherapist) =>
+      therapist.distanceKm != null ? Number(therapist.distanceKm) : null;
+    const compareNullable = (
+      a: number | null,
+      b: number | null,
+      direction: 1 | -1,
+    ) => {
+      if (a == null && b == null) return 0;
+      if (a == null) return 1;
+      if (b == null) return -1;
+      return (a - b) * direction;
+    };
+    return items
+      .map((therapist, index) => ({ therapist, index }))
+      .sort((a, b) => {
+        let result = 0;
+        if (sort === 'price_asc' || sort === 'price_desc') {
+          result = compareNullable(
+            therapistFromPrice(a.therapist),
+            therapistFromPrice(b.therapist),
+            sort === 'price_asc' ? 1 : -1,
+          );
+        } else if (sort === 'distance') {
+          result = compareNullable(
+            getDistance(a.therapist),
+            getDistance(b.therapist),
+            1,
+          );
+        }
+        return result || a.index - b.index;
+      })
+      .map(({ therapist }) => therapist);
+  }, [therapistList.items, sort]);
   const mapPoints = useMemo<DealMapPoint[]>(
     () =>
       deals.flatMap((d) =>
         d.branch?.latitude != null && d.branch?.longitude != null
           ? [{ id: d.id, lat: Number(d.branch.latitude), lng: Number(d.branch.longitude), label: formatINR(Number(d.salePrice)), title: d.title, href: `/deal/${d.id}` }]
           : [],
-      ),
-    [deals],
+      ), [deals],
   );
   const showMap = !!category && isDealCategory(category) && mapPoints.length > 0;
   const showingMap = view === 'map' && showMap;
@@ -346,11 +317,7 @@ export function Category() {
   ];
   const dealsLoading = list.status === 'loading';
   const dealsError = list.status === 'error' ? list.error : '';
-
-  // Filter-panel facet counts (business/branch/distance/price) for deal categories only; ignores
-  // stale responses and keeps the previous facets on error so the panel never flashes empty.
   const [facets, setFacets] = useState<CatalogDealFacets | null>(null);
-  // Another category's businesses/branches/price range must never show while this one loads.
   useEffect(() => setFacets(null), [category?.id]);
   useEffect(() => {
     if (!category || !isDealCategory(category) || cityPending || cityMissing) return;
@@ -368,20 +335,10 @@ export function Category() {
       minPrice,
       maxPrice,
     })
-      .then(({ data }) => {
-        if (!cancelled) setFacets(data);
-      })
-      .catch(() => {
-        // Keep the previous facets on a failed refetch.
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      .then(({ data }) => { if (!cancelled) setFacets(data); })
+      .catch(() => { });
+    return () => { cancelled = true; };
   }, [category?.id, activeSubcategory?.id, cityLocation?.city, lat, lng, radius, vendorIds.join(), branchIds.join(), minPrice, maxPrice]);
-
-  // Filter side panel: a column open by default on desktop, a closed side sheet on phones, until
-  // the visitor overrides it (`panelOpen`), which then wins regardless of viewport.
   const desktop = useMediaQuery('(min-width: 840px)', true);
   const [panelOpen, setPanelOpen] = useState<boolean | null>(null);
   const filtersOpen = panelOpen ?? desktop;
@@ -399,12 +356,7 @@ export function Category() {
   const onVendors = (ids: string[]) => setListParams({ vendor: ids.length ? ids.join(',') : undefined });
   const onBranches = (ids: string[]) => setListParams({ branch: ids.length ? ids.join(',') : undefined });
   const onClearAll = () => setListParams({ radius: undefined, min: undefined, max: undefined, vendor: undefined, branch: undefined });
-
-  // Hold the page (and its canonical) until the city resolves, so a city URL never briefly
-  // announces itself as the plain category page.
-  if (categoryLoading || cityPending) {
-    return <p className="loading-state"> {t.loading}</p>;
-  }
+  if (categoryLoading || cityPending) { return <p className="loading-state"> {t.loading}</p>; }
   if (categoryError || !category || cityMissing) {
     return (
       <PageSection stack aria-label={t.notFound.heading}>
@@ -416,8 +368,6 @@ export function Category() {
       </PageSection>
     );
   }
-  // Product and therapist listings can't be filtered by city, so a city URL on those categories
-  // shows the plain category page (noindexed) rather than a thin "X in City" duplicate.
   const cityFilterable = category.type !== 'PRODUCT' && category.type !== 'THERAPY';
   const activeCity = cityFilterable ? cityLocation : undefined;
   const displayName = activeCity
@@ -433,25 +383,14 @@ export function Category() {
     { name: category.name, path: categoryHref(category.slug) },
     ...(activeCity ? [{ name: activeCity.city, path }] : []),
   ];
-
   const filtersToggle = !isTherapyCategory
     ? createElement(
       'md-text-button',
-      {
-        'aria-expanded': String(filtersOpen),
-        onClick: () => setPanelOpen(!filtersOpen),
-      },
+      { 'aria-expanded': String(filtersOpen), onClick: () => setPanelOpen(!filtersOpen), },
       createElement('md-icon', { slot: 'icon', 'aria-hidden': 'true' }, 'tune'),
-      desktop
-        ? filtersOpen
-          ? t.toolbar.hideFilters
-          : t.toolbar.showFilters
-        : activeFilters
-          ? t.toolbar.filtersActive.replace('{count}', String(activeFilters))
-          : t.toolbar.filters,
-    )
+      desktop ? filtersOpen ? t.toolbar.hideFilters : t.toolbar.showFilters
+        : activeFilters ? t.toolbar.filtersActive.replace('{count}', String(activeFilters)) : t.toolbar.filters,)
     : null;
-
   const count = list.total;
   const noun = isTherapyCategory ? t.resultCount.therapist : isProductCategory ? t.resultCount.product : t.dealCount;
   const countText = dealsLoading ? '' : `${count} ${count === 1 ? noun.singular : noun.plural}`;
@@ -463,7 +402,6 @@ export function Category() {
   ) : list.items.length === 0 ? (
     <sky-info-card icon="sentiment_dissatisfied" heading={empty.heading} subheading={empty.subheading} />
   ) : undefined;
-
   const pills =
     category.children.length > 0 ? (
       <ChipNav
@@ -473,215 +411,75 @@ export function Category() {
         onSelect={(value) => setParam('sub', value || undefined)}
       />
     ) : null;
-
   const cardLayout = view === 'list' ? 'horizontal' : undefined;
-
   const cards = isTherapyCategory
-    ? therapists.map((therapist) => {
+    ? sortedTherapists.map((therapist) => {
       const price = therapistFromPrice(therapist);
-
+      const media = resolveTherapistMedia(therapist);
+      const images = media.images ?? [];
       return (
         <SkyProductCardWC
+          variant='outlined'
           key={therapist.id}
-          image={primaryImage(resolveTherapistMedia(therapist))}
+          image={undefined}
+          imageAlt={therapist.personName ?? therapist.therapistType}
+          gallery={images}
           eyebrow={therapist.personName}
-          eyebrowHref={
-            therapist.vendor?.slug
-              ? `/vendor/${therapist.vendor.slug}`
-              : undefined
-          }
+          eyebrowHref={therapist.vendor?.slug ? `/vendor/${therapist.vendor.slug}` : undefined}
           heading={therapist.therapistType}
           location={therapist.branch?.city ?? undefined}
-          distance={
-            therapist.distanceKm != null
-              ? `${Math.round(therapist.distanceKm * 10) / 10} km`
-              : undefined
-          }
+          distance={therapist.distanceKm != null ? `${Math.round(therapist.distanceKm * 10) / 10} km` : undefined}
           tag={therapist.popularTags?.[0]?.name}
-          pricePrefix={
-            price != null ? t.therapistPricePrefix : undefined
-          }
+          pricePrefix={price != null ? t.therapistPricePrefix : undefined}
           price={price != null ? formatINR(price) : undefined}
           href={`/therapist/${therapist.id}`}
           layout={cardLayout}
-        />
-      );
-    })
-    : isProductCategory
-      ? products.map((product) => {
-        const media = resolveProductMedia(product);
-        const images = media.images ?? [];
-
-
-
-        const originalPrice =
-          product.originalPrice != null
-            ? Number(product.originalPrice)
-            : undefined;
-
-        const price = Number(product.price);
-
-        const discount =
-          product.discount ??
-          (originalPrice !== undefined && originalPrice > price
-            ? Math.round(
-              ((originalPrice - price) / originalPrice) * 100,
-            )
-            : 0);
-
-        return (
-          <SkyProductCardWC
-            key={product.id}
-            variant="outlined"
-            image={undefined}
-            imageAlt={product.imageAlt ?? product.name}
-            favorite
-            favoriteActive={signedIn && hasProduct(product.id)}
-            badge={t.offeringLabels.product}
-            eyebrow={product.brand ?? product.vendor?.businessName ?? undefined}
-            eyebrowHref={
-              product.vendor?.slug
-                ? `/vendor/${product.vendor.slug}`
-                : undefined
-            }
-            heading={product.name}
-            originalPrice={
-              originalPrice !== undefined && originalPrice !== price
-                ? formatINR(originalPrice)
-                : undefined
-            }
-            price={formatINR(price)}
-            discount={discount ? `-${discount}%` : undefined}
-            tag={product.popularTags?.[0]?.name}
-            href={`/products/${product.id}`}
-            layout={cardLayout}
-            onFavorite={() => {
-              if (!isProductPending(product.id)) {
-                void toggleProductFavorite(product.id);
-              }
-            }}
-          >
-            <div slot="media" className="product-card-media">
-              <ProductCardGallery
-                images={images}
-                alt={product.imageAlt ?? product.name}
-                layout={cardLayout}
-              />
-            </div>
-
-            <div onClick={(event) => event.stopPropagation()}>
+        >
+          <TherapistAddToCartDialog
+            therapist={therapist}
+            renderTrigger={(open) => (
               <FilledButton
                 onClick={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
-                  void addProductToCart(product);
+                  open();
                 }}
-              >
-                <Icon slot="icon" aria-hidden="true">
-                  shopping_bag
-                </Icon>
-                {t.actions.addToCart}
+              >{t.actions.viewPackages}
               </FilledButton>
-            </div>
-          </SkyProductCardWC>
-        );
-      })
-      : deals.map((deal) => {
-        const media = resolveDealMedia(deal);
-        const images = media.images ?? [];
-
-        return (
-          <SkyProductCardWC
-            key={deal.id}
-            variant="outlined"
-            image={undefined}
-            imageAlt={deal.title}
-            favorite
-            favoriteActive={signedIn && isWishlisted(deal.id)}
-            badge={t.offeringLabels.service}
-            eyebrow={[
-              deal.vendor?.businessName,
-              deal.branch?.name,
-            ]
-              .filter(Boolean)
-              .join(' · ') || undefined}
-            eyebrowHref={
-              deal.vendor?.slug
-                ? `/vendor/${deal.vendor.slug}`
-                : undefined
-            }
-            heading={deal.title}
-            location={deal.branch?.city ?? undefined}
-            distance={
-              deal.distanceKm != null
-                ? `${Math.round(deal.distanceKm * 10) / 10} km`
-                : undefined
-            }
-            originalPrice={
-              deal.originalPrice &&
-                Number(deal.originalPrice) !== Number(deal.salePrice)
-                ? formatINR(Number(deal.originalPrice))
-                : undefined
-            }
-            price={formatINR(Number(deal.salePrice))}
-            discount={
-              deal.discountPercent
-                ? `-${Number(deal.discountPercent)}%`
-                : undefined
-            }
-            priceNote={
-              deal.durationMinutes
-                ? `${deal.durationMinutes} ${t.durationSuffix}`
-                : undefined
-            }
-            tag={deal.popularTags?.[0]?.name}
-            href={`/deal/${deal.id}`}
-            layout={cardLayout}
-            onFavorite={() => toggleFavorite(deal)}
-          >
-            <div slot="media" className="product-card-media">
-              <ProductCardGallery
-                images={images}
-                alt={deal.title}
-                layout={cardLayout}
-              />
-            </div>
-
-            <div onClick={(event) => event.stopPropagation()}>
-              <DealAddToCartDialog
-                deal={deal}
-                onAdded={(label) => {
-                  showSnackbar(
-                    t.messages.addToCartSuccess.replace('{item}', label),
-                    {
-                      variant: 'info',
-                      actionLabel: content.cartToast.viewCart,
-                      onAction: () => navigate('/cart'),
-                    },
-                  );
-                }}
-                renderTrigger={(open) => (
-                  <FilledButton
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-
-                      if (requireAuthOrRedirect()) {
-                        open();
-                      }
-                    }}
-                  >
-                    <Icon slot="icon" aria-hidden="true">
-                      shopping_bag
-                    </Icon>
-                    {t.actions.bookNow}
-                  </FilledButton>
-                )}
-              />
-            </div>
-          </SkyProductCardWC>
-        );
-      });
+            )}
+          />
+        </SkyProductCardWC>
+      );
+    })
+    : isProductCategory
+      ? products.map((product) => (
+        <OfferCard
+          key={product.id}
+          item={{ type: 'product', product }}
+          tag={product.popularTags?.[0]?.name
+            ? {
+              label: product.popularTags[0].name,
+              color: 'tertiary',
+              tone: 'tonal',
+            } : undefined}
+          variant="outlined"
+          layout={cardLayout ?? 'vertical'}
+        />
+      ))
+      : deals.map((deal) => (
+        <OfferCard
+          key={deal.id}
+          item={{ type: 'deal', deal }}
+          tag={deal.popularTags?.[0]?.name
+            ? {
+              label: deal.popularTags[0].name,
+              color: 'tertiary',
+              tone: 'tonal',
+            } : undefined}
+          variant="outlined"
+          layout={cardLayout ?? 'vertical'}
+        />
+      ));
   return (
     <>
       <Seo
@@ -706,11 +504,7 @@ export function Category() {
           titleClassName="headline-large"
           heading={displayName}
           subheading={category.description ? <ClampText text={category.description} more={t.description.more} less={t.description.less} /> : undefined}
-          actions={
-            <span className="body-medium" aria-live="polite" aria-atomic="true">
-              {countText}
-            </span>
-          }
+          actions={<span className="body-medium" aria-live="polite" aria-atomic="true">{countText}</span>}
         />
         {pills}
       </PageSection>
@@ -727,17 +521,15 @@ export function Category() {
                 value={view}
                 onChange={(v) => setParam('view', v === 'grid' ? undefined : v)}
               />
-              {!isTherapyCategory && (
-                <ChoiceMenu
-                  trigger="text"
-                  icon="swap_vert"
-                  label={t.toolbar.sort.replace('{label}', sortOption.label)}
-                  menuLabel={t.toolbar.sortMenu}
-                  options={sortMenuOptions}
-                  value={sortOption.value}
-                  onChange={(value) => setParam('sort', value === 'relevance' ? undefined : value)}
-                />
-              )}
+              <ChoiceMenu
+                trigger="text"
+                icon="swap_vert"
+                label={t.toolbar.sort.replace('{label}', sortOption.label)}
+                menuLabel={t.toolbar.sortMenu}
+                options={sortMenuOptions}
+                value={sortOption.value}
+                onChange={(value) => setParam('sort', value === 'relevance' ? undefined : value)}
+              />
             </>
           }
         />
@@ -751,12 +543,7 @@ export function Category() {
               kind={isProductCategory ? 'products' : 'deals'}
               facets={facets}
               location={{ city: visitorCity, hasCoords }}
-              onChangeLocation={() => {
-                // The phone sheet is modal (the page behind it is inert); close it so the city
-                // dialog is usable. On desktop the panel stays open.
-                if (!desktop) setPanelOpen(false);
-                setCityPickerOpen(true);
-              }}
+              onChangeLocation={() => { if (!desktop) setPanelOpen(false); setCityPickerOpen(true); }}
               radiusKm={radius}
               onRadius={onRadius}
               price={{ min: minPrice, max: maxPrice }}
@@ -783,9 +570,7 @@ export function Category() {
               )}
             </>
           ) : (
-            <CardGrid layout={view === 'list' ? 'list' : 'grid'} fallback={fallback}>
-              {cards}
-            </CardGrid>
+            <CardGrid layout={view === 'list' ? 'list' : 'grid'} fallback={fallback}>{cards}</CardGrid>
           )}
           {list.status === 'ready' && list.items.length > 0 && (
             <LoadMore

@@ -174,13 +174,11 @@
           "to": "/contact"
         }
       ],
-      "discoverExtra": [
-        
-      ],
+      "discoverExtra": [],
       "help": [
         {
           "label": "Help Center",
-          "to": "/help"
+          "to": "/help-center"
         },
         {
           "label": "Wishlist",
@@ -640,9 +638,10 @@
       "product": "Product"
     },
     "actions": {
-  "addToCart": "Add to Cart",
-  "bookNow": "Book Now"
-},
+      "addToCart": "Add to Cart",
+      "bookNow": "Book Now",
+      "viewPackages": "View Packages"
+    },
     "messages": {
       "addToCartSuccess": "Added \"{item}\" to your cart.",
       "bookingSuccess": "Booked \"{item}\" for {date} at {time}."
@@ -962,24 +961,23 @@
       "statusIconLabel": "Booking confirmed"
     }
   },
- "orders": {
-  "metaTitle": "My Orders | MSD",
-  "title": "My Orders",
-  "subtitle": "Your product and deal orders.",
-  "loading": "Loading orders…",
-  "empty": {
-    "title": "No orders yet",
-    "description": "Orders you place will show up here.",
-   "cta": "Explore Now"
+  "orders": {
+    "metaTitle": "My Orders | MSD",
+    "title": "My Orders",
+    "subtitle": "Your product and deal orders.",
+    "loading": "Loading orders…",
+    "empty": {
+      "title": "No orders yet",
+      "description": "Orders you place will show up here.",
+      "cta": "Explore Now"
+    },
+    "links": {
+      "viewDetails": "View details →"
+    },
+    "errors": {
+      "load": "Could not load your orders."
+    }
   },
-  "links": {
-    "viewDetails": "View details →"
-  },
-  "errors": {
-    "load": "Could not load your orders."
-  }
-  
-},
   "orderDetail": {
     "loading": "Loading order…",
     "notFound": {
@@ -1021,10 +1019,10 @@
       "cancel": "Keep order",
       "confirm": "Cancel order"
     },
-   "messages": {
-  "refundAfterCancellation": "Your refund will be credited to your original payment method within 5–7 business days.",
-  "cancelledWithoutReason": "This order has been cancelled."
-}
+    "messages": {
+      "refundAfterCancellation": "Your refund will be credited to your original payment method within 5–7 business days.",
+      "cancelledWithoutReason": "This order has been cancelled."
+    }
   },
   "meta": {
     "home": {
@@ -1390,7 +1388,7 @@
       "bookingSuccess": "Booked \"{service}\" for {date} at {time}."
     }
   },
-   "support": {
+  "support": {
     "title": "How can we help?",
     "description": "Find answers to common questions or get in touch with our support team.",
     "form": {
@@ -1399,5 +1397,156 @@
       "subject": "Support Request",
       "message": "Please describe your issue or query and our support team will assist you."
     }
+  },
+  "about": {
+    "metaTitleSuffix": " · MSD",
+    "metaDescription": "Learn more about MySpaDeal.",
+    "defaultHeading": "About MySpaDeal",
+    "eyebrow": "ABOUT MYSPADEAL",
+    "breadcrumb": {
+      "home": "Home",
+      "aboutUs": "About Us"
+    },
+    "loading": {
+      "title": "About Us · MSD",
+      "heading": "Loading About Us",
+      "description": "Please wait while we load the latest information."
+    },
+    "error": {
+      "heading": "About Us is unavailable",
+      "description": "This page is not available right now."
+    },
+    "chips": [
+      "Wellness",
+      "Beauty & Self-care",
+      "Feel-good experiences"
+    ],
+    "spotlight": {
+      "label": "YOUR WELLNESS JOURNEY",
+      "heading": "Make time for yourself.",
+      "description": "Discover wellness and self-care experiences with MySpaDeal."
+    },
+    "mission": {
+      "eyebrow": "WHY WE ARE HERE",
+      "heading": "Wellbeing deserves a place in everyday life.",
+      "cardHeading": "Our Mission"
+    },
+    "values": {
+      "eyebrow": "THE MYSPADEAL EXPERIENCE",
+      "heading": "Your kind of self-care.",
+      "description": "Explore new experiences, find what works for you, and make looking after yourself feel easier.",
+      "cards": [
+        {
+          "icon": "spa",
+          "heading": "Explore Wellness",
+          "description": "Discover spa and self-care experiences.",
+          "color": "surface-high"
+        },
+        {
+          "icon": "favorite",
+          "heading": "Find Your Fit",
+          "description": "Explore experiences that suit your preferences.",
+          "color": "secondary"
+        },
+        {
+          "icon": "self_improvement",
+          "heading": "Make Time for You",
+          "description": "Make self-care part of your everyday routine.",
+          "color": "tertiary"
+        }
+      ]
+    },
+    "story": {
+      "eyebrow": "OUR STORY",
+      "heading": "A little about us."
+    },
+    "cta": {
+      "ariaLabel": "Explore MySpaDeal",
+      "heading": "Make a little more room for you.",
+      "description": "Explore wellness and self-care experiences with MySpaDeal.",
+      "button": "Explore MySpaDeal",
+      "href": "/",
+      "icon": "spa",
+      "buttonIcon": "arrow_forward"
+    }
+  },
+  "howItWorks": {
+    "metaTitleSuffix": " · MSD",
+    "metaDescription": "See how booking with MySpaDeal works.",
+    "defaultHeading": "How It Works",
+    "eyebrow": "YOUR WELLNESS JOURNEY",
+    "loading": {
+      "title": "How It Works · MSD",
+      "heading": "Loading how it works",
+      "description": "Please wait while we load the steps."
+    },
+    "error": {
+      "title": "How It Works · MSD",
+      "heading": "Unable to load this page",
+      "description": "This page is not available right now.",
+      "loadFailed": "Could not load this page."
+    },
+    "emptySteps": {
+      "icon": "event_note",
+      "heading": "Steps coming soon",
+      "description": "We are preparing the details for your wellness journey."
+    },
+    "cardColors": [
+      "tertiary",
+      "surface-high",
+      "tertiary",
+      "surface-high"
+    ],
+    "defaultStepIcon": "spa",
+    "cta": {
+      "color": "secondary",
+      "icon": "spa",
+      "iconStyle": "surface",
+      "heading": "Ready to make time for yourself?",
+      "description": "Explore wellness and self-care experiences with MySpaDeal.",
+      "button": "Explore MySpaDeal",
+      "href": "/",
+      "buttonIcon": "arrow_forward"
+    }
+  },
+  "helpCenter": {
+    "metaTitle": "Help Center · MSD",
+    "metaDescription": "Find answers to common questions about bookings, payments, deals, and your MySpaDeal account.",
+    "hero": {
+      "heading": "How can we help you?",
+      "description": "Find answers to your questions about bookings, payments, deals and your MySpaDeal account.",
+      "searchLabel": "Search FAQs",
+      "searchPlaceholder": "Search questions about bookings, payments, deals...",
+      "searchActionLabel": "Search",
+      "searchIcon": "search"
+    },
+    "faqs": {
+      "heading": "Frequently Asked Questions",
+      "description": "Browse our frequently asked questions to find the information you need.",
+      "loading": "Loading frequently asked questions...",
+      "error": {
+        "icon": "error_outline",
+        "description": "We couldn't load the FAQs. Please try again.",
+        "retryButton": "Try again"
+      },
+      "empty": {
+        "icon": "search_off",
+        "noFaqsHeading": "No FAQs available",
+        "noFaqsDescription": "Please check back later.",
+        "noResultsHeading": "No matching questions found",
+        "noResultsDescription": "Try different keywords to find your answer."
+      }
+    },
+    "support": {
+      "icon": "support_agent",
+      "heading": "Still need help?",
+      "description": "Our support team is here to help you with your questions.",
+      "button": "Contact Us",
+      "href": "/contact",
+      "buttonIcon": "arrow_forward",
+      "color": "primary",
+      "iconStyle": "surface"
+    }
   }
+
 }

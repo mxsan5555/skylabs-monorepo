@@ -1,122 +1,194 @@
-import { useEffect, useState } from 'react';
-import { Icon } from '@skylabs-monorepo/shared-ui/react';
-import { getCatalogCareers, type CatalogCareers } from '../../../api/catalog';
-import { ApiRequestError } from '../../../api/rbac/client';
+import { useState } from 'react';
+import { Divider, FilledButton, OutlinedTextField, Icon, AssistChip, } from '@skylabs-monorepo/shared-ui/react';
 import './careers.css';
-
-/** Public Careers page — `GET /catalog/careers` on mount. Renders the singleton
- *  `CareersPageContent` row's hero copy plus every `PUBLISHED` `CareersJobListing`, as saved from
- *  the CMS admin page (`pages/account/cms/careers.tsx`). Each job card shows an "Apply now" link
- *  when `applyUrl` is set, otherwise falls back to the freeform `applyInstructions` text — never
- *  both, matching how the admin form treats them as alternatives. */
-export function Careers() {
-  const [careers, setCareers] = useState<CatalogCareers | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError('');
-    getCatalogCareers()
-      .then(({ data }) => {
-        if (!cancelled) setCareers(data);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof ApiRequestError ? err.message : 'Could not load this page.');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (loading) {
-    return (
-      <main className="careers">
-        <title>Careers · MSD</title>
-        <p className="loading-state">Loading…</p>
-      </main>
-    );
-  }
-
-  if (error || !careers) {
-    return (
-      <main className="careers">
-        <title>Careers · MSD</title>
-        <p className="error-state" role="alert">{error || 'This page is not available right now.'}</p>
-      </main>
-    );
-  }
-
-  const { content, jobs } = careers;
-  const heading = content.heroTitle || 'Careers';
-
+import {validateEmail,validatePhone,} from '../../../utils/validation';
+const staticJobs = [
+  {
+    department: 'Engineering',
+    title: 'Frontend Developer',
+    location: 'Noida / Hybrid',
+    employmentType: 'Full-Time',
+    icon: 'code',
+    description:'Build responsive and accessible experiences for our wellness marketplace.',
+  },
+  {
+    department: 'Product & Design',
+    title: 'UI/UX Designer',
+    location: 'Noida / Hybrid',
+    employmentType: 'Full-Time',
+    icon: 'design_services',
+    description:'Design intuitive booking and shopping journeys for our customers.',
+  },
+  {
+    department: 'Business',
+    title: 'Business Development Executive',
+    location: 'Noida',
+    employmentType: 'Full-Time',
+    icon: 'handshake',
+    description:'Help grow our network of spa, salon and wellness partners.',
+  },
+];
+function CareersRoadmap() {
+  const steps = [
+    {title: 'Application Review',
+      description:'Our recruitment desk reviews your technical foundation.',
+    },
+    {title: 'Technical Assessment',
+      description:'Deep-dive interview with our subject matter experts.',
+    },
+    {title: 'Cultural Alignment',
+      description:'Final discussion on ethics, mission, and institutional fit.',
+    },
+    {title: 'Onboarding',
+      description:'Join the team and start building better wellness experiences.',
+    }
+  ];
   return (
-    <main className="careers">
-      <title>{content.metaTitle || `${heading} · MSD`}</title>
-      <meta
-        name="description"
-        content={content.metaDescription || content.heroSubtitle || 'Explore open roles at MySpaDeal.'}
-      />
-      <article>
-        <header className="careers__hero">
-          <h1>{heading}</h1>
-          {content.heroSubtitle && <p className="careers__subtitle">{content.heroSubtitle}</p>}
-        </header>
-
-        {jobs.length === 0 ? (
-          <p className="empty-state">There are no open roles right now — check back soon.</p>
-        ) : (
-          <section aria-label="Open roles">
-            <ul className="careers__list">
-              {jobs.map((job) => (
-                <li key={job.id}>
-                  <sky-card variant="outlined">
-                    <article className="job-card">
-                      <h2 className="job-card__title">{job.jobTitle}</h2>
-                      <p className="job-card__meta">
-                        <span className="job-card__meta-item">
-                          <Icon aria-hidden="true">apartment</Icon>
-                          {job.department}
-                        </span>
-                        <span className="job-card__meta-item">
-                          <Icon aria-hidden="true">location_on</Icon>
-                          {job.location}
-                        </span>
-                        <span className="job-card__meta-item">
-                          <Icon aria-hidden="true">work</Icon>
-                          {job.employmentType}
-                        </span>
-                      </p>
-                      <p className="job-card__description">{job.description}</p>
-                      {job.applyUrl ? (
-                        <a
-                          className="job-card__apply"
-                          href={job.applyUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <Icon aria-hidden="true">open_in_new</Icon>
-                          Apply now
-                        </a>
-                      ) : (
-                        job.applyInstructions && (
-                          <p className="job-card__apply-instructions">{job.applyInstructions}</p>
-                        )
-                      )}
-                    </article>
-                  </sky-card>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-      </article>
+    <section className="careers-roadmap" aria-labelledby="careers-roadmap-title">
+      <div className="careers-container">
+        <div className="careers-roadmap-heading">
+          <h2 id="careers-roadmap-title">Your Path To Excellence</h2>
+        </div>
+        <div className="careers-roadmap-grid">
+          {steps.map((step, index) => (
+            <sky-feature-card
+              key={step.title}
+              color={index % 2 === 0 ? 'tertiary' : 'secondary'}
+              icon="route"
+              icon-style="tonal"
+              headline={step.title}
+              text={step.description}
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+function CareersEnquiry() {
+  const [phone, setPhone] = useState('');
+  const handlePhoneInput = (event: Event) => {
+    const target = event.target as HTMLInputElement;
+    const numbersOnly = target.value.replace(/\D/g, '').slice(0, 10);
+    target.value = numbersOnly;
+    setPhone(numbersOnly);
+  };
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const email = String(formData.get('email') ?? '');
+    const phone = String(formData.get('phone') ?? '');
+    if (!validateEmail(email)) {alert('Please enter a valid email address.');return;}
+    if (!validatePhone(phone)) {alert('Please enter a valid 10-digit mobile number.');return;
+    }};
+  return (
+    <section id="enquiry-form" className="careers-enquiry" aria-labelledby="careers-enquiry-title">
+      <div className="careers-container careers-enquiry-grid">
+        <div className="careers-enquiry-copy">
+          <p className="careers-eyebrow">DIRECT CONNECT</p>
+          <h2 id="careers-enquiry-title">Begin Your <span>Career Journey</span></h2>
+          <p>Interested in joining our team? Leave your details below and our talent acquisition team can connect with you.</p>
+        </div>
+        <sky-tile-card
+          headline="Submit Your Application"
+          text="Share your details and our team will get in touch."
+          color="none"
+        >
+          <form onSubmit={handleSubmit} className="careers-enquiry-form">
+            <div className="careers-enquiry-fields">
+              <OutlinedTextField
+                label="Full Name"
+                name="fullName"
+                type="text"
+                placeholder="Your name"
+                autocomplete="name"
+                required
+              />
+              <OutlinedTextField
+                label="Email Address"
+                name="email"
+                type="email"
+                autocomplete="email"
+                required
+              />
+            </div>
+            <OutlinedTextField
+              label="Contact No."
+              name="phone"
+              type="tel"
+              autocomplete="tel"
+              placeholder="10-digit mobile number"
+              maxLength={10}
+              value={phone}
+              onInput={handlePhoneInput}
+              required
+            />
+            <OutlinedTextField
+              label="Technical Expertise / Message"
+              name="message"
+              type="textarea"
+              rows={4}
+              placeholder="Tell us about your skills and the role you're interested in..."
+              required
+            />
+            <FilledButton>Submit Application
+              <Icon slot="icon" aria-hidden="true">arrow_forward</Icon>
+            </FilledButton>
+          </form>
+        </sky-tile-card>
+      </div>
+    </section>
+  );
+}
+export default function Careers() {
+   const handleApplyClick = () => {
+    document.getElementById('enquiry-form')?.scrollIntoView({behavior: 'smooth',block: 'start',});
+  };
+  return (
+    <main className="careers-page">
+      <CareersRoadmap />
+      <Divider />
+      <section
+        className="careers-openings careers-container"
+        id="open-positions"
+        aria-labelledby="careers-openings-title"
+      >
+        <div className="careers-section-heading">
+            <h2 id="careers-openings-title">Current Openings</h2>
+          <AssistChip className="careers-position-count">
+            {staticJobs.length}{' '}
+            {staticJobs.length === 1 ? 'opening' : 'openings'}
+          </AssistChip>
+        </div>
+        <div className="careers-static-job-grid">
+          {staticJobs.map((job) => (
+            <sky-cta-banner
+              key={job.title}
+              color="surface-high"
+              variant="outlined"
+              shape="large"
+              layout="horizontal"
+              icon={job.icon}
+              iconStyle="tonal"
+              headline={job.title}
+              text={job.description}
+            >
+              <div slot="actions" className="careers-job-actions">
+                <div className="careers-job-info">
+                  <AssistChip label={job.department} />
+                  <AssistChip label={job.location} />
+                  <AssistChip label={job.employmentType} />
+                </div>
+                <FilledButton onClick={handleApplyClick}>Apply Now
+                  <Icon slot="icon" aria-hidden="true">arrow_forward</Icon>
+                </FilledButton>
+              </div>
+            </sky-cta-banner>
+          ))}
+        </div>
+      </section>
+      <CareersEnquiry />
     </main>
   );
 }
-
-export default Careers;

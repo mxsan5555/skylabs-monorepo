@@ -5,14 +5,12 @@ import { useState } from 'react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { createCustomerSupport } from '../../../api/support';
-import { Breadcrumb } from '../../components/breadcrumb';
 export function Support() {
     const { token } = useAuth();
     const [subject, setSubject] = useState('');
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
-    const [errorMessage, setErrorMessage] = useState('');
-    
+    const [errorMessage, setErrorMessage] = useState(''); 
     const handleSubmit = async () => {
         setErrorMessage('');
         if (!subject.trim() || !message.trim()) {
@@ -21,9 +19,7 @@ export function Support() {
         }
         setLoading(true);
         try {
-            await createCustomerSupport(token, {
-                subject: subject.trim(), message: message.trim(),
-            });
+            await createCustomerSupport(token, {subject: subject.trim(), message: message.trim(),});
             setSubject('');
             setMessage('');
             showSnackbar('Your support request has been submitted successfully.', { variant: 'success' });
@@ -32,10 +28,8 @@ export function Support() {
         } finally { setLoading(false); }
     };
     return (
-        <div className="support-page">
-          
+        <div className="support-page">    
             <sky-tile-card className="support-page__card">
-
                 <div className="support-page__form">
                     <div className="support-page__field">
                         <OutlinedTextField

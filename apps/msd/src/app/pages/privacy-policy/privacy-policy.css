@@ -1,0 +1,106 @@
+
+.privacy-policy {
+  width: min(100% - 40px, 1120px);
+  margin-inline: auto;
+  padding-block: 48px 64px;
+  color: var(--md-sys-color-on-surface);
+}
+
+.privacy-policy__hero {
+  padding: clamp(28px, 5vw, 56px);
+  margin-bottom: 28px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 24px;
+  background: var(--md-sys-color-surface-container-low);
+}
+
+.privacy-policy__eyebrow {
+  display: inline-block;
+  margin-bottom: 16px;
+  color: var(--md-sys-color-primary);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.privacy-policy__hero h1 {
+  max-width: 720px;
+  margin: 0;
+  font-size: clamp(32px, 5vw, 52px);
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+}
+
+.privacy-policy__hero > p {
+  max-width: 700px;
+  margin: 18px 0 24px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.privacy-policy__updated {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 13px;
+}
+
+.privacy-policy__updated > * {
+  flex-shrink: 0;
+}
+
+.privacy-policy__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-bottom: 28px;
+}
+
+.privacy-policy__grid sky-info-card {
+  display: block;
+  min-width: 0;
+}
+
+.privacy-policy__rights {
+  margin-bottom: 28px;
+  min-width: 0;
+}
+
+.privacy-policy__rights sky-feature-card {
+  display: block;
+  width: 100%;
+}
+
+.privacy-policy__contact {
+  min-width: 0;
+}
+
+.privacy-policy__contact sky-cta-banner {
+  display: block;
+  width: 100%;
+}
+
+@media (max-width: 700px) {
+  .privacy-policy {
+    width: calc(100% - 28px);
+    padding-block: 28px 40px;
+  }
+
+  .privacy-policy__grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .privacy-policy__hero {
+    padding: 28px 22px;
+    border-radius: 20px;
+  }
+}
+
+@media (max-width: 420px) {
+  .privacy-policy__hero h1 {
+    font-size: 34px;
+  }
+}

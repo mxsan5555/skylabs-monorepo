@@ -37,6 +37,8 @@ const WISHLIST_ITEM_SELECT = {
       description: true,
       summary: true,
       imageAlt: true,
+      description: true,
+      summary: true,
       mediaImages: {
         select: {
           storageKey: true,

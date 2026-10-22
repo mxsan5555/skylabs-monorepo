@@ -4,16 +4,17 @@ import {
   apiDelete,
 } from './rbac/client';
 
-import type {
-  CatalogDeal,
-} from './catalog';
+import type { CatalogDeal, CatalogProduct, } from './catalog';
 
 export interface WishlistProduct {
   id: string;
   name: string;
   slug: string;
   brand: string | null;
-
+  description: string | null;
+  summary: string | null;
+  category: CatalogProduct['category'];
+  subcategory: CatalogProduct['subcategory'];
   image: string | null;
   imageAlt: string | null;
   mediaImages?: Array<{
@@ -34,9 +35,10 @@ export interface WishlistProduct {
     id: string;
     businessName: string;
     slug: string | null;
+    city?: string | null;
+    logoUrl?: string | null;
   } | null;
 }
-
 export interface WishlistItem {
   id: string;
 
