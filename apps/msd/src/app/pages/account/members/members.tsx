@@ -120,7 +120,6 @@ function AdminMemberManagement({ canCreate }: { canCreate: boolean }) {
         <MemberList
           members={members}
           onSelect={openMember}
-          onEdit={canEdit ? editMember : undefined}
           total={total}
           page={params.page}
           pageSize={params.pageSize}

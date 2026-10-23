@@ -24,7 +24,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   // notifyVendorOwner/notifySuperAdmins run for real (not mocked) inside raiseDispute's own
   // transaction — arm their own Prisma reads to safe no-ops so they never crash the test.
-  prismaMock.vendor.findUnique.mockResolvedValue(null); // notifyVendorOwner: no owner on file -> no-op
+  prismaMock.member.findUnique.mockResolvedValue(null); // notifyVendorOwner: no owner on file -> no-op
   prismaMock.user.findMany.mockResolvedValue([]); // notifySuperAdmins: nobody to notify -> no-op
 });
 

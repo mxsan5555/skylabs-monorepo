@@ -73,7 +73,7 @@ beforeEach(() => {
 describe('verifyVoucher', () => {
   it('returns WRONG_MEMBER_BRANCH when the caller is not this voucher\'s own vendor', async () => {
     prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture() as never);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: OTHER_VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: OTHER_VENDOR_ID } as never);
 
     const { result } = await verifyVoucher(CALLER_ID, CODE);
 
@@ -82,7 +82,7 @@ describe('verifyVoucher', () => {
 
   it('returns WRONG_MEMBER_BRANCH when the caller owns no vendor at all', async () => {
     prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture() as never);
-    prismaMock.vendor.findUnique.mockResolvedValue(null);
+    prismaMock.member.findUnique.mockResolvedValue(null);
 
     const { result } = await verifyVoucher(CALLER_ID, CODE);
     expect(result).toBe('WRONG_MEMBER_BRANCH');
@@ -92,7 +92,7 @@ describe('verifyVoucher', () => {
     prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(
       entitlementFixture({ orderItem: { order: { id: ORDER_ID, status: 'PENDING_PAYMENT' }, itemName: 'x' } }) as never,
     );
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
 
     const { result } = await verifyVoucher(CALLER_ID, CODE);
     expect(result).toBe('ADMIN_REVIEW_REQUIRED');
@@ -100,7 +100,7 @@ describe('verifyVoucher', () => {
 
   it('returns ADMIN_REVIEW_REQUIRED when a dispute currently blocks this entitlement', async () => {
     prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture({ settlementStatus: 'DISPUTED_BLOCKED' }) as never);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
 
     const { result } = await verifyVoucher(CALLER_ID, CODE);
     expect(result).toBe('ADMIN_REVIEW_REQUIRED');
@@ -108,31 +108,31 @@ describe('verifyVoucher', () => {
 
   it('returns CANCELLED_REFUNDED for a CANCELLED entitlement', async () => {
     prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture({ entitlementStatus: 'CANCELLED' }) as never);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
     expect((await verifyVoucher(CALLER_ID, CODE)).result).toBe('CANCELLED_REFUNDED');
   });
 
   it('returns CANCELLED_REFUNDED for a VOID settlement (fully refunded pre-payout)', async () => {
     prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture({ settlementStatus: 'VOID' }) as never);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
     expect((await verifyVoucher(CALLER_ID, CODE)).result).toBe('CANCELLED_REFUNDED');
   });
 
   it('returns ALREADY_USED for a COMPLETED entitlement', async () => {
     prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture({ entitlementStatus: 'COMPLETED' }) as never);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
     expect((await verifyVoucher(CALLER_ID, CODE)).result).toBe('ALREADY_USED');
   });
 
   it('returns VALID for a fresh, confirmed, undisputed voucher belonging to the caller\'s own vendor', async () => {
     prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture() as never);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
     expect((await verifyVoucher(CALLER_ID, CODE)).result).toBe('VALID');
   });
 
   it('never mutates the entitlement under any result', async () => {
     prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture({ entitlementStatus: 'COMPLETED' }) as never);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
 
     await verifyVoucher(CALLER_ID, CODE);
 
@@ -155,7 +155,7 @@ describe('verifyVoucher', () => {
    */
   it('always includes customerPhoneMasked/customerEmailMasked using the ••••<last4> convention', async () => {
     prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture() as never);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
 
     const { entitlement } = await verifyVoucher(CALLER_ID, CODE);
 
@@ -167,7 +167,7 @@ describe('verifyVoucher', () => {
     prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(
       entitlementFixture({ customer: { id: 'c1', name: 'Priya', phone: null, email: null } }) as never,
     );
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
 
     const { entitlement } = await verifyVoucher(CALLER_ID, CODE);
 
@@ -177,7 +177,7 @@ describe('verifyVoucher', () => {
 
   it('omits otpChallenge entirely when entitlementStatus is not OTP_REQUESTED', async () => {
     prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture({ entitlementStatus: 'ACTIVE' }) as never);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
 
     const { entitlement } = await verifyVoucher(CALLER_ID, CODE);
 
@@ -189,7 +189,7 @@ describe('verifyVoucher', () => {
     const lastSentAt = new Date('2026-10-10T10:00:00.000Z');
     const expiresAt = new Date('2026-10-10T10:10:00.000Z');
     prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture({ entitlementStatus: 'OTP_REQUESTED' }) as never);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
     prismaMock.financeSettings.upsert.mockResolvedValue(financeSettingsFixture as never);
     prismaMock.completionOtpChallenge.findFirst.mockResolvedValue({
       id: CHALLENGE_ID,
@@ -218,7 +218,7 @@ describe('verifyVoucher', () => {
 
   it('omits otpChallenge (rather than erroring) when status is OTP_REQUESTED but no unverified challenge row exists', async () => {
     prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture({ entitlementStatus: 'OTP_REQUESTED' }) as never);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
     prismaMock.financeSettings.upsert.mockResolvedValue(financeSettingsFixture as never);
     prismaMock.completionOtpChallenge.findFirst.mockResolvedValue(null);
 
@@ -229,7 +229,7 @@ describe('verifyVoucher', () => {
 
   it('remains 100% read-only even on the OTP_REQUESTED path that now does an extra lookup', async () => {
     prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture({ entitlementStatus: 'OTP_REQUESTED' }) as never);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
     prismaMock.financeSettings.upsert.mockResolvedValue(financeSettingsFixture as never);
     prismaMock.completionOtpChallenge.findFirst.mockResolvedValue({
       id: CHALLENGE_ID, lastSentAt: new Date(), expiresAt: new Date(), attempts: 0, verifiedAt: null,
@@ -247,7 +247,7 @@ describe('verifyVoucher', () => {
 describe('startService', () => {
   it('flips ACTIVE -> STARTED on success', async () => {
     prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture() as never);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
     prismaMock.purchaseEntitlement.updateMany.mockResolvedValue({ count: 1 } as never);
     prismaMock.purchaseEntitlement.findUniqueOrThrow.mockResolvedValue(entitlementFixture({ entitlementStatus: 'STARTED' }) as never);
 
@@ -262,7 +262,7 @@ describe('startService', () => {
 
   it('rejects with CONFLICT when the voucher was already started/completed (conditional updateMany guard)', async () => {
     prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture({ entitlementStatus: 'STARTED' }) as never);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
     prismaMock.purchaseEntitlement.updateMany.mockResolvedValue({ count: 0 } as never);
 
     await expect(startService(CALLER_ID, CODE)).rejects.toMatchObject({ code: 'CONFLICT' });
@@ -270,7 +270,7 @@ describe('startService', () => {
 
   it('rejects with FORBIDDEN when the voucher belongs to a different vendor', async () => {
     prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture() as never);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: OTHER_VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: OTHER_VENDOR_ID } as never);
 
     await expect(startService(CALLER_ID, CODE)).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(prismaMock.purchaseEntitlement.updateMany).not.toHaveBeenCalled();
@@ -278,7 +278,7 @@ describe('startService', () => {
 
   it('rejects a PRODUCT voucher with VALIDATION_ERROR — only a service voucher can be "started"', async () => {
     prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture({ fulfilmentKind: 'PRODUCT_PICKUP' }) as never);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
 
     await expect(startService(CALLER_ID, CODE)).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
     expect(prismaMock.purchaseEntitlement.updateMany).not.toHaveBeenCalled();
@@ -291,7 +291,7 @@ describe('startService', () => {
 describe('requestCompletionOtp', () => {
   function arm(entitlementOverrides: Record<string, unknown> = {}) {
     prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture(entitlementOverrides) as never);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
     prismaMock.financeSettings.upsert.mockResolvedValue(financeSettingsFixture as never);
   }
 
@@ -371,7 +371,7 @@ describe('requestCompletionOtp', () => {
 describe('completeVoucher', () => {
   function arm(entitlementOverrides: Record<string, unknown> = {}) {
     prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture({ entitlementStatus: 'OTP_REQUESTED', ...entitlementOverrides }) as never);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
     prismaMock.financeSettings.upsert.mockResolvedValue(financeSettingsFixture as never);
   }
 
@@ -452,13 +452,13 @@ describe('listMyVoucherQueue', () => {
   }
 
   it('throws NOT_FOUND when the caller has no vendor profile yet — never a bare empty page', async () => {
-    prismaMock.vendor.findUnique.mockResolvedValue(null);
+    prismaMock.member.findUnique.mockResolvedValue(null);
     await expect(listMyVoucherQueue(CALLER_ID, { page: 1, pageSize: 20 })).rejects.toMatchObject({ code: 'NOT_FOUND' });
     expect(prismaMock.purchaseEntitlement.count).not.toHaveBeenCalled();
   });
 
   it('scopes every query to the caller\'s own vendorId — never another vendor\'s rows', async () => {
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
     prismaMock.purchaseEntitlement.count.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
     prismaMock.purchaseEntitlement.findMany.mockResolvedValue([]);
 
@@ -473,7 +473,7 @@ describe('listMyVoucherQueue', () => {
   });
 
   it('maps a queue row to voucherCode/itemName/customerName/entitlementStatus/fulfilmentKind/settlementStatus — one DB row, one queue row', async () => {
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
     prismaMock.purchaseEntitlement.count.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
     prismaMock.purchaseEntitlement.findMany.mockResolvedValue([queueRow()] as never);
 
@@ -494,7 +494,7 @@ describe('listMyVoucherQueue', () => {
   });
 
   it('fills the rest of a page from the closed group once the actionable group runs out — actionable rows always come first', async () => {
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
     // 1 actionable row total, page size 2 -> 1 from actionable + 1 from closed.
     prismaMock.purchaseEntitlement.count.mockResolvedValueOnce(1).mockResolvedValueOnce(5);
     prismaMock.purchaseEntitlement.findMany
@@ -510,7 +510,7 @@ describe('listMyVoucherQueue', () => {
   });
 
   it('pages purely within the closed group once past every actionable row', async () => {
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
     prismaMock.purchaseEntitlement.count.mockResolvedValueOnce(2).mockResolvedValueOnce(10);
     prismaMock.purchaseEntitlement.findMany.mockResolvedValue([queueRow({ id: 'closed-page-2', entitlementStatus: 'COMPLETED' })] as never);
 
@@ -525,7 +525,7 @@ describe('listMyVoucherQueue', () => {
   });
 
   it('passes the search term into both groups\' where clauses', async () => {
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
     prismaMock.purchaseEntitlement.count.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
     prismaMock.purchaseEntitlement.findMany.mockResolvedValue([]);
 

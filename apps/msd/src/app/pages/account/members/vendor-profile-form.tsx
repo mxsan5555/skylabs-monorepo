@@ -341,6 +341,8 @@ export function VendorProfileForm({
   const show = (section: VendorFormSection) =>
     sections.includes(section);
 
+  const ownerMobileStripped = stripIndiaPrefix(form.ownerMobile ?? '');
+
   const showKyc = show('kyc');
   const vendorId = vendor?.id ?? null;
 

@@ -1,6 +1,7 @@
 import './config/env';
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
 import { env } from './config/env';
@@ -60,6 +61,7 @@ export function createApp(): express.Express {
   }
   app.use(helmet());
   app.use(cors({ origin: env.corsOrigin, credentials: true }));
+  app.use(cookieParser());
   // `verify` captures the exact raw bytes onto req.rawBody — payment.routes.ts's webhook needs
   // these (not a re-serialized JSON.stringify of the parsed body) to match Razorpay's HMAC
   // signature, which is computed over the literal request body it sent.

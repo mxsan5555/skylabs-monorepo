@@ -1,6 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
-import { Prisma, type Vendor } from '../generated/prisma-client';
+import { Prisma, type Member } from '../generated/prisma-client';
 import { nextVoucherCode, type VoucherPrefix } from '../lib/voucher';
 import { notifyVendorOwner } from './notification.service';
 import crypto from 'crypto';
@@ -42,15 +42,15 @@ export async function updateFinanceSettings(
 }
 
 export async function setVendorCommissionRate(vendorId: string, commissionRatePercent: number | null) {
-  const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
+  const vendor = await prisma.member.findUnique({ where: { id: vendorId } });
   if (!vendor) throw new ApiError('NOT_FOUND', 'Vendor not found');
-  return prisma.vendor.update({ where: { id: vendorId }, data: { commissionRatePercent } });
+  return prisma.member.update({ where: { id: vendorId }, data: { commissionRatePercent } });
 }
 
 /** `vendor.commissionRatePercent` override wins; otherwise the global default. Resolved ONCE per
  *  entitlement, at creation time, and snapshotted permanently (see PurchaseEntitlement's own
  *  schema doc comment) — never re-resolved later. */
-function resolveCommissionRate(vendor: Pick<Vendor, 'commissionRatePercent'>, settings: { defaultCommissionRatePercent: Prisma.Decimal }): Prisma.Decimal {
+function resolveCommissionRate(vendor: Pick<Member, 'commissionRatePercent'>, settings: { defaultCommissionRatePercent: Prisma.Decimal }): Prisma.Decimal {
   return vendor.commissionRatePercent != null ? new Prisma.Decimal(vendor.commissionRatePercent) : new Prisma.Decimal(settings.defaultCommissionRatePercent);
 }
 
@@ -96,7 +96,7 @@ export async function createEntitlementsForOrder(tx: Prisma.TransactionClient, o
   const settings = await tx.financeSettings.upsert({ where: { id: FINANCE_SETTINGS_ID }, update: {}, create: { id: FINANCE_SETTINGS_ID } });
 
   const vendorIds = [...new Set(items.map((i) => i.vendorId))];
-  const vendors = await tx.vendor.findMany({ where: { id: { in: vendorIds } }, select: { id: true, commissionRatePercent: true } });
+  const vendors = await tx.member.findMany({ where: { id: { in: vendorIds } }, select: { id: true, commissionRatePercent: true } });
   const vendorById = new Map(vendors.map((v) => [v.id, v]));
 
   for (const item of items) {
@@ -259,7 +259,7 @@ export async function listCustomerPaymentsForExport(opts: Omit<CustomerPaymentsO
 // ─── Member Settlements ───────────────────────────────────────────────────────
 
 const VENDOR_SETTLEMENT_SELECT = { id: true, businessName: true, bankAccountNumber: true, bankIfsc: true } as const;
-type VendorForSettlement = Prisma.VendorGetPayload<{ select: typeof VENDOR_SETTLEMENT_SELECT }>;
+type VendorForSettlement = Prisma.MemberGetPayload<{ select: typeof VENDOR_SETTLEMENT_SELECT }>;
 
 /** Last-4-digits-only display reference (e.g. `••••1234`) — the full `Vendor.bankAccountNumber`
  *  stays detail-page-only (`getMemberSettlementDetail`, untouched); this list response never
@@ -321,7 +321,7 @@ async function buildMemberSettlementRow(vendor: VendorForSettlement, branch: { n
 }
 
 export async function listMemberSettlements(opts: { page: number; pageSize: number; search?: string; status?: 'ready' }) {
-  const where: Prisma.VendorWhereInput = opts.search
+  const where: Prisma.MemberWhereInput = opts.search
     ? { businessName: { contains: opts.search, mode: 'insensitive' as const } }
     : {};
 
@@ -329,7 +329,7 @@ export async function listMemberSettlements(opts: { page: number; pageSize: numb
   // aggregate, not a Vendor column, so it can't be pushed into the `where` above. Every matching
   // vendor's aggregate is computed first, filtered, THEN paginated in memory.
   if (opts.status === 'ready') {
-    const vendors = await prisma.vendor.findMany({ where, orderBy: { businessName: 'asc' }, select: VENDOR_SETTLEMENT_SELECT });
+    const vendors = await prisma.member.findMany({ where, orderBy: { businessName: 'asc' }, select: VENDOR_SETTLEMENT_SELECT });
     const branchByVendor = await primaryBranchByVendorId(vendors.map((v) => v.id));
     const allItems = await Promise.all(vendors.map((v) => buildMemberSettlementRow(v, branchByVendor.get(v.id))));
     const filtered = allItems.filter((item) => item.readyForPayout.gt(0));
@@ -338,14 +338,14 @@ export async function listMemberSettlements(opts: { page: number; pageSize: numb
   }
 
   const [vendors, total] = await Promise.all([
-    prisma.vendor.findMany({
+    prisma.member.findMany({
       where,
       orderBy: { businessName: 'asc' },
       skip: (opts.page - 1) * opts.pageSize,
       take: opts.pageSize,
       select: VENDOR_SETTLEMENT_SELECT,
     }),
-    prisma.vendor.count({ where }),
+    prisma.member.count({ where }),
   ]);
   const branchByVendor = await primaryBranchByVendorId(vendors.map((v) => v.id));
   const items = await Promise.all(vendors.map((v) => buildMemberSettlementRow(v, branchByVendor.get(v.id))));
@@ -354,7 +354,7 @@ export async function listMemberSettlements(opts: { page: number; pageSize: numb
 }
 
 export async function getMemberSettlementDetail(vendorId: string) {
-  const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
+  const vendor = await prisma.member.findUnique({ where: { id: vendorId } });
   if (!vendor) throw new ApiError('NOT_FOUND', 'Vendor not found');
 
   const [entitlements, payouts] = await Promise.all([
@@ -410,7 +410,7 @@ export async function recordMemberPayout(
   const existingByKey = await prisma.memberPayout.findUnique({ where: { idempotencyKey }, include: { items: true } });
   if (existingByKey) return existingByKey; // true idempotent replay
 
-  const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
+  const vendor = await prisma.member.findUnique({ where: { id: vendorId } });
   if (!vendor) throw new ApiError('NOT_FOUND', 'Vendor not found');
   if (!vendor.bankAccountNumber || !vendor.bankIfsc || !vendor.bankAccountHolder) {
     throw new ApiError('VALIDATION_ERROR', "This member's bank details are incomplete — add them before recording a payout.");

@@ -47,6 +47,7 @@ const DEFAULT_PARAMS: CustomerTableParams = { page: 1, pageSize: 10, search: '' 
 export function CustomerManagement() {
   const { token, can } = useAuth();
   const canChangeStatus = can('customers', 'status_change');
+  const canCreate = can('customers', 'create');
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -55,6 +56,7 @@ export function CustomerManagement() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState('');
+  const [, setStatusError] = useState('');
 
   const params = useMemo<CustomerTableParams>(
     () => ({
@@ -112,7 +114,6 @@ export function CustomerManagement() {
       try {
         const { data } = await setCustomerStatus(token, id, status);
         setCustomers((prev) => prev.map((c) => (c.id === data.id ? data : c)));
-        setSelectedCustomer((prev) => (prev && prev.id === data.id ? data : prev));
         showSnackbar(STATUS_SUCCESS_COPY[status], { variant: 'success' });
       } catch (err) {
         const msg = err instanceof ApiRequestError ? err.message : 'Could not change customer status.';

@@ -70,7 +70,7 @@ describe('POST /api/v1/settlements/members/:vendorId/payouts — requireSuperAdm
     resolveMock.mockResolvedValue(['accounts.member-settlements:approve']);
     isSuperAdminMock.mockResolvedValue(true);
     prismaMock.memberPayout.findUnique.mockResolvedValue(null);
-    prismaMock.vendor.findUnique.mockResolvedValue(null); // vendor lookup fails downstream — proves the gates were passed, not faked
+    prismaMock.member.findUnique.mockResolvedValue(null); // vendor lookup fails downstream — proves the gates were passed, not faked
 
     const res = await request(app)
       .post(`/api/v1/settlements/members/${VENDOR_ID}/payouts`)
@@ -98,7 +98,7 @@ describe('POST /api/v1/settlements/members/:vendorId/payouts — requireSuperAdm
  */
 describe('GET /api/v1/settlements/members/:vendorId — ownership', () => {
   function armDetail() {
-    prismaMock.vendor.findUnique.mockResolvedValue({
+    prismaMock.member.findUnique.mockResolvedValue({
       id: VENDOR_ID,
       businessName: 'ABC Spa',
       bankAccountHolder: null,
@@ -124,7 +124,7 @@ describe('GET /api/v1/settlements/members/:vendorId — ownership', () => {
 
   it("a vendor holding only vendor-portal.payments:view may fetch their OWN vendorId", async () => {
     resolveMock.mockResolvedValue(['vendor-portal.payments:view']);
-    prismaMock.vendor.findUnique.mockImplementation((args: unknown) => {
+    prismaMock.member.findUnique.mockImplementation((args: unknown) => {
       const where = (args as { where?: { ownerUserId?: string; id?: string } }).where;
       if (where?.ownerUserId === VENDOR_OWNER_USER_ID) return Promise.resolve({ id: VENDOR_ID } as never);
       if (where?.id === VENDOR_ID) {
@@ -146,7 +146,7 @@ describe('GET /api/v1/settlements/members/:vendorId — ownership', () => {
 
   it("403s a vendor holding only vendor-portal.payments:view requesting a DIFFERENT vendor's data", async () => {
     resolveMock.mockResolvedValue(['vendor-portal.payments:view']);
-    prismaMock.vendor.findUnique.mockImplementation((args: unknown) => {
+    prismaMock.member.findUnique.mockImplementation((args: unknown) => {
       const where = (args as { where?: { ownerUserId?: string } }).where;
       if (where?.ownerUserId === VENDOR_OWNER_USER_ID) return Promise.resolve({ id: VENDOR_ID } as never); // caller owns VENDOR_ID, not OTHER_VENDOR_ID
       return Promise.resolve(null as never);
@@ -183,7 +183,7 @@ describe('GET /api/v1/settlements/members?status=ready', () => {
 
   it('200s and forwards status=ready through to the service', async () => {
     resolveMock.mockResolvedValue(['accounts.member-settlements:view']);
-    prismaMock.vendor.findMany.mockResolvedValue([]);
+    prismaMock.member.findMany.mockResolvedValue([]);
     prismaMock.branch.findMany.mockResolvedValue([]);
 
     const res = await request(app)
@@ -194,7 +194,7 @@ describe('GET /api/v1/settlements/members?status=ready', () => {
     // status=ready computes aggregates for every matching vendor up front rather than
     // paginating the vendor table — vendor.count is never called on this path (see
     // settlement.service.test.ts for the full behavior, exercised here only at the route level).
-    expect(prismaMock.vendor.count).not.toHaveBeenCalled();
+    expect(prismaMock.member.count).not.toHaveBeenCalled();
   });
 
   it('rejects an invalid status value', async () => {

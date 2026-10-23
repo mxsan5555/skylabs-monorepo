@@ -554,7 +554,7 @@ export function Category() {
             price={formatINR(price)}
             discount={discount ? `-${discount}%` : undefined}
             tag={product.popularTags?.[0]?.name}
-            href={`/products/${product.id}`}
+            href={productPath(product)}
             layout={cardLayout}
             onFavorite={() => {
               if (!isProductPending(product.id)) {
@@ -636,7 +636,7 @@ export function Category() {
                 : undefined
             }
             tag={deal.popularTags?.[0]?.name}
-            href={`/deal/${deal.id}`}
+            href={dealPath(deal)}
             layout={cardLayout}
             onFavorite={() => toggleFavorite(deal)}
           >

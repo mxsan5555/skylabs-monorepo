@@ -28,7 +28,6 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const { pathname } = useLocation();
   const menu = bootstrap?.menu ?? [];
   const visibleMenu = isPreviewing ? menu.filter((node) => node.id !== 'administration') : menu;
-  const activeId = activeMenuLeafId(visibleMenu, pathname);
   const initial = (bootstrap?.user.name ?? '?').charAt(0).toUpperCase();
   const dualRole = bootstrap ? isDualRoleUser(bootstrap) : false;
 

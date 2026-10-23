@@ -6,6 +6,7 @@ import { showCartAdded, useAddProductToCart } from '../../../hooks/use-add-produ
 import { useRequireSignIn } from '../../../hooks/use-require-sign-in';
 import { useWishlistToggle } from '../../../hooks/use-wishlist-toggle';
 import { fillTemplate, formatINR } from '../../../utils/format';
+import { dealPath, productPath } from '../../seo/public-urls';
 import { toDealCardDeal, toProductCardDeal } from '../../pages/home/home-data';
 import { DealAddToCartDialog } from '../deal-add-to-cart-dialog';
 import { ListingToolbar } from '../listing-toolbar/listing-toolbar';
@@ -80,7 +81,7 @@ export function OfferCard({ item, tag, color, variant = 'plain', layout = 'verti
       {...(card.originalPrice ? { originalPrice: formatINR(card.originalPrice) } : {})}
       {...(card.discount ? { discount: fillTemplate(t.discount, { percent: String(card.discount) }) } : {})}
       {...(rating ? { rating: rating.rating, reviews: rating.reviews } : {})}
-      href={isDeal ? `/deal/${id}` : `/products/${id}`}
+      href={isDeal ? dealPath(item.deal) : productPath(item.product)}
     >
       <ListingToolbar
         ariaLabel={named(t.actionsLabel)}

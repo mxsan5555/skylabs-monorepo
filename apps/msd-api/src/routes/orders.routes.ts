@@ -226,7 +226,7 @@ router.post('/pay-batch/verify', validateBody(VerifyBatchPaymentSchema), async (
 
 router.get('/', requireOrdersOrVendorSelf('view'), validateQuery(OrderListQuerySchema), async (req, res, next) => {
   try {
-    const { page, pageSize, status, vendorId, branchId, customerId, paymentStatus, createdFrom, createdTo, search } = req.validatedQuery as ReturnType<typeof OrderListQuerySchema.parse>;
+    const { page, pageSize, status, vendorId, branchId, customerId, excludeOrderId, paymentStatus, createdFrom, createdTo, search } = req.validatedQuery as ReturnType<typeof OrderListQuerySchema.parse>;
     const { items, total } = await orderService.listOrders(req.user!.sub, res.locals.orderScope, {
       page,
       pageSize,

@@ -22,7 +22,7 @@ const REFUND_ID = 'f0000000-0000-4000-8000-000000000008';
 beforeEach(() => {
   vi.clearAllMocks();
   // No linked Vendor profile — every test in this file is an admin caller unless overridden.
-  prismaMock.vendor.findUnique.mockResolvedValue(null as never);
+  prismaMock.member.findUnique.mockResolvedValue(null as never);
 });
 
 function orderFixture(overrides: Record<string, unknown> = {}) {
@@ -188,7 +188,7 @@ describe('getOrderActivityHistory', () => {
   });
 
   it("scopes a vendor caller's activity to only its own items — never a sibling vendor's entitlement/dispute/refund ids on the same multi-vendor order", async () => {
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: 'vendor-1' } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: 'vendor-1' } as never);
     prismaMock.order.findUnique.mockResolvedValue(
       adminOrderFixture({
         items: [
@@ -232,7 +232,7 @@ describe('getOrderCounts', () => {
   });
 
   it("force-scopes a vendor caller's counts to its own vendorId, ignoring any vendorId filter passed in", async () => {
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: 'vendor-1' } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: 'vendor-1' } as never);
     prismaMock.order.count.mockResolvedValue(0);
 
     await getOrderCounts('vendor-owner-1', { vendorId: 'vendor-2' });

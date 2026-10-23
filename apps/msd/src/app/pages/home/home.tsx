@@ -125,7 +125,7 @@ return (
           : undefined
       }
       tag={deal.popularTags?.[0]?.name}
-      href={`/deal/${deal.id}`}
+      href={dealPath(deal)}
       // layout={cardLayout}
       onFavorite={() => toggleFavorite('deal', deal.id)}
     >
@@ -264,7 +264,7 @@ console.log('Product:', product.name, {
                         ? `${product.discount}% OFF`
                         : undefined
                     }
-                    href={`/products/${product.id}`}
+                    href={productPath(product)}
                     onFavorite={() => toggleFavorite('product', product.id)}
                   />
                 </swiper-slide>

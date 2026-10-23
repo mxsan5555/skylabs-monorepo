@@ -27,7 +27,7 @@ async function assertUserMayLogIn(
     await prisma.loginHistory.create({ data: { userId: user.id, method, success: false, ...meta } });
     throw new ApiError('FORBIDDEN', 'This account has been disabled. Please contact support.');
   }
-  const vendor = await prisma.vendor.findUnique({ where: { ownerUserId: user.id }, select: { status: true } });
+  const vendor = await prisma.member.findUnique({ where: { ownerUserId: user.id }, select: { status: true } });
   if (vendor?.status === 'SUSPENDED') {
     await prisma.loginHistory.create({ data: { userId: user.id, method, success: false, ...meta } });
     throw new ApiError('FORBIDDEN', 'Your member account is suspended. Please contact support.');

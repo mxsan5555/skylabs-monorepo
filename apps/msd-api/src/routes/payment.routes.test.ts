@@ -242,7 +242,7 @@ describe('POST /api/v1/orders/me/:id/pay-cod', () => {
       prismaMock.member.findUnique.mockImplementation(({ where }: { where: { id: string } }) =>
         Promise.resolve({ ownerUserId: where.id === 'vendor-A' ? 'owner-A' : 'owner-B' }),
       );
-      prismaMock.vendor.findMany.mockResolvedValue([
+      prismaMock.member.findMany.mockResolvedValue([
         { id: 'vendor-A', commissionRatePercent: null },
         { id: 'vendor-B', commissionRatePercent: null },
       ]);

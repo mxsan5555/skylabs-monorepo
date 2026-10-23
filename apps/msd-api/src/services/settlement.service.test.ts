@@ -100,7 +100,7 @@ describe('createEntitlementsForOrder', () => {
     prismaMock.purchaseEntitlement.findFirst.mockResolvedValue(null);
     prismaMock.order.findUniqueOrThrow.mockResolvedValue({ customerId: CUSTOMER_ID } as never);
     prismaMock.financeSettings.upsert.mockResolvedValue(financeSettingsFixture as never);
-    prismaMock.vendor.findMany.mockResolvedValue([{ id: VENDOR_ID, commissionRatePercent: null }] as never);
+    prismaMock.member.findMany.mockResolvedValue([{ id: VENDOR_ID, commissionRatePercent: null }] as never);
     prismaMock.purchaseEntitlement.create.mockResolvedValue({} as never);
 
     await createEntitlementsForOrder(prismaMock as never, ORDER_ID);
@@ -138,7 +138,7 @@ describe('createEntitlementsForOrder', () => {
     prismaMock.purchaseEntitlement.findFirst.mockResolvedValue(null);
     prismaMock.order.findUniqueOrThrow.mockResolvedValue({ customerId: CUSTOMER_ID } as never);
     prismaMock.financeSettings.upsert.mockResolvedValue(financeSettingsFixture as never);
-    prismaMock.vendor.findMany.mockResolvedValue([{ id: VENDOR_ID, commissionRatePercent: null }] as never);
+    prismaMock.member.findMany.mockResolvedValue([{ id: VENDOR_ID, commissionRatePercent: null }] as never);
     prismaMock.purchaseEntitlement.create.mockResolvedValue({} as never);
 
     await createEntitlementsForOrder(prismaMock as never, ORDER_ID);
@@ -158,7 +158,7 @@ describe('createEntitlementsForOrder', () => {
     prismaMock.purchaseEntitlement.findFirst.mockResolvedValue(null);
     prismaMock.order.findUniqueOrThrow.mockResolvedValue({ customerId: CUSTOMER_ID } as never);
     prismaMock.financeSettings.upsert.mockResolvedValue(financeSettingsFixture as never); // default 10%
-    prismaMock.vendor.findMany.mockResolvedValue([{ id: VENDOR_ID, commissionRatePercent: new Prisma.Decimal('25') }] as never);
+    prismaMock.member.findMany.mockResolvedValue([{ id: VENDOR_ID, commissionRatePercent: new Prisma.Decimal('25') }] as never);
     prismaMock.purchaseEntitlement.create.mockResolvedValue({} as never);
 
     await createEntitlementsForOrder(prismaMock as never, ORDER_ID);
@@ -194,20 +194,20 @@ describe('updateFinanceSettings / setVendorCommissionRate — never touch existi
   });
 
   it('setVendorCommissionRate only writes Vendor, never PurchaseEntitlement', async () => {
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
-    prismaMock.vendor.update.mockResolvedValue({ id: VENDOR_ID, commissionRatePercent: new Prisma.Decimal('15') } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.update.mockResolvedValue({ id: VENDOR_ID, commissionRatePercent: new Prisma.Decimal('15') } as never);
 
     await setVendorCommissionRate(VENDOR_ID, 15);
 
-    expect(prismaMock.vendor.update).toHaveBeenCalledWith({ where: { id: VENDOR_ID }, data: { commissionRatePercent: 15 } });
+    expect(prismaMock.member.update).toHaveBeenCalledWith({ where: { id: VENDOR_ID }, data: { commissionRatePercent: 15 } });
     expect(prismaMock.purchaseEntitlement.update).not.toHaveBeenCalled();
     expect(prismaMock.purchaseEntitlement.updateMany).not.toHaveBeenCalled();
   });
 
   it('setVendorCommissionRate 404s for a vendor that does not exist', async () => {
-    prismaMock.vendor.findUnique.mockResolvedValue(null);
+    prismaMock.member.findUnique.mockResolvedValue(null);
     await expect(setVendorCommissionRate(VENDOR_ID, 15)).rejects.toMatchObject({ code: 'NOT_FOUND' });
-    expect(prismaMock.vendor.update).not.toHaveBeenCalled();
+    expect(prismaMock.member.update).not.toHaveBeenCalled();
   });
 });
 
@@ -244,20 +244,20 @@ describe('recordMemberPayout', () => {
     const result = await recordMemberPayout(ADMIN_ID, VENDOR_ID, { entitlementIds: [ENTITLEMENT_ID], idempotencyKey: 'key-1' });
 
     expect(result).toMatchObject({ id: PAYOUT_ID });
-    expect(prismaMock.vendor.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.member.findUnique).not.toHaveBeenCalled();
     expect(prismaMock.purchaseEntitlement.findMany).not.toHaveBeenCalled();
   });
 
   it('rejects when the vendor has incomplete bank details', async () => {
     prismaMock.memberPayout.findUnique.mockResolvedValue(null);
-    prismaMock.vendor.findUnique.mockResolvedValue({ ...vendorFixture, bankAccountNumber: null } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ ...vendorFixture, bankAccountNumber: null } as never);
 
     await expect(recordMemberPayout(ADMIN_ID, VENDOR_ID, { entitlementIds: [ENTITLEMENT_ID] })).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
   });
 
   it('rejects with CONFLICT (never silently proceeds) when a selected entitlement is not actually Ready for Payout', async () => {
     prismaMock.memberPayout.findUnique.mockResolvedValue(null);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorFixture as never);
+    prismaMock.member.findUnique.mockResolvedValue(vendorFixture as never);
     prismaMock.purchaseEntitlement.findMany.mockResolvedValue([
       { ...readyEntitlement, settlementStatus: 'PENDING_FULFILMENT' }, // not ON_HOLD yet
     ] as never);
@@ -268,7 +268,7 @@ describe('recordMemberPayout', () => {
 
   it('allocates a Ready-for-Payout entitlement, marks it PAID, and snapshots the vendor bank details', async () => {
     prismaMock.memberPayout.findUnique.mockResolvedValue(null);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorFixture as never);
+    prismaMock.member.findUnique.mockResolvedValue(vendorFixture as never);
     prismaMock.purchaseEntitlement.findMany.mockResolvedValue([readyEntitlement] as never);
     prismaMock.memberPayout.create.mockResolvedValue({ id: PAYOUT_ID } as never);
     prismaMock.memberPayoutItem.create.mockResolvedValue({ id: 'item-1' } as never);
@@ -297,7 +297,7 @@ describe('recordMemberPayout', () => {
 
   it('propagates a DB unique-constraint violation on MemberPayoutItem.entitlementId instead of silently succeeding twice — THIS is what prevents double-allocation under concurrent requests', async () => {
     prismaMock.memberPayout.findUnique.mockResolvedValue(null);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorFixture as never);
+    prismaMock.member.findUnique.mockResolvedValue(vendorFixture as never);
     prismaMock.purchaseEntitlement.findMany.mockResolvedValue([readyEntitlement] as never);
     prismaMock.memberPayout.create.mockResolvedValue({ id: PAYOUT_ID } as never);
     const uniqueConstraintError = Object.assign(new Error('Unique constraint failed on the fields: (`entitlementId`)'), { code: 'P2002' });
@@ -326,8 +326,8 @@ describe('listMemberSettlements — ABC Spa acceptance fixture', () => {
     vi.useFakeTimers();
     vi.setSystemTime(now);
 
-    prismaMock.vendor.findMany.mockResolvedValue([{ id: VENDOR_ID, businessName: 'ABC Spa', bankAccountNumber: '123', bankIfsc: 'IFSC0001' }] as never);
-    prismaMock.vendor.count.mockResolvedValue(1);
+    prismaMock.member.findMany.mockResolvedValue([{ id: VENDOR_ID, businessName: 'ABC Spa', bankAccountNumber: '123', bankIfsc: 'IFSC0001' }] as never);
+    prismaMock.member.count.mockResolvedValue(1);
     prismaMock.branch.findMany.mockResolvedValue([]);
     prismaMock.purchaseEntitlement.findMany.mockResolvedValue([
       { memberShareAmount: new Prisma.Decimal('800.00'), settlementStatus: 'PENDING_FULFILMENT', holdUntil: null, adjustments: [] }, // pending massage
@@ -368,8 +368,8 @@ describe('listMemberSettlements — masked bank reference, primary branch, statu
   });
 
   it("masks the vendor's bank account number to the last 4 digits, never the full number", async () => {
-    prismaMock.vendor.findMany.mockResolvedValue([{ id: VENDOR_ID, businessName: 'ABC Spa', bankAccountNumber: '1234567890', bankIfsc: 'IFSC0001' }] as never);
-    prismaMock.vendor.count.mockResolvedValue(1);
+    prismaMock.member.findMany.mockResolvedValue([{ id: VENDOR_ID, businessName: 'ABC Spa', bankAccountNumber: '1234567890', bankIfsc: 'IFSC0001' }] as never);
+    prismaMock.member.count.mockResolvedValue(1);
     prismaMock.branch.findMany.mockResolvedValue([]);
     prismaMock.purchaseEntitlement.findMany.mockResolvedValue([]);
 
@@ -380,8 +380,8 @@ describe('listMemberSettlements — masked bank reference, primary branch, statu
   });
 
   it('returns null bankReferenceMasked when no bank account is on file', async () => {
-    prismaMock.vendor.findMany.mockResolvedValue([{ id: VENDOR_ID, businessName: 'ABC Spa', bankAccountNumber: null, bankIfsc: null }] as never);
-    prismaMock.vendor.count.mockResolvedValue(1);
+    prismaMock.member.findMany.mockResolvedValue([{ id: VENDOR_ID, businessName: 'ABC Spa', bankAccountNumber: null, bankIfsc: null }] as never);
+    prismaMock.member.count.mockResolvedValue(1);
     prismaMock.branch.findMany.mockResolvedValue([]);
     prismaMock.purchaseEntitlement.findMany.mockResolvedValue([]);
 
@@ -391,8 +391,8 @@ describe('listMemberSettlements — masked bank reference, primary branch, statu
   });
 
   it("includes the vendor's oldest branch's name/city as primaryBranchName/primaryBranchCity", async () => {
-    prismaMock.vendor.findMany.mockResolvedValue([{ id: VENDOR_ID, businessName: 'ABC Spa', bankAccountNumber: null, bankIfsc: null }] as never);
-    prismaMock.vendor.count.mockResolvedValue(1);
+    prismaMock.member.findMany.mockResolvedValue([{ id: VENDOR_ID, businessName: 'ABC Spa', bankAccountNumber: null, bankIfsc: null }] as never);
+    prismaMock.member.count.mockResolvedValue(1);
     prismaMock.branch.findMany.mockResolvedValue([{ vendorId: VENDOR_ID, name: 'Gorakhpur Branch', city: 'Gorakhpur' }] as never);
     prismaMock.purchaseEntitlement.findMany.mockResolvedValue([]);
 
@@ -403,8 +403,8 @@ describe('listMemberSettlements — masked bank reference, primary branch, statu
   });
 
   it('returns null primaryBranchName/City when the vendor has no branch at all', async () => {
-    prismaMock.vendor.findMany.mockResolvedValue([{ id: VENDOR_ID, businessName: 'ABC Spa', bankAccountNumber: null, bankIfsc: null }] as never);
-    prismaMock.vendor.count.mockResolvedValue(1);
+    prismaMock.member.findMany.mockResolvedValue([{ id: VENDOR_ID, businessName: 'ABC Spa', bankAccountNumber: null, bankIfsc: null }] as never);
+    prismaMock.member.count.mockResolvedValue(1);
     prismaMock.branch.findMany.mockResolvedValue([]);
     prismaMock.purchaseEntitlement.findMany.mockResolvedValue([]);
 
@@ -416,7 +416,7 @@ describe('listMemberSettlements — masked bank reference, primary branch, statu
 
   it('status=ready filters out a vendor with zero readyForPayout, never touching vendor.count/skip/take for pagination', async () => {
     const VENDOR_B_ID = 'a0000000-0000-4000-8000-00000000000a';
-    prismaMock.vendor.findMany.mockResolvedValue([
+    prismaMock.member.findMany.mockResolvedValue([
       { id: VENDOR_ID, businessName: 'ABC Spa', bankAccountNumber: null, bankIfsc: null },
       { id: VENDOR_B_ID, businessName: 'XYZ Salon', bankAccountNumber: null, bankIfsc: null },
     ] as never);
@@ -438,7 +438,7 @@ describe('listMemberSettlements — masked bank reference, primary branch, statu
     expect(total).toBe(1);
     // status=ready computes aggregates for every matching vendor up front rather than paginating
     // the vendor table first — vendor.count is never called on this path.
-    expect(prismaMock.vendor.count).not.toHaveBeenCalled();
+    expect(prismaMock.member.count).not.toHaveBeenCalled();
   });
 });
 

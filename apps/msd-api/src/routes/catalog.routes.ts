@@ -152,7 +152,7 @@ router.get('/products', validateQuery(CatalogProductQuerySchema), async (req, re
 });
 
 
-router.get('/products/:id', validateParams(z.object({ id: z.string().uuid() })), async (req, res, next) => {
+router.get('/products/:id', validateParams(z.object({ id: z.string().min(1) })), async (req, res, next) => {
   try {
     sendData(res, await catalogService.getPublicProductOrThrow(req.params.id));
   } catch (err) {

@@ -467,7 +467,7 @@ describe('GET /api/v1/orders/counts', () => {
 
   it('200s with the three counts for an admin caller', async () => {
     resolveMock.mockResolvedValue(['orders:view']);
-    prismaMock.vendor.findUnique.mockResolvedValue(null);
+    prismaMock.member.findUnique.mockResolvedValue(null);
     prismaMock.order.count.mockResolvedValueOnce(42).mockResolvedValueOnce(30).mockResolvedValueOnce(5);
     const res = await request(app).get('/api/v1/orders/counts').set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
     expect(res.status).toBe(200);
@@ -478,7 +478,7 @@ describe('GET /api/v1/orders/counts', () => {
 
 describe('GET /api/v1/orders/:id/activity', () => {
   beforeEach(() => {
-    prismaMock.vendor.findUnique.mockResolvedValue(null);
+    prismaMock.member.findUnique.mockResolvedValue(null);
   });
 
   it('403s without orders:view or vendors:custom', async () => {
@@ -516,7 +516,7 @@ describe('GET /api/v1/orders/:id/activity', () => {
   // vendor's entitlement/dispute/refund ids on the same multi-vendor order.
   it("a vendor caller holding only 'vendors:custom' (never 'orders:view') can see its own order's activity", async () => {
     resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_A_ID, ownerUserId: 'vendor-user-1' });
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_A_ID, ownerUserId: 'vendor-user-1' });
     prismaMock.order.findUnique.mockResolvedValue(orderFixture); // single-vendor order, all items VENDOR_A_ID
     prismaMock.orderItem.findMany.mockResolvedValue([{ id: 'oi-1', purchaseEntitlements: [], refunds: [] }]);
     prismaMock.auditLog.findMany.mockResolvedValue([]);
@@ -528,7 +528,7 @@ describe('GET /api/v1/orders/:id/activity', () => {
 
   it("404s (never confirms existence) when a vendor requests another vendor's order's activity", async () => {
     resolveMock.mockResolvedValue(['orders:view']);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_B_ID, ownerUserId: 'vendor-user-2' });
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_B_ID, ownerUserId: 'vendor-user-2' });
     prismaMock.order.findUnique.mockResolvedValue({ ...orderFixture, vendorId: VENDOR_A_ID }); // all items VENDOR_A_ID only
     const res = await request(app)
       .get(`/api/v1/orders/${ORDER_ID}/activity`)

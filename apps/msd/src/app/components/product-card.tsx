@@ -9,6 +9,7 @@ import {
 
 import type { CatalogProduct } from '../../api/catalog';
 import { formatINR } from '../../utils/format';
+import { productPath } from '../seo/public-urls';
 import { ProductCardGallery } from './product-card-gallery';
 import './product-card.css';
 
@@ -98,7 +99,7 @@ export function ProductCard({
       price={formatINR(price)}
       discount={discount ? `-${discount}%` : undefined}
       tag={product.popularTags?.[0]?.name}
-      href={`/products/${product.id}`}
+      href={productPath(product)}
     >
       <div slot="media">
         <ProductCardGallery

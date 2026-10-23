@@ -38,13 +38,17 @@ const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 10, search: '' };
  * Role Permission Matrix; see blog-posts.routes.ts's own doc comment. Uses `showSnackbar()` for
  * every mutation's outcome rather than categories.tsx's older inline-`<p>` message.
  */
-export function BlogList() {
+export function BlogList({ scope = 'pages' }: { scope?: 'pages' | 'articles' }) {
   const { token, can } = useAuth();
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const navigate = useNavigate();
-  const canCreate = can('cms.blog.pages', 'create');
-  const canEdit = can('cms.blog.pages', 'edit');
-  const canDelete = can('cms.blog.pages', 'delete');
+  const baseRoute = scope === 'articles' ? '/account/cms/blog/articles' : '/account/cms/blog';
+  const heading = scope === 'articles' ? 'Articles' : 'Blog Pages';
+  const blogApi = scope === 'articles' ? blogPostsApi.blogArticlesApi : blogPostsApi;
+  const menuKey = `cms.blog.${scope}`;
+  const canCreate = can(menuKey, 'create');
+  const canEdit = can(menuKey, 'edit');
+  const canDelete = can(menuKey, 'delete');
 
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [total, setTotal] = useState(0);
@@ -80,19 +84,22 @@ export function BlogList() {
     setLoading(true);
     setError('');
     try {
-      const { data, meta } = await listBlogPosts(token, {
+      const { data, meta } = await blogApi.listBlogPosts(token, {
         page: params.page,
         pageSize: params.pageSize,
         search: params.search || undefined,
       });
-      setPosts(data);
-      setTotal(meta?.total ?? data.length);
+      const nextPosts = data ?? [];
+      setPosts(nextPosts);
+      setTotal(meta?.total ?? nextPosts.length);
     } catch (err) {
+      setPosts([]);
+      setTotal(0);
       setError(err instanceof ApiRequestError ? err.message : 'Could not load blog posts.');
     } finally {
       setLoading(false);
     }
-  }, [token, params, listBlogPosts]);
+  }, [blogApi, token, params]);
 
   useEffect(() => {
     load();
@@ -100,21 +107,21 @@ export function BlogList() {
 
   const save = async (input: BlogPostInput, existing?: BlogPost) => {
     if (existing) {
-      const { data } = await updateBlogPost(token, existing.id, input);
+      const { data } = await blogApi.updateBlogPost(token, existing.id, input);
       setPosts((prev) => prev.map((p) => (p.id === data.id ? data : p)));
       return data;
     }
-    const { data } = await createBlogPost(token, input);
+    const { data } = await blogApi.createBlogPost(token, input);
     setPosts((prev) => [...prev, data]);
     setTotal((t) => t + 1);
     return data;
   };
 
-  const toggleStatus = async (post: BlogPost) => {
+  const toggleStatus = useCallback(async (post: BlogPost) => {
     setError('');
     try {
       const nextStatus = post.status === 'PUBLISHED' ? 'DRAFT' : 'PUBLISHED';
-      const { data } = await setBlogPostStatus(token, post.id, nextStatus);
+      const { data } = await blogApi.setBlogPostStatus(token, post.id, nextStatus);
       setPosts((prev) => prev.map((p) => (p.id === data.id ? data : p)));
       showSnackbar(nextStatus === 'PUBLISHED' ? 'Post published.' : 'Post unpublished.', { variant: 'success' });
     } catch (err) {
@@ -122,22 +129,22 @@ export function BlogList() {
       setError(msg);
       showSnackbar(msg, { variant: 'error' });
     }
-  };
+  }, [blogApi, token]);
 
-  const remove = async (post: BlogPost) => {
+  const remove = useCallback(async (post: BlogPost) => {
     if (!(await confirm(`Delete "${post.title}"? This cannot be undone.`))) return;
     setError('');
     try {
-      await deleteBlogPost(token, post.id);
+      await blogApi.deleteBlogPost(token, post.id);
       setPosts((prev) => prev.filter((p) => p.id !== post.id));
-      setTotal((t) => t - 1);
+      setTotal((t) => Math.max(0, t - 1));
       showSnackbar('Blog post deleted.', { variant: 'success' });
     } catch (err) {
       const msg = err instanceof ApiRequestError ? err.message : 'Could not delete blog post.';
       setError(msg);
       showSnackbar(msg, { variant: 'error' });
     }
-  };
+  }, [blogApi, confirm, token]);
 
   const rows = useMemo(
     () =>
@@ -194,8 +201,7 @@ export function BlogList() {
       el.removeEventListener('sky-dt-params-change', onParamsChange);
       el.removeEventListener('sky-dt-row-action', onRowAction);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [posts, baseRoute]);
+  }, [baseRoute, navigate, posts, remove, toggleStatus]);
 
   return (
     <div className="admin-page admin-page--wide">
@@ -204,13 +210,13 @@ export function BlogList() {
       <header className="page-head">
         <div>
           <h1>{heading}</h1>
-          <p>Manage articles shown on the public blog.</p>
+          <p>{scope === 'articles' ? 'Manage articles shown on the public blog.' : 'Manage pages shown on the public blog.'}</p>
         </div>
         <div className="page-head__actions">
           {canCreate && (
             <OutlinedButton onClick={() => addDialogRef.current?.show()}>
               <Icon slot="icon" aria-hidden="true">add</Icon>
-              New blog post
+              {scope === 'articles' ? 'New article' : 'New page'}
             </OutlinedButton>
           )}
         </div>

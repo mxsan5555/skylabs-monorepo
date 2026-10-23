@@ -428,7 +428,7 @@ export function ProductListing() {
                         name:
                           product.name,
 
-                        url: `${SITE_URL}/products/${product.id}`,
+                        url: `${SITE_URL}${productPath(product)}`,
                       }),
                     ),
                 }}

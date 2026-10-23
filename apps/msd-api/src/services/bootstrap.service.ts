@@ -20,7 +20,7 @@ export async function getBootstrap(tokenPayload: AccessTokenPayload): Promise<Bo
   // SuperAdmin's "Login As" preview token (`isPreview`) — previewing a suspended member's own
   // view is a legitimate admin action, never blocked by the thing being previewed.
   if (!tokenPayload.isPreview) {
-    const vendor = await prisma.vendor.findUnique({ where: { ownerUserId: user.id }, select: { status: true } });
+    const vendor = await prisma.member.findUnique({ where: { ownerUserId: user.id }, select: { status: true } });
     if (vendor?.status === 'SUSPENDED') {
       throw new ApiError('FORBIDDEN', 'Your member account is suspended. Please contact support.');
     }

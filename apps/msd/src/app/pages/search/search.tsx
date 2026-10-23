@@ -38,6 +38,7 @@ import { ApiRequestError } from '../../../api/rbac/client';
 import { formatINR } from '../../../utils/format';
 import { resolveDealMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
 import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
+import { dealPath, productPath, therapistPath } from '../../seo/public-urls';
 import content from '../../../content.json';
 import './search.css';
 import { DealMap } from '../../components/deal-map/deal-map';

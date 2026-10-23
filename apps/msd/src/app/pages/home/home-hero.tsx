@@ -11,11 +11,9 @@ import { formatINR } from '../../../utils/format';
 import { imageSrcSet, toDealCardDeal } from './home-data';
 import { PageSection } from '../../components/page-section/page-section';
 import { OfferCard, type OfferItem, type OfferTag } from '../../components/offer-card/offer-card';
+import { dealPath } from '../../seo/public-urls';
 import content from '../../../content.json';
 import type { DealCardDeal } from '../../components/deal-card';
-
-const dealPath = ({ id, slug }: { id: string; slug?: string }) =>
-  slug ? `/deals/${encodeURIComponent(slug)}` : `/deals/${encodeURIComponent(id)}`;
 
 const { home } = content;
 const heroSrcSet = imageSrcSet(home.hero.image, [640, 960, 1400]);

@@ -22,7 +22,7 @@ import content from '../../../content.json';
 
 import './wishlist.css';
 import { DealCard, type DealCardDeal } from '../../components/deal-card';
-import { dealPath } from '../../seo/public-urls';
+import { dealPath, productPath } from '../../seo/public-urls';
 const { wishlist: wishlistContent } = content;
 
 /**
@@ -46,6 +46,7 @@ function toDealCardDeal(
 
   return {
     id: deal.id,
+    slug: deal.slug,
     title,
 
     image:
@@ -110,6 +111,7 @@ function toProductCardDeal(
 
   return {
     id: product.id,
+    slug: product.slug,
 
     title: product.name,
 
@@ -265,7 +267,7 @@ export function Wishlist() {
                       }
                       actions={
                         <FilledButton
-                          onClick={() => navigate(`/deal/${deal.id}`)}
+                          onClick={() => navigate(dealPath(deal))}
                         >
                           <Icon slot="icon" aria-hidden="true">
                             event_available
@@ -299,10 +301,10 @@ export function Wishlist() {
   deal={toProductCardDeal(product)}
   favoriteActive={true}
   onFavorite={() => void removeProduct(item.productId!)}
-  href={`/products/${product.id}`}
+  href={productPath(product)}
   actions={
     <FilledButton
-      onClick={() => navigate(`/products/${product.id}`)}
+      onClick={() => navigate(productPath(product))}
     >
       <Icon slot="icon" aria-hidden="true">
         shopping_bag

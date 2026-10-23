@@ -903,7 +903,7 @@ describe('GET /api/v1/rbac/bootstrap', () => {
   it('403s a suspended Member — their own bootstrap, not an admin\'s', async () => {
     resolveMock.mockResolvedValue(['dashboard:view']);
     prismaMock.user.findFirst.mockResolvedValue({ id: USER_ID, name: 'Vendor Owner', email: 'owner@test.com', phone: null, status: 'active' });
-    prismaMock.vendor.findUnique.mockResolvedValue({ status: 'SUSPENDED' });
+    prismaMock.member.findUnique.mockResolvedValue({ status: 'SUSPENDED' });
     const res = await request(app)
       .get('/api/v1/rbac/bootstrap')
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['vendor'] }));
@@ -914,7 +914,7 @@ describe('GET /api/v1/rbac/bootstrap', () => {
   it('does not 403 a SuperAdmin previewing a suspended Member (isPreview token)', async () => {
     resolveMock.mockResolvedValue(['dashboard:view']);
     prismaMock.user.findFirst.mockResolvedValue({ id: USER_ID, name: 'Vendor Owner', email: 'owner@test.com', phone: null, status: 'active' });
-    prismaMock.vendor.findUnique.mockResolvedValue({ status: 'SUSPENDED' });
+    prismaMock.member.findUnique.mockResolvedValue({ status: 'SUSPENDED' });
     prismaMock.role.findMany.mockResolvedValue([{ id: ROLE_ID, key: 'vendor', name: 'Vendor', isSuperAdmin: false }]);
     prismaMock.roleDashboardWidget.findMany.mockResolvedValue([]);
     const res = await request(app)

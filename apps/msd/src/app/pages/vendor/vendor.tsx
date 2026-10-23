@@ -17,6 +17,7 @@ import { useDealPurchaseSelection } from '../../../hooks/use-deal-purchase-selec
 import { useTherapistPurchaseSelection } from '../../../hooks/use-therapist-purchase-selection';
 import { formatINR, pluralize, formatTime12h } from '../../../utils/format';
 import { resolveDealMedia, resolveProductMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
+import { productPath } from '../../seo/public-urls';
 import { showSnackbar } from '../../../snackbar/snackbar';
 import './vendor.css';
 import content from '../../../content.json';

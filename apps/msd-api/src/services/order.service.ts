@@ -449,9 +449,15 @@ function buildBaseOrderWhere(
   scopedVendorId: string | undefined,
   opts: Pick<OrderListFilters, 'branchId' | 'customerId' | 'excludeOrderId' | 'createdFrom' | 'createdTo' | 'search'>,
 ): Prisma.OrderWhereInput {
+  // One `items` filter: a branchId must narrow the caller's own business, never replace it —
+  // two separate `items: {...}` spread keys would collide (object literals can't hold the same
+  // key twice; the second silently wins), dropping the vendorId scope whenever both are set.
+  const itemFilter = {
+    ...(scopedVendorId ? { vendorId: scopedVendorId } : {}),
+    ...(opts.branchId ? { branchId: opts.branchId } : {}),
+  };
   return {
-    ...(scopedVendorId ? { items: { some: { vendorId: scopedVendorId } } } : {}),
-    ...(opts.branchId ? { items: { some: { branchId: opts.branchId } } } : {}),
+    ...(Object.keys(itemFilter).length ? { items: { some: itemFilter } } : {}),
     ...(opts.customerId ? { customerId: opts.customerId } : {}),
     // "Customer's Other Orders" — excludes the one order currently being viewed.
     ...(opts.excludeOrderId ? { id: { not: opts.excludeOrderId } } : {}),
@@ -501,14 +507,8 @@ export async function listOrders(callerUserId: string, scope: OrderScope, opts: 
   const vendor = await getVendorByOwnerUserId(callerUserId);
   if (scope === 'OWN' && !vendor) return { items: [], total: 0 };
   const scopedVendorId = vendor ? vendor.id : opts.vendorId;
-  // One `items` filter: a branchId must narrow the caller's own business, never replace it.
-  const itemFilter = {
-    ...(scopedVendorId ? { vendorId: scopedVendorId } : {}),
-    ...(opts.branchId ? { branchId: opts.branchId } : {}),
-  };
-  const where = {
-    ...(Object.keys(itemFilter).length ? { items: { some: itemFilter } } : {}),
-    ...(opts.customerId ? { customerId: opts.customerId } : {}),
+  const where: Prisma.OrderWhereInput = {
+    ...buildBaseOrderWhere(scopedVendorId, opts),
     ...(opts.status ? { status: opts.status } : {}),
     // Order has no single "payment status" column of its own (Order 1 -> Payment[]) — this
     // matches "has at least one payment attempt in this state", not "the current/latest one".

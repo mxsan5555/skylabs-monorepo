@@ -3,7 +3,6 @@ import { z } from 'zod';
 import {
   OtpRequestSchema,
   OtpVerifySchema,
-  RefreshRequestSchema,
   AuthTokensResponseSchema,
 } from '../schemas/auth.schema';
 import {
@@ -168,19 +167,18 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'post',
     path: '/auth/refresh',
-    summary: 'Rotate the refresh token and issue a new access token',
+    summary: 'Rotate the refresh session (read from the HttpOnly cookie) and issue a new access token',
+    description: 'Requires the msd_refresh_token cookie (set on login) and a matching X-CSRF-Token header (double-submit of the msd_csrf_token cookie). No request body.',
     tags: ['Auth'],
-    request: { body: { content: { 'application/json': { schema: RefreshRequestSchema } } } },
-    responses: { 200: { description: 'Rotated' }, 401: errorResponse },
+    responses: { 200: { description: 'Rotated' }, 401: errorResponse, 403: errorResponse },
   });
 
   registry.registerPath({
     method: 'post',
     path: '/auth/logout',
-    summary: 'Revoke the current refresh session',
+    summary: 'Revoke the current refresh session and clear its cookies',
     tags: ['Auth'],
     security: bearer,
-    request: { body: { content: { 'application/json': { schema: RefreshRequestSchema } } } },
     responses: { 200: { description: 'Logged out' } },
   });
 

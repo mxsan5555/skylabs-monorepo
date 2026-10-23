@@ -60,6 +60,13 @@ const PAYMENT_STATUS_OPTIONS: { value: PaymentStatus; label: string }[] = [
   { value: 'CANCELLED', label: 'Cancelled' },
 ];
 
+const ORDER_STATUSES: readonly OrderStatus[] = ['PENDING_PAYMENT', 'CONFIRMED', 'COMPLETED', 'CANCELLED'];
+
+function parsePositiveInteger(value: string | null, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 /**
  * "Deal Order" / "Product Order" / "Therapist Order" / "Mixed Order" — computed from the
  * composition of the order's own items, never stored (mirrors msd-api's
@@ -109,9 +116,20 @@ interface TableParams {
   pageSize: number;
   search: string;
   filter: string;
+  paymentStatus: PaymentStatus | '';
+  vendorId: string;
+  customerId?: string;
+  excludeOrderId?: string;
 }
 
-const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 10, search: '', filter: '' };
+const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 10, search: '', filter: '', paymentStatus: '', vendorId: '' };
+
+interface OrderListBackState {
+  fromOrderId?: string;
+  fromOrderBackTo?: string;
+  customerName?: string;
+  customerPhone?: string | null;
+}
 
 /** One list serves both audiences: an admin sees every order, a vendor caller is force-scoped
  *  server-side to its own vendor (order.service.ts#listOrders) — no second vendor-only page.
@@ -126,9 +144,70 @@ const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 10, search: '', filter:
  *  behaviour unchanged. */
 export function OrderManagement({ scope = 'admin', refreshKey = 0 }: { scope?: 'admin' | 'member'; refreshKey?: number } = {}) {
   const { token, can } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const params = useMemo<TableParams>(() => {
+    const filter = searchParams.get('filter') ?? '';
+    const paymentStatus = searchParams.get('paymentStatus') ?? '';
+    return {
+      page: parsePositiveInteger(searchParams.get('page'), DEFAULT_PARAMS.page),
+      pageSize: parsePositiveInteger(searchParams.get('pageSize'), DEFAULT_PARAMS.pageSize),
+      search: searchParams.get('search') ?? DEFAULT_PARAMS.search,
+      filter: ORDER_STATUSES.includes(filter as OrderStatus) ? filter : '',
+      paymentStatus: PAYMENT_STATUS_OPTIONS.some((option) => option.value === paymentStatus)
+        ? (paymentStatus as PaymentStatus)
+        : '',
+      vendorId: searchParams.get('vendorId') ?? '',
+      customerId: searchParams.get('customerId') || undefined,
+      excludeOrderId: searchParams.get('excludeOrderId') || undefined,
+    };
+  }, [searchParams]);
+  const setParams = useCallback(
+    (next: Pick<TableParams, 'page' | 'pageSize' | 'search' | 'filter'>) => {
+      setSearchParams(
+        (previous) => {
+          const updated = new URLSearchParams(previous);
+          updated.set('page', String(next.page));
+          updated.set('pageSize', String(next.pageSize));
+          if (next.search) updated.set('search', next.search);
+          else updated.delete('search');
+          if (next.filter) updated.set('filter', next.filter);
+          else updated.delete('filter');
+          return updated;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+  const updateFilter = useCallback(
+    (key: 'paymentStatus' | 'vendorId', value: string) => {
+      setSearchParams((previous) => {
+        const updated = new URLSearchParams(previous);
+        updated.set('page', '1');
+        if (value) updated.set(key, value);
+        else updated.delete(key);
+        return updated;
+      });
+    },
+    [setSearchParams],
+  );
+  const clearCustomerFilter = useCallback(() => {
+    setSearchParams((previous) => {
+      const updated = new URLSearchParams(previous);
+      updated.delete('customerId');
+      updated.delete('excludeOrderId');
+      updated.set('page', '1');
+      return updated;
+    });
+  }, [setSearchParams]);
+  const backState =
+    location.state && typeof location.state === 'object' ? (location.state as OrderListBackState) : null;
   // D27: only `orders:status_change` (Super Admin, Admin) changes an order; members view their own
   // orders only, for deals and products alike. The API refuses members with 403 as well.
   const canChangeStatus = can('orders', 'status_change');
+  const canViewCustomers = can('customers', 'view');
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [total, setTotal] = useState(0);
@@ -136,6 +215,8 @@ export function OrderManagement({ scope = 'admin', refreshKey = 0 }: { scope?: '
   const [error, setError] = useState('');
 
   const [counts, setCounts] = useState<OrderCounts | null>(null);
+
+  const customerFilterUnavailable = Boolean(params.customerId && !canViewCustomers);
 
   // Lazy, searchable member picker (never loads the full vendor list — mirrors the
   // search-as-you-type picker already used by `popular-tags.tsx`'s mapping dialog): fetches at
@@ -177,10 +258,10 @@ export function OrderManagement({ scope = 'admin', refreshKey = 0 }: { scope?: '
         page: params.page,
         pageSize: params.pageSize,
         status: (params.filter || undefined) as OrderStatus | undefined,
-        paymentStatus: paymentStatus || undefined,
-        vendorId: vendorId || undefined,
-        customerId: customerId || undefined,
-        excludeOrderId: excludeOrderId || undefined,
+        paymentStatus: params.paymentStatus || undefined,
+        vendorId: params.vendorId || undefined,
+        customerId: params.customerId,
+        excludeOrderId: params.excludeOrderId,
         search: params.search || undefined,
       });
       setOrders(data);
@@ -190,7 +271,7 @@ export function OrderManagement({ scope = 'admin', refreshKey = 0 }: { scope?: '
     } finally {
       setLoading(false);
     }
-  }, [token, params, paymentStatus, vendorId, customerId, excludeOrderId, customerFilterUnavailable]);
+  }, [token, params, customerFilterUnavailable]);
 
   useEffect(() => {
     load();
@@ -207,22 +288,22 @@ export function OrderManagement({ scope = 'admin', refreshKey = 0 }: { scope?: '
     }
     try {
       const { data } = await getOrderCounts(token, {
-        vendorId: vendorId || undefined,
-        customerId: customerId || undefined,
-        excludeOrderId: excludeOrderId || undefined,
+        vendorId: params.vendorId || undefined,
+        customerId: params.customerId,
+        excludeOrderId: params.excludeOrderId,
         search: params.search || undefined,
       });
       setCounts(data);
     } catch {
       setCounts(null);
     }
-  }, [token, vendorId, customerId, excludeOrderId, params.search, customerFilterUnavailable]);
+  }, [token, params.vendorId, params.customerId, params.excludeOrderId, params.search, customerFilterUnavailable]);
 
   useEffect(() => {
     loadCounts();
   }, [loadCounts, refreshKey]);
 
-  const scopedByFilter = Boolean(vendorId || params.search || customerId);
+  const scopedByFilter = Boolean(params.vendorId || params.search || params.customerId);
 
   const rows = useMemo(() => JSON.stringify(orders.map(toOrderRow)), [orders]);
 
@@ -315,7 +396,7 @@ export function OrderManagement({ scope = 'admin', refreshKey = 0 }: { scope?: '
         </div>
         {backState?.fromOrderId && backState?.fromOrderBackTo && (
           <div className="page-head__actions">
-            <OutlinedButton onClick={() => navigate(backState.fromOrderBackTo as string)}>
+            <OutlinedButton onClick={() => backState.fromOrderBackTo && navigate(backState.fromOrderBackTo)}>
               <Icon slot="icon" aria-hidden="true">arrow_back</Icon>
               Back to Order #{shortOrderNumber(backState.fromOrderId)}
             </OutlinedButton>
@@ -329,7 +410,7 @@ export function OrderManagement({ scope = 'admin', refreshKey = 0 }: { scope?: '
           <TextButton onClick={clearCustomerFilter}>Clear filter</TextButton>
         </p>
       ) : (
-        customerId && (
+        params.customerId && (
           <p className="field-hint" role="status">
             Filtered to {filteredCustomerName || 'this customer'}
             {filteredCustomerPhone ? ` · ${filteredCustomerPhone}` : ''}
@@ -357,8 +438,8 @@ export function OrderManagement({ scope = 'admin', refreshKey = 0 }: { scope?: '
       <div className="form-grid" style={{ maxWidth: 420, marginBottom: 16 }}>
         <OutlinedSelect
           label="Payment Status"
-          value={paymentStatus}
-          onChange={(e: Event) => setPaymentStatus((e.target as HTMLSelectElement).value)}
+          value={params.paymentStatus}
+          onChange={(e: Event) => updateFilter('paymentStatus', (e.target as HTMLSelectElement).value)}
         >
           <SelectOption value=""><div slot="headline">All payment statuses</div></SelectOption>
           {PAYMENT_STATUS_OPTIONS.map((opt) => (
@@ -375,8 +456,8 @@ export function OrderManagement({ scope = 'admin', refreshKey = 0 }: { scope?: '
             />
             <OutlinedSelect
               label="Member"
-              value={vendorId}
-              onChange={(e: Event) => setVendorId((e.target as HTMLSelectElement).value)}
+              value={params.vendorId}
+              onChange={(e: Event) => updateFilter('vendorId', (e.target as HTMLSelectElement).value)}
             >
               <SelectOption value=""><div slot="headline">All members</div></SelectOption>
               {vendorOptions.map((v) => (

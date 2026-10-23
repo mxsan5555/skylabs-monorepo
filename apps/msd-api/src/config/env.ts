@@ -46,7 +46,10 @@ export const env = {
 
   jwtSecret: required('JWT_SECRET'),
   jwtAccessTtlMinutes: optionalInt('JWT_ACCESS_TTL_MINUTES', 15),
-  jwtRefreshTtlDays: optionalInt('JWT_REFRESH_TTL_DAYS', 30),
+  /** Rolling session length: every successful refresh re-issues a new session for this long
+   *  from "now" (see token.service.ts#rotateRefreshToken calling issueRefreshSession again),
+   *  so a user active at least once every 60 days never has to re-enter an OTP. */
+  jwtRefreshTtlDays: optionalInt('JWT_REFRESH_TTL_DAYS', 60),
 
   otpExpiryMinutes: optionalInt('OTP_EXPIRY_MINUTES', 10),
   otpMaxAttempts: optionalInt('OTP_MAX_ATTEMPTS', 5),

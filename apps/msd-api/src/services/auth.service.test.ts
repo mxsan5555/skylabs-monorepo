@@ -20,7 +20,7 @@ beforeEach(() => {
   prismaMock.loginHistory.create.mockResolvedValue({});
   // Default: no Vendor profile at all (a plain Customer) — matches most of this file's own
   // tests, which predate the Member-suspension login check and never set this up themselves.
-  prismaMock.vendor.findUnique.mockResolvedValue(null);
+  prismaMock.member.findUnique.mockResolvedValue(null);
 });
 
 /**
@@ -118,7 +118,7 @@ describe('loginWithIdentifier — blocked account pre-check', () => {
    */
   it('rejects login for the owner of a SUSPENDED vendor even though their own User.status is active', async () => {
     prismaMock.user.findUnique.mockResolvedValue({ id: USER_ID, status: 'active' });
-    prismaMock.vendor.findUnique.mockResolvedValue({ status: 'SUSPENDED' });
+    prismaMock.member.findUnique.mockResolvedValue({ status: 'SUSPENDED' });
 
     await expect(loginWithIdentifier('suspended-member@example.com')).rejects.toMatchObject({
       code: 'FORBIDDEN',
@@ -133,7 +133,7 @@ describe('loginWithIdentifier — blocked account pre-check', () => {
 
   it('a Member owner whose vendor is merely INACTIVE (not SUSPENDED) can still log in — only SUSPENDED blocks login', async () => {
     prismaMock.user.findUnique.mockResolvedValue({ id: USER_ID, status: 'active' });
-    prismaMock.vendor.findUnique.mockResolvedValue({ status: 'INACTIVE' });
+    prismaMock.member.findUnique.mockResolvedValue({ status: 'INACTIVE' });
     prismaMock.user.upsert.mockResolvedValue({
       id: USER_ID,
       name: 'Member Owner',
@@ -171,7 +171,7 @@ describe('loginWithGoogle — blocked account pre-check', () => {
 
   it('rejects Google login for a suspended Member just as it does for OTP — suspension cannot be bypassed by login method', async () => {
     prismaMock.user.findUnique.mockResolvedValue({ id: USER_ID, status: 'active', email: 'suspended-member@example.com' });
-    prismaMock.vendor.findUnique.mockResolvedValue({ status: 'SUSPENDED' });
+    prismaMock.member.findUnique.mockResolvedValue({ status: 'SUSPENDED' });
 
     await expect(loginWithGoogle('google-sub-3', 'suspended-member@example.com', 'Suspended Member')).rejects.toMatchObject({
       code: 'FORBIDDEN',

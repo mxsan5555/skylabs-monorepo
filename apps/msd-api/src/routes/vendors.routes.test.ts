@@ -228,7 +228,7 @@ describe('GET /api/v1/vendors/me/customers/:customerId', () => {
 
   it('returns 404 when the caller has no vendor profile yet', async () => {
     resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(null);
+    prismaMock.member.findUnique.mockResolvedValue(null);
     const res = await request(app)
       .get(`/api/v1/vendors/me/customers/${CUSTOMER_ID}`)
       .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
@@ -237,7 +237,7 @@ describe('GET /api/v1/vendors/me/customers/:customerId', () => {
 
   it("returns 404 (never confirms existence) for a customer with no Order linking them to Vendor A", async () => {
     resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.order.count.mockResolvedValue(0);
     const res = await request(app)
       .get(`/api/v1/vendors/me/customers/${CUSTOMER_ID}`)
@@ -251,7 +251,7 @@ describe('GET /api/v1/vendors/me/customers/:customerId', () => {
 
   it("returns the customer's summary (name/phone/email/totalOrders/confirmedPaymentsTotal) when they share an order with Vendor A", async () => {
     resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.order.count.mockResolvedValue(2);
     prismaMock.order.aggregate.mockResolvedValue({ _sum: { total: new Prisma.Decimal('800.00') } } as never);
     // `user.findUnique` is shared with the `authenticate` middleware's own per-request status
@@ -286,7 +286,7 @@ describe('GET /api/v1/vendors/me/customers/:customerId', () => {
 
   it("404s for Vendor B's own token looking up the SAME customerId Vendor A can see — isolation is in the query, not just the gate", async () => {
     resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_B_ID, ownerUserId: USER_B_ID, status: 'ACTIVE' } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_B_ID, ownerUserId: USER_B_ID, status: 'ACTIVE' } as never);
     prismaMock.order.count.mockResolvedValue(0);
 
     const res = await request(app)
@@ -1420,7 +1420,7 @@ describe('Admin vendor image routes — imageId param regression', () => {
 describe('Member profile image — single-image enforcement, video routes removed', () => {
   it('POST /vendors/:id/images rejects a second image (member already has one)', async () => {
     resolveMock.mockResolvedValue(['vendors:edit']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.vendorImage.count.mockResolvedValue(1);
     const res = await request(app)
       .post(`/api/v1/vendors/${VENDOR_A_ID}/images`)
@@ -1432,7 +1432,7 @@ describe('Member profile image — single-image enforcement, video routes remove
 
   it('POST /vendors/:id/images succeeds when the member has no image yet', async () => {
     resolveMock.mockResolvedValue(['vendors:edit']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.vendorImage.count.mockResolvedValue(0);
     prismaMock.vendorImage.create.mockResolvedValue({ id: 'vimg-1', vendorId: VENDOR_A_ID, storageKey: 'vendors/x/a.jpg' });
     const res = await request(app)

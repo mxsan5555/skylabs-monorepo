@@ -87,7 +87,7 @@ describe('POST /api/v1/vouchers/verify — member/branch isolation reaches the r
   it("returns VALID when the caller's own vendor owns the voucher", async () => {
     resolveMock.mockResolvedValue(['vendor-portal.orders:custom']);
     prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture() as never);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
 
     const res = await request(app)
       .post('/api/v1/vouchers/verify')
@@ -101,7 +101,7 @@ describe('POST /api/v1/vouchers/verify — member/branch isolation reaches the r
   it("returns WRONG_MEMBER_BRANCH (200, not 403) when a DIFFERENT member's own vendor looks up someone else's voucher — isolation is a result, not a gate rejection", async () => {
     resolveMock.mockResolvedValue(['vendor-portal.orders:custom']);
     prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture({ vendorId: VENDOR_ID }) as never);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: OTHER_VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: OTHER_VENDOR_ID } as never);
 
     const res = await request(app)
       .post('/api/v1/vouchers/verify')
@@ -141,7 +141,7 @@ describe('POST /api/v1/vouchers/:code/start — ownership + audit', () => {
   it("403s (via the service's FORBIDDEN) when the voucher belongs to a different member, even though the caller passed the route-level permission gate", async () => {
     resolveMock.mockResolvedValue(['vendor-portal.orders:custom']);
     prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture({ vendorId: VENDOR_ID }) as never);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: OTHER_VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: OTHER_VENDOR_ID } as never);
 
     const res = await request(app)
       .post(`/api/v1/vouchers/${VOUCHER_CODE}/start`)
@@ -154,7 +154,7 @@ describe('POST /api/v1/vouchers/:code/start — ownership + audit', () => {
   it('writes an audit log entry on a successful Start Service', async () => {
     resolveMock.mockResolvedValue(['vendor-portal.orders:custom']);
     prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture() as never);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
     prismaMock.purchaseEntitlement.updateMany.mockResolvedValue({ count: 1 } as never);
     prismaMock.purchaseEntitlement.findUniqueOrThrow.mockResolvedValue(
       entitlementFixture({ entitlementStatus: 'STARTED' }) as never,
@@ -192,7 +192,7 @@ describe('GET /api/v1/vouchers/queue — Service Queue', () => {
 
   it('404s when the caller has the permission but no vendor profile yet', async () => {
     resolveMock.mockResolvedValue(['vendor-portal.orders:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(null);
+    prismaMock.member.findUnique.mockResolvedValue(null);
 
     const res = await request(app)
       .get('/api/v1/vouchers/queue')
@@ -203,7 +203,7 @@ describe('GET /api/v1/vouchers/queue — Service Queue', () => {
 
   it("returns only the caller's own vendor's rows, paginated, with meta.total", async () => {
     resolveMock.mockResolvedValue(['vendor-portal.orders:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
     prismaMock.purchaseEntitlement.count.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
     prismaMock.purchaseEntitlement.findMany.mockResolvedValue([
       {
@@ -241,7 +241,7 @@ describe('GET /api/v1/vouchers/queue — Service Queue', () => {
 
   it("a second member's own vendor never sees the first member's queue rows (isolation is in the query, not just the gate)", async () => {
     resolveMock.mockResolvedValue(['vendor-portal.orders:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: OTHER_VENDOR_ID } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: OTHER_VENDOR_ID } as never);
     prismaMock.purchaseEntitlement.count.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
     prismaMock.purchaseEntitlement.findMany.mockResolvedValue([]);
 

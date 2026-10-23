@@ -128,14 +128,18 @@ async function assertProduct(productId: string) {
  *  (order.service.ts#createOrderFromCart) since CartItem.unitPrice is only provisional.
  *  Mirrors `catalog.service.ts`'s `VISIBLE_DEAL_WHERE` bar (active + approved deal, active
  *  vendor, active branch) — same "regression: only Product checked vendor status, Deal/
- *  Therapist did not" fix as `assertTherapist` below. */
+ *  Therapist did not" fix as `assertTherapist` below. The `where` below already guarantees
+ *  status/approvalStatus/vendor.status/branch.isActive for any row it returns, so (unlike
+ *  `assertProduct`, which fetches unconditionally) there is no separate re-check here — mirrors
+ *  `assertTherapist` exactly. A re-check used to live here reading `deal.vendor.status`/
+ *  `deal.branch.isActive`, but neither relation is selected on this `findFirst`, so it crashed
+ *  every time a deal was actually found ("Cannot read properties of undefined (reading
+ *  'status')") instead of ever doing anything, since `where` already ruled out the only cases
+ *  it was trying to catch. */
 async function assertServiceDeal(dealId: string, dealPackageId: string) {
   // A deal the storefront hides (draft, unapproved, member not ACTIVE, branch off) 404s like a missing one.
   const deal = await prisma.deal.findFirst({ where: { id: dealId, ...VISIBLE_DEAL_WHERE } });
   if (!deal) throw new ApiError('NOT_FOUND', 'Deal not found');
-  if (deal.status !== 'ACTIVE' || deal.approvalStatus !== 'APPROVED' || deal.vendor.status !== 'ACTIVE' || !deal.branch.isActive) {
-    throw new ApiError('VALIDATION_ERROR', 'Selected deal is not currently available');
-  }
   const pkg = await prisma.dealPackage.findUnique({ where: { id: dealPackageId } });
   if (!pkg || pkg.dealId !== deal.id) throw new ApiError('NOT_FOUND', 'Deal package not found');
   if (!pkg.isActive) throw new ApiError('VALIDATION_ERROR', 'Selected package is not currently available');

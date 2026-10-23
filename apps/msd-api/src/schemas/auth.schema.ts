@@ -20,12 +20,6 @@ export const OtpVerifySchema = z
   })
   .openapi('OtpVerify');
 
-export const RefreshRequestSchema = z
-  .object({
-    refreshToken: z.string().min(10),
-  })
-  .openapi('RefreshRequest');
-
 export const AuthUserSchema = z
   .object({
     id: z.string().uuid(),
@@ -36,10 +30,11 @@ export const AuthUserSchema = z
   })
   .openapi('AuthUser');
 
+/** The refresh token itself never appears in a response body — it's set as an HttpOnly cookie
+ *  (see lib/auth-cookies.ts) so page JS (and therefore localStorage) never has access to it. */
 export const AuthTokensResponseSchema = z
   .object({
     accessToken: z.string(),
-    refreshToken: z.string(),
     user: AuthUserSchema,
   })
   .openapi('AuthTokensResponse');

@@ -69,6 +69,7 @@ export function DealDetail() {
   const [copied, setCopied] = useState(false);
   const [related, setRelated] = useState<CatalogDeal[]>([]);
   const [activeImg, setActiveImg] = useState(0);
+  const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [vendorBranch, setVendorBranch] = useState<CatalogVendorBranch | null>(null);
@@ -223,6 +224,7 @@ export function DealDetail() {
       return;
     }
     setActionError('');
+    setActionMessage('');
 
 
     try {
@@ -231,6 +233,8 @@ export function DealDetail() {
         dealPackageId: activePackage.id,
         quantity,
       });
+
+      setActionMessage('Added to your cart.');
 
 showSnackbar(`Added "${deal.title}" to your cart.`, {
         variant: 'info',
