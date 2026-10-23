@@ -136,6 +136,12 @@ first, then sends `therapistIds`.
   `ChipNav`, `ClampText`, `ListingToolbar`, `ChoiceMenu`, `ViewSwitch`, `LoadMore`,
   `SidebarLayout`, `FilterPanel`, `CheckboxFacet`, `PriceRangeField`, `CityPickerDialog`, `DealMap`.
   Usage table and colour rules: `CLAUDE.md` "msd storefront".
+- **Cards and detail pages:** `offer-card/` (deals and products, `popularTag`), `therapist-card/`
+  (`TherapistCard`, `lowestPackagePrice`, `formatDistance`), `product-card-gallery.tsx` (the card
+  image slider; Swiper options set as properties before `initialize()`, `nested` inside rails),
+  `detail-page/` (`DetailGallery`, `DetailPrice`, `DetailPurchase`, `BranchPanels`,
+  `DetailNotFound`, shared `detail-page.css`) and `duration-package-selector.tsx` (one picker for
+  deal and therapist packages). Deal and therapist detail pages compose these; no page CSS.
 - **Prerender:** `nx run msd:prerender` renders `/`, every `/category/:slug` and
   `/category/:slug/:city` (deal categories × partner cities) with `react-dom/server`, embeds the
   page data as `#__MSD_DATA__`, and writes `sitemap.xml`, `robots.txt`, `llms.txt` (needs

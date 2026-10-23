@@ -45,6 +45,10 @@ const TONAL_STATUS = { primary: 'success', secondary: 'info', tertiary: 'warning
  * score share the first row; heading, description and the eyebrow (e.g. the member, right-aligned) form one
  * group; location (with a pin) and distance share the next row; slotted actions last, spanning
  * the card, set further apart.
+ * `divided` (with `price-first`): a hairline divider (M3 outline-variant) separates what the offer
+ * is from where it is. Under it, the member (left-aligned) and the place row, each on one line
+ * (the place truncates with an ellipsis; its full text stays in the accessibility tree). Use it
+ * for services, with a heading and no description, to keep the card short and scannable.
  *
  * @example
  * <sky-product-card
@@ -74,6 +78,7 @@ export class SkyProductCard extends LitElement {
     heading: { type: String },
     description: { type: String },
     priceFirst: { type: Boolean, attribute: 'price-first', reflect: true },
+    divided: { type: Boolean, reflect: true },
     location: { type: String },
     distance: { type: String },
     rating: { type: Number },
@@ -115,6 +120,8 @@ export class SkyProductCard extends LitElement {
   declare description?: string;
   /** Offer order: price and rating first, member and location after the text (see class docs). */
   declare priceFirst: boolean;
+  /** With `price-first`: divider, then member and place on one line each (see class docs). */
+  declare divided: boolean;
   declare location?: string;
   declare distance?: string;
   declare rating?: number;
@@ -146,6 +153,7 @@ export class SkyProductCard extends LitElement {
     this.align = 'left';
     this.layout = 'vertical';
     this.priceFirst = false;
+    this.divided = false;
     this.imageFailed = false;
   }
 
@@ -202,6 +210,12 @@ export class SkyProductCard extends LitElement {
         flex: 0 0 40%;
         min-inline-size: 160px;
         aspect-ratio: auto;
+      }
+      /* The text sets the row height; the image covers its column (a portrait photo would
+         otherwise stretch the row). */
+      :host([layout='horizontal']) .media img {
+        position: absolute;
+        inset: 0;
       }
     }
     .favorite {
@@ -405,6 +419,47 @@ export class SkyProductCard extends LitElement {
     :host([price-first]) .meta .tag {
       flex-wrap: nowrap;
     }
+    /* divided: what (price, heading) above a hairline, who and where below it. 12px either side
+       of the line, 4px between member and place, one line each. The heading takes only the lines
+       it needs; the place block sits at the bottom, so dividers line up across a row of cards. */
+    :host([price-first][divided]) .body {
+      gap: 12px;
+    }
+    :host([price-first][divided]) .heading.clamp {
+      min-block-size: 0;
+    }
+    .place + slot:not([name]) {
+      margin-top: 0;
+    }
+    .place {
+      display: flex;
+      flex-direction: column;
+      align-self: stretch;
+      align-items: var(--_align);
+      gap: 4px;
+      margin-block-start: auto;
+      padding-block-start: 12px;
+      border-block-start: 1px solid var(--md-sys-color-outline-variant);
+    }
+    :host([color]) .place {
+      border-block-start-color: var(--_outline);
+    }
+    .place .eyebrow {
+      max-inline-size: 100%;
+    }
+    .place .meta {
+      gap: 12px;
+    }
+    .place .tag {
+      min-inline-size: 0;
+      gap: 4px;
+    }
+    .truncate {
+      min-inline-size: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
   `;
 
   private _toggleFavorite(e: Event) {
@@ -542,6 +597,32 @@ export class SkyProductCard extends LitElement {
       : nothing;
   }
 
+  /** `divided`: heading (and description, if any), then the member and place under a hairline. */
+  private _renderDividedText() {
+    const hasPlace = this.eyebrow || this.location || this.distance;
+    return html`
+      ${this.heading || this.description
+        ? html`<div class="group">${this._renderHeading()} ${this._renderDescription()}</div>`
+        : nothing}
+      ${hasPlace
+        ? html`<div class="place">
+            ${this.eyebrow ? html`<span class="truncate">${this._renderEyebrow()}</span>` : nothing}
+            ${this.location || this.distance
+              ? html`<div class="meta body-medium">
+                  ${this.location
+                    ? html`<span class="tag"
+                        ><md-icon aria-hidden="true">location_on</md-icon
+                        ><span class="truncate" title=${this.location}>${this.location}</span></span
+                      >`
+                    : nothing}
+                  ${this._renderDistance()}
+                </div>`
+              : nothing}
+          </div>`
+        : nothing}
+    `;
+  }
+
   /** Offer order (`price-first`): see the class docs. */
   private _renderPriceFirstBody() {
     const hasPrice = this.price || this.priceNote;
@@ -549,7 +630,9 @@ export class SkyProductCard extends LitElement {
     return html`
       ${this._renderTag()}
       ${hasPrice || hasRating ? html`<div class="meta">${this._renderPrice()} ${this._renderRating()}</div>` : nothing}
-      ${this.heading || this.description || this.eyebrow
+      ${this.divided
+        ? this._renderDividedText()
+        : this.heading || this.description || this.eyebrow
         ? html`<div class="group">
             ${this._renderHeading()} ${this._renderDescription()}
             ${this.eyebrow
@@ -558,7 +641,7 @@ export class SkyProductCard extends LitElement {
               : nothing}
           </div>`
         : nothing}
-      ${this.location || this.distance
+      ${!this.divided && (this.location || this.distance)
         ? html`<div class="meta body-medium">
             ${this.location
               ? html`<span class="tag"><md-icon aria-hidden="true">location_on</md-icon>${this.location}</span>`

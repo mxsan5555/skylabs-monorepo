@@ -11,6 +11,7 @@ import {
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { MEMBER_STATUS_LABEL } from './member-status';
+import { EMAIL_REGEX, MOBILE_REGEX } from '../../../../utils/format';
 import { VendorDocumentUpload } from '../../../components/vendor-document-upload';
 
 const EMPTY_FORM: VendorFields = {
@@ -167,17 +168,8 @@ const KYC_DOCUMENT_TYPES: {
 // backend re-validates and remains the authority; this is not a security layer.
 
 const PINCODE_REGEX = /^\d{6}$/;
-
-/** Canonical Indian mobile rule (the ONLY mobile regex in this file — matches msd-api's
- *  `INDIA_MOBILE_LOCAL_REGEX` in `vendor.schema.ts` character-for-character, just applied to
- *  the plain 10-digit value this form always holds instead of the `+91`-prefixed value the
- *  backend stores). First digit 6-9, exactly 10 digits — no more, no less. */
-const INDIA_MOBILE_REGEX = /^[6-9]\d{9}$/;
-
-/** Deliberately simple (not RFC 5322) — mirrors the intent of msd-api's `z.string().email()`
- *  closely enough to catch obviously-invalid input before submit; the backend remains the
- *  authority (see this section's own doc comment above). */
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// MOBILE_REGEX (utils/format) matches msd-api's `INDIA_MOBILE_LOCAL_REGEX` in `vendor.schema.ts`,
+// applied to the plain 10-digit value this form holds (the backend stores it `+91`-prefixed).
 
 function validatePincode(value: string): string | null {
   if (!value) return null;
@@ -190,7 +182,7 @@ function validatePincode(value: string): string | null {
 function validateMobileNumber(value: string): string | null {
   if (!value) return null;
 
-  return INDIA_MOBILE_REGEX.test(value)
+  return MOBILE_REGEX.test(value)
     ? null
     : 'Enter a valid 10-digit mobile number';
 }

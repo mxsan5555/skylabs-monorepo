@@ -12,6 +12,8 @@ export interface CardGridProps {
    *  for horizontal cards. `compact`: narrower (160px) columns for small status/step cards that
    *  should sit several to a row (e.g. a member's setup-progress cards). */
   layout?: 'grid' | 'list' | 'compact';
+  /** Renders an `<ol>` for items whose order matters (steps). */
+  ordered?: boolean;
   children?: ReactNode;
 }
 
@@ -23,15 +25,15 @@ const LAYOUT_CLASS: Record<'grid' | 'list' | 'compact', string> = {
 
 /** Responsive card grid: 272px minimum columns (the card rail's slide width), equal-height rows.
  *  `layout="list"` switches to a single column; `layout="compact"` narrows the columns instead. */
-export function CardGrid({ above, panel, fallback, layout = 'grid', children }: CardGridProps) {
+export function CardGrid({ above, panel, fallback, layout = 'grid', ordered = false, children }: CardGridProps) {
+  const List = ordered ? 'ol' : 'ul';
   const body = fallback ?? (
     // list-style: none drops list semantics in Safari; the explicit role restores them.
-    // eslint-disable-next-line jsx-a11y/no-redundant-roles
-    <ul className={`card-grid__list${LAYOUT_CLASS[layout]}`} role="list">
+    <List className={`card-grid__list${LAYOUT_CLASS[layout]}`} role="list">
       {Children.map(children, (child) => (
         <li className="card-grid__item">{child}</li>
       ))}
-    </ul>
+    </List>
   );
   return (
     <div className="card-grid">

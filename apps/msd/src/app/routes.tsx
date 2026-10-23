@@ -74,6 +74,7 @@ import Search from './pages/search/search';
 import Category from './pages/category/category';
 import { CategoriesIndex } from './pages/categories/categories';
 import About from './pages/about/about';
+import HelpCenter from './pages/help-center/help-center';
 import Contact from './pages/contact/contact';
 import Careers from './pages/careers/careers';
 import { BecomeVendor } from './pages/become-vendor/become-vendor';
@@ -292,6 +293,7 @@ export function AppRoutes() {
           <Route path="/blog" element={<Blog />} />
           <Route path="/blog/:slug" element={<BlogDetail />} />
           <Route path="/about" element={<About />} />
+          <Route path="/help-center" element={<HelpCenter />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/careers" element={<Careers />} />
           {/* Public, unauthenticated Vendor self-registration ("Become a Vendor") — the storefront
@@ -299,12 +301,12 @@ export function AppRoutes() {
             comment. Linked from the footer's "Partner With Us" entry (content.json). */}
           <Route path="/become-member" element={<BecomeVendor />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
-          {/* WebsitePage is one reusable component parameterized by `slug` — wired to all 4 fixed
-            `WebsitePage` rows (see website-page.tsx's own doc comment), not 4 separate files. */}
-          <Route path="/privacy" element={<WebsitePage slug="privacy" />} />
-          <Route path="/terms" element={<WebsitePage slug="terms" />} />
-          <Route path="/accessibility" element={<WebsitePage slug="accessibility" />} />
-          <Route path="/cookies" element={<WebsitePage slug="cookies" />} />
+          {/* One legal page component for the 4 fixed WebsitePage rows (see website-page.tsx). */}
+          <Route path="/privacy" element={<WebsitePage page="privacy" />} />
+          <Route path="/terms" element={<WebsitePage page="terms" />} />
+          <Route path="/accessibility" element={<WebsitePage page="accessibility" />} />
+          <Route path="/cookies" element={<WebsitePage page="cookies" />} />
+          <Route path="/products/:slug" element={<ProductDetail />} />
           <Route path="/showcase" element={<Showcase />} />
           {/* ── Catch-all 404, inside the shell so it keeps header/footer. ── */}
           <Route path="*" element={<NotFound />} />

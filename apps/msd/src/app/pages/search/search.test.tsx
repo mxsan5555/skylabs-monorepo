@@ -22,10 +22,11 @@ vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
 }));
 
 vi.mock('../../../wishlist/wishlist-context', () => ({
-  useWishlist: () => ({ toggle: vi.fn(), has: () => false }),
+  useWishlist: () => ({ toggle: vi.fn(), has: () => false, toggleProduct: vi.fn(), hasProduct: () => false }),
 }));
 
 import { Search } from './search';
+import content from '../../../content.json';
 
 const LOCATIONS: CatalogLocation[] = [
   { state: 'Maharashtra', city: 'Mumbai' },
@@ -251,10 +252,8 @@ describe('Search — Add to Cart while logged out preserves the return destinati
     renderSearchWithSignInRoute(['/explore?q=Swedish%20Massage']);
     await waitFor(() => expect(listCatalogDealsMock).toHaveBeenCalled());
 
-    // Two "Add to Cart" texts exist once the deal card renders: the trigger button on the card
-    // itself, and the package-selection dialog's own submit button (hidden until the trigger
-    // opens it) — the first is the one that runs requireAuthOrRedirect().
-    const [addToCartTrigger] = await screen.findAllByText('Add to Cart');
+    // The deal's offer card (OfferCard) runs the sign-in check before opening the package picker.
+    const [addToCartTrigger] = await screen.findAllByText(content.offerCard.addToCart);
     fireEvent.click(addToCartTrigger);
 
     await waitFor(() =>
@@ -266,10 +265,8 @@ describe('Search — Add to Cart while logged out preserves the return destinati
     renderSearchWithSignInRoute(['/explore']);
     await waitFor(() => expect(listCatalogDealsMock).toHaveBeenCalled());
 
-    // Two "Add to Cart" texts exist once the deal card renders: the trigger button on the card
-    // itself, and the package-selection dialog's own submit button (hidden until the trigger
-    // opens it) — the first is the one that runs requireAuthOrRedirect().
-    const [addToCartTrigger] = await screen.findAllByText('Add to Cart');
+    // The deal's offer card (OfferCard) runs the sign-in check before opening the package picker.
+    const [addToCartTrigger] = await screen.findAllByText(content.offerCard.addToCart);
     fireEvent.click(addToCartTrigger);
 
     await waitFor(() => expect(currentUrl()).toBe('/sign-in?next=%2Fexplore'));

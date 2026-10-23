@@ -1,18 +1,33 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import {
+  render as rtlRender,
+  screen,
+  fireEvent,
+  waitFor,
+} from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ApiRequestError } from '../../../api/rbac/client';
+
+import { BecomeVendor } from './become-vendor';
 
 const registerPublicVendorMock = vi.fn();
 
 vi.mock('../../../api/rbac/vendors', async () => {
-  const actual = await vi.importActual<typeof import('../../../api/rbac/vendors')>('../../../api/rbac/vendors');
+  const actual = await vi.importActual<
+    typeof import('../../../api/rbac/vendors')
+  >('../../../api/rbac/vendors');
   return {
     ...actual,
-    registerPublicVendor: (...args: unknown[]) => registerPublicVendorMock(...args),
+    registerPublicVendor: (...args: unknown[]) =>
+      registerPublicVendorMock(...args),
   };
 });
 
-import { BecomeVendor } from './become-vendor';
+vi.mock('../../../api/catalog', () => ({
+  getCatalogContactUs: () => Promise.resolve({ data: null }),
+}));
+
+const render = (ui: React.ReactElement) =>
+  rtlRender(<MemoryRouter>{ui}</MemoryRouter>);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -47,7 +62,12 @@ beforeEach(() => {
 describe('BecomeVendor', () => {
   it('renders the hero and every section without requiring authentication', () => {
     render(<BecomeVendor />);
-    expect(screen.getByText('Become a Vendor')).toBeTruthy();
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Become a member' }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('complementary', { name: 'Talk to our partner team' }),
+    ).toBeTruthy();
     expect(screen.getByText('Business details')).toBeTruthy();
     expect(screen.getByText('Your details')).toBeTruthy();
     expect(screen.getByText('Business address')).toBeTruthy();
@@ -66,25 +86,34 @@ describe('BecomeVendor', () => {
     if (!form) throw new Error('form not found');
     fireEvent.submit(form);
 
-    await waitFor(() => expect(screen.getByText('Business name is required.')).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByText('Business name is required.')).toBeTruthy(),
+    );
     expect(registerPublicVendorMock).not.toHaveBeenCalled();
   });
 
   it('tells the visitor at the top of the page that our team creates member accounts', () => {
     render(<BecomeVendor />);
-    const notice = screen.getByRole('status');
-    expect(notice.textContent).toMatch(/created by our team/i);
+    const notice = screen.getByText(/created by our team/i);
+    expect(notice.tagName).toBe('P');
     const form = document.querySelector('form');
     if (!form) throw new Error('form not found');
     // The notice comes before the form in reading order.
-    expect(notice.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      notice.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(notice.querySelector('a')?.getAttribute('href')).toBe('/contact');
   });
 
   it('turns off the submit button, since registration always ends in a contact-us answer', () => {
     render(<BecomeVendor />);
-    const button = Array.from(document.querySelectorAll('md-filled-button')).find((el) => el.textContent?.includes('Submit application'));
-    expect(button?.hasAttribute('disabled') || (button as unknown as { disabled?: boolean })?.disabled).toBe(true);
+    const button = Array.from(
+      document.querySelectorAll('md-filled-button'),
+    ).find((el) => el.textContent?.includes('Submit application'));
+    expect(
+      button?.hasAttribute('disabled') ||
+        (button as unknown as { disabled?: boolean })?.disabled,
+    ).toBe(true);
   });
 
   it('does not show the "Application received" success screen before any submission', () => {

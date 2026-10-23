@@ -1,47 +1,15 @@
 import { JsonLd } from '../../seo/json-ld';
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
-
-import { ProductCard } from '../../components/product-card';
-
-import {
-  Divider,
-  Icon,
-  OutlinedSelect,
-  OutlinedTextField,
-  SelectOption,
-} from '@skylabs-monorepo/shared-ui/react';
-
+import {useEffect, useMemo, useState,} from 'react';
+import { OfferCard, popularTag } from '../../components/offer-card/offer-card';
+import {Divider,Icon,OutlinedSelect,OutlinedTextField,SelectOption,} from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-
 import { signInPathWithReturnTo } from '../../../auth/role-routing';
-
-import {
-  useLocation,
-  useNavigate,
-} from 'react-router-dom';
-
-import {
-  listCatalogProducts,
-  type CatalogProduct,
-} from '../../../api/catalog';
-
+import { useLocation, useNavigate,} from 'react-router-dom';
+import { listCatalogProducts, type CatalogProduct,} from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
-
 import { addCartItem } from '../../../api/cart';
-
 import { useWishlist } from '../../../wishlist/wishlist-context';
-
 import { Breadcrumb } from '../../components/breadcrumb';
-
-import {
-  resolveProductMedia,
-  primaryImage,
-} from '../../../utils/media';
-
 import type { ProductSort } from '../../../types';
 import { productPath } from '../../seo/public-urls';
 
@@ -361,35 +329,35 @@ export function ProductListing() {
 
       <JsonLd
         data={{
-              '@context':
-                'https://schema.org',
+          '@context':
+            'https://schema.org',
 
+          '@type':
+            'BreadcrumbList',
+
+          itemListElement: [
+            {
               '@type':
-                'BreadcrumbList',
+                'ListItem',
 
-              itemListElement: [
-                {
-                  '@type':
-                    'ListItem',
+              position: 1,
 
-                  position: 1,
+              name: 'Home',
 
-                  name: 'Home',
+              item: `${SITE_URL}/`,
+            },
+            {
+              '@type':
+                'ListItem',
 
-                  item: `${SITE_URL}/`,
-                },
-                {
-                  '@type':
-                    'ListItem',
+              position: 2,
 
-                  position: 2,
+              name: 'Products',
 
-                  name: 'Products',
-
-                  item: `${SITE_URL}/products`,
-                },
-              ],
-            }}
+              item: `${SITE_URL}/products`,
+            },
+          ],
+        }}
       />
 
       {/* Product list structured data */}
@@ -398,40 +366,40 @@ export function ProductListing() {
         0 && (
           <JsonLd
             data={{
-                  '@context':
-                    'https://schema.org',
+              '@context':
+                'https://schema.org',
 
-                  '@type':
-                    'ItemList',
+              '@type':
+                'ItemList',
 
-                  name:
-                    products.meta
-                      .listingTitle,
+              name:
+                products.meta
+                  .listingTitle,
 
-                  url: `${SITE_URL}/products`,
+              url: `${SITE_URL}/products`,
 
-                  numberOfItems:
-                    sortedProducts.length,
+              numberOfItems:
+                sortedProducts.length,
 
-                  itemListElement:
-                    sortedProducts.map(
-                      (
-                        product,
-                        index,
-                      ) => ({
-                        '@type':
-                          'ListItem',
+              itemListElement:
+                sortedProducts.map(
+                  (
+                    product,
+                    index,
+                  ) => ({
+                    '@type':
+                      'ListItem',
 
-                        position:
-                          index + 1,
+                    position:
+                      index + 1,
 
-                        name:
-                          product.name,
+                    name:
+                      product.name,
 
-                        url: `${SITE_URL}${productPath(product)}`,
-                      }),
-                    ),
-                }}
+                    url: `${SITE_URL}/products/${product.id}`,
+                  }),
+                ),
+            }}
           />
         )}
 
@@ -576,114 +544,45 @@ export function ProductListing() {
           {actionError}
         </p>
       )}
-
       {/* Product Grid */}
-
       <section
         className="products-page__grid-section"
-        aria-label={
-          products.listing
-            .resultsAriaLabel
-        }
+        aria-label={products.listing.resultsAriaLabel}
       >
         {loading ? (
           <p className="loading-state">
-            {
-              products.listing
-                .loading
-            }
+            {products.listing.loading}
           </p>
         ) : error ? (
-          <p
-            className="error-state"
-            role="alert"
-          >
+          <p className="error-state" role="alert">
             {error}
           </p>
-        ) : sortedProducts.length ===
-          0 ? (
+        ) : sortedProducts.length === 0 ? (
           <div
             className="products-page__empty"
             role="status"
           >
             <sky-info-card
               icon="search_off"
-              heading={
-                products.listing
-                  .emptyHeading
-              }
-              subheading={
-                products.listing
-                  .emptySubheading
-              }
+              heading={products.listing.emptyHeading}
+              subheading={products.listing.emptySubheading}
             />
           </div>
         ) : (
           <div className="products-page__grid">
-            {sortedProducts.map(
-              (product) => {
-                const salePrice =
-                  Number(
-                    product.price,
-                  );
-
-                const originalPrice =
-                  product.originalPrice !=
-                    null
-                    ? Number(
-                      product.originalPrice,
-                    )
-                    : undefined;
-
-                const media =
-                  resolveProductMedia(
-                    product,
-                  );
-
-                const image =
-                  primaryImage(
-                    media,
-                  );
-
-                /*
-                 * Current wishlist state.
-                 */
-                const isWishlisted =
-                  hasProduct(
-                    product.id,
-                  );
-
-                /*
-                 * Current wishlist request state.
-                 */
-                const wishlistPending =
-                  isProductPending(
-                    product.id,
-                  );
-
-                return (
-                  <div
-                    key={
-                      product.id
-                    }
-                    className="products-page__card-wrap"
-                  >
-                    <ProductCard
-                      product={product}
-                      image={image ?? undefined}
-                      gallery={media.images}
-                      favoriteActive={isWishlisted}
-                      onFavorite={() => {
-                        if (wishlistPending) return;
-                        void handleProductWishlist(product.id);
-                      }}
-                      onAddToCart={() => void addToCart(product)}
-                      addToCartLabel={products.listing.addToCart}
-                    />
-                  </div>
-                );
-              },
-            )}
+            {sortedProducts.map((product) => (
+              <div
+                key={product.id}
+                className="products-page__card-wrap"
+              >
+                <OfferCard slider
+                  item={{ type: 'product', product }}
+                  tag={popularTag(product.popularTags)}
+                  variant="plain"
+                  layout="vertical"
+                />
+              </div>
+            ))}
           </div>
         )}
       </section>

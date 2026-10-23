@@ -1,42 +1,45 @@
 import { useEffect, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Divider, FilledButton, Icon } from '@skylabs-monorepo/shared-ui/react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Icon } from '@skylabs-monorepo/shared-ui/react';
+import '@skylabs-monorepo/shared-ui/carousel';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { signInPathWithReturnTo } from '../../../auth/role-routing';
-import { getCatalogTherapist, type CatalogTherapist } from '../../../api/catalog';
+import { addCartItem } from '../../../api/cart';
+import { getCatalogTherapist, listCatalogTherapists, type CatalogTherapist } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
+import { useRequireSignIn } from '../../../hooks/use-require-sign-in';
+import { showCartAdded } from '../../../hooks/use-add-product-to-cart';
+import { useTherapistPurchaseSelection } from '../../../hooks/use-therapist-purchase-selection';
 import { Breadcrumb } from '../../components/breadcrumb';
-import { TherapistAddToCartDialog } from '../../components/therapist-add-to-cart-dialog';
-import { pluralize } from '../../../utils/format';
+import { CardRail } from '../../components/card-rail/card-rail';
+import { PageSection } from '../../components/page-section/page-section';
+import { DurationPackageSelector } from '../../components/duration-package-selector';
+import { BranchPanels, DetailGallery, DetailNotFound, DetailPrice, DetailPurchase, discountPercent } from '../../components/detail-page/detail-page';
+import { TherapistCard, lowestPackagePrice } from '../../components/therapist-card/therapist-card';
+import { Seo } from '../../seo/seo';
+import { fillTemplate, formatINR } from '../../../utils/format';
 import { resolveTherapistMedia } from '../../../utils/media';
-import { therapistPath } from '../../seo/public-urls';
-import { absoluteUrl } from '../../seo/site-url';
-import './therapist-detail.css';
+import content from '../../../content.json';
+
+const t = content.therapistDetail;
+const d = content.detailPage;
+
 /**
- * Therapist Detail — GET /catalog/therapists/:slug (also accepts a legacy UUID, see msd-api's
- * `getPublicTherapistOrThrow`). The customer-facing purchase entry point for adding a Therapist
- * to cart directly: Therapist Listing → here → select a package → Add to Cart, entirely
- * independent of Deal (never requires selecting a Deal first — see msd-api's Therapist schema
- * doc comment). A Therapist is a normal purchasable OrderItem exactly like a Deal or Product —
- * there is no Book Now path. Reuses `deal-detail.css`'s layout classes for visual consistency
- * with the Deal detail page, without pulling in any Deal-specific logic (siblings, wishlist —
- * none of those concepts apply to a Therapist purchased directly).
- *
- * A legacy UUID resolves to the same therapist, then this page client-navigates to the
- * canonical `/therapist/:slug` path (`replace`) — see DealDetail's own doc comment on why this
- * isn't a true HTTP 301/308.
+ * A single therapist (`GET /catalog/therapists/:id`), laid out like a service deal: gallery and
+ * buy box (package, quantity, Add to cart, share), about and policy beside the branch location
+ * and hours, then more therapists at the same member. A therapist is bought on its own (cart line
+ * `therapistId` + `therapistPackageId`), never through a Deal.
  */
 export function TherapistDetail() {
   const { slug: id = '' } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
-  const { isAuthenticated } = useAuth();
+  const { token } = useAuth();
+  const requireSignIn = useRequireSignIn();
   const [therapist, setTherapist] = useState<CatalogTherapist | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
-  const [actionMessage, setActionMessage] = useState('');
-  const [activeImg, setActiveImg] = useState(0);
+  const [related, setRelated] = useState<CatalogTherapist[]>([]);
+  const [actionError, setActionError] = useState('');
+  const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
     // Guards against a slower, now-stale request landing after a newer one and overwriting
@@ -45,157 +48,186 @@ export function TherapistDetail() {
 
     if (!id) {
       setTherapist(null);
-      setError('Invalid therapist.');
+      setError(t.errors.invalid);
       setLoading(false);
       return;
     }
+    let cancelled = false;
     setLoading(true);
     setError('');
     getCatalogTherapist(id)
       .then(({ data }) => { if (!cancelled) setTherapist(data); })
       .catch((err: unknown) => {
         if (cancelled) return;
-        if (err instanceof ApiRequestError && err.status === 404) {
-          setTherapist(null);
-          return;
-        }
-        setError(err instanceof ApiRequestError ? err.message : 'Could not load this therapist.');
+        if (err instanceof ApiRequestError && err.status === 404) setTherapist(null);
+        else setError(err instanceof ApiRequestError ? err.message : t.errors.load);
       })
       .finally(() => { if (!cancelled) setLoading(false); });
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [id]);
+
+  const vendorId = therapist?.vendor?.id;
+  const therapistId = therapist?.id;
   useEffect(() => {
-    if (!therapist) return;
-    const canonical = therapistPath(therapist);
-    if (canonical !== location.pathname) navigate(canonical, { replace: true });
-  }, [therapist, location.pathname, navigate]);
-  if (loading) {
-    return <p className="loading-state">Loading therapist…</p>;
-  }
-  if (error || !therapist) {
-    return (
-      <div className="therapist-detail therapist-detail--empty">
-        <title>Therapist Not Found | MSD</title>
-        <sky-info-card icon="search_off" heading="Therapist not found" subheading={error || 'This therapist may no longer be available.'} />
-        <FilledButton type="button" onClick={() => navigate('/therapists')}>Browse Therapists</FilledButton>
-      </div>
-    );
-  }
-  const requireAuthOrRedirect = () => {
-    if (isAuthenticated) return true;
-    navigate(signInPathWithReturnTo(location));
-    return false;
-  };
-  const fromPrice = therapist.packages.length > 0 ? Math.min(...therapist.packages.map((p) => Number(p.sellingPrice))) : null;
+    if (!vendorId) {
+      setRelated([]);
+      return;
+    }
+    let cancelled = false;
+    listCatalogTherapists({ vendorId, pageSize: 7 })
+      .then(({ data }) => { if (!cancelled) setRelated(data.filter((item) => item.id !== therapistId).slice(0, 6)); })
+      .catch(() => { if (!cancelled) setRelated([]); });
+    return () => { cancelled = true; };
+  }, [vendorId, therapistId]);
+
+  const selection = useTherapistPurchaseSelection(therapist?.packages ?? []);
+
+  if (loading) return <p className="loading-state" role="status">{t.loading}</p>;
+  if (error || !therapist) return <DetailNotFound copy={t.notFound} to="/therapists" />;
+
   const media = resolveTherapistMedia(therapist);
+  const price = selection.unitPrice;
+  const original = selection.activePackage?.originalPrice;
+  const originalPrice = original != null ? Number(original) : undefined;
+  const discountPct = discountPercent(price, originalPrice);
+  const fromPrice = lowestPackagePrice(therapist.packages);
+  const vendorName = therapist.vendor?.businessName;
+  const experience = therapist.experienceYears;
+  const place = [therapist.branch?.name, therapist.branch?.city].filter(Boolean).join(', ');
+
+  const handleAddToCart = async () => {
+    if (!requireSignIn()) return;
+    const activePackage = selection.activePackage;
+    if (!activePackage) {
+      setActionError(selection.missingSelection ?? d.selectDuration);
+      return;
+    }
+    setActionError('');
+    try {
+      await addCartItem(token, { therapistId: therapist.id, therapistPackageId: activePackage.id, quantity });
+      showCartAdded(`${therapist.therapistType} – ${therapist.personName}`, () => navigate('/cart'));
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : content.dealDetail.errors.addToCart);
+    }
+  };
+
   return (
-    <div className="therapist-detail">
-      <title>{`${therapist.therapistType} — ${therapist.personName} | MSD`}</title>
-      <meta
-        name="description"
-        content={`Book ${therapist.therapistType} ${therapist.personName}${therapist.vendor?.businessName ? ` at ${therapist.vendor.businessName}` : ''}.`}
+    <>
+      <Seo
+        title={fillTemplate(t.metaTitle, { type: therapist.therapistType, name: therapist.personName })}
+        description={fillTemplate(t.metaDescription, {
+          type: therapist.therapistType,
+          name: therapist.personName,
+          at: vendorName ? fillTemplate(t.metaAt, { vendor: vendorName }) : '',
+          price: fromPrice != null ? formatINR(fromPrice) : '',
+        })}
+        path={`/therapist/${therapist.id}`}
+        image={media.images[0]}
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@type': 'Service',
+          name: `${therapist.therapistType} – ${therapist.personName}`,
+          ...(therapist.bio ? { description: therapist.bio } : {}),
+          ...(vendorName ? { provider: { '@type': 'Organization', name: vendorName } } : {}),
+          ...(fromPrice != null
+            ? { offers: { '@type': 'AggregateOffer', lowPrice: fromPrice, priceCurrency: 'INR', offerCount: therapist.packages.length } }
+            : {}),
+        }}
       />
-      {absoluteUrl(therapistPath(therapist)) && <link rel="canonical" href={absoluteUrl(therapistPath(therapist))} />}
-      {absoluteUrl(therapistPath(therapist)) && <meta property="og:url" content={absoluteUrl(therapistPath(therapist))} />}
-      <Breadcrumb
-        className="therapist-detail__breadcrumb"
-        items={[
-          { label: 'Home', to: '/' },
-          { label: 'Therapists', to: '/therapists' },
-          { label: therapist.therapistType },
-        ]}
-      />
-      <div className="therapist-detail__layout">
-        <div className="therapist-detail__gallery">
-          <div className="therapist-detail__main-img-wrap">
-            {media.images[activeImg] && (
-              <img className="therapist-detail__main-img" src={media.images[activeImg]} alt={therapist.personName} width={800} height={450} />
-            )}
-          </div>
-          {media.images.length > 1 && (
-            <div className="therapist-detail__thumbs" aria-label="Gallery thumbnails">
-              {media.images.map((image, index) => (
-                <button
-                  key={`${image}-${index}`}
-                  type="button"
-                  className={`therapist-detail__thumb${index === activeImg ? 'therapist-detail__thumb--active' : ''}`}
-                  onClick={() => setActiveImg(index)}
-                  aria-label={`View image ${index + 1}`}
-                  aria-pressed={index === activeImg}
-                >
-                  <img src={image} alt="" width={80} height={60} loading="lazy" />
-                </button>
-              ))}
+
+      {/* Hero: gallery (70) + buy box (30) */}
+      <PageSection stack aria-labelledby="detail-title">
+        <Breadcrumb
+          items={[
+            { label: t.breadcrumb.home, to: '/' },
+            { label: t.breadcrumb.therapists, to: '/therapists' },
+            { label: therapist.therapistType },
+          ]}
+        />
+        <div className="detail-page__grid">
+          <DetailGallery images={media.images} video={media.video} alt={therapist.personName} discountPct={discountPct} />
+          <div className="detail-page__buy">
+            <div className="detail-page__chips">
+              <sky-badge variant="secondary" size="small">{t.kind}</sky-badge>
+              {vendorName &&
+                (therapist.vendor?.slug ? (
+                  <Link to={`/vendor/${therapist.vendor.slug}`}>
+                    <sky-badge variant="primary" size="small">{vendorName}</sky-badge>
+                  </Link>
+                ) : (
+                  <sky-badge variant="primary" size="small">{vendorName}</sky-badge>
+                ))}
             </div>
-          )}
-          {media.video && <video className="therapist-detail__video" controls src={media.video} />}
-        </div>
-        <div className="therapist-detail__info">
-          <div className="therapist-detail__meta-row">
-            {therapist.vendor?.businessName && (
-              <span className="therapist-detail__provider">{therapist.vendor.businessName}</span>
-            )}
-            <sky-badge variant="primary" size="small">Therapist</sky-badge>
-          </div>
-          <h1 className="therapist-detail__title">{therapist.therapistType}</h1>
-          <p className="therapist-detail__dist" aria-label="Therapist name">
-            <Icon aria-hidden="true">person</Icon>
-            {therapist.personName}
-            {therapist.gender ? ` · ${therapist.gender}` : ''}
-          </p>
-          {(therapist.branch?.city || therapist.branch?.address) && (
-            <p className="therapist-detail__dist" aria-label="Location">
-              <Icon aria-hidden="true">near_me</Icon>
-              {[therapist.branch?.name, therapist.branch?.address ?? therapist.branch?.city].filter(Boolean).join(' · ')}
-            </p>
-          )}
-          {therapist.experienceYears != null && (
-            <p className="therapist-detail__duration">
-              <Icon aria-hidden="true">schedule</Icon>
-              {therapist.experienceYears} {pluralize(therapist.experienceYears, 'year')} experience
-            </p>
-          )}
-          {therapist.specialization && <p>{therapist.specialization}</p>}
-          {/* `bio` is sanitized HTML from msd-api's `sanitizeRichText` allow-list — see
-            api/catalog.ts's own doc comment on CatalogTherapist. */}
-          {therapist.bio && <div dangerouslySetInnerHTML={{ __html: therapist.bio }} />}
-          <Divider />
-          {fromPrice != null && (
-            <div className="therapist-detail__price-row">
-              <div>
-                <span className="therapist-detail__price">From ₹{fromPrice.toLocaleString('en-IN')}</span>
-              </div>
-            </div>
-          )}
-          <div className="therapist-detail__cta">
-            <TherapistAddToCartDialog
-              therapist={therapist}
-              onAdded={(label) => setActionMessage(`Added "${label}" to your cart.`)}
-              renderTrigger={(open) => (
-                <FilledButton
-                  type="button"
-                  className="therapist-detail__add-btn"
-                  disabled={therapist.packages.length === 0}
-                  onClick={() => {
-                    if (requireAuthOrRedirect()) open();
-                  }}
-                >
-                  <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
-                  Add to Cart
-                </FilledButton>
+            <h1 id="detail-title" className="detail-page__title headline-medium">{therapist.therapistType}</h1>
+            <ul className="detail-page__facts body-large">
+              <li>
+                <Icon aria-hidden="true">person</Icon>
+                {[therapist.personName, therapist.gender].filter(Boolean).join(' · ')}
+              </li>
+              {experience != null && (
+                <li>
+                  <Icon aria-hidden="true">workspace_premium</Icon>
+                  {experience === 1 ? t.experienceOne : fillTemplate(t.experience, { years: String(experience) })}
+                </li>
               )}
+              {place && (
+                <li>
+                  <Icon aria-hidden="true">location_on</Icon>
+                  {place}
+                </li>
+              )}
+            </ul>
+            {therapist.packages.length > 0 && <DetailPrice price={price} originalPrice={originalPrice} discountPct={discountPct} />}
+            <DurationPackageSelector selection={selection} emptyText={t.noPackages} />
+            <DetailPurchase
+              unitPrice={price}
+              quantity={quantity}
+              onQuantityChange={setQuantity}
+              onAdd={() => void handleAddToCart()}
+              addDisabled={!!selection.missingSelection}
+              error={actionError}
             />
           </div>
-          {therapist.packages.length === 0 && (
-            <p className="field-hint">This therapist has no purchasable packages yet.</p>
-          )}
-          {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
         </div>
-      </div>
-    </div>
+      </PageSection>
+
+      {/* About (70) + location and hours (30) */}
+      <PageSection tone="tint" aria-labelledby="detail-details-heading">
+        <div className="detail-page__grid">
+          <div className="detail-page__content">
+            <h2 id="detail-details-heading" className="detail-page__heading title-large">{d.details}</h2>
+            <sky-accordion>
+              {therapist.bio && (
+                <sky-accordion-item header={t.about} level={3} open>
+                  <p className="detail-page__text body-large">{therapist.bio}</p>
+                </sky-accordion-item>
+              )}
+              {therapist.specialization && (
+                <sky-accordion-item header={t.specialization} level={3} {...(!therapist.bio ? { open: true } : {})}>
+                  <p className="detail-page__text body-large">{therapist.specialization}</p>
+                </sky-accordion-item>
+              )}
+              <sky-accordion-item header={d.cancellationPolicy} level={3}>
+                <p className="detail-page__text body-medium">{d.cancellationText}</p>
+              </sky-accordion-item>
+            </sky-accordion>
+          </div>
+          {therapist.branch && <BranchPanels branch={therapist.branch} vendorSlug={therapist.vendor?.slug} />}
+        </div>
+      </PageSection>
+
+      {related.length > 0 && (
+        <PageSection aria-labelledby="related-heading">
+          <CardRail id="related-heading" heading={vendorName ? fillTemplate(t.related, { vendor: vendorName }) : d.related}>
+            {related.map((item) => (
+              <swiper-slide key={item.id} className="card-rail__slide">
+                <TherapistCard therapist={item} variant="outlined" />
+              </swiper-slide>
+            ))}
+          </CardRail>
+        </PageSection>
+      )}
+    </>
   );
 }
 export default TherapistDetail;

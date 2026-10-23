@@ -75,7 +75,7 @@ If pages render unstyled or an import 500s in dev, it's almost always a **stale
 - **Angular (mera-driver)** uses raw `<md-*>` tags; any component using them needs `schemas: [CUSTOM_ELEMENTS_SCHEMA]`.
 - Custom in-house components live in `packages/shared-ui/src/components/` (e.g. `sky-badge`, `sky-card`), written in LIT **without decorators** for cross-framework source compatibility.
 - **Card components** (compose M3 web components inside, themed by `--md-sys-color-*`, primitive props → same usage in React/Angular):
-  - `sky-product-card` — listing card (image, badge, favorite, rating **stars** via `rating`+`reviews` _or_ a **score badge** via `score`+`score-label`, price/discount, optional `description`); `variant="outlined"` for the bordered look; `price-first` for the offer order (price + one-star rating row, heading, description, eyebrow, location + distance row, slotted actions spanning the card; showcase "Offer card"); `badge-color` (`primary|secondary|tertiary|error`) + `badge-tone="tonal"` draw the badge as a theme-role `sky-badge`; `color` (same `m3-surface` vocabulary as the feature card) colours the body, text, accents and slotted buttons (shared `actionRoles`); `layout="horizontal"` for list rows (media left, content right; stacks under 600px of its own width via a container query).
+  - `sky-product-card` — listing card (image, badge, favorite, rating **stars** via `rating`+`reviews` _or_ a **score badge** via `score`+`score-label`, price/discount, optional `description`); `variant="outlined"` for the bordered look; `price-first` for the offer order (price + one-star rating row, heading, description, eyebrow, location + distance row, slotted actions spanning the card; showcase "Offer card"); with `divided`, a hairline then the member and place on one line each (no description, for services); `badge-color` (`primary|secondary|tertiary|error`) + `badge-tone="tonal"` draw the badge as a theme-role `sky-badge`; `color` (same `m3-surface` vocabulary as the feature card) colours the body, text, accents and slotted buttons (shared `actionRoles`); `layout="horizontal"` for list rows (media left, content right; stacks under 600px of its own width via a container query).
   - `sky-image-card` — full-bleed image with overlay `label` (+ optional `href`, `ratio`).
   - `sky-category-card` — rounded image + `heading`/`subheading` (+ optional `href`).
   - `sky-info-card` — surface card with an illustration (`media` slot) or `icon` + `heading`/`subheading`.
@@ -114,8 +114,8 @@ slide content is app-specific, so a wrapper would add surface for no reuse.
 Public pages (home, category, explore, ...) are **composition only**: shared-ui components plus the
 msd building blocks below. No page-specific CSS files with hardcoded colours, sizes or copy;
 copy lives in `apps/msd/src/content.json`. Page-level CSS that still exists (`home.css` for
-hero/steps/offers, `category.css` for `/categories`, therapists, orders, invoices, payments) is
-legacy and is being migrated (task ST-21 in `docs/msd/TASKS.md`).
+hero/steps/offers) is legacy and is being migrated. Static pages compose `StaticPage`
+(`components/static-page/`); CMS body blocks render through `components/blog-blocks/`.
 
 **Colour split (60/30/10, M3 roles only):** 60 = `surface` (page base); 30 = `surface-container`
 bands (`PageSection tone="tint"`) + `secondary-container` fills (category tiles, step markers,
@@ -140,7 +140,9 @@ No hex values in app code; brand colour comes from each app's generated M3 theme
 | `CheckboxFacet` / `PriceRangeField` | Searchable checkbox list with counts / range slider + Min/Max fields. |
 | `CityPickerDialog` | City picker (used by the header `CityChip` and the filter panel). |
 | `DealMap` | Deal price markers on a map (see Maps below). |
-| `OfferCard` | Deal or product as `sky-product-card price-first` (tag, price, two-line title and description, member, place, distance, Add to cart, wishlist; whole card opens the detail page). Options: `tag`, `color`, `variant`, `layout`. Used by the home hero (`color="surface-high" variant="plain"`). |
+| `OfferCard` | Deal or product as `sky-product-card price-first` (tag, price, two-line title; services: no description, then `divided` member, place and distance; products: two-line description; Add to cart, wishlist; whole card opens the detail page). Options: `tag`, `color`, `variant`, `layout`, `slider` (image slider with previous / next buttons and dots via `ProductCardGallery fill`, when the item has 2+ images; default off). Used by the home hero (`color="surface-high" variant="plain"`). |
+| `TherapistCard` | Therapist listing card (image slider, member, area, distance, From price; optional actions); helpers `lowestPackagePrice`, `formatDistance`. Home, search, category, therapists, related rails. |
+| `detail-page/` | Detail page blocks shared by `/deal/:id` and `/therapist/:id`: `DetailGallery`, `DetailPrice`, `DetailPurchase` (quantity, total, Add to cart, share), `BranchPanels` (location + hours), `DetailNotFound`; with `DurationPackageSelector` for packages. |
 
 Hooks: `usePagedList` (page-by-page lists keyed by the filter set, seeded from prerender),
 `useMediaQuery(query, fallback)`, `useVisitorLocation()` (the one visitor location: city +

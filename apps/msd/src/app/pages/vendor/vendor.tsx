@@ -10,9 +10,9 @@ import { addCartItem } from '../../../api/cart';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
+import { lowestPackagePrice } from '../../components/therapist-card/therapist-card';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { DurationPackageSelector } from '../../components/duration-package-selector';
-import { TherapistPackageSelector } from '../../components/therapist-package-selector';
 import { useDealPurchaseSelection } from '../../../hooks/use-deal-purchase-selection';
 import { useTherapistPurchaseSelection } from '../../../hooks/use-therapist-purchase-selection';
 import { formatINR, pluralize, formatTime12h } from '../../../utils/format';
@@ -100,11 +100,6 @@ function groupServiceDeals(deals: CatalogDeal[]): CategoryGroup[] {
 function dealFromPrice(deal: CatalogDeal): number {
   if (deal.packages.length === 0) return Number(deal.salePrice);
   return Math.min(...deal.packages.map((p) => Number(p.sellingPrice)));
-}
-
-function therapistFromPrice(therapist: CatalogVendorTherapist): number | null {
-  if (therapist.packages.length === 0) return null;
-  return Math.min(...therapist.packages.map((p) => Number(p.sellingPrice)));
 }
 
 type VendorSection = 'deals' | 'products' | 'therapies';
@@ -629,7 +624,7 @@ export function VendorPage() {
               <div className="vendor-page__deal-list" role="radiogroup" aria-label="Available therapists">
                 {selectedBranch.therapists.map((t) => {
                   const isSelected = t.id === selectedTherapistCardId;
-                  const fromPrice = therapistFromPrice(t);
+                  const fromPrice = lowestPackagePrice(t.packages);
                   return (
                     <label
                       key={t.id}
@@ -869,7 +864,7 @@ function DealSelectionPanel({
  * no Deal involved at all (see msd-api's CartItem "exactly one of three shapes" doc comment).
  * Mirrors `DealSelectionPanel` exactly (same layout, same CTA row) but sources its packages from
  * the Therapist's own `packages`, via the same `useTherapistPurchaseSelection`/
- * `TherapistPackageSelector` pair every other Therapist purchase entry point uses. A Therapist is
+ * `DurationPackageSelector` pair every other Therapist purchase entry point uses. A Therapist is
  * a normal purchasable OrderItem exactly like a Deal or Product — there is no Book Now path.
  */
 function TherapistSelectionPanel({
@@ -941,7 +936,7 @@ function TherapistSelectionPanel({
 
       <Divider />
 
-      <TherapistPackageSelector selection={selection} />
+      <DurationPackageSelector selection={selection} emptyText={content.therapistDetail.noPackages} />
 
       <Divider />
 

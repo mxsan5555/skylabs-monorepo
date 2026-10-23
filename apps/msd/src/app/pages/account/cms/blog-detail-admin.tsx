@@ -2,35 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Icon } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { getBlogPost, blogArticlesApi, type BlogPost, type BlogBlock } from '../../../../api/rbac/blog-posts';
+import { getBlogPost, type BlogPost } from '../../../../api/rbac/blog-posts';
+import { renderBlock } from '../../../components/blog-blocks/blog-blocks';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { resolveMediaUrl } from '../../../../api/media';
 import { formatDate } from '../../../../blog/blog';
 import '../../blog-detail/blog-detail.css';
-
-/** Render one article body block with the right semantic element — same switch/render approach
- *  as the public `blog-detail.tsx`'s own `renderBlock`, kept as a small local copy since the
- *  admin `BlogBlock` type (`api/rbac/blog-posts.ts`) is declared separately from the public
- *  frontend's `BlogBlock` (`types/index.ts`), matching this app's existing admin/public type
- *  split (e.g. `Category`/`CategoryInput` vs the consumer catalogue's own category types). */
-function renderBlock(block: BlogBlock, i: number) {
-  switch (block.type) {
-    case 'heading':
-      return <h2 key={i}>{block.text}</h2>;
-    case 'list':
-      return (
-        <ul key={i}>
-          {block.items.map((item, j) => (
-            <li key={j}>{item}</li>
-          ))}
-        </ul>
-      );
-    case 'quote':
-      return <blockquote key={i}>{block.text}</blockquote>;
-    default:
-      return <p key={i}>{block.text}</p>;
-  }
-}
 
 /** Read-only admin preview of a single Blog Post at `/account/cms/blog/:id` — reached from the
  *  Blog list's "View" row action. Renders the same block content the public post page would,

@@ -458,6 +458,7 @@ export interface CatalogWebsitePage {
   content: BlogBlock[];
   metaTitle?: string | null;
   metaDescription?: string | null;
+  updatedAt?: string;
 }
 
 export function getCatalogPage(slug: string) {

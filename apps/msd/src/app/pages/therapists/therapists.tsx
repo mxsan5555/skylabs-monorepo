@@ -1,27 +1,24 @@
 import { useEffect, useState } from 'react';
-import { Icon } from '@skylabs-monorepo/shared-ui/react';
 import { listCatalogTherapists, type CatalogTherapist } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { Breadcrumb } from '../../components/breadcrumb';
-import { SkyProductCardWC } from '../../components/sky-product-card-wc';
-import { formatINR } from '../../../utils/format';
-import { resolveTherapistMedia, primaryImage } from '../../../utils/media';
+import { CardGrid } from '../../components/card-grid/card-grid';
+import { PageSection } from '../../components/page-section/page-section';
+import { SectionHead } from '../../components/section-head/section-head';
+import { Seo } from '../../seo/seo';
+import { TherapistCard } from '../../components/therapist-card/therapist-card';
+import { fillTemplate, formatINR } from '../../../utils/format';
+import { resolveTherapistMedia } from '../../../utils/media';
 import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
-import { therapistPath } from '../../seo/public-urls';
-import '../category/category.css';
+import content from '../../../content.json';
 
-/** Lowest active package price, for the listing card's "From ₹X" line — null when this
- *  therapist has no priced packages yet (still browsable, just not bookable until one exists). */
-function fromPrice(therapist: CatalogTherapist): number | null {
-  if (therapist.packages.length === 0) return null;
-  return Math.min(...therapist.packages.map((p) => Number(p.sellingPrice)));
-}
+const t = content.therapists;
 
 /**
  * Therapist Listing — the customer entry point for browsing therapists directly, entirely
  * independent of Deal (never requires selecting a Deal first — see msd-api's Therapist schema
- * doc comment). Backed by `GET /catalog/therapists`. Reuses `category.css`'s hero/grid classes
- * for the page chrome and the same Showcase Card (`sky-product-card`, via `SkyProductCardWC`)
+ * doc comment). Backed by `GET /catalog/therapists`. Composed from the storefront blocks
+ * (PageSection, SectionHead, CardGrid) and the same Showcase Card (`sky-product-card`, via `SkyProductCardWC`)
  * Deal/Product listings already use — no separate, less-capable card component for Therapist.
  * `therapistType` is the card heading and `personName` the eyebrow — the two are always shown
  * separately, never merged into one field. `rating`/`reviews` are omitted (no rating system
@@ -41,65 +38,33 @@ export function Therapists() {
     setError('');
     listCatalogTherapists({ pageSize: 60, latitude: coords?.latitude, longitude: coords?.longitude })
       .then(({ data }) => setTherapists(data))
-      .catch((err) => setError(err instanceof ApiRequestError ? err.message : 'Could not load therapists.'))
+      .catch((err) => setError(err instanceof ApiRequestError ? err.message : t.errors.load))
       .finally(() => setLoading(false));
   }, [coords?.latitude, coords?.longitude]);
 
+  const fallback = loading ? (
+    <p className="loading-state" role="status">{t.loading}</p>
+  ) : error ? (
+    <p className="error-state" role="alert">{error}</p>
+  ) : therapists.length === 0 ? (
+    <sky-info-card icon="spa" heading={t.empty.title} subheading={t.empty.description} />
+  ) : undefined;
+
   return (
-    <div className="category-page">
-      <title>Therapists | MSD</title>
-      <meta name="description" content="Browse therapists directly and book their own duration/price packages — no deal required." />
-
-      <Breadcrumb className="category-page__breadcrumb" items={[{ label: 'Home', to: '/' }, { label: 'Therapists' }]} />
-
-      <header className="category-page__hero">
-        <div className="category-page__hero-inner">
-          <div className="category-page__hero-icon" aria-hidden="true">
-            <Icon>spa</Icon>
-          </div>
-          <div>
-            <h1 className="category-page__title">Therapists</h1>
-            <p className="category-page__subtitle">Browse our therapists and book their own duration/price packages directly.</p>
-          </div>
-        </div>
-      </header>
-
-      <section className="category-page__grid-wrap" aria-label="Therapists">
-        <div className="category-page__grid-inner">
-          {loading ? (
-            <p className="loading-state">Loading therapists…</p>
-          ) : error ? (
-            <p className="error-state" role="alert">{error}</p>
-          ) : therapists.length === 0 ? (
-            <div className="category-page__empty">
-              <sky-info-card icon="spa" heading="No therapists yet" subheading="Check back soon." />
-            </div>
-          ) : (
-            <ul className="category-page__grid">
-              {therapists.map((t) => {
-                const price = fromPrice(t);
-                return (
-                  <li key={t.id}>
-                    <SkyProductCardWC
-                      image={primaryImage(resolveTherapistMedia(t))}
-                      eyebrow={t.personName}
-                      eyebrowHref={t.vendor?.slug ? `/vendor/${t.vendor.slug}` : undefined}
-                      heading={t.therapistType}
-                      location={t.branch?.city ?? undefined}
-                      distance={t.distanceKm != null ? `${(Math.round(t.distanceKm * 10) / 10)} km` : undefined}
-                      tag={t.popularTags?.[0]?.name}
-                      pricePrefix={price != null ? 'From' : undefined}
-                      price={price != null ? formatINR(price) : undefined}
-                      href={therapistPath(t)}
-                    />
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      </section>
-    </div>
+    <>
+      <Seo title={t.metaTitle} description={t.metaDescription} path={t.path} />
+      <PageSection stack aria-labelledby="therapists-heading">
+        <Breadcrumb items={[{ label: t.breadcrumb.home, to: '/' }, { label: t.breadcrumb.therapists }]} />
+        <SectionHead as="h1" id="therapists-heading" titleClassName="headline-large" heading={t.title} subheading={t.subtitle} />
+      </PageSection>
+      <PageSection tone="tint" aria-label={t.title}>
+        <CardGrid fallback={fallback}>
+          {therapists.map((therapist) => (
+            <TherapistCard key={therapist.id} therapist={therapist} />
+          ))}
+        </CardGrid>
+      </PageSection>
+    </>
   );
 }
 

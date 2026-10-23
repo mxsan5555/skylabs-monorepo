@@ -21,9 +21,13 @@
   inset-block-start: 8px;
 }
 
-.site-header {
-  /* Row 1 height and strip height (desktop); the mega panel's max height derives from both. */
+/* Row 1 height (desktop). On :root so sticky page columns can sit below the header. */
+:root {
   --site-header-top-size: 64px;
+}
+
+.site-header {
+  /* Strip height (desktop); the mega panel's max height derives from it and row 1. */
   --site-header-strip-size: 56px;
   --site-header-strip-link-size: 40px;
   position: sticky;

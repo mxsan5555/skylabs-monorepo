@@ -409,4 +409,24 @@ describe('sky-product-card description and price-first order', () => {
     expect(placeRow.textContent).toContain('Lucknow');
     expect(placeRow.querySelector('.distance')?.textContent).toContain('20 km');
   });
+
+  it('divided: heading alone above a divider, then the member and the place row, one line each', async () => {
+    const el = await card({
+      priceFirst: true,
+      divided: true,
+      heading: 'Hydro massage',
+      eyebrow: 'Delaware Injury Care',
+      location: 'Greater Kailash, New Delhi',
+      distance: '20 km',
+      price: '₹25',
+    });
+    expect(el.hasAttribute('divided')).toBe(true);
+    expect(order(el)).toEqual(['meta', 'group', 'place', 'SLOT']);
+    const place = el.shadowRoot?.querySelector('.place') as HTMLElement;
+    expect(place.firstElementChild?.textContent?.trim()).toBe('Delaware Injury Care');
+    const where = place.querySelector('.tag .truncate') as HTMLElement;
+    expect(where.textContent).toBe('Greater Kailash, New Delhi');
+    expect(where.getAttribute('title')).toBe('Greater Kailash, New Delhi');
+    expect(place.querySelector('.distance')?.textContent).toContain('20 km');
+  });
 });
