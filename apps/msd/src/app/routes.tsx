@@ -30,6 +30,8 @@ import { DealFormPage } from './pages/account/members/deal-form-page';
 import { TherapistFormPage } from './pages/account/members/therapist-form-page';
 import { ProductFormPage } from './pages/account/members/product-form-page';
 import { CustomerManagement } from './pages/account/customers/customers';
+import { CustomerDetailPage } from './pages/account/customers/customer-detail-page';
+import { CustomerOrderInvoicePage } from './pages/account/customers/customer-order-invoice-page';
 import { BranchList } from './pages/account/members/branch-list';
 import { DealList } from './pages/account/members/deal-list';
 import { TherapistList } from './pages/account/members/therapist-list';
@@ -361,6 +363,46 @@ export function AppRoutes() {
             element={
               <RequirePermission menuKey="customers">
                 <CustomerManagement />
+              </RequirePermission>
+            }
+          />
+          {/* One customer's own page: real routes (not tabs), same shape as Member Detail's
+            `/account/members/:memberId`/`:section` below — see `customer-detail-page.tsx`'s own
+            doc comment. The static `/account/customers` list route above always wins over this
+            dynamic segment. */}
+          <Route
+            path="/account/customers/:customerId"
+            element={
+              <RequirePermission menuKey="customers">
+                <CustomerDetailPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/customers/:customerId/:section"
+            element={
+              <RequirePermission menuKey="customers">
+                <CustomerDetailPage />
+              </RequirePermission>
+            }
+          />
+          {/* Customer-scoped Order Detail/Invoice — reuses the same `OrderDetailPage`/
+            `CustomerOrderInvoicePage` the order-wide routes below use; `OrderDetailPage` itself
+            layers the `:customerId` ownership check on top of `GET /orders/:id` (see its own doc
+            comment). */}
+          <Route
+            path="/account/customers/:customerId/orders/:orderId"
+            element={
+              <RequirePermission menuKey="customers">
+                <OrderDetailPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/customers/:customerId/orders/:orderId/invoice"
+            element={
+              <RequirePermission menuKey="customers">
+                <CustomerOrderInvoicePage />
               </RequirePermission>
             }
           />

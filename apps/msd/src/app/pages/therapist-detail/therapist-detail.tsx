@@ -52,7 +52,7 @@ export function TherapistDetail() {
       setLoading(false);
       return;
     }
-    let cancelled = false;
+  
     setLoading(true);
     setError('');
     getCatalogTherapist(id)

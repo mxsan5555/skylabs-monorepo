@@ -59,7 +59,7 @@ export function DealDetail() {
       setLoading(false);
       return;
     }
-    let cancelled = false;
+   
     setLoading(true);
     setError('');
     getCatalogDeal(id)

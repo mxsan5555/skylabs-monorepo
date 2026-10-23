@@ -45,7 +45,7 @@ export function ProductDetail() {
   const [addError, setAddError] = useState('');
   const [addedToCart, setAddedToCart] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [addedToCart, setAddedToCart] = useState(false)
+
   useEffect(() => {
     // Guards against a slower, now-stale request (a quick back-to-back navigation between two
     // products, or React StrictMode's dev-only double-invoke) landing after a newer one and
@@ -63,7 +63,7 @@ export function ProductDetail() {
     setError('');
     setActiveImg(0);
     getCatalogProduct(id)
-      .then(({ data }) => { setProduct(data); })
+      .then(({ data }) => { if (!cancelled) setProduct(data); })
       .catch((err: unknown) => {
         if (cancelled) return;
 
@@ -73,7 +73,11 @@ export function ProductDetail() {
         }
         setError(err instanceof ApiRequestError ? err.message : products.detail.errors.loadProduct,);
       })
-      .finally(() => { setLoading(false); });
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
   useEffect(() => {
     if (!product) return;
@@ -90,12 +94,17 @@ export function ProductDetail() {
     }
     listCatalogProducts({ categoryId: product.category.id, pageSize: 7, })
       .then(({ data }) => {
+        if (cancelled) return;
         setRelated(data
           .filter((item) => item.id !== product.id)
           .slice(0, 6),
         );
       })
-      .catch(() => { setRelated([]); });
+      .catch(() => { if (!cancelled) setRelated([]); });
+
+    return () => {
+      cancelled = true;
+    };
   }, [product]);
   if (loading) {
     return (<p className="loading-state"> {products.detail.loading}</p>);

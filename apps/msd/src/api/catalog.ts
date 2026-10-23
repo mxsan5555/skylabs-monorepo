@@ -63,6 +63,7 @@ export interface CatalogDeal {
    *  `dangerouslySetInnerHTML`, never as plain text (see deal-detail.tsx). */
   description: string | null;
   termsAndConditions: string | null;
+  note: string | null;
   policy: string | null;
   /** A synced "from price"/default-duration display cache (kept in sync with the cheapest
    *  active `packages[]` entry server-side — see DealPackage's own schema doc comment in
