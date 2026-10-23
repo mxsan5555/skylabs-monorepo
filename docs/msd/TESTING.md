@@ -109,6 +109,18 @@ mapPopularTag" (both pass alone).
   Add to cart and the heart do not; signed-out cart or heart goes to sign in and back
   (`useRequireSignIn`); checked at 1440 and 390 px in grid and list view. Each `color` role keeps
   every text and the slotted buttons at AA (lowest 4.98:1, price on primary); no `color` = default look.
+- `divided` (services): heading alone, then a `.place` block with the member and a one-line place
+  (full text in `title`) and distance; no description (`sky-product-card.test.ts`, `offer-card.test.tsx`).
+- `slider`: off by default (first image only); with 2+ images every slide renders, the buttons are
+  named "Previous / Next image of {title}" and never change the page; one image keeps the plain
+  image (`offer-card.test.tsx`). List cards keep one height whatever the photo ratio.
+- Explore: list and grid render offer and therapist cards; signed-out Add to cart goes to sign in
+  with the query kept (`search.test.tsx`); one (visually hidden) h1.
+- Category: a prerendered 404 renders not found on the first render; filter counts reload when
+  the city resolves (`category.test.tsx`).
+- Therapist detail (`therapist-detail.test.tsx`): type as h1, person and experience, Details and
+  the location aside, the rail leaves out the current therapist; the price follows the chosen
+  package; signed-out Add to cart goes to sign in; a 404 shows the not-found state.
 - One `<h1>` per page; prerendered `/` contains the hero `<h1>`, category links and JSON-LD; no
   hydration warnings; `sitemap.xml`, `robots.txt`, `llms.txt` written when `VITE_SITE_URL` is set.
 - Category page: pills set `?sub=`; sort and filters send the right API params; count shows
