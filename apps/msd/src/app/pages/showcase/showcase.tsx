@@ -58,6 +58,7 @@ import { ChipNav } from '../../components/chip-nav/chip-nav';
 import { listCatalogDeals, listCatalogProducts } from '../../../api/catalog';
 import { OfferCard, type OfferItem, type OfferTag } from '../../components/offer-card/offer-card';
 import { useVisitorLocation } from '../../../location/location-context';
+import { resolveDealMedia, resolveProductMedia } from '../../../utils/media';
 
 // ── Data table demo ──────────────────────────────────────────────────────────
 
@@ -447,9 +448,25 @@ const OFFER_TAGS: OfferTag[] = [
   { label: 'Expire soon', color: 'error', tone: 'tonal' },
 ];
 
+/** Demo only: local data has one image per item, so each card also borrows the other demo items'
+ *  images (after its own) to show the image slider. Live pages use each item's real gallery. */
+function withDemoGallery(items: OfferItem[]): OfferItem[] {
+  const own = (item: OfferItem) =>
+    item.type === 'deal' ? resolveDealMedia(item.deal).images : resolveProductMedia(item.product).images;
+  const pool = items.flatMap(own);
+  const gallery = (item: OfferItem) => [...own(item), ...pool.filter((url) => !own(item).includes(url))];
+  // Legacy URL fields (`images` / `gallery`) take the demo set; mediaImages would win over them.
+  return items.map((item) =>
+    item.type === 'deal'
+      ? { ...item, deal: { ...item.deal, mediaImages: [], images: gallery(item) } }
+      : { ...item, product: { ...item.product, mediaImages: [], gallery: gallery(item) } as typeof item.product },
+  );
+}
+
 function OfferCardDemo() {
   const [view, setView] = useState('grid');
   const [color, setColor] = useState<SkyColor | ''>('');
+  const [slider, setSlider] = useState(true);
   const [items, setItems] = useState<OfferItem[]>([]);
   // The visitor's coordinates make the API return each deal's distance (as on the home page).
   const { status: locationStatus, coords } = useVisitorLocation();
@@ -463,10 +480,12 @@ function OfferCardDemo() {
     Promise.all([listCatalogDeals({ pageSize: 2, latitude, longitude }), listCatalogProducts({ pageSize: 2 })])
       .then(([deals, products]) => {
         if (cancelled) return;
-        setItems([
-          ...deals.data.slice(0, 2).map((deal) => ({ type: 'deal' as const, deal })),
-          ...products.data.slice(0, 2).map((product) => ({ type: 'product' as const, product })),
-        ]);
+        setItems(
+          withDemoGallery([
+            ...deals.data.slice(0, 2).map((deal) => ({ type: 'deal' as const, deal })),
+            ...products.data.slice(0, 2).map((product) => ({ type: 'product' as const, product })),
+          ]),
+        );
       })
       .catch(() => setItems([]));
     return () => {
@@ -478,9 +497,11 @@ function OfferCardDemo() {
     <>
       <p className="demo-label">
         OfferCard (sky-product-card price-first): tag (New tertiary tonal, Deal primary, Hot error,
-        Expire soon error tonal), image, price, old price, discount, rating, headline, description (two
-        lines each), member, location and distance (services only), Add to cart and wishlist. The whole
-        card opens the detail page. The home hero uses it with color surface-high, variant plain.
+        Expire soon error tonal), image, price, old price, discount, rating and headline (two lines).
+        Services: no description; a divider, then the member and the place with distance, one line
+        each. Products: a two-line description. Add to cart and wishlist; the whole card opens the
+        detail page. Image slider (`slider`): previous / next buttons and dots when an item has more
+        than one image. The home hero uses it with color surface-high, variant plain.
       </p>
       <ListingToolbar
         ariaLabel="Offer card view"
@@ -492,7 +513,12 @@ function OfferCardDemo() {
             onSelect={(value) => setColor(value as SkyColor | '')}
           />
         }
-        end={<ViewSwitch label="Card view" options={OFFER_VIEWS} value={view} onChange={setView} />}
+        end={
+          <>
+            <FilterChip label="Image slider" selected={slider} onClick={() => setSlider((on) => !on)} />
+            <ViewSwitch label="Card view" options={OFFER_VIEWS} value={view} onChange={setView} />
+          </>
+        }
       />
       <CardGrid layout={list ? 'list' : 'grid'}>
         {items.map((item, index) => (
@@ -504,6 +530,7 @@ function OfferCardDemo() {
             variant="outlined"
             layout={list ? 'horizontal' : 'vertical'}
             rating={OFFER_RATINGS[item.type]}
+            slider={slider}
           />
         ))}
       </CardGrid>

@@ -88,7 +88,7 @@ export function Wishlist() {
               if (item.deal && item.dealId) {
                 return (
                   <li key={item.id} className="wishlist-grid__item">
-                    <OfferCard
+                    <OfferCard slider
                       item={{
                         type: 'deal',
                         deal: item.deal,
@@ -104,7 +104,7 @@ export function Wishlist() {
               if (item.product && item.productId) {
                 return (
                   <li key={item.id} className="wishlist-grid__item">
-                    <OfferCard
+                    <OfferCard slider
                       item={{
                         type: 'product',
                         product: toCatalogProduct(item.product),

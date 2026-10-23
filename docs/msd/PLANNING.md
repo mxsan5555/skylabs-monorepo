@@ -235,6 +235,23 @@ others), About us, Contact us, How it works, Careers (page and job listings). Ma
 and edits; Admin cannot delete (P10-31). Public pages read it from the catalog API. Rich text is
 sanitized on write and on render (D18).
 
+Public static pages (About, Contact, Help Center, How it works, Careers, legal pages, Become a
+member) share `StaticPage`: breadcrumb, h1 and intro on the left, the brand logo in the header
+row's right column (`SectionHead media`, decorative, hidden under 600px because the site header
+already shows it). The category page header uses the same logo slot.
+
+- **Contact:** address, phone and email come from the CMS Contact Us row; empty fields fall back
+  to `content.contact.defaults` (placeholders until the owner supplies real details, ST-31). Left
+  column: details + contact form; right column: the CMS map embed, else a keyless Google Maps
+  embed of the address. The form validates name, email, subject and message, then opens the
+  visitor's email app with the message filled in, addressed to the contact email. A stored
+  message needs a public endpoint first (ST-30).
+- **Become a member:** same split layout. The existing application form stays (submit stays off
+  while staff create every member); the right column shows the partner team contact details.
+- **Help Center:** CMS FAQs replace the 8 content.json defaults once any exist.
+- **About us:** describes MySpaDeal as a marketplace for deals and products from verified partner
+  businesses. No comparison claims.
+
 ## 6. CTA banners
 
 Call-to-action banners, managed under Masters → Promotions (`/account/masters/promotions`; super_admin

@@ -1,23 +1,18 @@
-import { useParams, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useEffect, useState, useMemo, createElement } from 'react';
-import { showSnackbar } from '../../../snackbar/snackbar';
-import { Icon, FilledButton } from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
-import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { signInPathWithReturnTo } from '../../../auth/role-routing';
-import { OfferCard } from '../../components/offer-card/offer-card';
+import { OfferCard, popularTag } from '../../components/offer-card/offer-card';
 import { getCatalogCategory, getCatalogDealFacets, listCatalogDeals, listCatalogProducts, listCatalogTherapists, type CatalogCategoryWithChildren, type CatalogDeal, type CatalogDealFacets, type CatalogDealSort, type CatalogProduct, type CatalogTherapist, } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
-import { SkyProductCardWC } from '../../components/sky-product-card-wc';
-import { useAddProductToCart } from '../../../hooks/use-add-product-to-cart';
-import { useWishlist } from '../../../wishlist/wishlist-context';
-import { useHydrated } from '../../../hooks/use-hydrated';
+import { TherapistCard, lowestPackagePrice } from '../../components/therapist-card/therapist-card';
 import { useMediaQuery } from '../../../hooks/use-media-query';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { TherapistAddToCartDialog } from '../../components/therapist-add-to-cart-dialog';
 import { CardGrid } from '../../components/card-grid/card-grid';
 import { PageSection } from '../../components/page-section/page-section';
 import { SectionHead } from '../../components/section-head/section-head';
+import { PageHeadLogo } from '../../components/section-head/page-head-logo';
 import { ChipNav } from '../../components/chip-nav/chip-nav';
 import { ClampText } from '../../components/clamp-text/clamp-text';
 import { ListingToolbar } from '../../components/listing-toolbar/listing-toolbar';
@@ -31,7 +26,6 @@ import type { PriceRange } from '../../components/price-range-field/price-range-
 import { DealMap, type DealMapPoint } from '../../components/deal-map/deal-map';
 import { usePagedList } from '../../../hooks/use-paged-list';
 import { formatINR } from '../../../utils/format';
-import { resolveTherapistMedia } from '../../../utils/media';
 import { useVisitorLocation } from '../../../location/location-context';
 import { citySlug, cityHref, categoryHref, useCatalogShell } from '../../../catalog/catalog-shell';
 import { categoryDataKey, usePrerenderedData } from '../../../prerender-data/prerender-data';
@@ -49,13 +43,6 @@ const SORTS = ['relevance', 'price_asc', 'price_desc', 'distance'] as const;
 /** SERVICE (or untyped, legacy) categories list deals; PRODUCT/THERAPY list their own entities. */
 function isDealCategory(category: CatalogCategoryWithChildren): boolean {
   return category.type !== 'PRODUCT' && category.type !== 'THERAPY';
-}
-/** Lowest active package price for a therapist listing card — mirrors `therapists.tsx`'s own
- *  `fromPrice` exactly (kept as a small local copy rather than a shared export, same as that
- *  file already does for its own single use). */
-function therapistFromPrice(therapist: CatalogTherapist): number | null {
-  if (therapist.packages.length === 0) return null;
-  return Math.min(...therapist.packages.map((p) => Number(p.sellingPrice)));
 }
 /** A non-negative number from a query param, or undefined. */
 function toPrice(value: string | null): number | undefined {
@@ -94,9 +81,6 @@ function toIds(value: string | null): string[] {
 export function Category() {
   const { slug = '', city: citySlugParam } = useParams<{ slug: string; city?: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
-  const { isAuthenticated } = useAuth();
-  const { toggle: toggleWishlist, toggleProduct, } = useWishlist();
   const { coords, city: visitorCity } = useVisitorLocation();
   const { locationsStatus, locations } = useCatalogShell();
   const cityLocation = citySlugParam ? locations.find((l) => citySlug(l.city) === citySlugParam) : undefined;
@@ -110,29 +94,36 @@ export function Category() {
   const cityPending = cityUnresolved && locationsStatus === 'loading';
   const cityMissing = cityUnresolved && locationsStatus === 'ready';
   useEffect(() => {
-    if (initial && category === initial.category) {
-      let cancelled = false;
+    let cancelled = false;
+    const notFound = (err: unknown) => err instanceof ApiRequestError && err.status === 404;
+    // `initial` is keyed by this slug (and city) and stable per key. Prerendered, the page shows it
+    // at once (a null category is a prerendered 404), then refreshes quietly and swaps only if the
+    // API changed it.
+    if (initial) {
+      const seed = initial.category;
+      setCategory(seed);
+      setCategoryLoading(false);
       getCatalogCategory(slug)
         .then(({ data }) => {
-          if (!cancelled && JSON.stringify(data) !== JSON.stringify(initial.category)) setCategory(data);
+          if (!cancelled && JSON.stringify(data) !== JSON.stringify(seed)) setCategory(data);
         })
         .catch((err) => {
-          if (!cancelled && err instanceof ApiRequestError && err.status === 404) setCategory(null);
+          if (!cancelled && notFound(err)) setCategory(null);
         });
       return () => { cancelled = true; };
     }
     setCategoryLoading(true);
     setCategoryError('');
     getCatalogCategory(slug)
-      .then(({ data }) => setCategory(data))
+      .then(({ data }) => { if (!cancelled) setCategory(data); })
       .catch((err) => {
-        if (err instanceof ApiRequestError && err.status === 404) { setCategory(null); }
-        else {
-          setCategoryError(err instanceof ApiRequestError ? err.message : content.category.errors.loadCategory);
-        }
+        if (cancelled) return;
+        if (notFound(err)) setCategory(null);
+        else setCategoryError(err instanceof ApiRequestError ? err.message : content.category.errors.loadCategory);
       })
-      .finally(() => setCategoryLoading(false));
-  }, [slug]);
+      .finally(() => { if (!cancelled) setCategoryLoading(false); });
+    return () => { cancelled = true; };
+  }, [slug, initial]);
   const subSlug = searchParams.get('sub');
   const subcategoryIdx = (category?.children.findIndex((c) => c.slug === subSlug) ?? -1) + 1;
   const activeSubcategory = subcategoryIdx === 0 ? undefined : category?.children[subcategoryIdx - 1];
@@ -178,12 +169,6 @@ export function Category() {
         } return next;
       }, { replace: true },
     );
-  };
-  const addToCart = useAddProductToCart();
-  const requireAuthOrRedirect = () => {
-    if (isAuthenticated) return true;
-    navigate(signInPathWithReturnTo(location));
-    return false;
   };
   const isTherapyCategory = category?.type === 'THERAPY';
   const isProductCategory = category?.type === 'PRODUCT';
@@ -285,8 +270,8 @@ export function Category() {
         let result = 0;
         if (sort === 'price_asc' || sort === 'price_desc') {
           result = compareNullable(
-            therapistFromPrice(a.therapist),
-            therapistFromPrice(b.therapist),
+            lowestPackagePrice(a.therapist.packages),
+            lowestPackagePrice(b.therapist.packages),
             sort === 'price_asc' ? 1 : -1,
           );
         } else if (sort === 'distance') {
@@ -319,26 +304,35 @@ export function Category() {
   const dealsError = list.status === 'error' ? list.error : '';
   const [facets, setFacets] = useState<CatalogDealFacets | null>(null);
   useEffect(() => setFacets(null), [category?.id]);
+  // Facet inputs as plain values, so the effect re-runs only when one of them really changes.
+  const facetCategoryId = category && isDealCategory(category) && !cityPending && !cityMissing ? category.id : undefined;
+  const facetSubcategoryId = activeSubcategory?.id;
+  const facetCity = cityLocation?.city;
+  const facetState = cityLocation?.state;
+  const facetRadius = hasCoords ? radius : undefined;
+  const vendorKey = vendorIds.join();
+  const branchKey = branchIds.join();
   useEffect(() => {
-    if (!category || !isDealCategory(category) || cityPending || cityMissing) return;
+    if (!facetCategoryId) return;
     let cancelled = false;
     getCatalogDealFacets({
-      categoryId: category.id,
-      subcategoryId: activeSubcategory?.id,
-      city: cityLocation?.city,
-      state: cityLocation?.state,
+      categoryId: facetCategoryId,
+      subcategoryId: facetSubcategoryId,
+      city: facetCity,
+      state: facetState,
       latitude: lat,
       longitude: lng,
-      radiusKm: hasCoords ? radius : undefined,
-      vendorIds,
-      branchIds,
+      radiusKm: facetRadius,
+      vendorIds: toIds(vendorKey),
+      branchIds: toIds(branchKey),
       minPrice,
       maxPrice,
     })
       .then(({ data }) => { if (!cancelled) setFacets(data); })
-      .catch(() => { });
+      // Facets are optional: a failed refresh keeps the last counts.
+      .catch(() => undefined);
     return () => { cancelled = true; };
-  }, [category?.id, activeSubcategory?.id, cityLocation?.city, lat, lng, radius, vendorIds.join(), branchIds.join(), minPrice, maxPrice]);
+  }, [facetCategoryId, facetSubcategoryId, facetCity, facetState, lat, lng, facetRadius, vendorKey, branchKey, minPrice, maxPrice]);
   const desktop = useMediaQuery('(min-width: 840px)', true);
   const [panelOpen, setPanelOpen] = useState<boolean | null>(null);
   const filtersOpen = panelOpen ?? desktop;
@@ -413,69 +407,39 @@ export function Category() {
     ) : null;
   const cardLayout = view === 'list' ? 'horizontal' : undefined;
   const cards = isTherapyCategory
-    ? sortedTherapists.map((therapist) => {
-      const price = therapistFromPrice(therapist);
-      const media = resolveTherapistMedia(therapist);
-      const images = media.images ?? [];
-      return (
-        <SkyProductCardWC
-          variant='outlined'
-          key={therapist.id}
-          image={undefined}
-          imageAlt={therapist.personName ?? therapist.therapistType}
-          gallery={images}
-          eyebrow={therapist.personName}
-          eyebrowHref={therapist.vendor?.slug ? `/vendor/${therapist.vendor.slug}` : undefined}
-          heading={therapist.therapistType}
-          location={therapist.branch?.city ?? undefined}
-          distance={therapist.distanceKm != null ? `${Math.round(therapist.distanceKm * 10) / 10} km` : undefined}
-          tag={therapist.popularTags?.[0]?.name}
-          pricePrefix={price != null ? t.therapistPricePrefix : undefined}
-          price={price != null ? formatINR(price) : undefined}
-          href={`/therapist/${therapist.id}`}
-          layout={cardLayout}
-        >
-          <TherapistAddToCartDialog
-            therapist={therapist}
-            renderTrigger={(open) => (
-              <FilledButton
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  open();
-                }}
-              >{t.actions.viewPackages}
-              </FilledButton>
-            )}
-          />
-        </SkyProductCardWC>
-      );
-    })
+    ? sortedTherapists.map((therapist) => (
+      <TherapistCard key={therapist.id} therapist={therapist} variant="outlined" layout={cardLayout}>
+        <TherapistAddToCartDialog
+          therapist={therapist}
+          renderTrigger={(open) => (
+            <FilledButton
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                open();
+              }}
+            >
+              {t.actions.viewPackages}
+            </FilledButton>
+          )}
+        />
+      </TherapistCard>
+    ))
     : isProductCategory
       ? products.map((product) => (
-        <OfferCard
+        <OfferCard slider
           key={product.id}
           item={{ type: 'product', product }}
-          tag={product.popularTags?.[0]?.name
-            ? {
-              label: product.popularTags[0].name,
-              color: 'tertiary',
-              tone: 'tonal',
-            } : undefined}
+          tag={popularTag(product.popularTags)}
           variant="outlined"
           layout={cardLayout ?? 'vertical'}
         />
       ))
       : deals.map((deal) => (
-        <OfferCard
+        <OfferCard slider
           key={deal.id}
           item={{ type: 'deal', deal }}
-          tag={deal.popularTags?.[0]?.name
-            ? {
-              label: deal.popularTags[0].name,
-              color: 'tertiary',
-              tone: 'tonal',
-            } : undefined}
+          tag={popularTag(deal.popularTags)}
           variant="outlined"
           layout={cardLayout ?? 'vertical'}
         />
@@ -505,6 +469,7 @@ export function Category() {
           heading={displayName}
           subheading={category.description ? <ClampText text={category.description} more={t.description.more} less={t.description.less} /> : undefined}
           actions={<span className="body-medium" aria-live="polite" aria-atomic="true">{countText}</span>}
+          media={<PageHeadLogo />}
         />
         {pills}
       </PageSection>

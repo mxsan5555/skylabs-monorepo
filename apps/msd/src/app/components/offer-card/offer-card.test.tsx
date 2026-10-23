@@ -74,10 +74,12 @@ beforeEach(() => {
 });
 
 describe('OfferCard', () => {
-  it('shows a service with its member, branch area and distance, and links to the deal', () => {
+  it('shows a service title without a description, then (divided) its member, branch area and distance, and links to the deal', () => {
     renderCard(<OfferCard item={{ type: 'deal', deal }} tag={{ label: 'New', color: 'tertiary', tone: 'tonal' }} />);
     expect(option(card(), 'heading')).toBe('Hydro massage');
-    expect(option(card(), 'description')).toBe('Up to 89% off.');
+    // Services show the title only; the member and place sit under a divider.
+    expect(option(card(), 'description')).toBeNull();
+    expect(option(card(), 'divided') === true || card().hasAttribute('divided')).toBe(true);
     expect(option(card(), 'eyebrow')).toBe('Delaware Injury Care');
     expect(option(card(), 'location')).toBe('Lower Parel, Mumbai');
     expect(option(card(), 'distance')).toBe(content.offerCard.distance.replace('{km}', '20'));
@@ -110,5 +112,37 @@ describe('OfferCard', () => {
     renderCard(<OfferCard item={{ type: 'deal', deal }} />);
     fireEvent.click(document.querySelector('md-outlined-icon-button[aria-label="Save Hydro massage to wishlist"]') as HTMLElement);
     expect(m.toggle).toHaveBeenCalledWith('d1');
+  });
+
+  describe('slider', () => {
+    const gallery = ['/a.jpg', '/b.jpg', '/c.jpg'];
+    const slides = () => Array.from(card().querySelectorAll('swiper-slide img')).map((img) => img.getAttribute('src'));
+
+    it('is off by default: the first image only, no slider', () => {
+      renderCard(<OfferCard item={{ type: 'deal', deal: { ...deal, images: gallery } }} />);
+      expect(card().querySelector('swiper-container')).toBeNull();
+      expect(option(card(), 'image')).toBe('/a.jpg');
+    });
+
+    it('shows every image with named previous / next buttons for a service and a product', () => {
+      renderCard(<OfferCard slider item={{ type: 'deal', deal: { ...deal, images: gallery } }} />);
+      expect(card().querySelector('.product-card-gallery')?.getAttribute('slot')).toBe('media');
+      expect(slides()).toEqual(gallery);
+      const prev = card().querySelector('.product-card-gallery__button--prev') as HTMLElement;
+      expect(prev.getAttribute('aria-label')).toBe('Previous image of Hydro massage');
+      // The buttons never open the detail page.
+      fireEvent.click(prev);
+      expect(m.path).toBe('/');
+
+      document.body.innerHTML = '';
+      renderCard(<OfferCard slider layout="horizontal" item={{ type: 'product', product: { ...product, gallery } as CatalogProduct }} />);
+      expect(slides()).toEqual(gallery);
+    });
+
+    it('keeps the plain image when there is only one', () => {
+      renderCard(<OfferCard slider item={{ type: 'deal', deal: { ...deal, images: ['/a.jpg'] } }} />);
+      expect(card().querySelector('swiper-container')).toBeNull();
+      expect(option(card(), 'image')).toBe('/a.jpg');
+    });
   });
 });

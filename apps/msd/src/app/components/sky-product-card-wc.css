@@ -8,12 +8,3 @@
   width: 100%;
 }
 
-.sky-product-card-wc > .product-card-gallery {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 5;
-  width: 100%;
-  aspect-ratio: 3 / 2;
-  pointer-events: auto;
-}

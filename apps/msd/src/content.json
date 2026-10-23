@@ -379,7 +379,6 @@
     },
     "ui": {
       "labels": {
-        "from": "From",
         "product": "Product"
       },
       "messages": {
@@ -399,6 +398,7 @@
     }
   },
   "search": {
+    "heading": "Explore deals, products and therapists",
     "placeholder": "Search spas, treatments, locations…",
     "ariaLabel": "Search deals",
     "resultLabel": "results",
@@ -473,7 +473,8 @@
       "durationSuffix": "min",
       "book": "Book",
       "removeWishlist": "Remove from wishlist",
-      "saveWishlist": "Save to wishlist"
+      "saveWishlist": "Save to wishlist",
+      "therapist": "Therapist"
     },
     "loading": {
       "deals": "Loading deals…",
@@ -556,7 +557,6 @@
       "heading": "No therapists yet",
       "subheading": "Check back soon."
     },
-    "therapistPricePrefix": "From",
     "description": {
       "more": "More",
       "less": "Less"
@@ -674,15 +674,37 @@
       "error": "Could not book this deal."
     }
   },
+  "detailPage": {
+    "off": "{percent}% off",
+    "originalPrice": "Original price {price}",
+    "details": "Details",
+    "notes": "Notes",
+    "policy": "Policy",
+    "terms": "Terms & Conditions",
+    "cancellationPolicy": "Cancellation policy",
+    "cancellationText": "Cancel up to 24 hours before your appointment for a full refund. Same-day cancellations are non-refundable.",
+    "location": "Location",
+    "locationAndHours": "Location and hours",
+    "hours": "Hours",
+    "getDirections": "Get directions",
+    "quantity": "Quantity",
+    "decrease": "Decrease quantity",
+    "increase": "Increase quantity",
+    "total": "Total",
+    "addToCart": "Add to cart",
+    "selectPackage": "Select your package",
+    "packageList": "Select a duration",
+    "packageOption": "{minutes} min",
+    "selectDuration": "Please select a duration.",
+    "share": "Copy link to this page",
+    "copied": "Link copied",
+    "thumbnails": "Gallery thumbnails",
+    "viewImage": "View image {n} of {count}",
+    "related": "You May Also Like"
+  },
   "dealDetail": {
     "loading": "Loading deal…",
-    "addToCart": "Add to Cart",
-    "addedToCart": "Added to Cart!",
     "bookNow": "Book Now",
-    "description": "Description",
-    "cancellationPolicy": "Cancellation Policy",
-    "cancellationText": "Cancel up to 24 hours before your appointment for a full refund. Same-day cancellations are non-refundable.",
-    "relatedDeals": "You May Also Like",
     "errors": {
       "invalidDeal": "Invalid deal.",
       "loadDeal": "Could not load this deal.",
@@ -704,16 +726,7 @@
       "defaultDescription": "Book {name} at MSD.",
       "locationPrefix": "in"
     },
-    "gallery": {
-      "thumbnailsLabel": "Gallery thumbnails",
-      "viewImage": "View image"
-    },
     "labels": {
-      "off": "OFF",
-      "originalPrice": "Original price",
-      "location": "Location",
-      "hours": "Hours",
-      "getDirections": "Get directions",
       "service": "Deal",
       "product": "Product",
       "durationSuffix": "min"
@@ -751,7 +764,35 @@
       "4:00 PM",
       "5:00 PM",
       "6:00 PM"
-    ]
+    ],
+    "description": "Description"
+  },
+  "therapistDetail": {
+    "loading": "Loading therapist…",
+    "breadcrumb": {
+      "home": "Home",
+      "therapists": "Therapists"
+    },
+    "kind": "Therapist",
+    "experience": "{years} years experience",
+    "experienceOne": "1 year experience",
+    "about": "About",
+    "specialization": "Specialization",
+    "noPackages": "This therapist has no bookable packages yet.",
+    "related": "More therapists at {vendor}",
+    "metaTitle": "{type} – {name} | MSD",
+    "metaDescription": "Book {type} {name}{at}. From {price}.",
+    "metaAt": " at {vendor}",
+    "errors": {
+      "invalid": "Invalid therapist.",
+      "load": "Could not load this therapist."
+    },
+    "notFound": {
+      "metaTitle": "Therapist Not Found | MSD",
+      "heading": "Therapist not found",
+      "subheading": "This therapist may no longer be available.",
+      "cta": "Browse therapists"
+    }
   },
   "blog": {
     "detail": {
@@ -785,6 +826,14 @@
     "discount": "-{percent}%",
     "serviceTag": "Service",
     "productTag": "Product"
+  },
+  "gallery": {
+    "previous": "Previous image of {title}",
+    "next": "Next image of {title}",
+    "imageAlt": "{title}, image {n} of {count}"
+  },
+  "therapistCard": {
+    "from": "From"
   },
   "cartToast": {
     "added": "Added \"{item}\" to your cart.",
@@ -976,7 +1025,45 @@
     },
     "errors": {
       "load": "Could not load your orders."
+    },
+    "filtersLabel": "Order status filters",
+    "filters": {
+      "all": "All",
+      "cancelled": "Cancelled"
     }
+  },
+  "payments": {
+    "metaTitle": "Payment History | MSD",
+    "title": "Payment History",
+    "subtitle": "Every payment across your orders, most recent first.",
+    "loading": "Loading payment history…",
+    "empty": {
+      "title": "No payments yet",
+      "description": "Payments you make will show up here."
+    },
+    "errors": {
+      "load": "Could not load your payment history."
+    },
+    "otherAttempts": "Other payment attempts on this order: {attempts}",
+    "viewOrder": "View order →"
+  },
+  "invoices": {
+    "metaTitle": "Invoices | MSD",
+    "title": "Invoices",
+    "subtitle": "Every order you've placed, most recent first.",
+    "loading": "Loading invoices…",
+    "empty": {
+      "title": "No invoices yet",
+      "description": "Orders you place will show up here."
+    },
+    "errors": {
+      "load": "Could not load your invoices."
+    },
+    "viewInvoice": "View invoice →"
+  },
+  "profile": {
+    "title": "Profile Details",
+    "subtitle": "Manage your contact details and saved addresses."
   },
   "orderDetail": {
     "loading": "Loading order…",
@@ -1228,6 +1315,7 @@
     }
   },
   "categories": {
+    "path": "/categories",
     "metaTitle": "Browse Categories | MSD",
     "metaDescription": "Browse deals and products by category — compare vendors, branches, and prices.",
     "breadcrumb": {
@@ -1248,6 +1336,25 @@
     "subcategory": {
       "singular": "subcategory",
       "plural": "subcategories"
+    }
+  },
+  "therapists": {
+    "path": "/therapists",
+    "metaTitle": "Therapists | MSD",
+    "metaDescription": "Browse therapists directly and book their own duration and price packages. No deal required.",
+    "breadcrumb": {
+      "home": "Home",
+      "therapists": "Therapists"
+    },
+    "title": "Therapists",
+    "subtitle": "Browse our therapists and book their own duration and price packages directly.",
+    "loading": "Loading therapists…",
+    "empty": {
+      "title": "No therapists yet",
+      "description": "Check back soon."
+    },
+    "errors": {
+      "load": "Could not load therapists."
     }
   },
   "invoice": {
@@ -1389,164 +1496,421 @@
     }
   },
   "support": {
-    "title": "How can we help?",
-    "description": "Find answers to common questions or get in touch with our support team.",
-    "form": {
-      "heading": "Contact Support",
-      "subheading": "Our support team is available to help you with your queries.",
-      "subject": "Support Request",
-      "message": "Please describe your issue or query and our support team will assist you."
-    }
+    "metaTitle": "Support · MSD",
+    "title": "Support",
+    "description": "Send us a question about an order, a booking or your account. Your request reaches our support team with your account details.",
+    "subject": "Subject",
+    "message": "Message",
+    "submit": "Send request",
+    "sending": "Sending…",
+    "required": "Enter a subject and a message.",
+    "sent": "Your support request has been sent.",
+    "failed": "We could not send your request. Try again."
   },
   "about": {
-    "metaTitleSuffix": " · MSD",
-    "metaDescription": "Learn more about MySpaDeal.",
-    "defaultHeading": "About MySpaDeal",
-    "eyebrow": "ABOUT MYSPADEAL",
-    "breadcrumb": {
-      "home": "Home",
-      "aboutUs": "About Us"
-    },
-    "loading": {
-      "title": "About Us · MSD",
-      "heading": "Loading About Us",
-      "description": "Please wait while we load the latest information."
-    },
-    "error": {
-      "heading": "About Us is unavailable",
-      "description": "This page is not available right now."
-    },
-    "chips": [
-      "Wellness",
-      "Beauty & Self-care",
-      "Feel-good experiences"
-    ],
-    "spotlight": {
-      "label": "YOUR WELLNESS JOURNEY",
-      "heading": "Make time for yourself.",
-      "description": "Discover wellness and self-care experiences with MySpaDeal."
-    },
-    "mission": {
-      "eyebrow": "WHY WE ARE HERE",
-      "heading": "Wellbeing deserves a place in everyday life.",
-      "cardHeading": "Our Mission"
-    },
-    "values": {
-      "eyebrow": "THE MYSPADEAL EXPERIENCE",
-      "heading": "Your kind of self-care.",
-      "description": "Explore new experiences, find what works for you, and make looking after yourself feel easier.",
-      "cards": [
+    "path": "/about",
+    "title": "About MySpaDeal",
+    "breadcrumb": "About us",
+    "description": "MySpaDeal is an online marketplace for spa, massage, beauty and wellness deals and products from verified partner businesses across India.",
+    "offer": {
+      "heading": "What MySpaDeal offers",
+      "items": [
         {
-          "icon": "spa",
-          "heading": "Explore Wellness",
-          "description": "Discover spa and self-care experiences.",
-          "color": "surface-high"
+          "icon": "local_offer",
+          "heading": "Deals from partner spas",
+          "text": "Discounted spa, massage, skin and hair packages, published by verified partner businesses in your city."
         },
         {
-          "icon": "favorite",
-          "heading": "Find Your Fit",
-          "description": "Explore experiences that suit your preferences.",
-          "color": "secondary"
+          "icon": "shopping_bag",
+          "heading": "Wellness products",
+          "text": "Skincare, haircare and wellness products listed by partner brands and stores, with the price shown up front."
         },
         {
-          "icon": "self_improvement",
-          "heading": "Make Time for You",
-          "description": "Make self-care part of your everyday routine.",
-          "color": "tertiary"
+          "icon": "event_available",
+          "heading": "Book and pay online",
+          "text": "Choose a package and a time, then pay by card, UPI or netbanking through Razorpay."
+        },
+        {
+          "icon": "verified",
+          "heading": "Verified partners",
+          "text": "Every partner business completes a KYC review before its deals and products go live."
         }
       ]
     },
-    "story": {
-      "eyebrow": "OUR STORY",
-      "heading": "A little about us."
-    },
+    "story": "Our story",
     "cta": {
-      "ariaLabel": "Explore MySpaDeal",
-      "heading": "Make a little more room for you.",
-      "description": "Explore wellness and self-care experiences with MySpaDeal.",
-      "button": "Explore MySpaDeal",
-      "href": "/",
-      "icon": "spa",
-      "buttonIcon": "arrow_forward"
+      "icon": "storefront",
+      "heading": "Run a spa, salon or wellness brand?",
+      "text": "Publish your deals and products on MySpaDeal and manage branches, therapists and orders from one console.",
+      "label": "Become a member",
+      "href": "/become-member"
     }
   },
   "howItWorks": {
-    "metaTitleSuffix": " · MSD",
-    "metaDescription": "See how booking with MySpaDeal works.",
-    "defaultHeading": "How It Works",
-    "eyebrow": "YOUR WELLNESS JOURNEY",
-    "loading": {
-      "title": "How It Works · MSD",
-      "heading": "Loading how it works",
-      "description": "Please wait while we load the steps."
-    },
-    "error": {
-      "title": "How It Works · MSD",
-      "heading": "Unable to load this page",
-      "description": "This page is not available right now.",
-      "loadFailed": "Could not load this page."
-    },
-    "emptySteps": {
-      "icon": "event_note",
-      "heading": "Steps coming soon",
-      "description": "We are preparing the details for your wellness journey."
-    },
-    "cardColors": [
-      "tertiary",
-      "surface-high",
-      "tertiary",
-      "surface-high"
-    ],
+    "path": "/how-it-works",
+    "title": "How MySpaDeal works",
+    "breadcrumb": "How it works",
+    "description": "Book a spa, massage or beauty treatment in three steps: find a deal, book a time and pay online, then visit the spa.",
+    "stepsHeading": "How to book",
     "defaultStepIcon": "spa",
     "cta": {
-      "color": "secondary",
       "icon": "spa",
-      "iconStyle": "surface",
-      "heading": "Ready to make time for yourself?",
-      "description": "Explore wellness and self-care experiences with MySpaDeal.",
-      "button": "Explore MySpaDeal",
-      "href": "/",
-      "buttonIcon": "arrow_forward"
+      "heading": "Ready to book?",
+      "text": "Browse deals from partner spas in your city.",
+      "label": "Browse categories",
+      "href": "/categories"
     }
   },
   "helpCenter": {
-    "metaTitle": "Help Center · MSD",
-    "metaDescription": "Find answers to common questions about bookings, payments, deals, and your MySpaDeal account.",
-    "hero": {
-      "heading": "How can we help you?",
-      "description": "Find answers to your questions about bookings, payments, deals and your MySpaDeal account.",
-      "searchLabel": "Search FAQs",
-      "searchPlaceholder": "Search questions about bookings, payments, deals...",
-      "searchActionLabel": "Search",
-      "searchIcon": "search"
+    "path": "/help-center",
+    "title": "Help Center",
+    "breadcrumb": "Help Center",
+    "description": "Answers to common questions about booking, payment, your account and listing your spa on MySpaDeal.",
+    "search": {
+      "label": "Search questions",
+      "placeholder": "Booking, payment, account…",
+      "action": "Search",
+      "icon": "search"
     },
-    "faqs": {
-      "heading": "Frequently Asked Questions",
-      "description": "Browse our frequently asked questions to find the information you need.",
-      "loading": "Loading frequently asked questions...",
-      "error": {
-        "icon": "error_outline",
-        "description": "We couldn't load the FAQs. Please try again.",
-        "retryButton": "Try again"
+    "faqsHeading": "Frequently asked questions",
+    "showAll": "Show all questions",
+    "resultCount": "{count} questions match “{query}”",
+    "resultCountOne": "1 question matches “{query}”",
+    "noResults": "No questions match “{query}”. Try another word or contact us.",
+    "faqs": [
+      {
+        "question": "How do I book a deal?",
+        "answer": "Open a deal, choose a package and a time, add it to your cart and pay at checkout. You need to sign in before you pay."
       },
-      "empty": {
-        "icon": "search_off",
-        "noFaqsHeading": "No FAQs available",
-        "noFaqsDescription": "Please check back later.",
-        "noResultsHeading": "No matching questions found",
-        "noResultsDescription": "Try different keywords to find your answer."
+      {
+        "question": "How do I sign in?",
+        "answer": "Enter your mobile number or email and the one-time password we send you, or continue with Google."
+      },
+      {
+        "question": "Which payment methods can I use?",
+        "answer": "Pay online by card, UPI or netbanking. Razorpay processes every payment, so your card details never reach MySpaDeal servers."
+      },
+      {
+        "question": "Where can I see my orders?",
+        "answer": "Sign in and open My Orders from your account menu. Each order shows its status, the spa branch and your invoice."
+      },
+      {
+        "question": "Can I cancel or reschedule a booking?",
+        "answer": "Each deal lists its own cancellation and rescheduling terms. Check them on the deal page before you pay, and contact the spa or our support team for changes."
+      },
+      {
+        "question": "How do I get a refund?",
+        "answer": "Approved refunds go back to the payment method you used. Banks usually take 5 to 7 working days to show the amount."
+      },
+      {
+        "question": "Do I need to print my booking?",
+        "answer": "No. Show the booking confirmation in My Orders on your phone when you arrive at the spa."
+      },
+      {
+        "question": "How do I list my spa or products on MySpaDeal?",
+        "answer": "Choose Become a member and share your business details. Our partner team reviews your KYC before your deals and products go live."
       }
-    },
-    "support": {
+    ],
+    "cta": {
       "icon": "support_agent",
       "heading": "Still need help?",
-      "description": "Our support team is here to help you with your questions.",
-      "button": "Contact Us",
-      "href": "/contact",
-      "buttonIcon": "arrow_forward",
-      "color": "primary",
-      "iconStyle": "surface"
+      "text": "Send us a message and our team will get back to you.",
+      "label": "Contact us",
+      "href": "/contact"
+    }
+  },
+  "staticPage": {
+    "home": "Home",
+    "loading": "Loading…",
+    "updated": "Last updated {date}",
+    "titleSuffix": " · MSD",
+    "cta": {
+      "icon": "support_agent",
+      "heading": "Still have a question?",
+      "text": "Search the Help Center or send us a message.",
+      "label": "Visit the Help Center",
+      "href": "/help-center"
+    }
+  },
+  "contact": {
+    "path": "/contact",
+    "title": "Contact MySpaDeal",
+    "breadcrumb": "Contact us",
+    "description": "Questions about a booking, a payment or listing your business? Write to us or visit our office.",
+    "detailsHeading": "Get in touch",
+    "address": "Address",
+    "phone": "Phone",
+    "email": "Email",
+    "mapTitle": "Map of the MySpaDeal office",
+    "cta": {
+      "icon": "support_agent",
+      "heading": "Have a question about an order?",
+      "text": "Sign in and send a support request from your account. It keeps your order details with your message.",
+      "label": "Send a support request",
+      "href": "/my-account/support"
+    },
+    "defaults": {
+      "address": "MySpaDeal Pvt. Ltd., Gorakhpur, Uttar Pradesh 273001, India",
+      "phone": "",
+      "email": "support@myspadeal.in"
+    },
+    "form": {
+      "heading": "Send us a message",
+      "name": "Your name",
+      "email": "Email",
+      "phone": "Mobile (optional)",
+      "subject": "Subject",
+      "message": "Message",
+      "submit": "Send message",
+      "hint": "Send opens your email app with your message filled in.",
+      "required": "Enter your name, email, subject and message.",
+      "invalidEmail": "Enter a valid email address.",
+      "invalidPhone": "Enter a valid 10-digit mobile number.",
+      "opened": "Your email app has your message ready to send.",
+      "mailBody": "{message}\n\n{name}\n{email}\n{phone}"
+    }
+  },
+  "careers": {
+    "path": "/careers",
+    "title": "Careers at MySpaDeal",
+    "breadcrumb": "Careers",
+    "description": "Open roles at MySpaDeal. See what each role involves and how to apply.",
+    "jobsHeading": "Open roles",
+    "responsibilities": "What you will do",
+    "requirements": "What you need",
+    "apply": "Apply now",
+    "empty": "There are no open roles right now. Check back soon.",
+    "cta": {
+      "icon": "mail",
+      "heading": "No role that fits?",
+      "text": "Tell us how you would like to work with MySpaDeal.",
+      "label": "Contact us",
+      "href": "/contact"
+    },
+    "applyLabel": "Apply now: {title}"
+  },
+  "legalPages": {
+    "placeholder": "Content coming soon.",
+    "notFound": "This page could not be found.",
+    "privacy": {
+      "path": "/privacy",
+      "title": "Privacy Policy",
+      "description": "How MySpaDeal collects, uses, shares and protects your personal information.",
+      "body": [
+        {
+          "type": "heading",
+          "text": "Information we collect"
+        },
+        {
+          "type": "paragraph",
+          "text": "Your name, mobile number and email address, your bookings and orders, and technical data such as device and browser type."
+        },
+        {
+          "type": "heading",
+          "text": "How we use it"
+        },
+        {
+          "type": "list",
+          "items": [
+            "To sign you in and run your account",
+            "To confirm bookings and process orders",
+            "To answer support requests",
+            "To keep the platform secure"
+          ]
+        },
+        {
+          "type": "heading",
+          "text": "Who we share it with"
+        },
+        {
+          "type": "paragraph",
+          "text": "We share the booking details a partner spa needs to serve you, and payment details with Razorpay to process your payment. We do not sell your information."
+        },
+        {
+          "type": "heading",
+          "text": "Security and retention"
+        },
+        {
+          "type": "paragraph",
+          "text": "We protect your information with access controls and keep it only as long as its purpose or the law requires."
+        },
+        {
+          "type": "heading",
+          "text": "Your choices"
+        },
+        {
+          "type": "paragraph",
+          "text": "You can update your profile from your account. To ask about or delete your data, contact us."
+        }
+      ]
+    },
+    "terms": {
+      "path": "/terms",
+      "title": "Terms of Service",
+      "description": "The terms for using MySpaDeal, booking spa and wellness services and buying products.",
+      "body": [
+        {
+          "type": "heading",
+          "text": "Using MySpaDeal"
+        },
+        {
+          "type": "paragraph",
+          "text": "By using MySpaDeal you accept these terms. Give accurate details, keep your sign-in secure and use the platform lawfully."
+        },
+        {
+          "type": "heading",
+          "text": "Bookings and orders"
+        },
+        {
+          "type": "paragraph",
+          "text": "Bookings depend on the partner spa’s availability. The spa delivers the service; MySpaDeal connects you and processes the payment."
+        },
+        {
+          "type": "heading",
+          "text": "Prices and payment"
+        },
+        {
+          "type": "paragraph",
+          "text": "Checkout shows the full price before you pay. Razorpay processes payments by card, UPI or netbanking."
+        },
+        {
+          "type": "heading",
+          "text": "Cancellations and refunds"
+        },
+        {
+          "type": "paragraph",
+          "text": "The cancellation and refund terms shown on a deal apply to that booking."
+        },
+        {
+          "type": "heading",
+          "text": "Changes to these terms"
+        },
+        {
+          "type": "paragraph",
+          "text": "We may update these terms. The date at the top of this page shows the latest version."
+        }
+      ]
+    },
+    "accessibility": {
+      "path": "/accessibility",
+      "title": "Accessibility",
+      "description": "How MySpaDeal works to make booking spa and wellness services accessible to everyone.",
+      "body": [
+        {
+          "type": "heading",
+          "text": "Our goal"
+        },
+        {
+          "type": "paragraph",
+          "text": "We build MySpaDeal to meet the Web Content Accessibility Guidelines (WCAG) 2.2 at level AA."
+        },
+        {
+          "type": "heading",
+          "text": "What we do"
+        },
+        {
+          "type": "list",
+          "items": [
+            "Every action works with a keyboard",
+            "Text and controls meet colour contrast minimums",
+            "Pages use real headings, landmarks and labels for screen readers",
+            "Layouts adapt to any screen size and to zoom"
+          ]
+        },
+        {
+          "type": "heading",
+          "text": "Report a barrier"
+        },
+        {
+          "type": "paragraph",
+          "text": "If something on MySpaDeal is hard to use, contact us and tell us the page and what happened."
+        }
+      ]
+    },
+    "cookies": {
+      "path": "/cookies",
+      "title": "Cookie Policy",
+      "description": "How MySpaDeal uses cookies and browser storage, and how you can control them.",
+      "body": [
+        {
+          "type": "heading",
+          "text": "What cookies are"
+        },
+        {
+          "type": "paragraph",
+          "text": "Cookies and browser storage are small pieces of data a website saves on your device."
+        },
+        {
+          "type": "heading",
+          "text": "How we use them"
+        },
+        {
+          "type": "list",
+          "items": [
+            "To keep you signed in",
+            "To remember your city and theme",
+            "Razorpay sets its own cookies when you pay, to keep the payment secure"
+          ]
+        },
+        {
+          "type": "heading",
+          "text": "Managing cookies"
+        },
+        {
+          "type": "paragraph",
+          "text": "You can clear or block cookies in your browser settings. Blocking them signs you out and resets your city and theme."
+        }
+      ]
+    }
+  },
+  "becomeMember": {
+    "path": "/become-member",
+    "title": "Become a member",
+    "breadcrumb": "Become a member",
+    "metaTitle": "Become a member · MSD",
+    "description": "List your spa, salon or wellness business on MySpaDeal. Tell us about your business and our partner team follows up to complete onboarding.",
+    "asideHeading": "Talk to our partner team",
+    "asideText": "Member accounts are set up by our team. Reach us directly and we will help you get listed.",
+    "formLabel": "Membership application",
+    "notice": {
+      "before": "Member accounts are created by our team. Please ",
+      "link": "contact us",
+      "after": " and we will set up your account."
+    },
+    "sections": {
+      "business": "Business details",
+      "owner": "Your details",
+      "address": "Business address"
+    },
+    "fields": {
+      "businessName": "Business name",
+      "businessEmail": "Business email",
+      "businessPhone": "Business phone",
+      "ownerFirstName": "First name",
+      "ownerLastName": "Last name",
+      "ownerEmail": "Email",
+      "ownerMobile": "Mobile",
+      "address": "Address",
+      "state": "State",
+      "city": "City",
+      "pincode": "PIN code"
+    },
+    "selectState": "Select a state",
+    "selectCity": "Select a city",
+    "selectStateFirst": "Select a state first",
+    "errors": {
+      "businessName": "Business name is required.",
+      "email": "Enter a valid email address.",
+      "mobile": "Enter a valid 10-digit mobile number.",
+      "pincode": "Enter a valid 6-digit PIN code.",
+      "summary": "Fix the highlighted fields and try again.",
+      "submit": "We could not submit your application. Try again."
+    },
+    "submit": "Submit application",
+    "success": {
+      "metaTitle": "Application received · MSD",
+      "heading": "Application received",
+      "text": "Thanks for applying to become a member on MySpaDeal. Our team reviews your business details and contacts you by email or phone once they are verified. You do not need to do anything else right now."
     }
   }
-
 }

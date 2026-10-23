@@ -88,10 +88,7 @@ export function SkyProductCardWC({
       return;
     }
 
-    const handleFavorite = () => {
-      console.log('Favorite event received in React wrapper');
-      onFavorite();
-    };
+    const handleFavorite = () => onFavorite();
 
     el.addEventListener('favorite', handleFavorite);
 
@@ -121,6 +118,7 @@ export function SkyProductCardWC({
             images={gallery}
             alt={props.imageAlt ?? ''}
             layout={props.layout}
+            fill
           />
         )}
         {children}

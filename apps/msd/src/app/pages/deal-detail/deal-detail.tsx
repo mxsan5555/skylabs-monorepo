@@ -1,252 +1,144 @@
-import { JsonLd } from '../../seo/json-ld';
 import { useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { FilledButton, Icon, OutlinedButton, OutlinedIconButton } from '@skylabs-monorepo/shared-ui/react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Icon, OutlinedIconButton } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
-import { showSnackbar } from '../../../snackbar/snackbar';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { signInPathWithReturnTo } from '../../../auth/role-routing';
 import { addCartItem } from '../../../api/cart';
-import { OfferCard } from '../../components/offer-card/offer-card';
-import { CardRail } from '../../components/card-rail/card-rail';
-import { getCatalogDeal, getCatalogVendor, listCatalogDeals, type CatalogDeal, type CatalogVendorBranch, } from '../../../api/catalog';
+import { getCatalogDeal, listCatalogDeals, type CatalogDeal } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { useWishlist } from '../../../wishlist/wishlist-context';
+import { useRequireSignIn } from '../../../hooks/use-require-sign-in';
+import { showCartAdded } from '../../../hooks/use-add-product-to-cart';
+import { useDealPurchaseSelection } from '../../../hooks/use-deal-purchase-selection';
+import { OfferCard } from '../../components/offer-card/offer-card';
+import { CardRail } from '../../components/card-rail/card-rail';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { PageSection } from '../../components/page-section/page-section';
-import { useDealPurchaseSelection } from '../../../hooks/use-deal-purchase-selection';
 import { DurationPackageSelector } from '../../components/duration-package-selector';
-import { formatINR, formatTime12h } from '../../../utils/format';
+import { BranchPanels, DetailGallery, DetailNotFound, DetailPrice, DetailPurchase, discountPercent } from '../../components/detail-page/detail-page';
+import { BannerSlot } from '../../components/banner-slot/banner-slot';
+import { Seo } from '../../seo/seo';
+import { fillTemplate, formatINR } from '../../../utils/format';
 import { resolveDealMedia } from '../../../utils/media';
 import content from '../../../content.json';
-import './deal-detail.css';
-import { BannerSlot } from '../../components/banner-slot/banner-slot';
-const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
-function directionsUrlFor(branch: CatalogDeal['branch']): string | undefined {
-  if (!branch) return undefined;
-  if (branch.latitude != null && branch.longitude != null) {
-    return `https://www.google.com/maps/dir/?api=1&destination=${branch.latitude},${branch.longitude}`;
-  }
-  const query = [branch.name, branch.address, branch.city].filter(Boolean).join(', ');
-  return query ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(query)}` : undefined;
-}
+
+const t = content.dealDetail;
+const d = content.detailPage;
+
 /**
- * A single Deal — GET /catalog/deals/:id. Deal is always a service offering (Product is a fully
- * independent catalog entity — see msd-api's Product schema doc comment) — Add to Cart always
- * goes through `DealAddToCartDialog`'s package-selection flow.
- *
- * /category/:slug links service deals here. Products link to /products/:id.
+ * A single service Deal (`GET /catalog/deals/:id`): gallery and buy box (package, quantity, Add to
+ * cart, wishlist, share), details beside the branch location and hours, then more deals from the
+ * same category. Products have their own page (/products/:id); therapists use the same layout
+ * (therapist-detail.tsx) through `components/detail-page`.
  */
 export function DealDetail() {
   const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
-  const { isAuthenticated, token } = useAuth();
-  const { has: isWishlisted, toggle: toggleWishlist, isPending: wishlistPending, } = useWishlist();
-  const { dealDetail, vendor: vendorContent } = content;
+  const { token } = useAuth();
+  const requireSignIn = useRequireSignIn();
+  const { has: isWishlisted, toggle: toggleWishlist, isPending: wishlistPending } = useWishlist();
   const [deal, setDeal] = useState<CatalogDeal | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [copied, setCopied] = useState(false);
   const [related, setRelated] = useState<CatalogDeal[]>([]);
-  const [activeImg, setActiveImg] = useState(0);
   const [actionError, setActionError] = useState('');
   const [quantity, setQuantity] = useState(1);
-  const [vendorBranch, setVendorBranch] = useState<CatalogVendorBranch | null>(null);
-  const [hoursLoaded, setHoursLoaded] = useState(false);
+
   useEffect(() => {
     if (!id) {
       setDeal(null);
-      setError(dealDetail.errors.invalidDeal);
+      setError(t.errors.invalidDeal);
       setLoading(false);
       return;
     }
+    let cancelled = false;
     setLoading(true);
     setError('');
-    setActiveImg(0);
     getCatalogDeal(id)
-      .then(({ data }) => { setDeal(data); })
+      .then(({ data }) => { if (!cancelled) setDeal(data); })
       .catch((err: unknown) => {
-        if (err instanceof ApiRequestError && err.status === 404) {
-          setDeal(null); return;
-        }
-        setError(err instanceof ApiRequestError ? err.message : dealDetail.errors.loadDeal);
+        if (cancelled) return;
+        if (err instanceof ApiRequestError && err.status === 404) setDeal(null);
+        else setError(err instanceof ApiRequestError ? err.message : t.errors.loadDeal);
       })
-      .finally(() => { setLoading(false); });
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [id]);
+
+  const categoryId = deal?.category?.id;
+  const dealId = deal?.id;
   useEffect(() => {
-    if (!deal?.category?.id) { setRelated([]); return; }
-    listCatalogDeals({ categoryId: deal.category.id, pageSize: 7, })
-      .then(({ data }) => {
-        setRelated(data.filter((item) => item.id !== deal.id).slice(0, 6),);
-      })
-      .catch(() => { setRelated([]); });
-  }, [deal]);
-  useEffect(() => {
-    const slug = deal?.vendor?.slug;
-    const branchId = deal?.branch?.id;
-    if (!slug || !branchId) {
-      setVendorBranch(null);
-      setHoursLoaded(true);
+    if (!categoryId) {
+      setRelated([]);
       return;
     }
-    setHoursLoaded(false);
-    getCatalogVendor(slug)
-      .then(({ data }) => {
-        setVendorBranch(data.branches.find((branch) => branch.id === branchId) ?? null);
-      })
-      .catch(() => { setVendorBranch(null); })
-      .finally(() => { setHoursLoaded(true); });
-  }, [deal?.vendor?.slug, deal?.branch?.id]);
+    let cancelled = false;
+    listCatalogDeals({ categoryId, pageSize: 7 })
+      .then(({ data }) => { if (!cancelled) setRelated(data.filter((item) => item.id !== dealId).slice(0, 6)); })
+      .catch(() => { if (!cancelled) setRelated([]); });
+    return () => { cancelled = true; };
+  }, [categoryId, dealId]);
+
   const purchaseSelection = useDealPurchaseSelection(deal);
-  if (loading) { return (<p className="loading-state">{dealDetail.loading}</p>); }
-  if (error || !deal) {
-    return (
-      <div className="deal-detail deal-detail--empty">
-        <title>{dealDetail.notFound.metaTitle}</title>
-        <sky-info-card
-          icon="search_off"
-          heading={dealDetail.notFound.heading}
-          subheading={dealDetail.notFound.subheading}
-        />
-        <FilledButton type="button" onClick={() => navigate('/categories')} > {dealDetail.notFound.cta} </FilledButton>
-      </div>
-    );
-  }
-  const requireAuthOrRedirect = () => {
-    if (isAuthenticated) {
-      return true;
-    }
-    navigate(signInPathWithReturnTo(location));
-    return false;
-  };
-  const name = deal.title;
-  const dealMedia = resolveDealMedia(deal);
-  const gallery = dealMedia.images;
-  const video = dealMedia.video;
+
+  if (loading) return <p className="loading-state" role="status">{t.loading}</p>;
+  if (error || !deal) return <DetailNotFound copy={t.notFound} to="/categories" />;
+
+  const media = resolveDealMedia(deal);
   const description = deal.description ?? deal.shortDescription ?? '';
   const salePrice = purchaseSelection.unitPrice;
-  const originalPrice = purchaseSelection.activePackage?.originalPrice != null
-    ? Number(purchaseSelection.activePackage.originalPrice)
-    : deal.originalPrice != null ? Number(deal.originalPrice) : undefined;
-  const discountPct = deal.discountPercent ??
-    (originalPrice !== undefined && originalPrice > salePrice
-      ? Math.round(((originalPrice - salePrice) / originalPrice) * 100,) : 0);
-  const dealId = deal.id;
-  const branch = deal.branch;
-  const directionsUrl = directionsUrlFor(branch);
-  const branchAddress = branch ? [branch.name, [branch.address, branch.city].filter(Boolean).join(', ')].filter(Boolean) : [];
-  function toggleFavorite() {
-    if (!requireAuthOrRedirect()) { return; } void toggleWishlist(dealId);
-  }
-  async function handleAddToCart() {
-    if (!deal) return;
-    if (!requireAuthOrRedirect()) return;
+  const activeOriginal = purchaseSelection.activePackage?.originalPrice;
+  const originalPrice = activeOriginal != null ? Number(activeOriginal) : deal.originalPrice != null ? Number(deal.originalPrice) : undefined;
+  const discountPct = deal.discountPercent ?? discountPercent(salePrice, originalPrice);
+  const saved = isWishlisted(deal.id);
+
+  const handleAddToCart = async () => {
+    if (!requireSignIn()) return;
     const activePackage = purchaseSelection.activePackage;
     if (!activePackage) {
-      setActionError(purchaseSelection.missingSelection ?? 'Please select a package.');
+      setActionError(purchaseSelection.missingSelection ?? d.selectDuration);
       return;
     }
     setActionError('');
     try {
-      await addCartItem(token, {
-        dealId: deal.id,
-        dealPackageId: activePackage.id,
-        quantity,
-      });
-      showSnackbar(`Added "${deal.title}" to your cart.`, {
-        variant: 'info',
-        actionLabel: 'View Cart',
-        onAction: () => navigate('/cart'),
-      });
+      await addCartItem(token, { dealId: deal.id, dealPackageId: activePackage.id, quantity });
+      showCartAdded(deal.title, () => navigate('/cart'));
     } catch (err) {
-      const message = err instanceof ApiRequestError ? err.message : 'Unable to add item to cart.';
-      setActionError(message);
-      showSnackbar(message, { variant: 'error' });
+      setActionError(err instanceof ApiRequestError ? err.message : t.errors.addToCart);
     }
-  }
-  async function copyLink() {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      setCopied(true);
-      setTimeout(() => { setCopied(false); }, 2000);
-    }
-    catch { setCopied(false); }
-  }
+  };
+
   return (
-    <div className="deal-detail">
-      <title>{`${name} – ${deal.vendor?.businessName ?? 'MSD'} | MSD`}</title>
-      <meta
-        name="description"
-        content={`${description || `Book ${name} at MSD.`} ${formatINR(salePrice)}${deal.branch?.city ? ` in ${deal.branch.city}` : ''}.`}
-      />
-      <JsonLd
-        data={{
-          '@context': 'https://schema.org', '@type': 'Service',
-          name,
+    <>
+      <Seo
+        title={`${deal.title} – ${deal.vendor?.businessName ?? 'MSD'}${t.meta.titleSuffix}`}
+        description={`${description || fillTemplate(t.meta.defaultDescription, { name: deal.title })} ${formatINR(salePrice)}${deal.branch?.city ? ` ${t.meta.locationPrefix} ${deal.branch.city}` : ''}.`}
+        path={`/deal/${deal.id}`}
+        image={media.images[0]}
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@type': 'Service',
+          name: deal.title,
           description,
-          provider: deal.vendor?.businessName ? { '@type': 'Organization', name: deal.vendor.businessName, } : undefined,
-          offers: {
-            '@type': 'Offer',
-            price: salePrice,
-            priceCurrency: 'INR',
-            availability: 'https://schema.org/InStock',
-          },
+          ...(deal.vendor?.businessName ? { provider: { '@type': 'Organization', name: deal.vendor.businessName } } : {}),
+          offers: { '@type': 'Offer', price: salePrice, priceCurrency: 'INR', availability: 'https://schema.org/InStock' },
         }}
       />
-      <Breadcrumb
-        className="deal-detail__breadcrumb"
-        items={[
-          { label: content.categories.breadcrumb.home, to: '/', },
-          ...(deal.category ? [
-            { label: deal.category.name, to: `/category/${deal.category.slug}`, },
-          ] : []),
-          { label: name, },]}
-      />
-      {/* Section 1 — 70/30: gallery left, buy box right */}
-      <PageSection aria-labelledby="deal-title" className="deal-detail__hero">
-        <div className="deal-detail__hero-grid">
-          <div className="deal-detail__gallery">
-            <div className="deal-detail__main-img-wrap">
-              {gallery[activeImg] && (
-                <img
-                  key={activeImg}
-                  className="deal-detail__main-img"
-                  src={gallery[activeImg]}
-                  alt={name}
-                  width={800}
-                  height={450}
-                />
-              )}
-              {discountPct > 0 && (
-                <span className="deal-detail__badge" aria-label={`${discountPct}% ${dealDetail.labels.off}`}>
-                  {discountPct}% {dealDetail.labels.off}
-                </span>
-              )}
-            </div>
-            {gallery.length > 1 && (
-              <div className="deal-detail__thumbs" aria-label="Gallery thumbnails">
-                {gallery.map((image, index) => (
-                  <button
-                    key={`${image}-${index}`}
-                    type="button"
-                    className={`deal-detail__thumb${index === activeImg ? ' deal-detail__thumb--active' : ''}`}
-                    onClick={() => setActiveImg(index)}
-                    aria-label={`${dealDetail.gallery.viewImage} ${index + 1}`}
-                    aria-pressed={index === activeImg}
-                  >
-                    <img src={image} alt="" width={80} height={60} loading="lazy" />
-                  </button>
-                ))}
-              </div>
-            )}
-            {video && (<video className="deal-detail__video" controls src={video} />)}
-          </div>
-          <div className="deal-detail__buy">
-            <div className="deal-detail__meta-row">
-              {deal.category && (
-                <sky-badge variant="secondary" size="small"> {deal.category.name} </sky-badge>
-              )}
+
+      {/* Hero: gallery (70) + buy box (30) */}
+      <PageSection stack aria-labelledby="detail-title">
+        <Breadcrumb
+          items={[
+            { label: content.categories.breadcrumb.home, to: '/' },
+            ...(deal.category ? [{ label: deal.category.name, to: `/category/${deal.category.slug}` }] : []),
+            { label: deal.title },
+          ]}
+        />
+        <div className="detail-page__grid">
+          <DetailGallery images={media.images} video={media.video} alt={deal.title} discountPct={discountPct} />
+          <div className="detail-page__buy">
+            <div className="detail-page__chips">
+              {deal.category && <sky-badge variant="secondary" size="small">{deal.category.name}</sky-badge>}
               {deal.vendor?.businessName &&
                 (deal.vendor.slug ? (
                   <Link to={`/vendor/${deal.vendor.slug}`}>
@@ -256,173 +148,79 @@ export function DealDetail() {
                   <sky-badge variant="primary" size="small">{deal.vendor.businessName}</sky-badge>
                 ))}
             </div>
-            <h1 id="deal-title" className="deal-detail__title">{name}</h1>
-            <div className="deal-detail__price-row">
-              <span className="deal-detail__price">{formatINR(salePrice)}</span>
-              {originalPrice !== undefined && originalPrice > salePrice && (
-                <s className="deal-detail__original-price" aria-label={`${dealDetail.labels.originalPrice} ${formatINR(originalPrice)}`}>
-                  {formatINR(originalPrice)}
-                </s>
-              )}
-              {discountPct > 0 && (
-                <sky-badge variant="error" size="small">{discountPct}% {dealDetail.labels.off}</sky-badge>
-              )}
-            </div>
+            <h1 id="detail-title" className="detail-page__title headline-medium">{deal.title}</h1>
+            <DetailPrice price={salePrice} originalPrice={originalPrice} discountPct={discountPct} />
             <DurationPackageSelector selection={purchaseSelection} />
-            <div className="deal-detail__cta">
-              <div className="deal-detail__purchase">
-                <div className="deal-detail__quantity">
-                  <span>Quantity</span>
-                  <div
-                    className="deal-detail__quantity-control"
-                    role="group"
-                    aria-label="Quantity"
-                  >
-                    <button
-                      type="button"
-                      aria-label="Decrease quantity"
-                      disabled={quantity <= 1}
-                      onClick={() => setQuantity((current) => Math.max(1, current - 1))}
-                    >−</button>
-                    <span aria-live="polite">{quantity}</span>
-                    <button
-                      type="button"
-                      aria-label="Increase quantity"
-                      onClick={() => setQuantity((current) => current + 1)
-                      }
-                    >+</button>
-                  </div>
-                </div>
-                <div className="deal-detail__total">
-                  <span>Total</span>
-                  <strong>{formatINR(purchaseSelection.unitPrice * quantity)}</strong>
-                </div>
-                <div className="deal-detail__action-row">
-                  <FilledButton
-                    type="button"
-                    className="deal-detail__add-btn"
-                    onClick={handleAddToCart}
-                    disabled={!!purchaseSelection.missingSelection}
-                  >
-                    <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>Add to Cart</FilledButton>
-                  <OutlinedIconButton
-                    className="deal-detail__action-icon"
-                    aria-label={isWishlisted(dealId) ? dealDetail.wishlist.remove : dealDetail.wishlist.save}
-                    aria-pressed={isWishlisted(dealId)}
-                    disabled={wishlistPending(dealId)}
-                    onClick={toggleFavorite}
-                  >
-                    <Icon aria-hidden="true">{isWishlisted(dealId) ? 'favorite' : 'favorite_border'}</Icon>
-                  </OutlinedIconButton>
-                  <OutlinedIconButton
-                    className="deal-detail__action-icon"
-                    aria-label={copied ? 'Link copied' : 'Share deal'}
-                    onClick={copyLink}
-                  >
-                    <Icon aria-hidden="true">{copied ? 'check' : 'link'}</Icon>
-                  </OutlinedIconButton>
-                </div>
-              </div>
-            </div>
-            {actionError && (
-              <p className="error-state" role="alert">{actionError} </p>
-            )}
+            <DetailPurchase
+              unitPrice={salePrice}
+              quantity={quantity}
+              onQuantityChange={setQuantity}
+              onAdd={() => void handleAddToCart()}
+              addDisabled={!!purchaseSelection.missingSelection}
+              error={actionError}
+              actions={
+                <OutlinedIconButton
+                  aria-label={saved ? t.wishlist.remove : t.wishlist.save}
+                  aria-pressed={saved}
+                  disabled={wishlistPending(deal.id)}
+                  onClick={() => { if (requireSignIn()) void toggleWishlist(deal.id); }}
+                >
+                  <Icon aria-hidden="true">{saved ? 'favorite' : 'favorite_border'}</Icon>
+                </OutlinedIconButton>
+              }
+            />
           </div>
         </div>
       </PageSection>
 
-      {/* Section 2 — 70/30: details left, location + hours right */}
-      <PageSection tone="tint" aria-labelledby="deal-details-heading" className="deal-detail__details">
-        <div className="deal-detail__details-grid">
-          <div className="deal-detail__content">
-            <h2 id="deal-details-heading" className="deal-detail__panel-heading">Details</h2>
+      {/* Details (70) + location and hours (30) */}
+      <PageSection tone="tint" aria-labelledby="detail-details-heading">
+        <div className="detail-page__grid">
+          <div className="detail-page__content">
+            <h2 id="detail-details-heading" className="detail-page__heading title-large">{d.details}</h2>
             <sky-accordion>
               {description && (
-                <sky-accordion-item header={dealDetail.description} open>
-                  <p className="deal-detail__desc">{description}</p>
+                <sky-accordion-item header={t.description} level={3} open>
+                  <p className="detail-page__text body-large">{description}</p>
                 </sky-accordion-item>
               )}
               {deal.notes && (
-                <sky-accordion-item header="Notes">
-                  <p className="deal-detail__desc">{deal.notes}</p>
+                <sky-accordion-item header={d.notes} level={3}>
+                  <p className="detail-page__text body-large">{deal.notes}</p>
                 </sky-accordion-item>
               )}
               {deal.policy && (
-                <sky-accordion-item header="Policy">
-                  <p className="deal-detail__policy">{deal.policy}</p>
+                <sky-accordion-item header={d.policy} level={3}>
+                  <p className="detail-page__text body-medium">{deal.policy}</p>
                 </sky-accordion-item>
               )}
-              <sky-accordion-item header={dealDetail.cancellationPolicy}>
-                <p className="deal-detail__policy">{dealDetail.cancellationText}</p>
+              <sky-accordion-item header={d.cancellationPolicy} level={3}>
+                <p className="detail-page__text body-medium">{d.cancellationText}</p>
               </sky-accordion-item>
               {deal.termsAndConditions && (
-                <sky-accordion-item header="Terms & Conditions">
-                  <p className="deal-detail__policy">{deal.termsAndConditions}</p>
+                <sky-accordion-item header={d.terms} level={3}>
+                  <p className="detail-page__text body-medium">{deal.termsAndConditions}</p>
                 </sky-accordion-item>
               )}
             </sky-accordion>
           </div>
-          {branch && (
-            <aside className="deal-detail__sidebar" aria-label="Location and hours">
-              <div className="deal-detail__panel">
-                <h3 className="deal-detail__panel-heading">{dealDetail.labels.location}</h3>
-                <p className="deal-detail__address">
-                  <Icon aria-hidden="true">location_on</Icon>
-                  <span>{branchAddress.join(' — ')}</span>
-                </p>
-                {directionsUrl && (
-                  <OutlinedButton href={directionsUrl} target="_blank" rel="noopener noreferrer" className="deal-detail__directions-btn">
-                    <Icon slot="icon" aria-hidden="true">directions</Icon>
-                    {dealDetail.labels.getDirections}
-                  </OutlinedButton>
-                )}
-              </div>
-              {hoursLoaded && (
-                <div className="deal-detail__panel">
-                  <h3 className="deal-detail__panel-heading">{dealDetail.labels.hours}</h3>
-                  {vendorBranch?.openingHours && Object.keys(vendorBranch.openingHours).length > 0 ? (
-                    <ul className="deal-detail__hours-list">
-                      {DAY_ORDER.map((day) => {
-                        const dayHours = vendorBranch.openingHours?.[day];
-                        const closed = !dayHours || !dayHours.open || !dayHours.start || !dayHours.end;
-                        return (
-                          <li key={day} className="deal-detail__hours-row">
-                            <span className="deal-detail__hours-day">{vendorContent.days[day]}</span>
-                            <span className="deal-detail__hours-time">
-                              {closed ? vendorContent.labels.closed : `${formatTime12h(dayHours.start!)} – ${formatTime12h(dayHours.end!)}`}
-                            </span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  ) : (
-                    <p className="deal-detail__hours-empty">{vendorContent.labels.timingsNotAvailable}</p>
-                  )}
-                </div>
-              )}
-            </aside>
-          )}
+          {deal.branch && <BranchPanels branch={deal.branch} vendorSlug={deal.vendor?.slug} />}
         </div>
       </PageSection>
+
       {related.length > 0 && (
-        <section className="deal-detail__related" aria-labelledby="related-heading">
-          <div className="deal-detail__related-inner">
-            <CardRail id="related-heading" heading={dealDetail.relatedDeals}>
-              {related.map((deal) => (
-                <swiper-slide key={deal.id} className="card-rail__slide">
-                  <OfferCard
-                    item={{ type: 'deal', deal }}
-                    variant="outlined"
-                    layout="vertical"
-                  />
-                </swiper-slide>
-              ))}
-            </CardRail>
-          </div>
-        </section>
+        <PageSection aria-labelledby="related-heading">
+          <CardRail id="related-heading" heading={d.related}>
+            {related.map((item) => (
+              <swiper-slide key={item.id} className="card-rail__slide">
+                <OfferCard slider item={{ type: 'deal', deal: item }} variant="outlined" layout="vertical" />
+              </swiper-slide>
+            ))}
+          </CardRail>
+        </PageSection>
       )}
       <BannerSlot slot="DEAL_BOTTOM" />
-    </div>
+    </>
   );
 }
 export default DealDetail;

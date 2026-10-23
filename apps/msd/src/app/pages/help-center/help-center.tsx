@@ -1,252 +1,93 @@
-import {
-  useCallback,
-  useRef,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
-import { FilledButton, Icon } from '@skylabs-monorepo/shared-ui/react';
-import {
-  listCatalogFaqs,
-  type CatalogFaq,
-} from '../../../api/catalog';
+import { useMemo, useRef, useState } from 'react';
+import { TextButton } from '@skylabs-monorepo/shared-ui/react';
+import { listCatalogFaqs } from '../../../api/catalog';
+import { useCmsContent } from '../../../hooks/use-cms-content';
+import { useCustomEvent } from '../../../hooks/use-custom-event';
+import { PageSection } from '../../components/page-section/page-section';
+import { SectionHead } from '../../components/section-head/section-head';
+import { StaticPage, StaticPageLoading } from '../../components/static-page/static-page';
+import { faqPageJsonLd } from '../../seo/jsonld';
+import { fillTemplate } from '../../../utils/format';
 import content from '../../../content.json';
-import './help-center.css';
 
-const helpContent = content.helpCenter;
+const t = content.helpCenter;
 
-type FeatureCardColor =
-  | 'surface-high'
-  | 'secondary'
-  | 'tertiary'
-  | 'surface'
-  | 'primary'
-  | 'none'
-  | 'inverse';
-
-type IconStyle = 'surface' | 'filled' | 'tonal' | 'plain';
-
-function isFeatureCardColor(
-  value: string,
-): value is FeatureCardColor {
-  return [
-    'surface-high',
-    'secondary',
-    'tertiary',
-    'surface',
-    'primary',
-    'none',
-    'inverse',
-  ].includes(value);
-}
-
-function isIconStyle(value: string): value is IconStyle {
-  return ['surface', 'filled', 'tonal', 'plain'].includes(value);
-}
-
+/** Help Center: searchable FAQ accordion. CMS FAQs (`GET /catalog/faqs`) replace the content.json
+ *  defaults once any exist; the full list ships as FAQPage JSON-LD. */
 export function HelpCenter() {
-  const [faqs, setFaqs] = useState<CatalogFaq[]>([]);
-  const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const [selectedFaqId, setSelectedFaqId] = useState<string | null>(
-    null,
-  );
+  const { data, loading } = useCmsContent(listCatalogFaqs);
+  const faqs = data && data.length > 0 ? data : t.faqs;
+  const [query, setQuery] = useState('');
+  const searchRef = useRef<HTMLElement>(null);
+  useCustomEvent<{ value: string }>(searchRef, 'sky-submit', (e) => setQuery(e.detail.value));
 
-  const searchFieldRef = useRef<HTMLElement | null>(null);
+  const matches = useMemo(() => {
+    const q = query.toLowerCase();
+    return q ? faqs.filter((f) => `${f.question} ${f.answer}`.toLowerCase().includes(q)) : faqs;
+  }, [faqs, query]);
 
-  const supportColor: FeatureCardColor = isFeatureCardColor(
-    helpContent.support.color,
-  )
-    ? helpContent.support.color
-    : 'primary';
+  const resultText = !query
+    ? ''
+    : matches.length === 0
+      ? fillTemplate(t.noResults, { query })
+      : fillTemplate(matches.length === 1 ? t.resultCountOne : t.resultCount, { count: String(matches.length), query });
 
-  const supportIconStyle: IconStyle = isIconStyle(
-    helpContent.support.iconStyle,
-  )
-    ? helpContent.support.iconStyle
-    : 'surface';
-
-  const loadFaqs = useCallback(async () => {
-    setLoading(true);
-    setError(false);
-
-    try {
-      const { data } = await listCatalogFaqs();
-      setFaqs(data);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadFaqs();
-  }, [loadFaqs]);
-
-  useEffect(() => {
-    const field = searchFieldRef.current;
-
-    if (!field) {
-      return;
-    }
-
-    const handleSubmit = (event: Event) => {
-      const customEvent = event as CustomEvent<{ value: string }>;
-      setSearch(customEvent.detail.value);
-    };
-
-    field.addEventListener('sky-submit', handleSubmit);
-
-    return () => {
-      field.removeEventListener('sky-submit', handleSubmit);
-    };
-  }, []);
-
-  const filteredFaqs = useMemo(() => {
-    const query = search.trim().toLowerCase();
-
-    if (!query) {
-      return faqs;
-    }
-
-    return faqs.filter(
-      (faq) =>
-        faq.question.toLowerCase().includes(query) ||
-        faq.answer.toLowerCase().includes(query),
-    );
-  }, [faqs, search]);
-
-  const handleFaqClick = (faqId: string) => {
-    if (search.trim()) {
-      setSelectedFaqId(faqId);
-      setSearch('');
-
-      if (searchFieldRef.current) {
-        (
-          searchFieldRef.current as HTMLElement & { value: string }
-        ).value = '';
-      }
-
-      return;
-    }
-
-    setSelectedFaqId((currentId) =>
-      currentId === faqId ? null : faqId,
-    );
+  const clear = () => {
+    setQuery('');
+    if (searchRef.current) (searchRef.current as HTMLElement & { value: string }).value = '';
   };
 
   return (
-    <main className="help-center">
-      <title>{helpContent.metaTitle}</title>
-
-      <meta
-        name="description"
-        content={helpContent.metaDescription}
-      />
-
-      <section className="help-center__hero">
-        <div className="help-center__container">
-          <h1>{helpContent.hero.heading}</h1>
-
-          <p>{helpContent.hero.description}</p>
-
-          <div className="help-center__search">
+    <StaticPage
+      path={t.path}
+      title={t.title}
+      breadcrumb={t.breadcrumb}
+      description={t.description}
+      schema={faqPageJsonLd(faqs)}
+      cta={t.cta}
+    >
+      <PageSection tone="tint" stack aria-labelledby="help-faqs">
+        <SectionHead
+          id="help-faqs"
+          heading={t.faqsHeading}
+          actions={
             <sky-action-field
-              ref={searchFieldRef}
+              ref={searchRef}
               role="search"
               type="search"
               enterkeyhint="search"
-              icon={helpContent.hero.searchIcon}
-              label={helpContent.hero.searchLabel}
-              placeholder={helpContent.hero.searchPlaceholder}
-              actionLabel={helpContent.hero.searchActionLabel}
+              icon={t.search.icon}
+              label={t.search.label}
+              placeholder={t.search.placeholder}
+              action-label={t.search.action}
               variant="outlined"
+              dense
             />
+          }
+        />
+        <p className="body-medium text-muted" aria-live="polite">
+          {resultText}
+        </p>
+        {query && (
+          <div>
+            <TextButton onClick={clear}>{t.showAll}</TextButton>
           </div>
-        </div>
-      </section>
-
-      <section className="help-center__content">
-        <div className="help-center__container">
-          <div className="help-center__section-heading">
-            <h2>{helpContent.faqs.heading}</h2>
-            <p>{helpContent.faqs.description}</p>
-          </div>
-
-          {loading && (
-            <div className="help-center__state" role="status">
-              <p>{helpContent.faqs.loading}</p>
-            </div>
-          )}
-
-          {!loading && error && (
-            <div className="help-center__state" role="alert">
-              <Icon aria-hidden="true">
-                {helpContent.faqs.error.icon}
-              </Icon>
-
-              <p>{helpContent.faqs.error.description}</p>
-
-              <FilledButton onClick={() => void loadFaqs()}>
-                {helpContent.faqs.error.retryButton}
-              </FilledButton>
-            </div>
-          )}
-
-          {!loading && !error && filteredFaqs.length === 0 && (
-            <div className="help-center__state">
-              <Icon aria-hidden="true">
-                {helpContent.faqs.empty.icon}
-              </Icon>
-
-              <h3>
-                {faqs.length === 0
-                  ? helpContent.faqs.empty.noFaqsHeading
-                  : helpContent.faqs.empty.noResultsHeading}
-              </h3>
-
-              <p>
-                {faqs.length === 0
-                  ? helpContent.faqs.empty.noFaqsDescription
-                  : helpContent.faqs.empty.noResultsDescription}
-              </p>
-            </div>
-          )}
-
-          {!loading && !error && filteredFaqs.length > 0 && (
-            <div className="help-center__faq-list">
-              <sky-accordion>
-                {filteredFaqs.map((faq) => (
-                  <sky-accordion-item
-                    key={faq.id}
-                    header={faq.question}
-                    open={selectedFaqId === faq.id}
-                    onClick={() => handleFaqClick(faq.id)}
-                  >
-                    {faq.answer}
-                  </sky-accordion-item>
-                ))}
-              </sky-accordion>
-            </div>
-          )}
-        </div>
-
-        <div className="help-center__support">
-          <sky-cta-banner
-            color={supportColor}
-            icon={helpContent.support.icon}
-            iconStyle={supportIconStyle}
-            headline={helpContent.support.heading}
-            text={helpContent.support.description}
-            ctaLabel={helpContent.support.button}
-            ctaHref={helpContent.support.href}
-            ctaIcon={helpContent.support.buttonIcon}
-          />
-        </div>
-      </section>
-    </main>
+        )}
+        {loading ? (
+          <StaticPageLoading />
+        ) : (
+          matches.length > 0 && (
+            <sky-accordion>
+              {matches.map((faq) => (
+                <sky-accordion-item key={faq.question} header={faq.question} level={3}>
+                  <p className="prose body-large">{faq.answer}</p>
+                </sky-accordion-item>
+              ))}
+            </sky-accordion>
+          )
+        )}
+      </PageSection>
+    </StaticPage>
   );
 }
 

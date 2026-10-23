@@ -1,32 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Icon } from '@skylabs-monorepo/shared-ui/react';
-import type { BlogBlock, BlogPost } from '../../../types';
+import type { BlogPost } from '../../../types';
+import { renderBlock } from '../../components/blog-blocks/blog-blocks';
 import { getPost, categoryName, formatDate } from '../../../blog/blog';
 import './blog-detail.css';
 import content from '../../../content.json';
-/** Render one article body block with the right semantic element. Exported so the public About
- *  Us page (`pages/about/about.tsx`) can reuse the exact same block-rendering approach for its
- *  own `body: BlogBlock[]` field — both share this app's canonical public `BlogBlock` type
- *  (`types/index.ts`), unlike the admin CMS module's separately-declared `BlogBlock`. */
-export function renderBlock(block: BlogBlock, i: number) {
-  switch (block.type) {
-    case 'heading':
-      return <h2 key={i}>{block.text}</h2>;
-    case 'list':
-      return (
-        <ul key={i}>
-          {block.items.map((item, j) => (
-            <li key={j}>{item}</li>
-          ))}
-        </ul>
-      );
-    case 'quote':
-      return <blockquote key={i}>{block.text}</blockquote>;
-    default:
-      return <p key={i}>{block.text}</p>;
-  }
-}
 /** Blog detail: a single article, looked up by `:slug` via `GET /catalog/blog-posts/:slug`
  *  (see `blog/blog.ts`'s own doc comment). `getPost` resolves to `null` for an unpublished or
  *  nonexistent slug — same "not found" state as before, just reached without a throw. */

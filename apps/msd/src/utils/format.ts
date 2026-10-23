@@ -1,11 +1,23 @@
+/** The storefront's one display locale. Fixed (not the browser's) so prerendered HTML and the
+ *  hydrated client format numbers and dates the same way. */
+export const LOCALE = 'en-IN';
+
 export const formatINR = (n: number): string =>
-  `₹${n.toLocaleString('en-IN')}`;
+  `₹${n.toLocaleString(LOCALE)}`;
+
+/** ISO date -> "14 October 2026". */
+export const formatLongDate = (iso: string): string =>
+  new Date(iso).toLocaleDateString(LOCALE, { dateStyle: 'long' });
 
 export const pluralize = (count: number, singular: string, plural = `${singular}s`): string =>
   count === 1 ? singular : plural;
 
 export const inputValue = (e: Event): string =>
   (e.target as unknown as { value: string }).value;
+
+export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** Indian 10-digit mobile number. */
+export const MOBILE_REGEX = /^[6-9]\d{9}$/;
 
 /** "20:00" -> "08:00 PM" (zero-padded hour, matching this app's own "10:00 AM - 08:00 PM"
  *  convention) — Branch.openingHours stores plain 24-hour "HH:MM" strings; this is the only place

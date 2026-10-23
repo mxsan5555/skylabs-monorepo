@@ -88,6 +88,8 @@ declare module 'react' {
         description?: string;
         /** Offer order: price + rating row first, member and location after the text. */
         priceFirst?: boolean;
+        /** With priceFirst: divider, then member and place on one line each. */
+        divided?: boolean;
         location?: string;
         distance?: string;
         rating?: number;

@@ -398,7 +398,7 @@ export function ProductDetail() {
       >
         {related.map((item) => (
           <swiper-slide key={item.id} className="card-rail__slide">
-            <OfferCard
+            <OfferCard slider
               item={{ type: 'product', product: item }}
               variant="outlined"
               layout="vertical"

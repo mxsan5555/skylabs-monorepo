@@ -40,7 +40,7 @@ Known failures at 2026-10-18; they must not grow. Anything else failing is a reg
 
 | Project | Failing | Where |
 |---|---|---|
-| msd | 24 tests in 14 files | `permission-matrix` 9, `india-locations` 3, `contact-us` 2, and 1 each in `app.spec`, `widget-registry`, `deal-card`, `media-uploader`, `sky-product-card-wc`, `site-footer`, `become-vendor`, `wishlist`, `roles`, `settings`; `entry-server.test.tsx` fails to load |
+| msd | 23 tests in 13 files | `permission-matrix` 9, `india-locations` 3, `contact-us` 2, and 1 each in `app.spec`, `widget-registry`, `deal-card`, `media-uploader`, `sky-product-card-wc`, `site-footer`, `wishlist`, `roles`, `settings`; `entry-server.test.tsx` fails to load. Regressions since commit e756759 (NewOfferCard), not yet fixed: `home` 4 (FAQ section no longer rendered, deal favourite), `category` 1 (product wishlist heart) |
 | msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; the other 1,163 pass) |
 | shared-menu | 5 | `index.test.ts` |
 
@@ -146,6 +146,12 @@ mapPopularTag" (both pass alone).
 - Rich text: an XSS payload is stripped on write and on render (P10-36).
 - CTA banners, home slider, masters, social links: CRUD screens covered by their component tests;
   public catalog endpoints return active rows only.
+- Static page header: `SectionHead media` renders in its right-column wrapper (`section-head.test`);
+  hidden under 600px (checked in the browser at 390, 700 and 1366px, no horizontal scroll).
+- Contact (`contact.test`): default address and email show when the CMS row is empty, the map
+  embeds the address; CMS values and map embed win when set; an empty submit shows the required
+  message. Become a member (`become-vendor.test`): h1 + partner team column; the notice is plain text
+  before the form (no live region); an empty submit shows the business-name error.
 - Analytics (after AN-02): no analytics cookie or GA request before consent; events carry ids only.
 
 ### 4.12 Platform

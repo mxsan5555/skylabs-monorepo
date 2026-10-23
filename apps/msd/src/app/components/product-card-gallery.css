@@ -1,62 +1,92 @@
-
 .product-card-gallery {
   position: relative;
-  inset: auto;
   display: block;
-  width: 100%;
-  height: auto;
+  inline-size: 100%;
   aspect-ratio: 3 / 2;
   flex: 0 0 auto;
   overflow: hidden;
   border-radius: inherit;
 }
 
+/* Inside a card's media frame: the frame sets the size (3:2 in grid view, the row height in
+   list view). Covering it (out of flow) keeps the slide images from stretching the row. */
+.product-card-gallery--fill {
+  position: absolute;
+  inset: 0;
+  aspect-ratio: auto;
+}
+
 .product-card-gallery swiper-container {
   display: block;
-  width: 100%;
-  height: 100%;
+  inline-size: 100%;
+  block-size: 100%;
 }
 
 .product-card-gallery swiper-slide {
   display: flex;
-  width: 100%;
-  height: 100%;
+  inline-size: 100%;
+  block-size: 100%;
 }
 
 .product-card-gallery img {
   display: block;
-  width: 100%;
-  height: 100%;
+  inline-size: 100%;
+  block-size: 100%;
   object-fit: cover;
 }
 
+/* Above the card's stretched link (z-index 1) and the image tag. */
 .product-card-gallery__button {
   position: absolute;
-  top: 50%;
-  z-index: 10;
+  inset-block-start: 50%;
+  z-index: 3;
   transform: translateY(-50%);
-  opacity: 1;
-  visibility: visible;
 }
 
 .product-card-gallery__button--prev {
-  left: 8px;
+  inset-inline-start: 8px;
 }
 
 .product-card-gallery__button--next {
-  right: 8px;
+  inset-inline-end: 8px;
 }
 
+/* Mouse: the buttons appear on hover. Keyboard focus and touch screens always show them. */
 @media (hover: hover) and (pointer: fine) {
   .product-card-gallery__button {
     opacity: 0;
-    visibility: hidden;
-    transition: opacity 160ms ease, visibility 160ms ease;
+    transition: opacity var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
   }
 
   .product-card-gallery:hover .product-card-gallery__button,
-  .product-card-gallery:focus-within .product-card-gallery__button {
+  .product-card-gallery:focus-within .product-card-gallery__button,
+  :hover > .product-card-gallery .product-card-gallery__button {
     opacity: 1;
-    visibility: visible;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-card-gallery__button {
+    transition: none;
+  }
+}
+
+/* Page dots on a scrim pill, readable on light and dark photos. */
+.product-card-gallery swiper-container {
+  --swiper-pagination-color: var(--md-sys-color-inverse-on-surface);
+  --swiper-pagination-bullet-inactive-color: var(--md-sys-color-inverse-on-surface);
+  --swiper-pagination-bullet-inactive-opacity: 0.55;
+  --swiper-pagination-bullet-size: 6px;
+  --swiper-pagination-bullet-horizontal-gap: 3px;
+  --swiper-pagination-bottom: 8px;
+}
+
+.product-card-gallery swiper-container::part(pagination) {
+  inset-inline-start: 50%;
+  inline-size: auto;
+  padding: 4px 6px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background-color: color-mix(in srgb, var(--md-sys-color-inverse-surface) 55%, transparent);
+  line-height: 0;
+  transform: translateX(-50%);
 }

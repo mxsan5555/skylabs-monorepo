@@ -230,7 +230,10 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | ST-18 | FE | Popular searches render only on the client until the catalog is seeded into the prerender | S | - | Present in prerendered HTML |
 | [ ] | ST-19 | FE | Shared `--sky-content-max` token for the 1280px / 16px containers (header, footer, home) | S | - | One token, no repeated values |
 | [ ] | ST-20 | FE | Move the remaining `useCurrentLocation` callers (category, search, therapists, vendor) to `useVisitorLocation` | S | - | `useCurrentLocation` deleted |
-| [ ] | ST-21 | FE | Move `/categories`, therapists, orders, invoices and payments off `category.css` onto `PageSection`/`CardGrid`, then delete `category.css` | M | - | File deleted |
+| [ ] | ST-21 | FE | Move `/categories`, therapists, orders, invoices and payments off `category.css` onto `PageSection`/`CardGrid`, then delete `category.css` | M | - | File deleted (pages migrated 2026-10-22, nothing imports it; only the file delete is left) |
+| [ ] | ST-30 | BE | Public contact message endpoint (`POST /catalog/contact-messages`, table, console list) so the Contact form stores messages instead of opening the email app | M | - | Message stored; form posts; tests |
+| [ ] | ST-31 | BIZ | Owner supplies the real office address, phone and email (CMS Contact Us), replacing the `content.contact.defaults` placeholders | S | - | CMS row filled |
+| [x] | ST-32 | FE | Static page headers show the brand logo in the right column; Contact gets details + form + map; Become a member uses the same layout; 8 default FAQs; About copy describes a marketplace | M | - | Tests in contact, become-vendor, section-head |
 | [ ] | ST-22 | BIZ | Reviews system (customers rate completed orders) so the category page can add a rating sort, rating filter and card ratings | L | - | Module rules written in PLANNING.md |
 | [ ] | ST-23 | FE | Explore page adopts `FilterPanel`/`SidebarLayout` and the horizontal card list view | M | - | Same behaviour as category page |
 | [ ] | ST-24 | BE | Product vendor facet for the product category filter panel | S | - | Facet returned, tests |
