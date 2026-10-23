@@ -209,11 +209,24 @@ one grouped Filter menu, with distinct tonal colours per status.
 - **Offer card** (`sky-product-card price-first`, showcase "Offer card", to replace listing cards
   page by page in task ST-31): tag on the image (New, Deal, Hot, Expire soon, each a theme role
   via `badge-color` / `badge-tone`), price, old price and discount with a one-star score, title
-  and description (two lines each, ellipsis), member (services, right-aligned), place and distance
-  from the visitor (services), Add to cart and wishlist. The whole card opens the detail page; Add
+  (two lines, ellipsis). Services: no description; a hairline divider, then the member and the
+  place with distance from the visitor, one line each (`divided`). Products: a two-line
+  description. Add to cart and wishlist. The whole card opens the detail page; Add
   to cart (a deal asks for its package) and the heart act on their own, signed-out visitors go to
   sign in first. Grid or list view. `color` takes the same M3 roles as the feature card (none,
   surface, surface-high, primary, secondary, tertiary, inverse), slotted buttons included.
+  `slider`: an image slider with previous / next buttons and dots when the item has two or more
+  images (the buttons never open the detail page). On every listing: home, hero, category,
+  explore, products, wishlist and "You May Also Like".
+- **Therapist card** (`TherapistCard`): image slider, member, area, distance and "From" lowest
+  package price; used on home, explore, category, therapists and the therapist page rail.
+- **Explore** (`/explore`): list and grid show the same offer and therapist cards as the category
+  page (list = horizontal cards), each with a kind tag (Deal, Product, Therapist).
+- **Detail pages** (`/deal/:id`, `/therapist/:id`): one layout. Breadcrumb; gallery with
+  thumbnails and the discount tag; buy box with chips, h1, price, package list, quantity, total,
+  Add to cart, wishlist (deals) and share; Details accordions beside Location (Get directions)
+  and Hours; then a rail (deals: same category; therapists: same member). A therapist is added
+  to cart from its own page with the chosen package, never through a deal.
 - **Category page** (`/category/:slug`, `/category/:slug/:city`): h1 and total, clamped
   description, subcategory pills, Filters, List/Grid/Map, sort (Relevance, Price low to high, high
   to low, Distance when the visitor has coordinates), filter panel (Your location, Distance,
@@ -234,6 +247,23 @@ task P8-07): blog (posts, categories, block editor), FAQs, legal and static page
 others), About us, Contact us, How it works, Careers (page and job listings). Marketing creates
 and edits; Admin cannot delete (P10-31). Public pages read it from the catalog API. Rich text is
 sanitized on write and on render (D18).
+
+Public static pages (About, Contact, Help Center, How it works, Careers, legal pages, Become a
+member) share `StaticPage`: breadcrumb, h1 and intro on the left, the brand logo in the header
+row's right column (`SectionHead media`, decorative, hidden under 600px because the site header
+already shows it). The category page header uses the same logo slot.
+
+- **Contact:** address, phone and email come from the CMS Contact Us row; empty fields fall back
+  to `content.contact.defaults` (placeholders until the owner supplies real details, ST-34). Left
+  column: details + contact form; right column: the CMS map embed, else a keyless Google Maps
+  embed of the address. The form validates name, email, subject and message, then opens the
+  visitor's email app with the message filled in, addressed to the contact email. A stored
+  message needs a public endpoint first (ST-33).
+- **Become a member:** same split layout. The existing application form stays (submit stays off
+  while staff create every member); the right column shows the partner team contact details.
+- **Help Center:** CMS FAQs replace the 8 content.json defaults once any exist.
+- **About us:** describes MySpaDeal as a marketplace for deals and products from verified partner
+  businesses. No comparison claims.
 
 ## 6. CTA banners
 

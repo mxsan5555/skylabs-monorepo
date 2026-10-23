@@ -1,28 +1,42 @@
 import { createElement, useId, useState, type FormEvent } from 'react';
-import { OutlinedTextField, OutlinedSelect, SelectOption, Icon } from '@skylabs-monorepo/shared-ui/react';
-import { registerPublicVendor, type VendorSelfInput } from '../../../api/rbac/vendors';
+import { Link } from 'react-router-dom';
+import {
+  OutlinedTextField,
+  OutlinedSelect,
+  SelectOption,
+  Icon,
+} from '@skylabs-monorepo/shared-ui/react';
+import {
+  registerPublicVendor,
+  type VendorSelfInput,
+} from '../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../api/rbac/client';
-import { extractBecomeVendorFieldErrors, type BecomeVendorFieldKey } from '../account/cms/field-errors';
+import {
+  extractBecomeVendorFieldErrors,
+  type BecomeVendorFieldKey,
+} from '../account/cms/field-errors';
 import { STATES, citiesForState } from '../../../data/india-locations';
+import { getCatalogContactUs } from '../../../api/catalog';
+import { useCmsContent } from '../../../hooks/use-cms-content';
+import {
+  ContactDetails,
+  contactInfo,
+} from '../../components/contact-details/contact-details';
+import { PageSection } from '../../components/page-section/page-section';
+import { SectionHead } from '../../components/section-head/section-head';
+import { SplitLayout } from '../../components/split-layout/split-layout';
+import { StaticPage } from '../../components/static-page/static-page';
+import { EMAIL_REGEX, MOBILE_REGEX, inputValue } from '../../../utils/format';
+import content from '../../../content.json';
 import './become-vendor.css';
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MOBILE_REGEX = /^[6-9]\d{9}$/;
+const t = content.becomeMember;
+
 const PINCODE_REGEX = /^\d{6}$/;
 
-interface BecomeVendorForm {
-  businessName: string;
-  businessEmail: string;
-  businessPhone: string;
-  ownerFirstName: string;
-  ownerLastName: string;
-  ownerEmail: string;
-  ownerMobile: string;
-  address: string;
-  city: string;
-  state: string;
-  pincode: string;
-}
+type Field = BecomeVendorFieldKey;
+type BecomeVendorForm = Record<Field, string>;
+type FormErrors = Partial<Record<Field, string>>;
 
 const EMPTY_FORM: BecomeVendorForm = {
   businessName: '',
@@ -38,21 +52,64 @@ const EMPTY_FORM: BecomeVendorForm = {
   pincode: '',
 };
 
-type FormErrors = Partial<Record<BecomeVendorFieldKey, string>>;
+/** Text-field options: input type, autocomplete hint and, for numeric fields, the digit count. */
+type TextField = Exclude<Field, 'state' | 'city'>;
+const FIELD_OPTIONS: Record<
+  TextField,
+  { type?: 'email' | 'tel'; autocomplete?: string; digits?: number }
+> = {
+  businessName: { autocomplete: 'organization' },
+  businessEmail: { type: 'email', autocomplete: 'email' },
+  businessPhone: { type: 'tel', autocomplete: 'tel-national', digits: 10 },
+  ownerFirstName: { autocomplete: 'given-name' },
+  ownerLastName: { autocomplete: 'family-name' },
+  ownerEmail: { type: 'email', autocomplete: 'email' },
+  ownerMobile: { type: 'tel', autocomplete: 'tel-national', digits: 10 },
+  address: { autocomplete: 'street-address' },
+  pincode: { autocomplete: 'postal-code', digits: 6 },
+};
+
+/** Optional fields checked against a pattern when filled in. */
+const PATTERNS: Partial<Record<Field, [RegExp, string]>> = {
+  businessEmail: [EMAIL_REGEX, t.errors.email],
+  ownerEmail: [EMAIL_REGEX, t.errors.email],
+  businessPhone: [MOBILE_REGEX, t.errors.mobile],
+  ownerMobile: [MOBILE_REGEX, t.errors.mobile],
+  pincode: [PINCODE_REGEX, t.errors.pincode],
+};
+
+const SECTIONS: { heading: string; fields: TextField[] }[] = [
+  {
+    heading: t.sections.business,
+    fields: ['businessName', 'businessEmail', 'businessPhone'],
+  },
+  {
+    heading: t.sections.owner,
+    fields: ['ownerFirstName', 'ownerLastName', 'ownerEmail', 'ownerMobile'],
+  },
+];
+
+const trimAll = (form: BecomeVendorForm) =>
+  Object.fromEntries(
+    Object.entries(form).map(([k, v]) => [k, v.trim()]),
+  ) as BecomeVendorForm;
 
 /**
- * Public, unauthenticated "Become a Vendor" application (`POST /vendors/public/register`) — the
- * storefront-facing counterpart of the admin "Add Vendor" wizard, trimmed to a first-pass
- * application only: business name + the same owner identity fields (name/email/mobile) + basic
- * address. No KYC/bank/branch/category UI here at all — `VendorSelfCreateSchema` structurally has
- * no fields for any of that, so there is nothing privileged this form could even send; the admin
- * fills in the rest via the existing onboarding pipeline once the application is approved.
+ * Public, unauthenticated "Become a member" application (`POST /vendors/public/register`), the
+ * storefront counterpart of the admin "Add member" wizard trimmed to a first pass: business name,
+ * owner identity (name/email/mobile) and a basic address. `VendorSelfCreateSchema` has no KYC,
+ * bank, branch or category fields, so this form cannot send anything privileged.
  *
  * Registration is closed: staff create every member, so the server answers every submit with 403
  * and a "contact our team" message. The page says so at the top and keeps the submit button off.
  * No token is ever sent with the request.
+ *
+ * Laid out like Contact: the static page header, then the form beside the partner team's contact
+ * details (CMS `GET /catalog/contact-us` over content.json defaults).
  */
 export function BecomeVendor() {
+  const { data } = useCmsContent(getCatalogContactUs);
+  const { items } = contactInfo(data);
   const [form, setForm] = useState<BecomeVendorForm>(EMPTY_FORM);
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
@@ -60,31 +117,23 @@ export function BecomeVendor() {
   const [submitted, setSubmitted] = useState(false);
   const noticeId = useId();
 
-  const set = <K extends keyof BecomeVendorForm>(key: K, value: string) => {
-    setForm((f) => ({ ...f, [key]: value, ...(key === 'state' ? { city: '' } : {}) }));
+  const set = (key: Field, value: string) => {
+    setForm((f) => ({
+      ...f,
+      [key]: value,
+      ...(key === 'state' ? { city: '' } : {}),
+    }));
     setErrors((e) => (e[key] ? { ...e, [key]: undefined } : e));
   };
-  const text = (key: keyof BecomeVendorForm) => (e: Event) => set(key, (e.target as HTMLInputElement).value);
-  const phoneInput = (key: keyof BecomeVendorForm) => (e: Event) =>
-    set(key, (e.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 10));
 
-  const validate = (): boolean => {
+  const validate = (v: BecomeVendorForm): boolean => {
     const next: FormErrors = {};
-    if (!form.businessName.trim()) next.businessName = 'Business name is required.';
-    if (form.businessEmail.trim() && !EMAIL_REGEX.test(form.businessEmail.trim())) {
-      next.businessEmail = 'Enter a valid email address.';
-    }
-    if (form.ownerEmail.trim() && !EMAIL_REGEX.test(form.ownerEmail.trim())) {
-      next.ownerEmail = 'Enter a valid email address.';
-    }
-    if (form.businessPhone.trim() && !MOBILE_REGEX.test(form.businessPhone.trim())) {
-      next.businessPhone = 'Enter a valid 10-digit mobile number.';
-    }
-    if (form.ownerMobile.trim() && !MOBILE_REGEX.test(form.ownerMobile.trim())) {
-      next.ownerMobile = 'Enter a valid 10-digit mobile number.';
-    }
-    if (form.pincode.trim() && !PINCODE_REGEX.test(form.pincode.trim())) {
-      next.pincode = 'Enter a valid 6-digit PIN code.';
+    if (!v.businessName) next.businessName = t.errors.businessName;
+    for (const [key, [pattern, message]] of Object.entries(PATTERNS) as [
+      Field,
+      [RegExp, string],
+    ][]) {
+      if (v[key] && !pattern.test(v[key])) next[key] = message;
     }
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -93,169 +142,180 @@ export function BecomeVendor() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (submitting) return;
-    if (!validate()) return;
+    const v = trimAll(form);
+    if (!validate(v)) return;
     setSubmitting(true);
     setSubmitError('');
     try {
-      const input: VendorSelfInput = {
-        businessName: form.businessName.trim(),
-        ...(form.businessEmail.trim() && { businessEmail: form.businessEmail.trim() }),
-        ...(form.businessPhone.trim() && { businessPhone: form.businessPhone.trim() }),
-        ...(form.ownerFirstName.trim() && { ownerFirstName: form.ownerFirstName.trim() }),
-        ...(form.ownerLastName.trim() && { ownerLastName: form.ownerLastName.trim() }),
-        ...(form.ownerEmail.trim() && { ownerEmail: form.ownerEmail.trim() }),
-        ...(form.ownerMobile.trim() && { ownerMobile: form.ownerMobile.trim() }),
-        ...(form.address.trim() && { address: form.address.trim() }),
-        ...(form.city.trim() && { city: form.city.trim() }),
-        ...(form.state.trim() && { state: form.state.trim() }),
-        ...(form.pincode.trim() && { pincode: form.pincode.trim() }),
-      };
+      // Only the filled-in fields; businessName is always present after validation.
+      const input = Object.fromEntries(
+        Object.entries(v).filter(([, x]) => x),
+      ) as VendorSelfInput;
       await registerPublicVendor(input);
       setSubmitted(true);
     } catch (err) {
       if (err instanceof ApiRequestError) {
         const fieldErrors = extractBecomeVendorFieldErrors(err);
         if (fieldErrors) setErrors((prev) => ({ ...prev, ...fieldErrors }));
-        // Covers CONFLICT (email/phone already belongs to an existing account — a Vendor
-        // registration is always a brand-new account, never a reuse) and RATE_LIMITED (429,
-        // "too many registration attempts") alike — the backend's own message is already clear
-        // enough to show directly, no special-casing needed per error code.
+        // CONFLICT (email/phone already has an account) and RATE_LIMITED (429) both carry a
+        // message clear enough to show as-is.
         setSubmitError(err.message);
       } else {
-        setSubmitError('Could not submit your application — please try again.');
+        setSubmitError(t.errors.submit);
       }
     } finally {
       setSubmitting(false);
     }
   };
 
+  const hasFieldErrors = Object.values(errors).some(Boolean);
   const cityOptions = citiesForState(form.state);
+
+  /** One labelled text field and, below it, its error. */
+  const textField = (key: TextField, required = false) => {
+    const { type, autocomplete, digits } = FIELD_OPTIONS[key];
+    return [
+      <OutlinedTextField
+        key={key}
+        label={t.fields[key]}
+        type={type}
+        autocomplete={autocomplete}
+        {...(digits && { inputMode: 'numeric', maxLength: digits })}
+        value={form[key]}
+        required={required}
+        onInput={(e: Event) =>
+          set(
+            key,
+            digits
+              ? inputValue(e).replace(/\D/g, '').slice(0, digits)
+              : inputValue(e),
+          )
+        }
+        error={Boolean(errors[key])}
+      />,
+      errors[key] && (
+        <p key={`${key}-error`} className="error-state">
+          {errors[key]}
+        </p>
+      ),
+    ];
+  };
+
+  const select = (
+    key: 'state' | 'city',
+    options: readonly string[],
+    placeholder: string,
+    disabled = false,
+  ) => (
+    <OutlinedSelect
+      label={t.fields[key]}
+      value={form[key]}
+      onChange={(e: Event) => set(key, inputValue(e))}
+      disabled={disabled}
+    >
+      <SelectOption value="">
+        <div slot="headline">{placeholder}</div>
+      </SelectOption>
+      {options.map((option) => (
+        <SelectOption key={option} value={option}>
+          <div slot="headline">{option}</div>
+        </SelectOption>
+      ))}
+    </OutlinedSelect>
+  );
 
   if (submitted) {
     return (
-      <main className="become-vendor">
-        <title>Application received · MSD</title>
-        <section className="become-vendor__success" aria-label="Application received" role="status">
+      <PageSection aria-labelledby="become-member-success">
+        <title>{t.success.metaTitle}</title>
+        <div className="become-vendor__success" role="status">
           <Icon aria-hidden="true">check_circle</Icon>
-          <h1>Application received</h1>
-          <p>
-            Thanks for applying to become a vendor on MySpaDeal. Our team will review your business details and get in
-            touch by email or phone once it&apos;s been verified — no further action is needed from you right now.
-          </p>
-        </section>
-      </main>
+          <h1 id="become-member-success">{t.success.heading}</h1>
+          <p>{t.success.text}</p>
+        </div>
+      </PageSection>
     );
   }
 
   return (
-    <main className="become-vendor">
-      <title>Become a Vendor · MSD</title>
-      <meta name="description" content="Apply to list your spa or wellness business on MySpaDeal." />
-      <header className="become-vendor__hero">
-        <h1>Become a Member</h1>
-        <p>Tell us about your business — our team will review your application and follow up to complete onboarding.</p>
-      </header>
-
-      <p id={noticeId} className="field-hint" role="status">
-        Member accounts are created by our team. Please <a href="/contact">contact us</a> and we will set up your account.
-      </p>
-
-      <form className="form-grid" onSubmit={submit} noValidate>
-        <h2 className="section-title">Business details</h2>
-        <OutlinedTextField
-          label="Business name"
-          value={form.businessName}
-          required
-          onInput={text('businessName')}
-          error={Boolean(errors.businessName)}
-        />
-        {errors.businessName && <p className="error-state" role="alert">{errors.businessName}</p>}
-        <OutlinedTextField
-          label="Business email"
-          type="email"
-          value={form.businessEmail}
-          onInput={text('businessEmail')}
-          error={Boolean(errors.businessEmail)}
-        />
-        {errors.businessEmail && <p className="error-state" role="alert">{errors.businessEmail}</p>}
-        <OutlinedTextField
-          label="Business phone"
-          type="tel"
-          inputMode="numeric"
-          maxLength={10}
-          value={form.businessPhone}
-          onInput={phoneInput('businessPhone')}
-          error={Boolean(errors.businessPhone)}
-        />
-        {errors.businessPhone && <p className="error-state" role="alert">{errors.businessPhone}</p>}
-
-        <h2 className="section-title">Your details</h2>
-        <OutlinedTextField label="First name" value={form.ownerFirstName} onInput={text('ownerFirstName')} />
-        <OutlinedTextField label="Last name" value={form.ownerLastName} onInput={text('ownerLastName')} />
-        <OutlinedTextField
-          label="Email"
-          type="email"
-          value={form.ownerEmail}
-          onInput={text('ownerEmail')}
-          error={Boolean(errors.ownerEmail)}
-        />
-        {errors.ownerEmail && <p className="error-state" role="alert">{errors.ownerEmail}</p>}
-        <OutlinedTextField
-          label="Mobile"
-          type="tel"
-          inputMode="numeric"
-          maxLength={10}
-          value={form.ownerMobile}
-          onInput={phoneInput('ownerMobile')}
-          error={Boolean(errors.ownerMobile)}
-        />
-        {errors.ownerMobile && <p className="error-state" role="alert">{errors.ownerMobile}</p>}
-
-        <h2 className="section-title">Business address</h2>
-        <OutlinedTextField label="Address" value={form.address} onInput={text('address')} />
-        <OutlinedSelect label="State" value={form.state} onChange={(e: Event) => set('state', (e.target as HTMLSelectElement).value)}>
-          <SelectOption value="">
-            <div slot="headline">Select a state</div>
-          </SelectOption>
-          {STATES.map((state) => (
-            <SelectOption key={state} value={state}>
-              <div slot="headline">{state}</div>
-            </SelectOption>
-          ))}
-        </OutlinedSelect>
-        <OutlinedSelect
-          label="City"
-          value={form.city}
-          onChange={(e: Event) => set('city', (e.target as HTMLSelectElement).value)}
-          disabled={!form.state}
+    <StaticPage
+      path={t.path}
+      title={t.title}
+      breadcrumb={t.breadcrumb}
+      description={t.description}
+      metaTitle={t.metaTitle}
+      cta={null}
+    >
+      <PageSection tone="tint" aria-label={t.formLabel}>
+        <SplitLayout
+          asideLabel={t.asideHeading}
+          aside={
+            <div className="become-vendor__aside">
+              <SectionHead
+                id="become-member-contact"
+                heading={t.asideHeading}
+                subheading={t.asideText}
+              />
+              <ContactDetails items={items} />
+            </div>
+          }
         >
-          <SelectOption value="">
-            <div slot="headline">{form.state ? 'Select a city' : 'Select a state first'}</div>
-          </SelectOption>
-          {cityOptions.map((city) => (
-            <SelectOption key={city} value={city}>
-              <div slot="headline">{city}</div>
-            </SelectOption>
-          ))}
-        </OutlinedSelect>
-        <OutlinedTextField
-          label="PIN code"
-          inputMode="numeric"
-          maxLength={6}
-          value={form.pincode}
-          onInput={(e: Event) => set('pincode', (e.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 6))}
-          error={Boolean(errors.pincode)}
-        />
-        {errors.pincode && <p className="error-state" role="alert">{errors.pincode}</p>}
+          <p id={noticeId} className="become-vendor__notice body-large">
+            {t.notice.before}
+            <Link className="text-link" to={content.contact.path}>
+              {t.notice.link}
+            </Link>
+            {t.notice.after}
+          </p>
 
-        {submitError && <p className="error-state" role="alert">{submitError}</p>}
+          <form className="form-grid" onSubmit={submit} noValidate>
+            {hasFieldErrors && (
+              <p className="error-state" role="alert">
+                {t.errors.summary}
+              </p>
+            )}
+            {SECTIONS.map((section) => [
+              <h2 key={section.heading} className="section-title">
+                {section.heading}
+              </h2>,
+              ...section.fields.map((key) =>
+                textField(key, key === 'businessName'),
+              ),
+            ])}
 
-        <div className="form-actions">
-          {/* Off for now: registration always ends in the contact-us answer shown above. */}
-          {createElement('md-filled-button', { type: 'submit', disabled: true, 'aria-describedby': noticeId }, 'Submit application')}
-        </div>
-      </form>
-    </main>
+            <h2 className="section-title">{t.sections.address}</h2>
+            {textField('address')}
+            {select('state', STATES, t.selectState)}
+            {select(
+              'city',
+              cityOptions,
+              form.state ? t.selectCity : t.selectStateFirst,
+              !form.state,
+            )}
+            {textField('pincode')}
+
+            {submitError && (
+              <p className="error-state" role="alert">
+                {submitError}
+              </p>
+            )}
+
+            <div className="form-actions">
+              {/* Off for now: registration always ends in the contact-us answer shown above. */}
+              {createElement(
+                'md-filled-button',
+                {
+                  type: 'submit',
+                  disabled: true,
+                  'aria-describedby': noticeId,
+                },
+                t.submit,
+              )}
+            </div>
+          </form>
+        </SplitLayout>
+      </PageSection>
+    </StaticPage>
   );
 }
 

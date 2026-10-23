@@ -1,10 +1,10 @@
 import { useMemo, type ReactNode } from 'react';
 import '@skylabs-monorepo/shared-ui/carousel';
-import { OfferCard } from '../../components/offer-card/offer-card';
+import { OfferCard, popularTag } from '../../components/offer-card/offer-card';
 import { formatINR } from '../../../utils/format';
 import { primaryImage, resolveDealMedia, resolveTherapistMedia } from '../../../utils/media';
 import { CardRail } from '../../components/card-rail/card-rail';
-import { SkyProductCardWC } from '../../components/sky-product-card-wc';
+import { TherapistCard } from '../../components/therapist-card/therapist-card';
 import { PageSection } from '../../components/page-section/page-section';
 import { Seo } from '../../seo/seo';
 import { faqPageJsonLd, itemListJsonLd, type JsonLdObject } from '../../seo/jsonld';
@@ -52,13 +52,9 @@ export function Home() {
   }, [catalog.deals, catalog.faqs]);
   const renderDeal = (deal: CatalogDeal): ReactNode => (
     <swiper-slide key={deal.id} className="card-rail__slide">
-      <OfferCard
+      <OfferCard slider
         item={{ type: 'deal', deal }}
-        tag={deal.popularTags?.[0]?.name ? {
-          label: deal.popularTags[0].name,
-          color: 'tertiary',
-          tone: 'tonal',
-        } : undefined}
+        tag={popularTag(deal.popularTags)}
         variant="outlined"
         layout="vertical"
       />
@@ -85,28 +81,11 @@ export function Home() {
             seeAll={home.sections.therapists.seeAll}
             seeAllTo={home.sections.therapists.seeAllTo}
           >
-            {catalog.therapists.map((therapist) => {
-              const price = therapist.packages.length
-                ? Math.min(...therapist.packages.map((p) => Number(p.sellingPrice)))
-                : null;
-              return (
-                <swiper-slide key={therapist.id} className="card-rail__slide">
-                  <SkyProductCardWC
-                    image={primaryImage(resolveTherapistMedia(therapist))}
-                    imageAlt={therapist.personName}
-                    eyebrow={therapist.personName}
-                    eyebrowHref={therapist.vendor?.slug ? `/vendor/${therapist.vendor.slug}` : undefined}
-                    heading={therapist.therapistType}
-                    location={therapist.branch?.city ?? undefined}
-                    distance={therapist.distanceKm != null ? `${Math.round(therapist.distanceKm * 10) / 10} km` : undefined}
-                    tag={therapist.popularTags?.[0]?.name}
-                    pricePrefix={price != null ? home.ui.labels.from : undefined}
-                    price={price != null ? formatINR(price) : undefined}
-                    href={`/therapist/${therapist.id}`}
-                  />
-                </swiper-slide>
-              );
-            })}
+            {catalog.therapists.map((therapist) => (
+              <swiper-slide key={therapist.id} className="card-rail__slide">
+                <TherapistCard therapist={therapist} />
+              </swiper-slide>
+            ))}
           </CardRail>
         </PageSection>
       )}
@@ -121,13 +100,9 @@ export function Home() {
           >
             {catalog.products.map((product) => (
               <swiper-slide key={product.id} className="card-rail__slide">
-                <OfferCard
+                <OfferCard slider
                   item={{ type: 'product', product }}
-                  tag={product.popularTags?.[0]?.name ? {
-                    label: product.popularTags[0].name,
-                    color: 'tertiary',
-                    tone: 'tonal',
-                  } : undefined}
+                  tag={popularTag(product.popularTags)}
                   variant="outlined"
                   layout="vertical"
                 />

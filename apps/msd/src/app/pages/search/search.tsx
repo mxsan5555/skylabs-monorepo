@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
-import { useSearchParams, Link, useLocation, useNavigate } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import {
   OutlinedTextField,
   OutlinedSelect,
@@ -9,7 +9,6 @@ import {
   FilterChip,
   Icon,
   IconButton,
-  FilledTonalButton,
   Dialog,
   FilledButton,
   TextButton,
@@ -17,11 +16,9 @@ import {
   Radio,
   Divider,
 } from '@skylabs-monorepo/shared-ui/react';
-import { SkyProductCardWC } from '../../components/sky-product-card-wc';
-import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
-import { useWishlist } from '../../../wishlist/wishlist-context';
-import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { signInPathWithReturnTo } from '../../../auth/role-routing';
+import { TherapistCard } from '../../components/therapist-card/therapist-card';
+import { CardGrid } from '../../components/card-grid/card-grid';
+import { OfferCard, type OfferTag } from '../../components/offer-card/offer-card';
 import {
   listCatalogCategories,
   listCatalogDeals,
@@ -42,6 +39,12 @@ import content from '../../../content.json';
 import './search.css';
 import { DealMap } from '../../components/deal-map/deal-map';
 import { BannerSlot } from '../../components/banner-slot/banner-slot';
+
+/** Kind tags: search results mix services and products, so each card says which it is. */
+const KIND_TAGS: Record<'deal' | 'product', OfferTag> = {
+  deal: { label: content.search.labels.service, color: 'primary', tone: 'tonal' },
+  product: { label: content.search.labels.product, color: 'secondary', tone: 'tonal' },
+};
 
 const { search: searchContent } = content;
 
@@ -66,14 +69,10 @@ type ActiveDialog = 'price' | 'category' | 'location' | null;
  * of guessing a location.
  */
 export function Search() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { isAuthenticated } = useAuth();
   const [params, setParams] = useSearchParams();
   const [view, setView] = useState<View>('list');
+  const cardLayout = view === 'list' ? 'horizontal' : 'vertical';
   const [activeDialog, setActiveDialog] = useState<ActiveDialog>(null);
-  const [actionMessage, setActionMessage] = useState('');
-  const [actionError, setActionError] = useState('');
 
   // ── Filter state (mirrors the URL; kept in sync both ways) ─────────────
   const [query, setQuery] = useState(params.get('q') ?? '');
@@ -274,13 +273,6 @@ export function Search() {
   const hasActiveFilters =
     suggested || selectedCategory !== '' || priceMax < searchContent.filters.price.max || selectedState !== '';
 
-  const { toggle: wishlistToggle, has: wishlistHas } = useWishlist();
-
-  const requireAuthOrRedirect = () => {
-    if (isAuthenticated) return true;
-    navigate(signInPathWithReturnTo(location));
-    return false;
-  };
 
   // ── Map view — only deals whose branch has real, non-fabricated coordinates ──
   const dealsWithCoords = deals.filter(
@@ -411,6 +403,8 @@ export function Search() {
       <BannerSlot slot="EXPLORE_TOP" />
       {/* ── Results header ─────────────────────────────────────────────── */}
       <div className="search-page__content">
+        {/* The search field is the visible header; the page still needs one h1 above the h3 cards. */}
+        <h1 className="sr-only">{searchContent.heading}</h1>
         <p
           className="search-page__count"
           role="status"
@@ -420,8 +414,6 @@ export function Search() {
           {resultsLoading ? '…' : `${totalResultCount} ${searchContent.resultLabel}`}
         </p>
 
-        {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
-        {actionError && <p className="error-state" role="alert">{actionError}</p>}
 
         {resultsLoading ? (
           <p className="loading-state"> {searchContent.loading.deals}</p>
@@ -431,258 +423,43 @@ export function Search() {
           <p className="search-page__empty">{searchContent.noResults}</p>
         ) : (
           <>
-            {/* ── List view ───────────────────────────────────────────── */}
-            {view === 'list' && (
-              <section aria-label={searchContent.results.listAriaLabel}>
-                <ul className="search-results-list">
-                  {deals.map((deal) => {
-                    const heading = deal.title;
-                    const image = primaryImage(resolveDealMedia(deal));
-                    const imageAlt = heading;
-                    return (
-                      <li key={deal.id} className="search-results-list__item">
-                        <article className="search-result-card">
-                          <Link
-                            to={`/deal/${deal.id}`}
-                            className="search-result-card__img-link"
-                            tabIndex={-1}
-                            aria-hidden="true"
-                          >
-                            {image && (
-                              <img
-                                className="search-result-card__img"
-                                src={image}
-                                alt={imageAlt}
-                                width={140}
-                                height={140}
-                                loading="lazy"
-                              />
-                            )}
-                          </Link>
-                          <div className="search-result-card__body">
-                            <div className="search-result-card__top">
-                              <div>
-                                <h3 className="search-result-card__title">
-                                  <Link to={`/deal/${deal.id}`}>{heading}</Link>
-                                </h3>
-                                {deal.vendor?.businessName && (
-                                  <p className="search-result-card__provider">
-                                    {deal.vendor.slug ? (
-                                      <Link to={`/vendor/${deal.vendor.slug}`}>{deal.vendor.businessName}</Link>
-                                    ) : (
-                                      deal.vendor.businessName
-                                    )}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                            <p className="search-result-card__desc">
-                              {deal.shortDescription ?? deal.description}
-                            </p>
-                            <div className="search-result-card__meta">
-                              <span className="search-result-card__price">
-                                {formatINR(Number(deal.salePrice))}
-                              </span>
-                            </div>
-                            <div className="search-result-card__actions">
-                              <DealAddToCartDialog
-                                deal={deal}
-                                onAdded={(label) => setActionMessage(`Added "${label}" to your cart.`)}
-                                renderTrigger={(open) => (
-                                  <FilledTonalButton
-                                    onClick={() => {
-                                      if (requireAuthOrRedirect()) open();
-                                    }}
-                                  >
-                                    Add to Cart
-                                  </FilledTonalButton>
-                                )}
-                              />
-                              <IconButton
-                                aria-label={
-                                  wishlistHas(deal.id)
-                                    ? searchContent.labels.removeWishlist
-                                    : searchContent.labels.saveWishlist
-                                }
-                                onClick={() => wishlistToggle(deal.id)}
-                              >
-                                <Icon aria-hidden="true">
-                                  {wishlistHas(deal.id) ? 'favorite' : 'favorite_border'}
-                                </Icon>
-                              </IconButton>
-                            </div>
-                          </div>
-                        </article>
-                      </li>
-                    );
-                  })}
-                </ul>
-
-                {/* Product/Therapist results — simpler cards (no inline Add to Cart/wishlist:
-                    Product has no dedicated add-to-cart dialog yet, and wishlist is Deal-only —
-                    see `useWishlist`'s own `dealId`-typed signature); each links straight to its
-                    own detail page. */}
-                {products.length > 0 && (
-                  <>
-                    <h2 className="search-results-list__subheading">Products</h2>
-                    <ul className="search-results-list">
-                      {products.map((product) => (
-                        <li key={product.id} className="search-results-list__item">
-                          <article className="search-result-card">
-                            <Link to={`/products/${product.id}`} className="search-result-card__img-link" tabIndex={-1} aria-hidden="true">
-                              {product.image && (
-                                <img className="search-result-card__img" src={product.image} alt={product.imageAlt ?? product.name} width={140} height={140} loading="lazy" />
-                              )}
-                            </Link>
-                            <div className="search-result-card__body">
-                              <div className="search-result-card__top">
-                                <div>
-                                  <h3 className="search-result-card__title">
-                                    <Link to={`/products/${product.id}`}>{product.name}</Link>
-                                  </h3>
-                                  {product.vendor?.businessName && (
-                                    <p className="search-result-card__provider">
-                                      {product.vendor.slug ? (
-                                        <Link to={`/vendor/${product.vendor.slug}`}>{product.vendor.businessName}</Link>
-                                      ) : (
-                                        product.vendor.businessName
-                                      )}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                              <p className="search-result-card__desc">{product.summary ?? product.description}</p>
-                              <div className="search-result-card__meta">
-                                <span className="search-result-card__price">{formatINR(Number(product.price))}</span>
-                              </div>
-                            </div>
-                          </article>
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-
-                {therapists.length > 0 && (
-                  <>
-                    <h2 className="search-results-list__subheading">Therapists</h2>
-                    <ul className="search-results-list">
-                      {therapists.map((therapist) => {
-                        const image = primaryImage(resolveTherapistMedia(therapist));
-                        const fromPrice = therapist.packages.length > 0
-                          ? Math.min(...therapist.packages.map((p) => Number(p.sellingPrice)))
-                          : null;
-                        return (
-                          <li key={therapist.id} className="search-results-list__item">
-                            <article className="search-result-card">
-                              <Link to={`/therapist/${therapist.id}`} className="search-result-card__img-link" tabIndex={-1} aria-hidden="true">
-                                {image && (
-                                  <img className="search-result-card__img" src={image} alt={therapist.personName} width={140} height={140} loading="lazy" />
-                                )}
-                              </Link>
-                              <div className="search-result-card__body">
-                                <div className="search-result-card__top">
-                                  <div>
-                                    <h3 className="search-result-card__title">
-                                      <Link to={`/therapist/${therapist.id}`}>{therapist.therapistType}</Link>
-                                    </h3>
-                                    <p className="search-result-card__provider">
-                                      {therapist.personName}
-                                      {therapist.vendor?.businessName ? ` · ${therapist.vendor.businessName}` : ''}
-                                    </p>
-                                  </div>
-                                </div>
-                                {therapist.bio && <p className="search-result-card__desc">{therapist.bio}</p>}
-                                {fromPrice != null && (
-                                  <div className="search-result-card__meta">
-                                    <span className="search-result-card__price">From {formatINR(fromPrice)}</span>
-                                  </div>
-                                )}
-                              </div>
-                            </article>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </>
-                )}
-              </section>
-            )}
-
-            {/* ── Grid view ───────────────────────────────────────────── */}
-            {view === 'grid' && (
-              <section aria-label={searchContent.results.gridAriaLabel}>
-                <ul className="search-results-grid">
-                  {deals.map((deal) => (
-                    <li key={deal.id}>
-                      <SkyProductCardWC
-                        image={primaryImage(resolveDealMedia(deal))}
-                        imageAlt={deal.title}
-                        badge={searchContent.labels.service}
-                        tag={deal.popularTags?.[0]?.name}
-                        heading={deal.title}
-                        eyebrow={[deal.vendor?.businessName, deal.branch?.name].filter(Boolean).join(' · ')}
-                        eyebrowHref={deal.vendor?.slug ? `/vendor/${deal.vendor.slug}` : undefined}
-                        location={deal.branch?.city ?? undefined}
-                        distance={deal.distanceKm != null ? `${(Math.round(deal.distanceKm * 10) / 10)} km` : undefined}
-                        priceNote={deal.durationMinutes ? `${deal.durationMinutes}${searchContent.labels.durationSuffix}` : undefined}
-                        price={formatINR(Number(deal.salePrice))}
-                        originalPrice={
-                          deal.originalPrice && Number(deal.originalPrice) !== Number(deal.salePrice)
-                            ? formatINR(Number(deal.originalPrice))
-                            : undefined
-                        }
-                        favorite={true}
-                        favoriteActive={wishlistHas(deal.id)}
-                        href={`/deal/${deal.id}`}
-                        onFavorite={() => wishlistToggle(deal.id)}
+            {/* ── List / grid view: the storefront offer cards (as on Category), one kind tag each
+                 since results mix services, products and therapists. ── */}
+            {view !== 'map' && (
+              <section aria-label={view === 'list' ? searchContent.results.listAriaLabel : searchContent.results.gridAriaLabel}>
+                <CardGrid layout={view === 'list' ? 'list' : 'grid'}>
+                  {[
+                    ...deals.map((deal) => (
+                      <OfferCard
+                        key={deal.id}
+                        slider
+                        item={{ type: 'deal', deal }}
+                        tag={KIND_TAGS.deal}
+                        variant="outlined"
+                        layout={cardLayout}
                       />
-                    </li>
-                  ))}
-                  {products.map((product) => (
-                    <li key={product.id}>
-                      <SkyProductCardWC
-                        image={product.image ?? undefined}
-                        imageAlt={product.imageAlt ?? product.name}
-                        badge="Product"
-                        tag={product.popularTags?.[0]?.name}
-                        heading={product.name}
-                        eyebrow={product.vendor?.businessName ?? undefined}
-                        eyebrowHref={product.vendor?.slug ? `/vendor/${product.vendor.slug}` : undefined}
-                        price={formatINR(Number(product.price))}
-                        originalPrice={
-                          product.originalPrice && Number(product.originalPrice) !== Number(product.price)
-                            ? formatINR(Number(product.originalPrice))
-                            : undefined
-                        }
-                        href={`/products/${product.id}`}
+                    )),
+                    ...products.map((product) => (
+                      <OfferCard
+                        key={product.id}
+                        slider
+                        item={{ type: 'product', product }}
+                        tag={KIND_TAGS.product}
+                        variant="outlined"
+                        layout={cardLayout}
                       />
-                    </li>
-                  ))}
-                  {therapists.map((therapist) => {
-                    const fromPrice = therapist.packages.length > 0
-                      ? Math.min(...therapist.packages.map((p) => Number(p.sellingPrice)))
-                      : null;
-                    return (
-                      <li key={therapist.id}>
-                        <SkyProductCardWC
-                          image={primaryImage(resolveTherapistMedia(therapist))}
-                          imageAlt={therapist.personName}
-                          badge="Therapist"
-                          tag={therapist.popularTags?.[0]?.name}
-                          heading={therapist.therapistType}
-                          eyebrow={[therapist.personName, therapist.vendor?.businessName].filter(Boolean).join(' · ')}
-                          eyebrowHref={therapist.vendor?.slug ? `/vendor/${therapist.vendor.slug}` : undefined}
-                          location={therapist.branch?.city ?? undefined}
-                          distance={therapist.distanceKm != null ? `${Math.round(therapist.distanceKm * 10) / 10} km` : undefined}
-                          pricePrefix={fromPrice != null ? 'From' : undefined}
-                          price={fromPrice != null ? formatINR(fromPrice) : undefined}
-                          href={`/therapist/${therapist.id}`}
-                        />
-                      </li>
-                    );
-                  })}
-                </ul>
+                    )),
+                    ...therapists.map((therapist) => (
+                      <TherapistCard
+                        key={therapist.id}
+                        therapist={therapist}
+                        badge={searchContent.labels.therapist}
+                        variant="outlined"
+                        layout={cardLayout}
+                      />
+                    )),
+                  ]}
+                </CardGrid>
               </section>
             )}
 

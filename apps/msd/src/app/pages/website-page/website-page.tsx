@@ -1,80 +1,39 @@
-import { useEffect, useState } from 'react';
-import { getCatalogPage, type CatalogWebsitePage } from '../../../api/catalog';
-import { ApiRequestError } from '../../../api/rbac/client';
-import { renderBlock } from '../blog-detail/blog-detail';
-import './website-page.css';
+import { getCatalogPage } from '../../../api/catalog';
+import type { BlogBlock } from '../../../types';
+import { useCmsContent } from '../../../hooks/use-cms-content';
+import { PageSection } from '../../components/page-section/page-section';
+import { Prose, StaticPage, StaticPageLoading } from '../../components/static-page/static-page';
+import content from '../../../content.json';
 
-/** One reusable public page for every fixed `WebsitePage` row (privacy/terms/accessibility/
- *  cookies) — `GET /catalog/pages/:slug` on mount + slug change, rendering the title and
- *  `content: BlogBlock[]` body exactly as saved from the CMS admin page
- *  (`pages/account/cms/legal-pages-list.tsx`), reusing `blog-detail.tsx`'s `renderBlock` (same
- *  approach as the public About Us page). A single parameterized component wired to 4 routes
- *  instead of 4 near-duplicate page files — see `routes.tsx`. */
-export function WebsitePage({ slug }: { slug: string }) {
-  const [page, setPage] = useState<CatalogWebsitePage | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+const t = content.legalPages;
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError('');
-    setPage(null);
-    getCatalogPage(slug)
-      .then(({ data }) => {
-        if (!cancelled) setPage(data);
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(
-            err instanceof ApiRequestError && err.code === 'NOT_FOUND'
-              ? 'This page could not be found.'
-              : err instanceof ApiRequestError
-                ? err.message
-                : 'Could not load this page.',
-          );
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [slug]);
+export type LegalPageKey = 'privacy' | 'terms' | 'accessibility' | 'cookies';
 
-  if (loading) {
-    return (
-      <main className="website-page">
-        <title>Loading… · MSD</title>
-        <p className="loading-state">Loading…</p>
-      </main>
-    );
-  }
+/** The seeded rows only hold "Content coming soon.", which must not replace the real default. */
+const isPlaceholder = (blocks: BlogBlock[]) =>
+  blocks.length === 0 || (blocks.length === 1 && 'text' in blocks[0] && blocks[0].text === t.placeholder);
 
-  if (error || !page) {
-    return (
-      <main className="website-page">
-        <title>Page not found · MSD</title>
-        <meta name="robots" content="noindex" />
-        <p className="error-state" role="alert">{error || 'This page is not available right now.'}</p>
-      </main>
-    );
-  }
+/** One page for the four fixed legal `WebsitePage` rows (privacy/terms/accessibility/cookies):
+ *  the CMS body (`GET /catalog/pages/:slug`, slug = `page`) once an admin writes one, otherwise
+ *  the content.json default. */
+export function WebsitePage({ page }: { page: LegalPageKey }) {
+  const fallback = t[page];
+  const { data, loading } = useCmsContent(getCatalogPage, page);
+  const cms = data && !isPlaceholder(data.content) ? data : null;
 
   return (
-    <main className="website-page">
-      <title>{page.metaTitle || `${page.title} · MSD`}</title>
-      <meta name="description" content={page.metaDescription || page.title} />
-      <article>
-        <h1>{page.title}</h1>
-        {page.content.length > 0 ? (
-          <div className="post__body website-page__body">{page.content.map(renderBlock)}</div>
-        ) : (
-          <p className="empty-state">This page has no content yet.</p>
-        )}
-      </article>
-    </main>
+    <StaticPage
+      path={fallback.path}
+      title={cms?.title || fallback.title}
+      description={fallback.description}
+      metaTitle={cms?.metaTitle}
+      metaDescription={cms?.metaDescription}
+      updatedAt={cms?.updatedAt}
+    >
+      <PageSection tone="tint">
+        {loading ? <StaticPageLoading /> : <Prose blocks={cms ? cms.content : (fallback.body as BlogBlock[])} />}
+      </PageSection>
+    </StaticPage>
   );
 }
 

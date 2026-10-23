@@ -175,7 +175,7 @@ export function HomeHero({ spotlight }: { spotlight?: CatalogDeal }) {
             >
               {slides.map((slide) => (
                 <swiper-slide key={slide.id} className="home-hero__slide">
-                  <OfferCard item={slideItem(slide)} tag={SLIDE_TAGS[slide.type]} color="surface-high" variant="plain" />
+                  <OfferCard slider item={slideItem(slide)} tag={SLIDE_TAGS[slide.type]} color="surface-high" variant="plain" />
                 </swiper-slide>
               ))}
             </swiper-container>

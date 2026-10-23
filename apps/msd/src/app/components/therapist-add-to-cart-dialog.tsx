@@ -6,7 +6,8 @@ import { addCartItem } from '../../api/cart';
 import { ApiRequestError } from '../../api/rbac/client';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { useTherapistPurchaseSelection } from '../../hooks/use-therapist-purchase-selection';
-import { TherapistPackageSelector } from './therapist-package-selector';
+import { DurationPackageSelector } from './duration-package-selector';
+import content from '../../content.json';
 import './duration-package-selector.css';
 import { formatINR } from '../../utils/format';
 import { showSnackbar } from '../../snackbar/snackbar';
@@ -76,7 +77,7 @@ export function TherapistAddToCartDialog({
       <Dialog ref={dialogRef}>
         <div slot="headline">{therapist.therapistType} — {therapist.personName}</div>
         <div slot="content" className="form-grid">
-          <TherapistPackageSelector selection={selection} />
+          <DurationPackageSelector selection={selection} emptyText={content.therapistDetail.noPackages} />
 
           {activePackage && (
             <div className="dps__price-row">

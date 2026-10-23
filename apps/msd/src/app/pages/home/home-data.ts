@@ -64,6 +64,7 @@ export function toProductCardDeal(product: CatalogProduct): DealCardDeal {
     title: product.name,
     image: media.images[0] ?? '',
     imageAlt: product.imageAlt ?? product.name,
+    gallery: media.images.length > 0 ? media.images : undefined,
     providerName: product.vendor?.businessName ?? undefined,
     location: product.vendor?.city ?? undefined,
     price,

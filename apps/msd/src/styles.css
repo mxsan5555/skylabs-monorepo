@@ -40,6 +40,99 @@
   font-size: 16px;
 }
 
+/* ── Content utilities (StaticPage, CMS bodies, any long-form text) ───────────── */
+.text-muted {
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Long-form text: CMS blocks, legal copy, job details. 70ch keeps lines readable. */
+.prose {
+  max-inline-size: 70ch;
+  color: var(--md-sys-color-on-surface);
+}
+
+.prose > * {
+  margin-block: 0 16px;
+}
+
+.prose > :last-child {
+  margin-block-end: 0;
+}
+
+.prose :is(h2, h3, h4) {
+  margin-block: 32px 8px;
+  color: var(--md-sys-color-on-surface);
+}
+
+.prose > :is(h2, h3, h4):first-child {
+  margin-block-start: 0;
+}
+
+.prose h2 {
+  font: var(--md-sys-typescale-headline-small-weight) var(--md-sys-typescale-headline-small-size) /
+    var(--md-sys-typescale-headline-small-line-height) var(--md-sys-typescale-headline-small-font);
+}
+
+.prose h3 {
+  font: var(--md-sys-typescale-title-large-weight) var(--md-sys-typescale-title-large-size) /
+    var(--md-sys-typescale-title-large-line-height) var(--md-sys-typescale-title-large-font);
+}
+
+.prose h4 {
+  font: var(--md-sys-typescale-title-medium-weight) var(--md-sys-typescale-title-medium-size) /
+    var(--md-sys-typescale-title-medium-line-height) var(--md-sys-typescale-title-medium-font);
+}
+
+.prose ul {
+  padding-inline-start: 24px;
+}
+
+.prose li + li {
+  margin-block-start: 8px;
+}
+
+.prose blockquote {
+  margin-inline: 0;
+  padding-inline-start: 16px;
+  border-inline-start: 1px solid var(--md-sys-color-outline);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Inline text link: primary role (10) with a visible focus ring. */
+.text-link,
+.prose a {
+  color: var(--md-sys-color-primary);
+  text-underline-offset: 3px;
+}
+
+.text-link:focus-visible,
+.prose a:focus-visible {
+  outline: 3px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+  border-radius: var(--md-sys-shape-corner-extra-small);
+}
+
+/* Embedded map (iframe): fluid, 16:9, M3 large corner. */
+.map-frame {
+  display: block;
+  inline-size: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: var(--md-sys-shape-corner-large);
+  background-color: var(--md-sys-color-surface-container-high);
+}
+
+/* Map in a right column (Contact): 4:3 when stacked, portrait beside the main column. */
+.map-frame--tall {
+  aspect-ratio: 4 / 3;
+}
+@media (min-width: 840px) {
+  .map-frame--tall {
+    aspect-ratio: 4 / 5;
+  }
+}
+
 /* ── RBAC console (dashboard, Role Management, User Management, Audit Logs) ──
    Shared shell classes (.admin-layout, .admin-sidebar, .admin-topbar,
    .admin-content, .admin-page, .auth-*, ...) come from
@@ -623,6 +716,18 @@ a.dashboard-stat:focus-visible {
   width: 100%;
 }
 
+/* A form's own heading (public forms). */
+.form-grid>h2.form-grid__full {
+  margin: 0;
+  color: var(--md-sys-color-on-surface);
+}
+
+/* Single-column form (support request, short public forms). */
+.form-grid--stack {
+  grid-template-columns: minmax(0, 1fr);
+  max-inline-size: 640px;
+}
+
 /* Elements that must always span every column, never squeeze into a single field-width cell —
    section headers, hints/errors, fieldsets (packages, KYC documents, etc.), and the save/cancel
    action row. */
@@ -631,6 +736,7 @@ a.dashboard-stat:focus-visible {
 .form-grid>.error-state,
 .form-grid>fieldset,
 .form-grid>.form-actions,
+.form-grid>.form-grid__full,
 .form-grid>section {
   grid-column: 1 / -1;
 }

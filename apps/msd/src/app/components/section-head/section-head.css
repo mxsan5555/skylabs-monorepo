@@ -58,3 +58,26 @@
   outline: 3px solid var(--md-sys-color-primary);
   outline-offset: 2px;
 }
+/* Right-column media (page header logo). Phones already show the logo in the site header.
+   The row stays one line so the logo keeps the right column; the text column shrinks instead. */
+.section-head:has(> .section-head__media) {
+  flex-wrap: nowrap;
+}
+.section-head:has(> .section-head__media) > .section-head__text {
+  flex: 1 1 auto;
+}
+.section-head__media {
+  display: none;
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+}
+.section-head__media img {
+  display: block;
+  inline-size: clamp(160px, 22vw, 260px);
+  block-size: auto;
+}
+@media (min-width: 600px) {
+  .section-head__media {
+    display: flex;
+  }
+}

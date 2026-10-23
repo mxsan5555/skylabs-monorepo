@@ -1,6 +1,6 @@
 import { JsonLd } from '../../seo/json-ld';
 import {useEffect, useMemo, useState,} from 'react';
-import { OfferCard } from '../../components/offer-card/offer-card';
+import { OfferCard, popularTag } from '../../components/offer-card/offer-card';
 import {Divider,Icon,OutlinedSelect,OutlinedTextField,SelectOption,} from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { signInPathWithReturnTo } from '../../../auth/role-routing';
@@ -574,17 +574,9 @@ export function ProductListing() {
                 key={product.id}
                 className="products-page__card-wrap"
               >
-                <OfferCard
+                <OfferCard slider
                   item={{ type: 'product', product }}
-                  tag={
-                    product.popularTags?.[0]?.name
-                      ? {
-                        label: product.popularTags[0].name,
-                        color: 'tertiary',
-                        tone: 'tonal',
-                      }
-                      : undefined
-                  }
+                  tag={popularTag(product.popularTags)}
                   variant="plain"
                   layout="vertical"
                 />
