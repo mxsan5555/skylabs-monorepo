@@ -27,6 +27,10 @@ Needs Postgres (local, never Neon production): `prisma migrate dev`, seed twice,
   an icon also contains the icon ligature text, so match on "contains", not equality.
 - Prerendered pages must hydrate cleanly: never pass `prop={undefined}` to a custom element; gate
   client-only state behind effects or `useHydrated`. `src/hydration.test.tsx` guards this.
+- `sky-*` options whose LIT attribute is kebab-case go in JSX in that form (`price-first`,
+  `image-alt`, also as `{...spread}` keys): server rendering writes `priceFirst` as `pricefirst` and
+  hydration never sets the property. `src/sky-element-props.test.ts` fails on the camelCase form and
+  on unknown attributes.
 - ESLint rejects empty functions, including in tests: use `vi.fn()`.
 - Tests that assert snackbar copy render `<SnackbarHost />` next to the page.
 - API route tests: 401 without a token, 403 without the permission, 200 with it; 422 for invalid
@@ -40,7 +44,7 @@ Known failures at 2026-10-18; they must not grow. Anything else failing is a reg
 
 | Project | Failing | Where |
 |---|---|---|
-| msd | 23 tests in 13 files | `permission-matrix` 9, `india-locations` 3, `contact-us` 2, and 1 each in `app.spec`, `widget-registry`, `deal-card`, `media-uploader`, `sky-product-card-wc`, `site-footer`, `wishlist`, `roles`, `settings`; `entry-server.test.tsx` fails to load. Regressions since commit e756759 (NewOfferCard), not yet fixed: `home` 4 (FAQ section no longer rendered, deal favourite), `category` 1 (product wishlist heart) |
+| msd | 22 tests in 12 files | `permission-matrix` 9, `india-locations` 3, `contact-us` 2, and 1 each in `app.spec`, `widget-registry`, `deal-card`, `media-uploader`, `site-footer`, `wishlist`, `roles`, `settings`; `entry-server.test.tsx` fails to load (`sky-product-card-wc` fixed 2026-10-24). Regressions since commit e756759 (NewOfferCard), not yet fixed: `home` 4 (FAQ section no longer rendered, deal favourite), `category` 1 (product wishlist heart) |
 | msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; the other 1,163 pass) |
 | shared-menu | 5 | `index.test.ts` |
 

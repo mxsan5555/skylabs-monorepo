@@ -54,7 +54,7 @@ function RichRow({
         alt=""
         ratio="1"
         shape="medium"
-        placeholderIcon="spa"
+        placeholder-icon="spa"
       />
       <span className="search-panel__body">
         <span className="search-panel__title title-small">

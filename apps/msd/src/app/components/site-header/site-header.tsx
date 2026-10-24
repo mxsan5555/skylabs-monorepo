@@ -151,7 +151,7 @@ export function SiteHeader() {
               role="search"
               dense
               clearable
-              clearLabel={content.header.searchClear}
+              clear-label={content.header.searchClear}
               combobox
               expanded={open && mode === 'results'}
               controlsElement={open ? listbox : null}

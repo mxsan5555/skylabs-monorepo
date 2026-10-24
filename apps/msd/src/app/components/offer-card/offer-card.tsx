@@ -79,17 +79,17 @@ export function OfferCard({ item, tag, color, variant = 'plain', layout = 'verti
       variant={variant}
       {...(color ? { color } : {})}
       layout={layout}
-      priceFirst
+      price-first
       divided={isDeal}
-      {...(!gallery && card.image ? { image: card.image, imageAlt: card.imageAlt } : {})}
-      {...(tag ? { badge: tag.label, badgeColor: tag.color, badgeTone: tag.tone ?? 'filled' } : {})}
+      {...(!gallery && card.image ? { image: card.image, 'image-alt': card.imageAlt } : {})}
+      {...(tag ? { badge: tag.label, 'badge-color': tag.color, 'badge-tone': tag.tone ?? 'filled' } : {})}
       heading={card.title}
       {...(description ? { description } : {})}
       {...(isDeal && card.providerName ? { eyebrow: card.providerName } : {})}
       {...(place ? { location: place } : {})}
       {...(isDeal && card.distance != null ? { distance: formatDistance(card.distance) } : {})}
       price={formatINR(card.price)}
-      {...(card.originalPrice ? { originalPrice: formatINR(card.originalPrice) } : {})}
+      {...(card.originalPrice ? { 'original-price': formatINR(card.originalPrice) } : {})}
       {...(card.discount ? { discount: fillTemplate(t.discount, { percent: String(card.discount) }) } : {})}
       {...(rating ? { rating: rating.rating, reviews: rating.reviews } : {})}
       href={isDeal ? `/deal/${id}` : `/products/${id}`}

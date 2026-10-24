@@ -75,7 +75,7 @@ export function CityPicker({
         variant="outlined"
         dense
         clearable
-        clearLabel={content.header.searchClear}
+        clear-label={content.header.searchClear}
         icon="location_on"
         type="search"
         enterkeyhint="go"
