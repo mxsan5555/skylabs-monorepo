@@ -169,6 +169,12 @@ declare module 'react' {
         dense?: boolean;
         required?: boolean;
         disabled?: boolean;
+        clearable?: boolean;
+        clearLabel?: string;
+        combobox?: boolean;
+        expanded?: boolean;
+        controlsElement?: globalThis.Element | null;
+        activeOption?: globalThis.Element | null;
         /** React 19 attaches on<event> props on custom elements as listeners. */
         'onsky-submit'?: (event: CustomEvent<{ value: string }>) => void;
       }>;

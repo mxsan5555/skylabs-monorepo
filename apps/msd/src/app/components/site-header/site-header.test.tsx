@@ -8,8 +8,9 @@ import { beforeEach, describe, it, expect, vi } from 'vitest';
 import '@skylabs-monorepo/shared-ui';
 import { SiteHeader } from './site-header';
 
-const { setCity, shell, listCatalogDealsMock, listCatalogProductsMock, listCatalogTherapistsMock } = vi.hoisted(() => ({
+const { setCity, requestBrowser, shell, listCatalogDealsMock, listCatalogProductsMock, listCatalogTherapistsMock } = vi.hoisted(() => ({
   setCity: vi.fn(),
+  requestBrowser: vi.fn(),
   shell: {
     locations: [] as Array<{ state: string; city: string }>,
     categories: [] as Array<{ id: string; name: string; slug: string; description: null; children: Array<{ id: string; name: string; slug: string; description: null }> }>,
@@ -48,7 +49,7 @@ vi.mock('../../../location/location-context', () => ({
     state: 'Maharashtra',
     coords: null,
     setCity,
-    requestBrowser: vi.fn(),
+    requestBrowser,
   }),
 }));
 vi.mock('../../../api/catalog', async (importOriginal) => ({
@@ -122,6 +123,7 @@ beforeEach(() => {
   ];
   shell.links = [{ id: 'c1', label: 'Massage', to: '/category/massage' }];
   setCity.mockClear();
+  requestBrowser.mockReset();
   listCatalogDealsMock.mockReset().mockResolvedValue({ data: [] });
   listCatalogProductsMock.mockReset().mockResolvedValue({ data: [] });
   listCatalogTherapistsMock.mockReset().mockResolvedValue({ data: [] });
@@ -264,11 +266,24 @@ describe('SiteHeader — search suggestions', () => {
     vi.useRealTimers();
   });
 
-  it('shows no dropdown below the minimum query length, without calling the catalog APIs', async () => {
+  it('below the minimum query length shows the location row and categories, without calling the catalog APIs', async () => {
     renderHeader();
     await typeQuery('m');
-    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(screen.getByText('Near Pune')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Change' })).toBeTruthy();
+    expect(suggestionOption('Massage').getAttribute('href')).toBeNull();
+    expect(screen.queryByText(/Show all/)).toBeNull();
     expect(listCatalogDealsMock).not.toHaveBeenCalled();
+  });
+
+  it('exposes the inner input as an expanded list combobox while the panel is open', async () => {
+    renderHeader();
+    await typeQuery('swed');
+    await act(async () => {
+      await searchField().updateComplete;
+    });
+    expect(searchInput().getAttribute('role')).toBe('combobox');
+    expect(searchInput().getAttribute('aria-expanded')).toBe('true');
   });
 
   it('matches categories/subcategories synchronously, before the debounced deal/product/therapist fetch has even fired', async () => {
@@ -277,7 +292,7 @@ describe('SiteHeader — search suggestions', () => {
     // The synchronous category match already produced a result, so the loading status text is
     // suppressed (only shown while there are zero results so far) — see search-suggestions.tsx.
     expect(suggestionOption('Swedish')).toBeTruthy();
-    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.getByRole('status').textContent).toBe('');
     expect(listCatalogDealsMock).not.toHaveBeenCalled();
   });
 
@@ -300,7 +315,7 @@ describe('SiteHeader — search suggestions', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(250);
     });
-    expect(screen.getByRole('status')).toHaveTextContent('No results found');
+    expect(screen.getByRole('status')).toHaveTextContent('No results for “zzz-no-match”');
   });
 
   it('selecting a suggestion by click navigates to it, clears the field, and closes the dropdown', async () => {
@@ -323,7 +338,7 @@ describe('SiteHeader — search suggestions', () => {
 
     pressKey('ArrowDown');
     expect(option.getAttribute('aria-selected')).toBe('true');
-    expect(searchField().getAttribute('aria-activedescendant')).toBe(option.id);
+    expect((searchField() as unknown as { activeOption: Element | null }).activeOption).toBe(option);
 
     pressKey('Enter');
     expect(currentUrl()).toBe('/category/massage?sub=swedish');
@@ -352,6 +367,70 @@ describe('SiteHeader — search suggestions', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('listbox')).toBeNull();
     expect(currentUrl()).toBe('/');
+  });
+
+  it('Show all carries the API total and opens /explore with the query', async () => {
+    listCatalogDealsMock.mockResolvedValue({
+      data: [{ id: 'd1', title: 'Hot Stone Massage', category: null, branch: { city: 'Pune' }, packages: [], salePrice: '699', originalPrice: '999' }],
+      meta: { total: 40 },
+    });
+    listCatalogTherapistsMock.mockResolvedValue({ data: [], meta: { total: 2 } });
+    renderHeader();
+    await typeQuery('massage');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    fireEvent.click(screen.getByText('Show all 42 results').closest('md-filled-button') as HTMLElement);
+    expect(currentUrl()).toBe('/explore?q=massage');
+    expect(screen.queryByRole('listbox')).toBeNull();
+  });
+
+  it('Change opens the location step; picking a city sets it and returns to the results', async () => {
+    renderHeader();
+    await typeQuery('swed');
+    fireEvent.click(screen.getByRole('button', { name: 'Change' }));
+    expect(screen.queryByRole('listbox')).toBeNull();
+    const step = screen.getByRole('region', { name: 'Choose your location' });
+    fireEvent.click(within(within(step).getByRole('list')).getByRole('button', { name: /Pune/ }));
+    expect(setCity).toHaveBeenCalledWith({ state: 'Maharashtra', city: 'Pune' });
+    expect(screen.getByRole('listbox')).toBeTruthy();
+  });
+
+  it('shows an alert in the location step when the browser refuses the location', async () => {
+    requestBrowser.mockResolvedValue('failed');
+    renderHeader();
+    await typeQuery('swed');
+    fireEvent.click(screen.getByRole('button', { name: 'Change' }));
+    await act(async () => {
+      fireEvent.click(screen.getByText('Use my current location').closest('md-filled-tonal-button') as HTMLElement);
+    });
+    expect(requestBrowser).toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('We could not find your location.');
+    expect(screen.getByRole('region', { name: 'Choose your location' })).toBeTruthy();
+  });
+
+  it('Escape in the location step goes back to the results before closing', async () => {
+    renderHeader();
+    await typeQuery('swed');
+    fireEvent.click(screen.getByRole('button', { name: 'Change' }));
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.getByRole('listbox')).toBeTruthy();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('listbox')).toBeNull();
+  });
+
+  it('shows nearest deals from other cities under a note when the visitor city has none', async () => {
+    listCatalogDealsMock
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({ data: [{ id: 'far', title: 'Classic Body Massage', category: null, branch: { city: 'New Delhi' }, packages: [], salePrice: '999', originalPrice: '999' }] });
+    renderHeader();
+    await typeQuery('massage');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(suggestionOption('Classic Body Massage')).toBeTruthy();
+    const group = screen.getByRole('group', { name: 'Deals' });
+    expect(group).toHaveAccessibleDescription('No deals in Pune yet. These are from other states.');
   });
 
   it('submitting the field directly (sky-submit) navigates to /explore with the query, closing the dropdown', async () => {

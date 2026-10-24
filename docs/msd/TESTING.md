@@ -114,6 +114,18 @@ mapPopularTag" (both pass alone).
 - `slider`: off by default (first image only); with 2+ images every slide renders, the buttons are
   named "Previous / Next image of {title}" and never change the page; one image keeps the plain
   image (`offer-card.test.tsx`). List cards keep one height whatever the photo ratio.
+- Header search (ST-38, `site-header.test.tsx`, `use-search-suggestions.test.ts`,
+  `city-picker.test.tsx`, `sky-action-field.test.ts`): focus opens the panel with "Near {city}" and
+  Change, or the set-location prompt without a location; an empty query lists categories without
+  any API call; a query shows categories, Deals, Therapists and Products rows (image, title,
+  price, distance) with deals sent the city, state and coordinates; a location change re-runs the
+  search; a city with no matching deal shows other cities' deals under the note and Show all
+  without a count; Change shows the city filter, a pick calls `setCity` and returns to results; a refused
+  browser location shows the error alert; Show all opens `/explore?q=` with the total; arrows,
+  Enter and Escape work (Escape leaves the location step first) and the field's `activeOption` is the
+  active row (ARIA element reflection on the inner combobox input);
+  `sky-action-field clearable` clears and refocuses, default rendering unchanged. Checked at 1366
+  and 390 px.
 - Explore: list and grid render offer and therapist cards; signed-out Add to cart goes to sign in
   with the query kept (`search.test.tsx`); one (visually hidden) h1.
 - Category: a prerendered 404 renders not found on the first render; filter counts reload when

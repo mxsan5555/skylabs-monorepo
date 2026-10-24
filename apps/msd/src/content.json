@@ -54,20 +54,38 @@
       "dialogTitle": "Choose your city",
       "useCurrent": "Use my current location",
       "listLabel": "Cities with partner spas",
-      "close": "Close"
+      "close": "Close",
+      "filterLabel": "Search partner cities",
+      "filterPlaceholder": "Type a city",
+      "noMatch": "No partner city matches “{query}”",
+      "locateFailedTitle": "We could not find your location.",
+      "locateFailedText": "Allow location access for this site in your browser settings, or pick a city below."
     },
     "searchSuggestions": {
-      "listLabel": "Search suggestions",
+      "listLabel": "Search results",
       "loading": "Searching…",
-      "noResults": "No results found",
+      "noResults": "No results for “{query}”. Try another word or a different location.",
+      "near": "Near {city}",
+      "nearYou": "Near your current location",
+      "noLocation": "Set your location to see deals near you",
+      "change": "Change",
+      "setLocation": "Set location",
+      "locationTitle": "Choose your location",
+      "back": "Back to results",
+      "from": "From {price}",
+      "showAll": "Show all results",
+      "showAllCount": "Show all {count} results",
+      "showAllOne": "Show 1 result",
+      "dealsElsewhere": "No deals in {city} yet. These are from other states.",
       "groups": {
-        "deals": "Deals",
-        "products": "Products",
-        "therapists": "Therapists",
+        "browse": "Browse categories",
         "categories": "Categories",
-        "subcategories": "Subcategories"
+        "deals": "Deals",
+        "therapists": "Therapists",
+        "products": "Products"
       }
-    }
+    },
+    "searchClear": "Clear search"
   },
   "tabBar": {
     "label": "Primary",

@@ -204,6 +204,21 @@ one grouped Filter menu, with distinct tonal colours per status.
   confirmation. No rating badge until reviews exist (task ST-22).
 - **Location:** saved choice, then browser location (only if already granted or on user action),
   then Vercel IP, then none. Coordinates map to the nearest partner city within 75 km.
+- **Header search** (`SearchPanel` under the header field, task ST-38): focusing the field opens
+  a panel. Its first row names the visitor's location ("Near {city}", Change) or asks for one
+  ("Set your location to see what's near you"). With no query it lists the top categories. From 2
+  characters it shows, in order: matching categories and subcategories (text rows), Deals
+  (nearest first with distance when there are coordinates, else the visitor's city; when the
+  city has none, deals from other cities, nearest first, under "No deals in {city} yet. These are
+  from other states.", and Show all then has no count),
+  Therapists (nearest first), Products (not location bound); each a row with image, member, title,
+  place, distance and price, 4 per group. The footer "Show all results" opens `/explore?q=` and
+  carries the result count from the API. Change switches the panel to a location step: filter
+  the partner cities, pick one, or "Use my current location"; when the browser refuses or fails,
+  an error says so and points to the browser's location setting and the city list. Picking a
+  location re-runs the search for it and returns to the results. Combobox keyboard path: arrows
+  move through result rows, Enter opens one, Escape closes, Tab reaches Change and Show all. No
+  new API: existing `/catalog/deals`, `/catalog/therapists`, `/catalog/products`.
 - **Home:** hero with search, shop by category, deals near you (category tabs, distance sorted),
   how it works, therapists, offers, products, popular treatments, FAQ, partner banner.
 - **Offer card** (`sky-product-card price-first`, showcase "Offer card", to replace listing cards
