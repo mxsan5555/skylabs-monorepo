@@ -82,7 +82,7 @@ If pages render unstyled or an import 500s in dev, it's almost always a **stale
   - Raw `<sky-*-card>` tags in both apps (typed in `apps/msd/src/types/sky-elements.d.ts`).
 - **M3 surface components** (`sky-image`, `sky-tile-card`, `sky-feature-card`, `sky-cta-banner`) share one option vocabulary from `components/m3-surface.ts`, every value mapped to an M3 token (no brand values in the components): `color` = `none|surface|surface-high|primary|secondary|tertiary|inverse` (container + on-container + accent roles), `variant` = `filled|outlined|elevated`, `shape` = M3 corner scale `none…extra-large|full`, `icon` + `icon-style` (`filled|tonal|surface|plain`) + `icon-shape`. Linked surfaces use `md-ripple` + `md-focus-ring` (M3 state layer).
   - `sky-image` — framed image/logo (`fit="contain"`, `ratio`) with a placeholder icon when `src` is missing or fails; `href` makes it one link.
-  - `sky-tile-card` — icon + headline + text tile (category grids); `href` = whole-tile link.
+  - `sky-tile-card` — icon + headline + text tile (category grids); `href` = whole-tile link; a slotted `headline` holding a link (home category tiles) gets the same hover/press state layer.
   - `sky-feature-card` — icon + headline + text + CTA (`cta-label`/`cta-href`/`cta-icon`, accent-tinted `md-filled-button`) or an `actions` slot (its buttons take the card's accent role too); `layout="horizontal"` for a strip; optional `image`/`image-alt` (leading media, decorative without alt, placeholder if it fails to load) and `cta-color` (`primary|secondary|tertiary|inverse` button role).
   - `sky-cta-banner` — `sky-feature-card` preset to horizontal (stacks under 600px of its own width).
   - All four are raw tags in both apps (typed in `apps/msd/src/types/sky-elements.d.ts`). msd's `useShadowLinkNavigation` (in `AppRoutes`) routes same-origin shadow-DOM `href` clicks through React Router, so these links don't reload the page.
@@ -102,6 +102,9 @@ slide content is app-specific, so a wrapper would add surface for no reuse.
   base bundle). Then use raw `<swiper-container>` / `<swiper-slide>` tags.
 - **React (msd)**: tags work in JSX; `apps/msd/src/types/swiper-elements.d.ts` types them.
 - **Angular (mera-driver)**: the component needs `schemas: [CUSTOM_ELEMENTS_SCHEMA]`.
+- **Card carousels clip at `::part(container)`** (Swiper's inner `overflow: hidden`), not the
+  host: put room for hover shadows / focus rings in `swiper-container::part(container) { padding }`
+  and cancel it with a negative host margin (see `card-rail.css`, `.home-hero__carousel`).
 - **Theming is automatic**: `theme/base.css` maps `--swiper-theme-color` to
   `--md-sys-color-primary`, so pagination/scrollbar/arrows match each app's brand.
 - **Features are attributes** (`slides-per-view="auto"`, `space-between`, `loop`,
