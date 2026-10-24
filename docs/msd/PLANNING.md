@@ -219,7 +219,7 @@ one grouped Filter menu, with distinct tonal colours per status.
   location re-runs the search for it and returns to the results. Combobox keyboard path: arrows
   move through result rows, Enter opens one, Escape closes, Tab reaches Change and Show all. No
   new API: existing `/catalog/deals`, `/catalog/therapists`, `/catalog/products`.
-- **Home:** hero with search, shop by category, deals near you (category tabs, distance sorted),
+- **Home:** hero with search, deals by category (5x2 tile grid from 840px, 2 columns below), deals near you (category tabs, distance sorted),
   how it works, therapists, offers, products, popular treatments, FAQ, partner banner.
 - **Offer card** (`sky-product-card price-first`, showcase "Offer card", to replace listing cards
   page by page in task ST-31): tag on the image (New, Deal, Hot, Expire soon, each a theme role

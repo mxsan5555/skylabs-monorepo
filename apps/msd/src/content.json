@@ -295,7 +295,7 @@
     },
     "sections": {
       "browseByCategory": {
-        "heading": "Shop by category",
+        "heading": "Deals by category",
         "seeAll": "See all",
         "seeAllTo": "/explore"
       },
