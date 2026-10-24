@@ -130,17 +130,42 @@ mapPopularTag" (both pass alone).
   active row (ARIA element reflection on the inner combobox input);
   `sky-action-field clearable` clears and refocuses, default rendering unchanged. Checked at 1366
   and 390 px.
-- Explore: list and grid render offer and therapist cards; signed-out Add to cart goes to sign in
-  with the query kept (`search.test.tsx`); one (visually hidden) h1.
-- Category: a prerendered 404 renders not found on the first render; filter counts reload when
-  the city resolves (`category.test.tsx`).
 - Therapist detail (`therapist-detail.test.tsx`): type as h1, person and experience, Details and
   the location aside, the rail leaves out the current therapist; the price follows the chosen
   package; signed-out Add to cart goes to sign in; a 404 shows the not-found state.
 - One `<h1>` per page; prerendered `/` contains the hero `<h1>`, category links and JSON-LD; no
   hydration warnings; `sitemap.xml`, `robots.txt`, `llms.txt` written when `VITE_SITE_URL` is set.
-- Category page: pills set `?sub=`; sort and filters send the right API params; count shows
-  `meta.total`; page 2 requested on scroll; map hidden for products and therapists.
+- Category page (`category.test.tsx`): pills set `?sub=`; sort and filters send the right API
+  params; the count shows `meta.total` at the end of the chip row; page 2 requested on scroll;
+  map hidden for products and therapists; a prerendered 404 renders not found on the first
+  render; filter counts reload when the city resolves.
+- Card tags (ST-40, `offer-tag.test.ts`, `catalog.routes.test.ts`): a deal ending in 7 days or
+  less is Expire soon even when it is also hot, new or 30% off; ended deals get no Expire soon;
+  Hot needs the top 10% of paid lines in 30 days and at least 5 (4 lines → not hot; pending and
+  cancelled orders ignored); New is created within 14 days; Deal is 30% off or more (29% → none);
+  products never get Expire soon; `tags=hot,new` returns only items whose shown tag is one of
+  them; tag facet counts equal the filtered list totals; `tags=foo` → 422.
+- Catalog API for listings (ST-40, `catalog.routes.test.ts`): no new params → same items and
+  order as before plus `tag`; `products?categoryIds=` narrows; products facets return category,
+  tag and price counts, each ignoring its own selection; therapists `sort=price_asc` orders by
+  the lowest active package across pages (page 2 continues page 1); `distance` without
+  coordinates behaves like `relevance`; `radiusKm`, `city`, `vendorIds`, `branchIds`,
+  `minPrice` / `maxPrice` narrow and `meta.total` matches; therapist facets match the list.
+- Listing shell (ST-41, `filter-panel.test.tsx`, `chip-nav.test.tsx`, `category.test.tsx`): deals show Your location,
+  Distance, Price, Tags, Business, Branches; products show Category (on `/products`), Price and
+  Tags with no location or distance; therapists show Your location, Distance, Price, Business,
+  Branches; Clear all empties every filter param; a tag checkbox writes `?tag=` and the card
+  image shows the API tag with its theme role; no Reviews section.
+- Listing pages (ST-42, `listing-page.test.tsx`, `prerender/routes.test.ts`): `/deals`, `/deals/:city`, `/products`,
+  `/therapists` and `/therapists/:city` render one h1, breadcrumb, category chips as links to
+  `/category/:slug`, the count on the chip row and 12 cards then page 2 on scroll; unknown city
+  → not found and `noindex`; prerendered HTML holds the cards, ItemList and BreadcrumbList
+  JSON-LD and hydrates without warnings; `sitemap.xml` lists the new routes and only cities
+  with results. Checked at 1366 and 390 px, light and dark, no horizontal scroll at 320 px.
+- Explore (ST-43, `search.test.tsx`): kind chips All, Deals, Products, Therapists with counts set
+  `?kind=`; the filter panel follows the kind; list and grid render offer and therapist cards;
+  signed-out Add to cart goes to sign in with the query kept; one (visually hidden) h1;
+  `noindex, follow` and canonical `/explore`; `?category=` narrows to that category's kind.
 - axe (WCAG 2.2 AA) clean on `/` in light, dark and high-contrast; no horizontal scroll at 320,
   390, 768 and 1280 px; full keyboard path (skip link, header, panels, tab bar, footer); Lighthouse
   SEO and Accessibility 100 and LCP under 2.5 s on mobile for `/`.

@@ -1,7 +1,7 @@
 import { createElement, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { SkyColor } from '@skylabs-monorepo/shared-ui';
-import type { CatalogDeal, CatalogProduct } from '../../../api/catalog';
+import type { CatalogDeal, CatalogOfferTag, CatalogProduct } from '../../../api/catalog';
 import { showCartAdded, useAddProductToCart } from '../../../hooks/use-add-product-to-cart';
 import { useRequireSignIn } from '../../../hooks/use-require-sign-in';
 import { useWishlistToggle } from '../../../hooks/use-wishlist-toggle';
@@ -24,14 +24,23 @@ export interface OfferTag {
   tone?: 'filled' | 'tonal';
 }
 
-/** An item's first popular tag (Admin-managed) as the card's tonal tertiary tag. */
-export function popularTag(tags?: { name: string }[] | null): OfferTag | undefined {
-  const name = tags?.[0]?.name;
-  return name ? { label: name, color: 'tertiary', tone: 'tonal' } : undefined;
+/** Theme role per API card tag (PLANNING §4 D30); filled and tonal alternate so neighbours
+ *  stay apart where the roles are close in hue. */
+const TAG_ROLES: Record<CatalogOfferTag, Omit<OfferTag, 'label'>> = {
+  expire_soon: { color: 'error', tone: 'tonal' },
+  hot: { color: 'error' },
+  new: { color: 'tertiary', tone: 'tonal' },
+  deal: { color: 'primary' },
+};
+
+/** The card tag for an API `tag`, or undefined when the item has none. */
+export function offerTagFor(tag?: CatalogOfferTag | null): OfferTag | undefined {
+  return tag ? { label: t.tags[tag], ...TAG_ROLES[tag] } : undefined;
 }
 
 export interface OfferCardProps {
   item: OfferItem;
+  /** Overrides the item's own API tag (e.g. the home hero's Service / Product label). */
   tag?: OfferTag;
   color?: SkyColor;
   variant?: 'plain' | 'outlined';
@@ -51,6 +60,7 @@ export interface OfferCardProps {
  * distance when the API sent it (`divided`). Products keep their two-line description.
  */
 export function OfferCard({ item, tag, color, variant = 'plain', layout = 'vertical', rating, slider = false }: OfferCardProps) {
+  const shownTag = tag ?? offerTagFor(item.type === 'deal' ? item.deal.tag : item.product.tag);
   const navigate = useNavigate();
   const requireSignIn = useRequireSignIn();
   const addProductToCart = useAddProductToCart();
@@ -82,7 +92,7 @@ export function OfferCard({ item, tag, color, variant = 'plain', layout = 'verti
       price-first
       divided={isDeal}
       {...(!gallery && card.image ? { image: card.image, 'image-alt': card.imageAlt } : {})}
-      {...(tag ? { badge: tag.label, 'badge-color': tag.color, 'badge-tone': tag.tone ?? 'filled' } : {})}
+      {...(shownTag ? { badge: shownTag.label, 'badge-color': shownTag.color, 'badge-tone': shownTag.tone ?? 'filled' } : {})}
       heading={card.title}
       {...(description ? { description } : {})}
       {...(isDeal && card.providerName ? { eyebrow: card.providerName } : {})}

@@ -24,22 +24,22 @@ Monorepo-wide topics (shared packages, RBAC recipes, hosting): [`../README.md`](
 Follow the shared workflow in [`../README.md`](../README.md#how-to-work-on-a-feature-both-apps-people-and-claude-code):
 find the module below, then use its section number in every file. Example: customer block/unblock is module 3, so `PLANNING.md` §3, `DATABASE.md` §3, `API.md` §3, `TESTING.md` §4.3, `TASKS.md` §3.
 
-## Module status (2026-10-17)
+## Module status (2026-10-24)
 
 | # | Module | Built | Next | Tasks done |
 |---|---|---|---|---|
-| 1 | Admin and staff | OTP and Google sign-in, dynamic RBAC, role, user and audit screens, Login As | Enforce own scope, 14-key permission matrix, staff users, settings | 1 of 30 |
-| 2 | Members | Lifecycle (active, inactive, suspended, archived), documents with review, reminders and review flag, Remind now, member list and detail tabs, catalog CRUD | Own-scope routes, flat catalog routes, deal approval removal, signed document links | 30 of 87 |
-| 3 | Customers and orders | Cart, wishlist, checkout with Razorpay and COD, order history, support requests | Cancel, refund requests, customer block | 0 of 10 |
-| 4 | Storefront | Header, footer, tab bar, home, category page with filters, sorts and map, prerender and SEO files | Follow-ups ST-01 to ST-28 | 0 of 29 |
+| 1 | Admin and staff | OTP and Google sign-in, dynamic RBAC, role, user and audit screens, Login As | Enforce own scope, 14-key permission matrix, staff users, settings | 2 of 31 |
+| 2 | Members | Lifecycle (active, inactive, suspended, archived), documents with review, reminders and review flag, Remind now, member list and detail tabs, catalog CRUD | Own-scope routes, flat catalog routes, deal approval removal, signed document links | 32 of 87 |
+| 3 | Customers and orders | Cart, wishlist, checkout with Razorpay and COD, order history, support requests | Cancel, refund requests, customer block | 2 of 12 |
+| 4 | Storefront | Header with search panel, footer, tab bar, home, offer and therapist cards, category, deals, products, therapists and explore pages on one listing layout with card tags, deal and therapist detail pages, prerender and SEO files | Follow-ups in TASKS §4 (ST-01 onward) | 16 of 42 |
 | 5 | Static content | Blog, FAQs, legal pages, about, contact, how it works, careers screens and public APIs | `content` permission key, rich text sanitizing | 0 of 5 |
-| 6 | CTA banners | Promotions screen and public API | Write placement and editing rules | 0 of 1 |
-| 7 | Home slider | Home hero screen and public API | Write slide rules | 0 of 1 |
+| 6 | CTA banners | Promotions screen and public API | Write placement and editing rules | 4 of 5 |
+| 7 | Home slider | Home hero screen and public API | Write slide rules | 7 of 8 |
 | 8 | Masters | Categories, popular tags, popular treatments | Load the approved category tree | 0 of 1 |
 | 9 | Payments, payouts and reports | Razorpay payments, nine summary reports | Payouts, the six business reports, export | 0 of 11 |
 | 10 | Analytics | Not started | GA4, GTM, consent, events | 0 of 3 |
 | 11 | Social media | Social links screen, footer and JSON-LD | Write the wider scope | 0 of 1 |
-| 12 | Platform, security and release | CI gate, Vercel and Railway deploys | Hardening, OpenAPI coverage, security QA, release | 1 of 65 |
+| 12 | Platform, security and release | CI gate, Vercel and Railway deploys | Hardening, OpenAPI coverage, security QA, release | 7 of 69 |
 
 Current focus: finish the member release (pending before production: P10-43, P10-44, P10-45,
 P6-07), then customers, admin and staff, static content, CTA banners, home slider, analytics and

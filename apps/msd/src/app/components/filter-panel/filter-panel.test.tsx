@@ -24,6 +24,12 @@ const facets: CatalogDealFacets = {
     { km: 100, count: 6 },
   ],
   price: { min: 299, max: 3499 },
+  tags: [
+    { tag: 'expire_soon', count: 0 },
+    { tag: 'hot', count: 2 },
+    { tag: 'new', count: 4 },
+    { tag: 'deal', count: 1 },
+  ],
 };
 
 function baseProps(overrides: Partial<React.ComponentProps<typeof FilterPanel>> = {}) {
@@ -41,27 +47,88 @@ function baseProps(overrides: Partial<React.ComponentProps<typeof FilterPanel>> 
     onVendors: vi.fn(),
     branchIds: [],
     onBranches: vi.fn(),
+    tags: [],
+    onTags: vi.fn(),
     onClearAll: vi.fn(),
     copy,
     ...overrides,
   };
 }
 
+/** The md-checkbox whose `value` property (set by React, not reflected) is `value`. */
+const checkboxIn = (root: ParentNode, value: string) =>
+  (Array.from(root.querySelectorAll('md-checkbox')) as (HTMLElement & { checked: boolean; value: string })[]).find((c) => c.value === value) as HTMLElement & { checked: boolean };
+
 const accordionItems = () => Array.from(document.querySelectorAll('sky-accordion-item')) as (HTMLElement & { header?: string })[];
 
 describe('FilterPanel', () => {
-  it('renders a sky-accordion with all 5 sections for deals', () => {
+  it('renders a sky-accordion with all 6 sections for deals', () => {
     render(<FilterPanel {...baseProps()} />);
     expect(document.querySelector('sky-accordion')).toBeTruthy();
-    const items = accordionItems();
-    expect(items).toHaveLength(5);
-    expect(items.map((i) => i.header)).toEqual([
+    expect(accordionItems().map((i) => i.header)).toEqual([
+      copy.location.title,
+      copy.distance.title,
+      copy.price.title,
+      copy.tags.title,
+      copy.business.title,
+      copy.branches.title,
+    ]);
+  });
+
+  it('therapists: location, distance, price, business and branches; no tags (ST-41)', () => {
+    render(<FilterPanel {...baseProps({ kind: 'therapists' })} />);
+    expect(accordionItems().map((i) => i.header)).toEqual([
       copy.location.title,
       copy.distance.title,
       copy.price.title,
       copy.business.title,
       copy.branches.title,
     ]);
+  });
+
+  it('products with a category facet: category, price and tags; no location or distance (ST-41)', () => {
+    const onCategories = vi.fn();
+    render(
+      <FilterPanel
+        {...baseProps({
+          kind: 'products',
+          facets: { ...facets, categories: [{ id: 'c1', name: 'Skin', slug: 'skin', count: 3 }] },
+          categoryIds: [],
+          onCategories,
+        })}
+      />,
+    );
+    expect(accordionItems().map((i) => i.header)).toEqual([copy.category.title, copy.price.title, copy.tags.title]);
+    const box = checkboxIn(document.body, 'c1');
+    box.checked = true;
+    fireEvent.change(box);
+    expect(onCategories).toHaveBeenCalledWith(['c1']);
+  });
+
+  it('lists the four tags with counts and reports a picked tag (ST-41)', () => {
+    const onTags = vi.fn();
+    render(<FilterPanel {...baseProps({ onTags })} />);
+    const tagSection = accordionItems().find((i) => i.header === copy.tags.title) as HTMLElement;
+    expect(Array.from(tagSection.querySelectorAll('.checkbox-facet__label')).map((l) => l.textContent)).toEqual([
+      content.offerCard.tags.expire_soon,
+      content.offerCard.tags.hot,
+      content.offerCard.tags.new,
+      content.offerCard.tags.deal,
+    ]);
+    const hot = checkboxIn(tagSection, 'hot');
+    hot.checked = true;
+    fireEvent.change(hot);
+    expect(onTags).toHaveBeenCalledWith(['hot']);
+  });
+
+  it('all (explore): location, distance and price only (ST-43)', () => {
+    render(<FilterPanel {...baseProps({ kind: 'all' })} />);
+    expect(accordionItems().map((i) => i.header)).toEqual([copy.location.title, copy.distance.title, copy.price.title]);
+  });
+
+  it('has no Reviews section (no review system yet, ST-22)', () => {
+    render(<FilterPanel {...baseProps()} />);
+    expect(accordionItems().some((i) => /review/i.test(i.header ?? ''))).toBe(false);
   });
 
   it('shows the current city and calls onChangeLocation', () => {
@@ -101,10 +168,9 @@ describe('FilterPanel', () => {
     expect(document.body.textContent).toContain(copy.distance.needsLocation);
   });
 
-  it('renders only the Price section for products', () => {
+  it('products without a category facet: price and tags only', () => {
     render(<FilterPanel {...baseProps({ kind: 'products' })} />);
-    const items = accordionItems();
-    expect(items.map((i) => i.header)).toEqual([copy.price.title]);
+    expect(accordionItems().map((i) => i.header)).toEqual([copy.price.title, copy.tags.title]);
   });
 
   it('clears all filters', () => {

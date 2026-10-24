@@ -127,6 +127,11 @@ value and hash) is not built yet (task P5-16).
 No own tables; reads members' catalog (section 2), masters (section 8) and content (section 5)
 through `publicVisibleWhere()`.
 
+Card tags (D30) need no schema change: Expire soon reads `Deal.endDate`, New `createdAt`, Deal
+`Deal.discountPercent` / `Product.discount`, and Hot counts `OrderItem` lines (indexed on
+`dealId` and `productId`) whose `Order.status` is `CONFIRMED` or `COMPLETED`. `Product.badge`
+(member free text) is not a tag.
+
 ## 5. Static content
 
 | Model (table) | Columns | Relations | Unique / indexes |

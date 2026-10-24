@@ -142,8 +142,27 @@ first, then sends `therapistIds`.
   `detail-page/` (`DetailGallery`, `DetailPrice`, `DetailPurchase`, `BranchPanels`,
   `DetailNotFound`, shared `detail-page.css`) and `duration-package-selector.tsx` (one picker for
   deal and therapist packages). Deal and therapist detail pages compose these; no page CSS.
+- **Listing shell** (ST-41 to ST-43), `components/listing/`: `listing-params.ts`
+  (`useListingParams` reads and writes `sort`, `view`, `min`, `max`, `radius`, `vendor`, `branch`,
+  `tag`, `cat` with defensive parsing; `pickSort`, `sortOptionsFor` per kind, `countText`),
+  `listing-body.tsx` (`ListingBody`: toolbar with Filters / List-Grid-Map / Sort, `SidebarLayout`
+  + `FilterPanel`, `CardGrid` or `DealMap`, `LoadMore`, city picker), `listing-cards.tsx`
+  (`listingCards`, `listingNoun`) and `use-listing-facets.ts`. Pages own their data, heading,
+  chip row (`ChipNav` with the count as `end`) and SEO: `pages/category/` (subcategory pills),
+  `pages/listing/listing-page.tsx` (one `ListingPage kind` for `/deals`, `/products`,
+  `/therapists` and the city routes; chips are links to `/category/:slug`) and `pages/search/`
+  (explore: kind chips with one-row count requests; "All" pages deals, products and therapists
+  together, a full page of each, relevance only, location / distance / price filters with merged
+  facets). `FilterPanel kind="deals|products|therapists|all"` picks its sections; Category and
+  Tags are `CheckboxFacet`s. `ChipNav` items with `href` render as a `<nav>` of real links. Card
+  tags come from the API's `tag` through `offerTagFor()` in `offer-card/` (label from
+  `content.offerCard.tags`, theme role in code); an explicit `tag` prop still overrides it (home
+  hero). The old `pages/products/` and `pages/therapists/` pages were removed. `Seo noindex="follow"`
+  writes `noindex, follow` (explore).
 - **Prerender:** `nx run msd:prerender` renders `/`, every `/category/:slug` and
-  `/category/:slug/:city` (deal categories × partner cities) with `react-dom/server`, embeds the
+  `/category/:slug/:city` (deal categories × partner cities), `/deals`, `/deals/:city`,
+  `/products`, `/therapists` and `/therapists/:city` (partner cities with results;
+  `loadListingData` + `listingDataKey`, seeding `ListingPage`'s default view) with `react-dom/server`, embeds the
   page data as `#__MSD_DATA__`, and writes `sitemap.xml`, `robots.txt`, `llms.txt` (needs
   `VITE_SITE_URL`). `main.tsx` hydrates when `#root[data-prerendered]` exists. Vercel rewrites
   every non-API path to `/spa.html` (the untouched client shell). If the API is unreachable at
@@ -160,6 +179,16 @@ first, then sends `therapistIds`.
   in `services/catalog.service.ts` (keep `id` as the last tiebreak); distance work stays in the
   pure `services/deal-ranking.ts`; register static paths (`/deals/facets`) before `/deals/:id`;
   add the OpenAPI entry; widen `apps/msd/src/api/catalog.ts`; deploy the API before the frontend.
+- **Card tags (API):** `services/offer-tag.ts` (pure) holds the D30 thresholds, `offerTag(item,
+  hotIds, now)`, `hotIdsFrom(lines)` and `tagWhere` / `tagsWhere` (a Prisma `where` per tag with
+  the higher-priority tags excluded, so filter, count and card always agree; `offer-tag.test.ts`
+  checks the two against each other). `getHotIds(kind)` in `catalog.service.ts` groups paid
+  `OrderItem` lines of the last 30 days by `dealId` / `productId`, cached in memory for 10 minutes
+  (`clearHotCache()` for tests). Product facets: `services/product-facets.ts`.
+- **Therapist listing (API):** Prisma narrows by category, city/state, member and branch;
+  `services/therapist-ranking.ts` (pure, like `deal-ranking.ts`) adds the lowest package price
+  and distance, then filters by price and radius, sorts and pages in memory. Before ST-40 the
+  category page sorted therapists in the browser one page at a time, so page 2 broke the order.
 
 ## 5. Static content
 

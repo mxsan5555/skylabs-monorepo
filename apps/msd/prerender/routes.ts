@@ -1,11 +1,12 @@
 import { categoryHref, cityHref, citySlug } from '../src/catalog/catalog-shell';
 import type { ShellData } from '../src/prerender-data/loaders';
 
-/** One page to prerender. Category routes carry the slug, and city routes the city name and
- *  state the category page resolves from `shell.locations`. */
+/** One page to prerender. Category routes carry the slug, listing routes their kind, and city
+ *  routes the city name and state the page resolves from `shell.locations`. */
 export interface PrerenderRoute {
   path: string;
   slug?: string;
+  listing?: 'deals' | 'products' | 'therapists';
   city?: string;
   state?: string;
 }
@@ -13,8 +14,8 @@ export interface PrerenderRoute {
 /** Public, indexable pages listed in the sitemap whether or not they are prerendered. */
 export const STATIC_PUBLIC_PATHS = [
   '/',
-  '/explore',
   '/categories',
+  '/deals',
   '/products',
   '/therapists',
   '/blog',
@@ -29,16 +30,17 @@ export const STATIC_PUBLIC_PATHS = [
   '/cookies',
 ] as const;
 
-/** A city page with no deals is thin content: it is neither prerendered nor listed in the
+/** A city page with no results is thin content: it is neither prerendered nor listed in the
  *  sitemap (the SPA still serves it if someone links to it). */
-export function isEmptyCityPage(route: PrerenderRoute, data: { deals: readonly unknown[] }): boolean {
-  return !!route.city && data.deals.length === 0;
+export function isEmptyCityPage(route: PrerenderRoute, data: { deals?: readonly unknown[]; items?: readonly unknown[] }): boolean {
+  return !!route.city && (data.items ?? data.deals ?? []).length === 0;
 }
 
 const hasDeals = (type: string | null | undefined) => type !== 'PRODUCT' && type !== 'THERAPY';
 
-/** `/`, every `/category/<slug>`, and `/category/<slug>/<city>` for each deal category x unique
- *  city slug (first location wins, matching the category page's `locations.find`). */
+/** `/`, every `/category/<slug>`, `/category/<slug>/<city>` for each deal category x unique city
+ *  slug (first location wins, matching the category page's `locations.find`), then `/deals`,
+ *  `/products`, `/therapists` and `/deals/<city>`, `/therapists/<city>` (PLANNING §4). */
 export function buildRoutes(shell: ShellData): PrerenderRoute[] {
   const cities = new Map<string, { city: string; state: string }>();
   for (const { city, state } of shell.locations) {
@@ -50,6 +52,10 @@ export function buildRoutes(shell: ShellData): PrerenderRoute[] {
   for (const c of shell.categories) {
     if (!hasDeals(c.type)) continue;
     for (const { city, state } of cities.values()) routes.push({ path: cityHref(c.slug, city), slug: c.slug, city, state });
+  }
+  for (const listing of ['deals', 'products', 'therapists'] as const) routes.push({ path: `/${listing}`, listing });
+  for (const listing of ['deals', 'therapists'] as const) {
+    for (const { city, state } of cities.values()) routes.push({ path: `/${listing}/${citySlug(city)}`, listing, city, state });
   }
   return routes;
 }

@@ -95,7 +95,14 @@ async function main() {
     for (const route of bundle.buildRoutes(shell)) {
       let payload: PrerenderPayload;
       try {
-        if (!route.slug) {
+        if (route.listing) {
+          const data = await withTimeout(bundle.loadListingData(route.listing, route.city, route.state), timeoutMs, route.path);
+          if (bundle.isEmptyCityPage(route, data)) {
+            log(`${route.path}: no results in this city, skipped (not in the sitemap)`);
+            continue;
+          }
+          payload = { shell, [bundle.listingDataKey(route.listing, route.city)]: data };
+        } else if (!route.slug) {
           payload = { shell, home: await withTimeout(bundle.loadHomeData(), timeoutMs, route.path) };
         } else {
           const data = await withTimeout(bundle.loadCategoryData(route.slug, route.city, route.state), timeoutMs, route.path);

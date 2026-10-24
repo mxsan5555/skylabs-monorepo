@@ -417,86 +417,28 @@
   },
   "search": {
     "heading": "Explore deals, products and therapists",
-    "placeholder": "Search spas, treatments, locations…",
-    "ariaLabel": "Search deals",
-    "resultLabel": "results",
-    "noResults": "No results found. Try adjusting your filters.",
-    "emptySuggestion": "No spas found",
-    "view": {
-      "groupLabel": "Results view",
-      "list": "List view",
-      "grid": "Grid view",
-      "map": "Map view"
+    "description": "Search every deal, product and therapist from verified partners. Filter by distance, price and tag.",
+    "resultsFor": "Results for “{q}”",
+    "kindsLabel": "Result types",
+    "kindChip": "{label} ({count})",
+    "kinds": {
+      "all": "All",
+      "deals": "Deals",
+      "products": "Products",
+      "therapists": "Therapists"
     },
-    "filters": {
-      "price": {
-        "label": "Price",
-        "min": 499,
-        "max": 15000,
-        "activeLabel": "Price (up to {price})",
-        "priceLevels": [
-          {
-            "value": "$",
-            "label": "Budget (₹499–₹1,499)"
-          },
-          {
-            "value": "$$",
-            "label": "Mid-range (₹1,500–₹4,999)"
-          },
-          {
-            "value": "$$$",
-            "label": "Premium (₹5,000+)"
-          }
-        ],
-        "dialogTitle": "Filter by Price",
-        "priceUpTo": "Price up to:",
-        "clear": "Clear",
-        "apply": "Apply"
-      },
-      "suggested": {
-        "label": "Suggested"
-      },
-      "category": {
-        "label": "Category",
-        "dialogTitle": "Select Category",
-        "ariaLabel": "Category",
-        "all": "All categories",
-        "clear": "Clear",
-        "apply": "Apply",
-        "browseAll": "Browse all categories →"
-      },
-      "location": {
-        "label": "Location",
-        "dialogTitle": "Filter by Location",
-        "stateLabel": "State",
-        "stateAll": "All states",
-        "cityLabel": "City",
-        "cityAll": "All cities",
-        "clear": "Clear",
-        "apply": "Apply"
-      },
-      "clearAll": "Clear filters"
+    "resultsAriaLabel": "Search results",
+    "resultCount": {
+      "singular": "result",
+      "plural": "results"
     },
-    "results": {
-      "listAriaLabel": "Search results list",
-      "gridAriaLabel": "Search results grid",
-      "mapAriaLabel": "Search results map",
-      "mapImageLabel": "Map showing deal locations",
-      "mapResultsSuffix": "results in view"
+    "empty": {
+      "heading": "No results found",
+      "subheading": "Try another search or clear the filters."
     },
-    "labels": {
-      "addToCart": "Add to Cart",
-      "service": "Deal",
-      "product": "Product",
-      "durationSuffix": "min",
-      "book": "Book",
-      "removeWishlist": "Remove from wishlist",
-      "saveWishlist": "Save to wishlist",
-      "therapist": "Therapist"
-    },
-    "loading": {
-      "deals": "Loading deals…",
-      "categories": "Loading categories…"
+    "breadcrumb": {
+      "home": "Home",
+      "explore": "Explore"
     },
     "errors": {
       "loadDeals": "Could not load deals."
@@ -519,6 +461,14 @@
       {
         "value": "distance",
         "label": "Distance: Nearest"
+      },
+      {
+        "value": "newest",
+        "label": "Newest"
+      },
+      {
+        "value": "discount",
+        "label": "Biggest discount"
       }
     ],
     "view": {
@@ -597,8 +547,8 @@
       "clearAll": "Clear all",
       "showMore": "Show more",
       "showLess": "Show less",
-      "countOne": ", 1 deal",
-      "countMany": ", {count} deals",
+      "countOne": ", 1 result",
+      "countMany": ", {count} results",
       "location": {
         "title": "Your location",
         "notSet": "Not set",
@@ -616,6 +566,14 @@
         "max": "Max",
         "minLabel": "Minimum price",
         "maxLabel": "Maximum price"
+      },
+      "category": {
+        "title": "Category",
+        "search": "Search categories"
+      },
+      "tags": {
+        "title": "Tags",
+        "search": "Search tags"
       },
       "business": {
         "title": "Business",
@@ -843,7 +801,13 @@
     "distance": "{km} km",
     "discount": "-{percent}%",
     "serviceTag": "Service",
-    "productTag": "Product"
+    "productTag": "Product",
+    "tags": {
+      "expire_soon": "Expire soon",
+      "hot": "Hot",
+      "new": "New",
+      "deal": "Deal"
+    }
   },
   "gallery": {
     "previous": "Previous image of {title}",
@@ -1235,53 +1199,6 @@
     "vendorLabel": "Continue as Vendor"
   },
   "products": {
-    "listing": {
-      "title": "Wellness Products",
-      "subtitle": "Oils, creams, masks and kits — shop top-rated skincare and wellness products.",
-      "loading": "Loading products…",
-      "searchLabel": "Search",
-      "resultsAriaLabel": "Product results",
-      "filterAriaLabel": "Search and sort products",
-      "addToCart": "Add to Cart",
-      "addToCartSuccess": "Added \"{item}\" to your cart.",
-      "addToCartError": "Could not add to cart.",
-      "offSuffix": "OFF",
-      "filters": {
-        "all": "All",
-        "day": "Day",
-        "night": "Night",
-        "skinCare": "Skin Care"
-      },
-      "errors": {
-        "load": "Could not load products."
-      },
-      "breadcrumb": {
-        "home": "Home",
-        "products": "Products"
-      },
-      "sortOptions": [
-        {
-          "value": "popular",
-          "label": "Popularity"
-        },
-        {
-          "value": "price-asc",
-          "label": "Price: Low to High"
-        },
-        {
-          "value": "price-desc",
-          "label": "Price: High to Low"
-        },
-        {
-          "value": "newest",
-          "label": "Newest"
-        }
-      ],
-      "sortLabel": "Sort by",
-      "resultLabel": "products",
-      "emptyHeading": "No products found",
-      "emptySubheading": "Try selecting a different category or check back later."
-    },
     "detail": {
       "loading": "Loading product…",
       "addToCart": "Add to Cart",
@@ -1326,10 +1243,6 @@
       "accordionHowToUse": "How To Use",
       "accordionIngredients": "Ingredients",
       "accordionReturn": "Return / Refund Policy"
-    },
-    "meta": {
-      "listingTitle": "Wellness Products | MSD – MySpaDeal",
-      "listingDescription": "Shop massage oils, face masks, body scrubs, aromatherapy sets and wellness kits from top Indian wellness brands."
     }
   },
   "categories": {
@@ -1354,25 +1267,6 @@
     "subcategory": {
       "singular": "subcategory",
       "plural": "subcategories"
-    }
-  },
-  "therapists": {
-    "path": "/therapists",
-    "metaTitle": "Therapists | MSD",
-    "metaDescription": "Browse therapists directly and book their own duration and price packages. No deal required.",
-    "breadcrumb": {
-      "home": "Home",
-      "therapists": "Therapists"
-    },
-    "title": "Therapists",
-    "subtitle": "Browse our therapists and book their own duration and price packages directly.",
-    "loading": "Loading therapists…",
-    "empty": {
-      "title": "No therapists yet",
-      "description": "Check back soon."
-    },
-    "errors": {
-      "load": "Could not load therapists."
     }
   },
   "invoice": {
@@ -1929,6 +1823,40 @@
       "metaTitle": "Application received · MSD",
       "heading": "Application received",
       "text": "Thanks for applying to become a member on MySpaDeal. Our team reviews your business details and contacts you by email or phone once they are verified. You do not need to do anything else right now."
+    }
+  },
+  "listingPages": {
+    "deals": {
+      "title": "Spa and wellness deals",
+      "description": "Every massage, spa and beauty deal from verified partners in one place. Filter by distance, price and tag, or pick a category.",
+      "cityTitle": "Spa and wellness deals in {city}",
+      "cityDescription": "Massage, spa and beauty deals from verified partners in {city}. Compare prices, check the distance and book online.",
+      "breadcrumb": "Deals",
+      "chipsLabel": "Deal categories",
+      "all": "All deals",
+      "ariaLabel": "Deal results"
+    },
+    "products": {
+      "title": "Wellness products",
+      "description": "Oils, creams, masks and kits from our partner spas and salons. Filter by category, price and tag.",
+      "breadcrumb": "Products",
+      "chipsLabel": "Product categories",
+      "all": "All products",
+      "ariaLabel": "Product results",
+      "empty": {
+        "heading": "No products found",
+        "subheading": "Try another category or clear the filters."
+      }
+    },
+    "therapists": {
+      "title": "Therapists",
+      "description": "Book a therapist directly and pick a package by session length and price. Filter by distance, price and business.",
+      "cityTitle": "Therapists in {city}",
+      "cityDescription": "Book massage and wellness therapists in {city} directly, with a price for each session length.",
+      "breadcrumb": "Therapists",
+      "chipsLabel": "Therapy categories",
+      "all": "All therapists",
+      "ariaLabel": "Therapist results"
     }
   }
 }

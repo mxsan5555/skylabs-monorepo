@@ -132,7 +132,8 @@ No hex values in app code; brand colour comes from each app's generated M3 theme
 | `PageSection` | Full-bleed band (`tone="surface"` or `"tint"`, `flush`, `stack`) + 1280px / 16px container. Every page section uses it. |
 | `SectionHead` | Section header row (h2, or `as="h1"` for a page title), subheading (string or node), See all link, actions. |
 | `CardRail` / `CardGrid` | Swiper carousel / responsive grid (272px min columns, `layout="list"` one per row; `above`, `panel` tabpanel, `fallback`). |
-| `ChipNav` | Single-select pill row (`md-filter-chip`), scrolls sideways on phones. |
+| `ChipNav` | Single-select pill row (`md-filter-chip`), or a `<nav>` of real links when items have `href` (category chips); `end` = the result count at the row end. Scrolls sideways on phones. |
+| `listing/` | `ListingBody` (toolbar, filter panel, grid or map, load more), `useListingParams` (URL state), `listingCards`, `useListingFacets`: the shared results band of category, `/deals`, `/products`, `/therapists` and explore. |
 | `ClampText` | Two-line clamped description with More / Less. |
 | `ListingToolbar` | Toolbar row above a listing (`start` / `end` slots). |
 | `ChoiceMenu` | Trigger (assist chip or text button) + `md-menu` of single choices (sort). |
@@ -152,10 +153,13 @@ Hooks: `usePagedList` (page-by-page lists keyed by the filter set, seeded from p
 coordinates, also drives the header "Set location"), `useCustomEvent` (listen to `sky-*` / `md-*`
 events on elements React hydrated from prerendered HTML).
 
-**Category page** (`/category/:slug`, `/category/:slug/:city`): h1 + total (`meta.total`),
-clamped description, subcategory pills, toolbar (Filters, List/Grid/Map, Sort: Relevance, Price
-low-high / high-low, Distance when the visitor has coordinates), filter panel, 12 cards per page.
-All view state is in the URL: `sub`, `sort`, `view`, `radius`, `vendor`, `branch`, `min`, `max`.
+**Listing pages** (category `/category/:slug[/:city]`, `ListingPage` for `/deals[/:city]`,
+`/products`, `/therapists[/:city]`, explore `/explore`): h1, description, chip row with the total
+(`meta.total`) at its end, toolbar (Filters, List/Grid/Map, Sort per kind), filter panel per kind
+(deals: location, distance, price, tags, business, branches; products: category on `/products`,
+price, tags; therapists: deals minus tags; explore "All": location, distance, price), 12 cards per
+page. Card images carry the API's tag (New, Deal, Hot, Expire soon). All view state is in the
+URL: `sub`, `sort`, `view`, `radius`, `vendor`, `branch`, `min`, `max`, `tag`, `cat`, `kind`.
 No ratings anywhere until a review system exists.
 
 **Maps:** `DealMap` lazy-loads its engine only when a map view opens. `VITE_MAP_PROVIDER=leaflet`
@@ -167,8 +171,12 @@ No ratings anywhere until a review system exists.
 `GET /deals` (`sort=relevance|price_asc|price_desc|distance|newest|discount`, `vendorIds`,
 `branchIds` comma lists, `radiusKm` with `latitude`/`longitude`, `minPrice`/`maxPrice`, paging
 with `meta.total`), `GET /deals/facets` (vendor / branch / distance-bucket counts + price range,
-each facet ignoring its own selection), `GET /products` (price sorts), `GET /therapists`. With
-coordinates the deal list is ranked in memory (`services/deal-ranking.ts`).
+each facet ignoring its own selection, plus tag counts), `GET /products` (sorts, `categoryIds`,
+`tags`) + `GET /products/facets`, `GET /therapists` (server-side `sort`, price = lowest package,
+`radiusKm`, `city`, `vendorIds`, `branchIds`) + `GET /therapists/facets`. Deals and products carry
+a computed `tag` (`services/offer-tag.ts`, rule in `docs/msd/PLANNING.md` §4) and accept `tags=`.
+With coordinates the deal and therapist lists are ranked in memory (`deal-ranking.ts`,
+`therapist-ranking.ts`).
 
 **Testing gotchas (msd, Vitest + jsdom):**
 - `@lit/react` resolves to its Node/SSR build under Vitest, so shared-ui React **wrappers**
