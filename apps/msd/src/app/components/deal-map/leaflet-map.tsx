@@ -53,9 +53,35 @@ export default function LeafletMap({ points }: { points: DealMapPoint[] }) {
       const icon = L.divIcon({ className: 'deal-map__marker-host', html: markerHtml(point), iconSize: MARKER_SIZE });
       L.marker([point.lat, point.lng], { icon, keyboard: false, riseOnHover: true }).addTo(layer);
     }
-    if (points.length === 1) map.setView([points[0].lat, points[0].lng], 14);
-    else map.fitBounds(L.latLngBounds(points.map((p) => [p.lat, p.lng] as L.LatLngTuple)), { padding: [48, 48] });
-  }, [points]);
+ const validPoints = points.filter(
+  (point) =>
+    Number.isFinite(point.lat) &&
+    Number.isFinite(point.lng) &&
+    point.lat >= -90 &&
+    point.lat <= 90 &&
+    point.lng >= -180 &&
+    point.lng <= 180,
+);
+
+if (validPoints.length === 0) return;
+
+const bounds = L.latLngBounds(
+  validPoints.map(
+    (point) => [point.lat, point.lng] as L.LatLngTuple,
+  ),
+);
+
+if (validPoints.length === 1 || bounds.getNorthEast().equals(bounds.getSouthWest())) {
+  map.setView(
+    [validPoints[0].lat, validPoints[0].lng],
+    13,
+  );
+} else {
+  map.fitBounds(bounds, {
+    padding: [48, 48],
+    maxZoom: 13,
+  });
+} }, [points]);
 
   return <div ref={container} className="deal-map__canvas" />;
 }

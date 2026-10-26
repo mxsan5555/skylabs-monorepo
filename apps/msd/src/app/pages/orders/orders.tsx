@@ -69,15 +69,13 @@ export function Orders() {
           </FilterChip>
         </ChipSet>
       </div>
-      <CardGrid layout="list" fallback={fallback}>
-        {filteredOrders.map((order) => (
-          <CustomerOrderCard
-            key={order.id}
-            order={order}
-            onViewDetails={(selectedOrder) => navigate(`/orders/${selectedOrder.id}`)}
-          />
-        ))}
-      </CardGrid>
+    <div className="customer-orders-list">
+  <CardGrid layout="list" fallback={fallback}>
+    {filteredOrders.map((order) => (
+      <CustomerOrderCard key={order.id} order={order} />
+    ))}
+  </CardGrid>
+</div>
     </>
   );
 }

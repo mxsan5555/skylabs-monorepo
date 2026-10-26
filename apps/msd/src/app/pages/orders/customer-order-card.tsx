@@ -1,75 +1,74 @@
-import { OutlinedButton } from '@skylabs-monorepo/shared-ui/react';
-import type { Order } from '../../../api/orders';
-import { Icon } from '@skylabs-monorepo/shared-ui/react';
-import { ProductOrderTimeline } from './product-order-timeline';
-interface CustomerOrderCardProps {
-    order: Order;
-    onViewDetails: (order: Order) => void;
-}
-function formatDate(date: string): string {
-    return new Date(date).toLocaleDateString('en-IN', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-    });
-}
-function formatAmount(amount: string): string {
-    return `₹${Number(amount).toLocaleString('en-IN')}`;
-}
-function getStatusLabel(status: Order['status']): string {
-    return status.replace('_', ' ');
-}
-export function CustomerOrderCard({
-    order,
-    onViewDetails,
-}: CustomerOrderCardProps) {
-    //   const shortOrderId = order.id.slice(0, 8);
-    return (
-        <>
-            {/* NEW CARD */}
-            <sky-tile-card  >
-                <div className="customer-order-card-new">
-                    {order.items?.[0]?.image && (
-                        <img
-                            className="customer-order-card-new__image"
-                            src={order.items[0].image}
-                            alt={order.items[0].itemName ?? 'Order item'}
-                            width={120}
-                            height={120}
-                            loading="lazy"
-                        />
-                    )}
-                    <div className="customer-order-card-new__content">
-                        <div className="customer-order-card-new__top">
-                            <div>
-                                <p className="customer-order-card-new__eyebrow">Order</p>
-                                <h3 className="customer-order-card-new__title">Order #{order.id}</h3>
-                                <p className="customer-order-card-new__date">{formatDate(order.createdAt)}</p>
-                            </div>
-                            <sky-badge>{getStatusLabel(order.status)}</sky-badge>
-                        </div>
-                        <div className="customer-order-card-new__items">
-                            {order.items?.map((item) => (
-                                <div key={item.id} className="customer-order-card-new__item">
-                                    <span>{item.itemName}</span>
-                                    <span>Qty: {item.quantity}</span>
-                                    <strong>{formatAmount(item.lineTotal)}</strong>
-                                </div>
-                            ))}
-                        </div>
-                     
 
-                        {/* {order.type === 'PRODUCT' && (
-                            <ProductOrderTimeline status={order.status} />
-                        )} */}
-                        <div className="customer-order-card-new__bottom">
-                            <strong className="customer-order-card-new__total">Total: {formatAmount(order.total)}</strong>
-                            <OutlinedButton onClick={() => onViewDetails(order)}>View Details</OutlinedButton>
-                        </div>
-                    </div>
-                </div>
-            </sky-tile-card>
-        </>
-    );
+import type { Order } from '../../../api/orders';
+import { formatINR } from '../../../utils/format';
+
+interface CustomerOrderCardProps {
+  order: Order;
 }
+
+function formatDate(date: string): string {
+  return new Date(date).toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+function formatStatus(status: string): string {
+  return status.replace(/_/g, ' ');
+}
+
+function getBadgeColor(
+  status: Order['status'],
+): 'error' | 'tertiary' | 'primary' {
+  if (status === 'CANCELLED') return 'error';
+  if (status === 'PENDING_PAYMENT') return 'tertiary';
+  return 'primary';
+}
+
+export function CustomerOrderCard({ order }: CustomerOrderCardProps) {
+  const items = order.items ?? [];
+  const firstItem = items[0];
+  const imageItem = items.find((item) => item.image);
+  const paidPayment = order.payments?.find(
+    (payment) => payment.status === 'PAID',
+  );
+  const latestPayment = order.payments?.[0];
+
+  const paymentStatus = paidPayment
+    ? 'PAID'
+    : latestPayment?.status ?? 'PAYMENT PENDING';
+
+  const itemSummary = firstItem
+    ? `${firstItem.itemName} · Qty: ${firstItem.quantity}${
+        items.length > 1 ? ` · +${items.length - 1} more item(s)` : ''
+      }`
+    : `${items.length} items`;
+const orderDetails = [
+  order.type === 'PRODUCT' ? 'Product order' : 'Service order',
+  itemSummary,
+  `Placed on ${formatDate(order.createdAt)}`,
+  `Payment: ${formatStatus(paymentStatus)}`,
+].join('\n');
+  return (
+    <sky-product-card
+      layout="horizontal"
+      variant="outlined"
+      {...(imageItem?.image
+        ? {
+            image: imageItem.image,
+            imageAlt: imageItem.itemName ?? 'Order item',
+          }
+        : {})}
+      heading={`Order #${order.id}`}
+      eyebrow={order.vendorNameSnapshot || 'Vendor'}
+      description={orderDetails}
+      badge={formatStatus(order.status)}
+      badgeColor={getBadgeColor(order.status)}
+      price={formatINR(Number(order.total))}
+      href={`/orders/${order.id}`}
+    />
+  );
+}
+
 export default CustomerOrderCard;
