@@ -147,6 +147,27 @@ export interface Vendor extends Omit<VendorFields, 'businessName'> {
   };
 }
 
+export interface VendorApplicationInput {
+  businessName: string;
+  businessEmail: string;
+  businessPhone: string;
+  ownerFirstName: string;
+  ownerLastName: string;
+  ownerEmail: string;
+  ownerMobile: string;
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
+}
+
+export interface VendorApplicationResponse {
+  id: string;
+  status: 'PENDING' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
+  message: string;
+  createdAt: string;
+}
+
 export type VendorCreateInput = VendorFields & { ownerUserId?: string };
 export type VendorUpdateInput = Partial<VendorCreateInput>;
 export type VendorSelfInput = Partial<VendorFields> & Pick<VendorFields, 'businessName'>;

@@ -11,18 +11,21 @@ import { prisma } from '../lib/prisma';
 
 const prismaMock = vi.mocked(prisma, true);
 
-// `vendorPublicRegisterRateLimiter` keys on ip+ownerEmail/ownerMobile and its in-memory store is
-// not reset between tests in this file, so every test gets its own ownerEmail. Only the
-// dedicated rate-limit test reuses one key on purpose.
 let emailCounter = 0;
 function uniqueBody(overrides: Record<string, unknown> = {}) {
   emailCounter += 1;
   return {
     businessName: 'Sunrise Spa',
+    businessEmail: `hello${emailCounter}@example.com`,
+    businessPhone: '9876543210',
     ownerFirstName: 'Asha',
     ownerLastName: 'Rao',
     ownerEmail: `asha${emailCounter}@example.com`,
     ownerMobile: '9876543210',
+    address: '12 Market Road',
+    city: 'Gorakhpur',
+    state: 'Uttar Pradesh',
+    pincode: '273001',
     ...overrides,
   };
 }
@@ -31,45 +34,64 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-/**
- * Feature: Public "Become a Vendor" registration is closed (decision D9).
- * Staff create every member, so the public endpoint refuses with 403 and a "contact our team"
- * message. It still exists so the `/become-vendor` page gets a clear answer, and it still sits
- * behind its rate limiter.
- */
 describe('POST /api/v1/vendors/public/register', () => {
-  it('refuses with 403 and the contact-our-team message, with no Authorization header', async () => {
+  it('accepts a valid application and stores it without creating a user or vendor', async () => {
+    prismaMock.vendorApplication.create.mockResolvedValue({
+      id: 'app-1',
+      status: 'PENDING',
+      createdAt: new Date('2024-01-01T00:00:00.000Z'),
+    });
+
     const res = await request(app).post('/api/v1/vendors/public/register').send(uniqueBody());
 
-    expect(res.status).toBe(403);
-    expect(res.body.data).toBeNull();
-    expect(res.body.error.code).toBe('FORBIDDEN');
-    expect(res.body.error.message).toBe(
-      'Member accounts are created by our team. Please contact us and we will set up your account.',
+    expect(res.status).toBe(201);
+    expect(res.body.data).toMatchObject({
+      id: 'app-1',
+      status: 'PENDING',
+      message: 'Your application has been submitted successfully. Our team will review it and contact you.',
+    });
+    expect(prismaMock.vendorApplication.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          businessName: 'Sunrise Spa',
+          ownerEmail: 'asha1@example.com',
+          pincode: '273001',
+        }),
+      }),
     );
-  });
-
-  it('creates no User, Member, role grant or audit row', async () => {
-    await request(app).post('/api/v1/vendors/public/register').send(uniqueBody());
-
-    expect(prismaMock.user.findFirst).not.toHaveBeenCalled();
     expect(prismaMock.user.create).not.toHaveBeenCalled();
     expect(prismaMock.member.create).not.toHaveBeenCalled();
-    expect(prismaMock.userRole.upsert).not.toHaveBeenCalled();
     expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
   });
 
-  it('refuses even a body that tries to send privileged fields', async () => {
+  it('rejects missing required fields', async () => {
     const res = await request(app)
       .post('/api/v1/vendors/public/register')
-      .send(uniqueBody({ createdByUserId: 'admin-1', ownerUserId: 'admin-1', status: 'ACTIVE', role: 'admin' }));
+      .send({ businessName: 'Sunrise Spa' });
 
-    expect(res.status).toBe(403);
-    expect(prismaMock.member.create).not.toHaveBeenCalled();
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(res.body.error.details.fieldErrors).toHaveProperty('businessEmail');
+  });
+
+  it('rejects malformed email, mobile and pincode values', async () => {
+    const res = await request(app)
+      .post('/api/v1/vendors/public/register')
+      .send(
+        uniqueBody({
+          businessEmail: 'not-an-email',
+          businessPhone: '123',
+          ownerMobile: '123',
+          pincode: '12345',
+        }),
+      );
+
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
   });
 
   it('rate-limits repeated attempts for the same identity (5/10min, same wiring as otpRequestRateLimiter)', async () => {
-    const body = uniqueBody(); // one fixed identity, reused for every call below on purpose
+    const body = uniqueBody();
     let lastStatus = 0;
     for (let i = 0; i < 6; i++) {
       const res = await request(app).post('/api/v1/vendors/public/register').send(body);

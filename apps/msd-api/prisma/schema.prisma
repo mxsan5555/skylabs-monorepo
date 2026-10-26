@@ -1,6 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
-  output   = "../src/generated/prisma-client"
+  provider      = "prisma-client-js"
+  output        = "../src/generated/prisma-client"
   // "native" covers the local dev OS; "debian-openssl-3.0.x" is the Railway/Nixpacks runtime, so a
   // Linux query-engine is always generated for the deployed host (harmless locally).
   binaryTargets = ["native", "debian-openssl-3.0.x"]
@@ -43,6 +43,37 @@ model User {
   @@index([status])
 }
 
+enum VendorApplicationStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+model VendorApplication {
+  id             String                  @id @default(uuid())
+  businessName   String
+  businessEmail  String
+  businessPhone  String
+  ownerFirstName String
+  ownerLastName  String
+  ownerEmail     String
+  ownerMobile    String
+  address        String
+  city           String
+  state          String
+  pincode        String
+  status         VendorApplicationStatus @default(PENDING)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([ownerEmail])
+  @@index([ownerMobile])
+  @@index([businessEmail])
+}
+
 model SupportRequest {
   id         String   @id @default(uuid())
   customerId String
@@ -56,7 +87,6 @@ model SupportRequest {
   @@index([customerId])
   @@index([createdAt])
 }
-
 
 model Role {
   id               String                @id @default(uuid())
@@ -236,25 +266,25 @@ model LoginHistory {
 }
 
 model ImpersonationSession {
-  id               String    @id @default(uuid())
+  id               String   @id @default(uuid())
   superAdminUserId String
   targetUserId     String
-  startedAt        DateTime  @default(now())
-  previewTokenJti  String    @unique
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  superAdmin       User      @relation("ImpersonationSuperAdmin", fields: [superAdminUserId], references: [id], onDelete: Cascade)
-  target           User      @relation("ImpersonationTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  startedAt        DateTime @default(now())
+  previewTokenJti  String   @unique
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  superAdmin       User     @relation("ImpersonationSuperAdmin", fields: [superAdminUserId], references: [id], onDelete: Cascade)
+  target           User     @relation("ImpersonationTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
 
   @@index([superAdminUserId])
   @@index([targetUserId])
 }
 
 model Member {
-  id                         String                 @id @default(uuid())
+  id                         String                   @id @default(uuid())
   /// The User who logs in and manages this business. Null until an admin-created
   /// vendor is claimed, or set immediately on self-registration (== req.user.sub).
-  ownerUserId                String?                @unique
+  ownerUserId                String?                  @unique
   /// Nullable: the admin-create pipeline persists a Vendor after Step 1 (Vendor User)
   /// with only ownerUserId set, before Business Details (Step 2) is filled in.
   businessName               String?
@@ -275,8 +305,8 @@ model Member {
   state                      String?
   country                    String?
   pincode                    String?
-  latitude                   Decimal?               @db.Decimal(10, 6)
-  longitude                  Decimal?               @db.Decimal(10, 6)
+  latitude                   Decimal?                 @db.Decimal(10, 6)
+  longitude                  Decimal?                 @db.Decimal(10, 6)
   /// User-pasted Google Maps share URL (e.g. `https://maps.app.goo.gl/...`) — the source the
   /// admin/vendor actually edits. `latitude`/`longitude` above remain the persisted, queried
   /// coordinates, resolved server-side from this URL on create/update (see
@@ -291,14 +321,14 @@ model Member {
   /// KYC documents are now actual uploaded files (see `VendorDocument`); this column is kept
   /// read-only for backward compatibility with any vendor onboarded before that existed.
   kycDocuments               Json?
-  kycStatus                  KycStatus              @default(PENDING)
+  kycStatus                  KycStatus                @default(PENDING)
   kycRejectionReason         String?
   bankAccountHolder          String?
   bankName                   String?
   bankAccountNumber          String?
   bankIfsc                   String?
   upiId                      String?
-  status                     MemberStatus           @default(ACTIVE)
+  status                     MemberStatus             @default(ACTIVE)
   /// Reason recorded on inactive, suspend and archive. Cleared when the member becomes ACTIVE.
   statusReason               String?
   statusChangedAt            DateTime?
@@ -313,19 +343,19 @@ model Member {
   documentReminders          MemberDocumentReminder[]
   /// Admin who created this vendor profile, if admin-created (self-registration leaves this null).
   createdByUserId            String?
-  createdAt                  DateTime               @default(now())
-  updatedAt                  DateTime               @updatedAt
+  createdAt                  DateTime                 @default(now())
+  updatedAt                  DateTime                 @updatedAt
   /// Public storefront URL slug (`/vendors/:slug`). Nullable — existing rows predate this
   /// column; backfilled once in seed.ts, never required at the DB level to avoid a
   /// backfill-before-migrate step. Unique so two vendors can never collide on one slug.
-  slug                       String?                @unique
-  offersProduct              Boolean                @default(false)
+  slug                       String?                  @unique
+  offersProduct              Boolean                  @default(false)
   /// Business module flags — kept explicit rather than derived from `categoryAccess` existing so
   /// "module checked, no category chosen yet" remains representable (a distinct validation state
   /// from "module not offered at all"). Set together with `categoryAccess` via
   /// `setVendorModulesAndCategoryAccess` (vendor.service.ts).
-  offersService              Boolean                @default(false)
-  offersTherapy              Boolean                @default(false)
+  offersService              Boolean                  @default(false)
+  offersTherapy              Boolean                  @default(false)
   addressLine2               String?
   ownerFirstName             String?
   ownerLastName              String?
@@ -335,7 +365,7 @@ model Member {
   orderItems                 OrderItem[]
   products                   Product[]
   therapists                 Therapist[]
-  owner                      User?                  @relation("VendorOwner", fields: [ownerUserId], references: [id])
+  owner                      User?                    @relation("VendorOwner", fields: [ownerUserId], references: [id])
   categoryAccess             VendorCategoryAccess[]
   documents                  MemberDocument[]
   mediaImages                VendorImage[]
@@ -458,7 +488,7 @@ model VendorVideo {
 }
 
 model Branch {
-  id             String      @id @default(uuid())
+  id             String                 @id @default(uuid())
   vendorId       String
   name           String
   address        String?
@@ -466,21 +496,21 @@ model Branch {
   state          String?
   country        String?
   pincode        String?
-  latitude       Decimal?    @db.Decimal(10, 6)
-  longitude      Decimal?    @db.Decimal(10, 6)
+  latitude       Decimal?               @db.Decimal(10, 6)
+  longitude      Decimal?               @db.Decimal(10, 6)
   /// User-pasted Google Maps share URL — see Vendor.mapLocationUrl's doc comment for the full
   /// rationale (identical here).
   mapLocationUrl String?
   phone          String?
   email          String?
-  isActive       Boolean     @default(true)
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  isActive       Boolean                @default(true)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
   /// Loosely-structured weekly hours, e.g. {"mon":"09:00-20:00",...,"sun":"closed"} — same
   /// no-upload-pipeline-style Json field as Vendor.kycDocuments/Deal.images. Nullable: existing
   /// seeded branches predate this column.
   openingHours   Json?
-  vendor         Member      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor         Member                 @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   deals          Deal[]
   orders         Order[]
   orderItems     OrderItem[]
@@ -608,32 +638,32 @@ model TherapistVideo {
 /// `masters.sub-categories` (parentId: set rows) admin pages, and the source of
 /// Deal.categoryId/subcategoryId.
 model Category {
-  id                       String                 @id @default(uuid())
+  id                       String                    @id @default(uuid())
   name                     String
-  slug                     String                 @unique
+  slug                     String                    @unique
   parentId                 String?
-  isActive                 Boolean                @default(true)
-  createdAt                DateTime               @default(now())
-  updatedAt                DateTime               @updatedAt
+  isActive                 Boolean                   @default(true)
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
   description              String?
-  sortOrder                Int                    @default(0)
+  sortOrder                Int                       @default(0)
   /// Nullable during migration only — backfilled by the direct_category_access data-fix, then
   /// tightened to required in a follow-up migration once every row has a value (see that
   /// migration's own comment). Only ever meaningful/set on a top-level row (`parentId: null`);
   /// a subcategory inherits its parent's type by join — never duplicated here.
   type                     CategoryType?
-  parent                   Category?              @relation("CategoryParent", fields: [parentId], references: [id])
-  children                 Category[]             @relation("CategoryParent")
+  parent                   Category?                 @relation("CategoryParent", fields: [parentId], references: [id])
+  children                 Category[]                @relation("CategoryParent")
   mediaImages              CategoryImage[]
-  deals                    Deal[]                 @relation("DealCategory")
-  subcategoryDeals         Deal[]                 @relation("DealSubcategory")
+  deals                    Deal[]                    @relation("DealCategory")
+  subcategoryDeals         Deal[]                    @relation("DealSubcategory")
   popularTagLinks          PopularTagCategory[]
-  popularTreatments        PopularTreatment[]     @relation("PopularTreatmentCategory")
-  popularTreatmentSubcats  PopularTreatment[]     @relation("PopularTreatmentSubcategory")
+  popularTreatments        PopularTreatment[]        @relation("PopularTreatmentCategory")
+  popularTreatmentSubcats  PopularTreatment[]        @relation("PopularTreatmentSubcategory")
   promotionLinks           Promotion[]
-  products                 Product[]              @relation("ProductCategory")
-  subcategoryProducts      Product[]              @relation("ProductSubcategory")
-  therapistSpecializations Therapist[]            @relation("TherapistSpecialization")
+  products                 Product[]                 @relation("ProductCategory")
+  subcategoryProducts      Product[]                 @relation("ProductSubcategory")
+  therapistSpecializations Therapist[]               @relation("TherapistSpecialization")
   vendorAccess             VendorCategoryAccess[]
   branchAccess             BranchCategoryAccess[]
   branchSubcategoryAccess  BranchSubcategoryAccess[]
@@ -1018,28 +1048,28 @@ model PopularTreatment {
 /// gates (both null = always visible while `isActive`) — same "hard-coded server-side visibility
 /// filter, never trust a caller-supplied override" discipline as `VISIBLE_DEAL_WHERE`.
 model Promotion {
-  id               String                @id @default(uuid())
+  id               String               @id @default(uuid())
   title            String
   description      String?
   buttonLabel      String?
-  destinationType  PromotionDestination  @default(ROUTE)
+  destinationType  PromotionDestination @default(ROUTE)
   destinationRoute String?
   categoryId       String?
   dealId           String?
   productId        String?
   /// null = Global/Default banner, shown where the visitor's state has none for the slot.
   state            String?
-  backgroundRole   BannerColorRole       @default(PRIMARY)
-  buttonRole       BannerColorRole       @default(PRIMARY)
-  sortOrder        Int                   @default(0)
-  isActive         Boolean               @default(true)
+  backgroundRole   BannerColorRole      @default(PRIMARY)
+  buttonRole       BannerColorRole      @default(PRIMARY)
+  sortOrder        Int                  @default(0)
+  isActive         Boolean              @default(true)
   startDate        DateTime?
   endDate          DateTime?
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
-  category         Category?             @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  deal             Deal?                 @relation(fields: [dealId], references: [id], onDelete: SetNull)
-  product          Product?              @relation(fields: [productId], references: [id], onDelete: SetNull)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  category         Category?            @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  deal             Deal?                @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  product          Product?             @relation(fields: [productId], references: [id], onDelete: SetNull)
   mediaImages      PromotionImage[]
   placements       PromotionPlacement[]
 

@@ -119,6 +119,13 @@ export function createPrismaMock() {
       create: vi.fn(),
       findMany: vi.fn(),
     },
+    vendorApplication: {
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      findMany: vi.fn(),
+      update: vi.fn(),
+      count: vi.fn(),
+    },
     branch: {
       findUnique: vi.fn(),
       findMany: vi.fn(),

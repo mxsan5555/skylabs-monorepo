@@ -25,6 +25,7 @@ import {
   MemberCreateSchema,
   MemberListQuerySchema,
   MemberDocumentReviewSchema,
+  VendorApplicationCreateSchema,
   VendorCreateSchema,
   VendorUpdateSchema,
   VendorSelfUpdateSchema,
@@ -802,6 +803,23 @@ export function buildOpenApiDocument() {
       responses: { 200: { description: 'Deleted' }, 403: errorResponse, 404: errorResponse },
     });
   }
+
+  registry.registerPath({
+    method: 'post',
+    path: '/vendors/public/register',
+    summary: 'Submit a public business membership application without creating an account',
+    tags: ['Vendors - Public'],
+    request: { body: { content: { 'application/json': { schema: VendorApplicationCreateSchema } } } },
+    responses: {
+      201: {
+        description: 'Application received',
+        content: { 'application/json': { schema: z.object({ data: z.object({ id: z.string(), status: z.string(), message: z.string(), createdAt: z.string() }) }) } },
+      },
+      422: errorResponse,
+      429: errorResponse,
+      500: errorResponse,
+    },
+  });
 
   registry.registerPath({
     method: 'get',
