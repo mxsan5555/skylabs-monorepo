@@ -3,6 +3,9 @@ import type { CatalogDeal, CatalogProduct, CatalogTherapist } from '../../../api
 import { OfferCard } from '../offer-card/offer-card';
 import { TherapistCard } from '../therapist-card/therapist-card';
 import { TherapistAddToCartDialog } from '../therapist-add-to-cart-dialog';
+import { ApiRequestError } from '../../../api/rbac/client';
+import { formatINR } from '../../../utils/format';
+import type { DealMapPoint } from '../deal-map/deal-map';
 import type { ListingKind, ListingView } from './listing-params';
 import content from '../../../content.json';
 
@@ -46,4 +49,25 @@ export function listingCards(list: ListingItems, view: ListingView) {
 export function listingNoun(kind: ListingKind) {
   const t = content.category;
   return kind === 'therapists' ? t.resultCount.therapist : kind === 'products' ? t.resultCount.product : t.dealCount;
+}
+
+/** Loading, load-error and empty copy per kind; `all` = explore's mixed list. */
+export function listingCopy(kind: ListingKind | 'all') {
+  if (kind === 'all') return { loading: content.search.loading, loadError: content.search.loadError, empty: content.search.empty };
+  const page = content.listingPages[kind];
+  const empty = kind === 'products' ? content.listingPages.products.empty : kind === 'therapists' ? content.category.emptyTherapists : content.category.emptyDeals;
+  return { loading: page.loading, loadError: page.loadError, empty };
+}
+
+/** `usePagedList`'s errorMessage: the API's message, else the kind's load-error copy. */
+export const listingLoadError = (kind: ListingKind | 'all') => (err: unknown) =>
+  err instanceof ApiRequestError ? err.message : listingCopy(kind).loadError;
+
+/** Map markers for deals whose branch has coordinates (price label, link to the deal). */
+export function dealMapPoints(deals: CatalogDeal[]): DealMapPoint[] {
+  return deals.flatMap((d) =>
+    d.branch?.latitude != null && d.branch?.longitude != null
+      ? [{ id: d.id, lat: Number(d.branch.latitude), lng: Number(d.branch.longitude), label: formatINR(Number(d.salePrice)), title: d.title, href: `/deal/${d.id}` }]
+      : [],
+  );
 }

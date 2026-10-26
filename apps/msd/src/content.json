@@ -440,9 +440,8 @@
       "home": "Home",
       "explore": "Explore"
     },
-    "errors": {
-      "loadDeals": "Could not load deals."
-    }
+    "loading": "Loading results…",
+    "loadError": "Could not load results."
   },
   "category": {
     "sortOptions": [
@@ -607,7 +606,6 @@
     },
     "dealsAriaLabelSuffix": "deals",
     "loading": "Loading category…",
-    "loadingDeals": "Loading deals…",
     "durationSuffix": "min",
     "offeringLabels": {
       "service": "Deal",
@@ -624,8 +622,7 @@
     },
     "errors": {
       "loadCategory": "Could not load category.",
-      "addToCart": "Could not add to cart.",
-      "loadDeals": "Could not load deals."
+      "addToCart": "Could not add to cart."
     },
     "notFound": {
       "metaTitle": "Category Not Found | MSD",
@@ -1834,7 +1831,9 @@
       "breadcrumb": "Deals",
       "chipsLabel": "Deal categories",
       "all": "All deals",
-      "ariaLabel": "Deal results"
+      "ariaLabel": "Deal results",
+      "loading": "Loading deals…",
+      "loadError": "Could not load deals."
     },
     "products": {
       "title": "Wellness products",
@@ -1846,7 +1845,9 @@
       "empty": {
         "heading": "No products found",
         "subheading": "Try another category or clear the filters."
-      }
+      },
+      "loading": "Loading products…",
+      "loadError": "Could not load products."
     },
     "therapists": {
       "title": "Therapists",
@@ -1856,7 +1857,9 @@
       "breadcrumb": "Therapists",
       "chipsLabel": "Therapy categories",
       "all": "All therapists",
-      "ariaLabel": "Therapist results"
+      "ariaLabel": "Therapist results",
+      "loading": "Loading therapists…",
+      "loadError": "Could not load therapists."
     }
   }
 }

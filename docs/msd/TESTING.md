@@ -138,7 +138,8 @@ mapPopularTag" (both pass alone).
 - Category page (`category.test.tsx`): pills set `?sub=`; sort and filters send the right API
   params; the count shows `meta.total` at the end of the chip row; page 2 requested on scroll;
   map hidden for products and therapists; a prerendered 404 renders not found on the first
-  render; filter counts reload when the city resolves.
+  render; not-found keeps one h1; filter counts reload when the city resolves; a therapy category
+  under a city URL does not filter by city; empty copy names the kind.
 - Card tags (ST-40, `offer-tag.test.ts`, `catalog.routes.test.ts`): a deal ending in 7 days or
   less is Expire soon even when it is also hot, new or 30% off; ended deals get no Expire soon;
   Hot needs the top 10% of paid lines in 30 days and at least 5 (4 lines → not hot; pending and

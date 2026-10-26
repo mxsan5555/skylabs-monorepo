@@ -147,7 +147,9 @@ first, then sends `therapistIds`.
   `tag`, `cat` with defensive parsing; `pickSort`, `sortOptionsFor` per kind, `countText`),
   `listing-body.tsx` (`ListingBody`: toolbar with Filters / List-Grid-Map / Sort, `SidebarLayout`
   + `FilterPanel`, `CardGrid` or `DealMap`, `LoadMore`, city picker), `listing-cards.tsx`
-  (`listingCards`, `listingNoun`) and `use-listing-facets.ts`. Pages own their data, heading,
+  (`listingCards`, `listingNoun`, `listingCopy` and `listingLoadError` per kind, `dealMapPoints`),
+  `kindOfCategoryType` in `listing-params.ts`, and `use-listing-facets.ts` (`LISTING_FACETS`).
+  City pages filter by city for deal categories only. Pages own their data, heading,
   chip row (`ChipNav` with the count as `end`) and SEO: `pages/category/` (subcategory pills),
   `pages/listing/listing-page.tsx` (one `ListingPage kind` for `/deals`, `/products`,
   `/therapists` and the city routes; chips are links to `/category/:slug`) and `pages/search/`
