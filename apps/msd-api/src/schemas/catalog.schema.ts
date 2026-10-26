@@ -4,6 +4,11 @@ import { PaginationQuerySchema } from './common.schema';
 
 extendZodWithOpenApi(z);
 
+const TAG = '(expire_soon|hot|new|deal)';
+/** Comma list of card tags (PLANNING §4 D30): items whose shown tag is any of them. */
+const tagsParam = z.string().regex(new RegExp(`^${TAG}(,${TAG}){0,3}$`)).optional();
+const idsParam = z.string().regex(/^[0-9a-f-]{36}(,[0-9a-f-]{36}){0,49}$/i).optional();
+
 export const CatalogDealQuerySchema = PaginationQuerySchema.extend({
   categoryId: z.string().uuid().optional(),
   subcategoryId: z.string().uuid().optional(),
@@ -37,11 +42,15 @@ export const CatalogDealQuerySchema = PaginationQuerySchema.extend({
    *  Never persisted — used only for this request's own distance calc. */
   latitude: z.coerce.number().min(-90).max(90).optional(),
   longitude: z.coerce.number().min(-180).max(180).optional(),
+  tags: tagsParam,
 }).openapi('CatalogDealQuery');
 
 /** Comma-separated UUID list (`vendorIds`/`branchIds`) → a plain string array, or `undefined`
  *  when the query param was omitted. */
 export const splitIds = (value?: string) => (value ? value.split(',').filter(Boolean) : undefined);
+
+/** `tags` query param → the tag keys (the regex above already rejected anything else). */
+export const splitTags = (value?: string) => splitIds(value) as ('expire_soon' | 'hot' | 'new' | 'deal')[] | undefined;
 
 /** `GET /catalog/deals/facets` — every base/facet filter `CatalogDealQuerySchema` accepts, minus
  *  paging and sort (facets counts, never paginates or sorts a list). */
@@ -61,7 +70,13 @@ export const CatalogProductQuerySchema = PaginationQuerySchema.extend({
   sort: z.enum(['relevance', 'price_asc', 'price_desc', 'newest', 'discount']).optional().default('relevance'),
   minPrice: z.coerce.number().min(0).optional(),
   maxPrice: z.coerce.number().min(0).optional(),
+  /** Comma-separated top-level category UUIDs (max 50); wins over `categoryId`. */
+  categoryIds: idsParam,
+  tags: tagsParam,
 }).openapi('CatalogProductQuery');
+
+/** `GET /catalog/products/facets` — the product list filters minus paging and sort. */
+export const CatalogProductFacetQuerySchema = CatalogProductQuerySchema.omit({ page: true, pageSize: true, sort: true }).openapi('CatalogProductFacetQuery');
 
 export const CatalogTherapistQuerySchema = PaginationQuerySchema.extend({
   /** Top-level THERAPY Category id — matches therapists whose `specializationCategoryId` is
@@ -76,7 +91,20 @@ export const CatalogTherapistQuerySchema = PaginationQuerySchema.extend({
   /** See `CatalogDealQuerySchema`'s identical param doc comment. */
   latitude: z.coerce.number().min(-90).max(90).optional(),
   longitude: z.coerce.number().min(-180).max(180).optional(),
+  /** Price = the therapist's lowest active package. `distance` without coordinates behaves like
+   *  `relevance` (newest first). */
+  sort: z.enum(['relevance', 'price_asc', 'price_desc', 'distance']).optional().default('relevance'),
+  minPrice: z.coerce.number().min(0).optional(),
+  maxPrice: z.coerce.number().min(0).optional(),
+  radiusKm: z.coerce.number().gt(0).max(500).optional(),
+  state: z.string().max(100).optional(),
+  city: z.string().max(100).optional(),
+  vendorIds: idsParam,
+  branchIds: idsParam,
 }).openapi('CatalogTherapistQuery');
+
+/** `GET /catalog/therapists/facets` — the therapist list filters minus paging and sort. */
+export const CatalogTherapistFacetQuerySchema = CatalogTherapistQuerySchema.omit({ page: true, pageSize: true, sort: true, vendorId: true, branchId: true }).openapi('CatalogTherapistFacetQuery');
 
 /** `GET /catalog/vendors/:slug` — narrows the nested active-branches list, same state/city
  *  semantics as CatalogDealQuerySchema above. */

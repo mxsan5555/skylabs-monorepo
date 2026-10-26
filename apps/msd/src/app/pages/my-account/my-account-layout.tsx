@@ -82,7 +82,7 @@ const currentPage = breadcrumbLabels[location.pathname] ?? 'My Account';
             <li className="my-account-nav__profile">
               <sky-tile-card
                 icon="person"
-                iconShape="full" 
+                icon-shape="full" 
                 headline={bootstrap?.user.email ?? bootstrap?.user.phone ?? ''}
                 align="center"
                 color="none"

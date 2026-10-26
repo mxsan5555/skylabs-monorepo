@@ -361,7 +361,9 @@ OpenAPI.
 | GET | `/api/v1/catalog/locations` | public |
 | GET | `/api/v1/catalog/products` | public |
 | GET | `/api/v1/catalog/products/:id` | public |
+| GET | `/api/v1/catalog/products/facets` | public |
 | GET | `/api/v1/catalog/therapists` | public |
+| GET | `/api/v1/catalog/therapists/facets` | public |
 | GET | `/api/v1/catalog/therapists/:id` | public |
 | GET | `/api/v1/catalog/vendors/:slug` | public |
 
@@ -369,7 +371,24 @@ OpenAPI.
 `branchIds` (comma lists, max 50), `radiusKm` with `latitude`/`longitude`, `minPrice`/`maxPrice`,
 paging with `meta.total`. With coordinates the list is ranked in memory
 (`services/deal-ranking.ts`). `GET /catalog/deals/facets` returns vendor, branch, distance-bucket
-(1, 5, 10, 20, 50, 100 km) and price-range counts, each facet ignoring its own selection.
+(1, 5, 10, 20, 50, 100 km), tag and price-range counts, each facet ignoring its own selection.
+
+Listing pages (ST-40, PLANNING §4 D29/D30). Every new param is optional; omitting all of them
+returns today's response plus the new `tag` field.
+
+- **Tags:** deals and products carry `tag: "expire_soon" | "hot" | "new" | "deal" | null` (rule
+  in PLANNING §4). `GET /catalog/deals` and `/catalog/products` accept
+  `tags=expire_soon,hot,new,deal` (any of the four, comma list; anything else → 422).
+- `GET /catalog/deals`: `categoryId` stays optional, so `/deals` lists every category.
+- `GET /catalog/products`: adds `categoryIds` (comma list, max 50, wins over `categoryId`),
+  `tags`. `GET /catalog/products/facets` takes the same filters minus paging and sort and
+  returns `{ categories: [{ id, name, slug, count }], tags: [{ tag, count }], price: { min, max } }`.
+- `GET /catalog/therapists`: adds `sort=relevance|price_asc|price_desc|distance` (price = lowest
+  active package; `distance` needs coordinates, else behaves like `relevance`), `minPrice` /
+  `maxPrice` (lowest package), `radiusKm`, `city` / `state`, `vendorIds` / `branchIds`, and
+  `meta.total`. `GET /catalog/therapists/facets` returns `vendors`, `branches`, `distance` and
+  `price` in the deal facet shape.
+- Static paths (`/products/facets`, `/therapists/facets`) are registered before `/:id`.
 
 ## 5. Static content
 

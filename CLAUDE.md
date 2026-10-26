@@ -71,7 +71,7 @@ If pages render unstyled or an import 500s in dev, it's almost always a **stale
 - Register all M3 elements once per app: `import '@skylabs-monorepo/shared-ui';`
 - Theme: `import '@skylabs-monorepo/shared-ui/theme.css';` + `applyTheme('light' | 'dark', contrast?)`.
 - App-shell / auth layout styles: `@skylabs-monorepo/shared-ui/layout.css` (msd imports it in `main.tsx`; mera-driver lists it in `project.json` build `styles`).
-- **React (msd)** uses typed wrappers: `import { FilledButton } from '@skylabs-monorepo/shared-ui/react';`
+- **React (msd)** uses typed wrappers for `md-*`: `import { FilledButton } from '@skylabs-monorepo/shared-ui/react';`. `sky-*` elements have no wrappers: use raw tags, and write any option whose LIT attribute is kebab-case in that form (`price-first`, `image-alt`, `icon-style`, also as keys in `{...spread}` objects). Server rendering writes `priceFirst` as a `pricefirst` attribute and hydration never sets the property, so a camelCase option is lost on prerendered pages. `apps/msd/src/sky-element-props.test.ts` enforces this; element-valued props (`controlsElement`) and arrays stay camelCase properties.
 - **Angular (mera-driver)** uses raw `<md-*>` tags; any component using them needs `schemas: [CUSTOM_ELEMENTS_SCHEMA]`.
 - Custom in-house components live in `packages/shared-ui/src/components/` (e.g. `sky-badge`, `sky-card`), written in LIT **without decorators** for cross-framework source compatibility.
 - **Card components** (compose M3 web components inside, themed by `--md-sys-color-*`, primitive props → same usage in React/Angular):
@@ -79,15 +79,15 @@ If pages render unstyled or an import 500s in dev, it's almost always a **stale
   - `sky-image-card` — full-bleed image with overlay `label` (+ optional `href`, `ratio`).
   - `sky-category-card` — rounded image + `heading`/`subheading` (+ optional `href`).
   - `sky-info-card` — surface card with an illustration (`media` slot) or `icon` + `heading`/`subheading`.
-  - React: `SkyProductCardReact`, `SkyImageCardReact`, `SkyCategoryCardReact`, `SkyInfoCardReact`. Angular: raw `<sky-*-card>` tags.
+  - Raw `<sky-*-card>` tags in both apps (typed in `apps/msd/src/types/sky-elements.d.ts`).
 - **M3 surface components** (`sky-image`, `sky-tile-card`, `sky-feature-card`, `sky-cta-banner`) share one option vocabulary from `components/m3-surface.ts`, every value mapped to an M3 token (no brand values in the components): `color` = `none|surface|surface-high|primary|secondary|tertiary|inverse` (container + on-container + accent roles), `variant` = `filled|outlined|elevated`, `shape` = M3 corner scale `none…extra-large|full`, `icon` + `icon-style` (`filled|tonal|surface|plain`) + `icon-shape`. Linked surfaces use `md-ripple` + `md-focus-ring` (M3 state layer).
   - `sky-image` — framed image/logo (`fit="contain"`, `ratio`) with a placeholder icon when `src` is missing or fails; `href` makes it one link.
-  - `sky-tile-card` — icon + headline + text tile (category grids); `href` = whole-tile link.
+  - `sky-tile-card` — icon + headline + text tile (category grids); `href` = whole-tile link; a slotted `headline` holding a link (home category tiles) gets the same hover/press state layer.
   - `sky-feature-card` — icon + headline + text + CTA (`cta-label`/`cta-href`/`cta-icon`, accent-tinted `md-filled-button`) or an `actions` slot (its buttons take the card's accent role too); `layout="horizontal"` for a strip; optional `image`/`image-alt` (leading media, decorative without alt, placeholder if it fails to load) and `cta-color` (`primary|secondary|tertiary|inverse` button role).
   - `sky-cta-banner` — `sky-feature-card` preset to horizontal (stacks under 600px of its own width).
   - All four are raw tags in both apps (typed in `apps/msd/src/types/sky-elements.d.ts`). msd's `useShadowLinkNavigation` (in `AppRoutes`) routes same-origin shadow-DOM `href` clicks through React Router, so these links don't reload the page.
-- **Action field** (`sky-action-field`): M3 text field with an attached action button, for any "type, then act" UI (site search, newsletter, coupon, pincode). Options: `icon` (leading), `action-label` → `md-filled-button` / `action-icon` alone → `md-filled-icon-button`, `variant="filled|outlined"`, `shape` (default `full`), `dense` (48dp), plus native `type`/`name`/`autocomplete`/`enterkeyhint`/`required`/`disabled`. Fires `sky-submit` `{ value }` (trimmed); in React 19 bind it with the `onsky-submit` prop. Put `role="search"` on the host for a search landmark. Used by the msd header and home hero.
-- **Accordion** (`sky-accordion` + `sky-accordion-item`): expandable card panels with a rotating `md-icon` chevron. Each header is one accessible trigger (`aria-expanded`/`aria-controls`); collapsed bodies are `hidden`. `sky-accordion single` keeps only one item open. React: `SkyAccordionReact`/`SkyAccordionItemReact`; Angular: raw `<sky-accordion>`/`<sky-accordion-item>`.
+- **Action field** (`sky-action-field`): M3 text field with an attached action button, for any "type, then act" UI (site search, newsletter, coupon, pincode). Options: `icon` (leading), `action-label` → `md-filled-button` / `action-icon` alone → `md-filled-icon-button`, `variant="filled|outlined"`, `shape` (default `full`), `dense` (48dp), `clearable` (+ `clear-label`), `combobox` + `expanded` + `controlsElement`/`activeOption` (ARIA element reflection for a popup listbox in the page), plus native `type`/`name`/`autocomplete`/`enterkeyhint`/`required`/`disabled`. Fires `sky-submit` `{ value }` (trimmed); in React 19 bind it with the `onsky-submit` prop. Put `role="search"` on the host for a search landmark. Used by the msd header and home hero.
+- **Accordion** (`sky-accordion` + `sky-accordion-item`): expandable card panels with a rotating `md-icon` chevron. Each header is one accessible trigger (`aria-expanded`/`aria-controls`); collapsed bodies are `hidden`. `sky-accordion single` keeps only one item open. Raw `<sky-accordion>`/`<sky-accordion-item>` tags in both apps.
   - All cards are **fluid** (fill their container — wrap them in a responsive grid/flex), support **`align="left|center|right"`**, and are **semantic + accessible by default**: `figure`/`figcaption` (image & category), `article` + `h3`/`p`, `<img alt>`, `href` renders one labelled stretched link, and `aria` on the rating and favorite button.
 - Icons: self-hosted Material Symbols Outlined (the `material-symbols` package, imported in `theme/base.css`). Use `<md-icon>name</md-icon>` and `aria-hidden="true"` when decorative.
 
@@ -102,6 +102,9 @@ slide content is app-specific, so a wrapper would add surface for no reuse.
   base bundle). Then use raw `<swiper-container>` / `<swiper-slide>` tags.
 - **React (msd)**: tags work in JSX; `apps/msd/src/types/swiper-elements.d.ts` types them.
 - **Angular (mera-driver)**: the component needs `schemas: [CUSTOM_ELEMENTS_SCHEMA]`.
+- **Card carousels clip at `::part(container)`** (Swiper's inner `overflow: hidden`), not the
+  host: put room for hover shadows / focus rings in `swiper-container::part(container) { padding }`
+  and cancel it with a negative host margin (see `card-rail.css`, `.home-hero__carousel`).
 - **Theming is automatic**: `theme/base.css` maps `--swiper-theme-color` to
   `--md-sys-color-primary`, so pagination/scrollbar/arrows match each app's brand.
 - **Features are attributes** (`slides-per-view="auto"`, `space-between`, `loop`,
@@ -129,7 +132,8 @@ No hex values in app code; brand colour comes from each app's generated M3 theme
 | `PageSection` | Full-bleed band (`tone="surface"` or `"tint"`, `flush`, `stack`) + 1280px / 16px container. Every page section uses it. |
 | `SectionHead` | Section header row (h2, or `as="h1"` for a page title), subheading (string or node), See all link, actions. |
 | `CardRail` / `CardGrid` | Swiper carousel / responsive grid (272px min columns, `layout="list"` one per row; `above`, `panel` tabpanel, `fallback`). |
-| `ChipNav` | Single-select pill row (`md-filter-chip`), scrolls sideways on phones. |
+| `ChipNav` | Single-select pill row (`md-filter-chip`), or a `<nav>` of real links when items have `href` (category chips); `end` = the result count at the row end. Scrolls sideways on phones. |
+| `listing/` | `ListingBody` (toolbar, filter panel, grid or map, load more), `useListingParams` (URL state), `listingCards`, `useListingFacets`: the shared results band of category, `/deals`, `/products`, `/therapists` and explore. |
 | `ClampText` | Two-line clamped description with More / Less. |
 | `ListingToolbar` | Toolbar row above a listing (`start` / `end` slots). |
 | `ChoiceMenu` | Trigger (assist chip or text button) + `md-menu` of single choices (sort). |
@@ -149,10 +153,13 @@ Hooks: `usePagedList` (page-by-page lists keyed by the filter set, seeded from p
 coordinates, also drives the header "Set location"), `useCustomEvent` (listen to `sky-*` / `md-*`
 events on elements React hydrated from prerendered HTML).
 
-**Category page** (`/category/:slug`, `/category/:slug/:city`): h1 + total (`meta.total`),
-clamped description, subcategory pills, toolbar (Filters, List/Grid/Map, Sort: Relevance, Price
-low-high / high-low, Distance when the visitor has coordinates), filter panel, 12 cards per page.
-All view state is in the URL: `sub`, `sort`, `view`, `radius`, `vendor`, `branch`, `min`, `max`.
+**Listing pages** (category `/category/:slug[/:city]`, `ListingPage` for `/deals[/:city]`,
+`/products`, `/therapists[/:city]`, explore `/explore`): h1, description, chip row with the total
+(`meta.total`) at its end, toolbar (Filters, List/Grid/Map, Sort per kind), filter panel per kind
+(deals: location, distance, price, tags, business, branches; products: category on `/products`,
+price, tags; therapists: deals minus tags; explore "All": location, distance, price), 12 cards per
+page. Card images carry the API's tag (New, Deal, Hot, Expire soon). All view state is in the
+URL: `sub`, `sort`, `view`, `radius`, `vendor`, `branch`, `min`, `max`, `tag`, `cat`, `kind`.
 No ratings anywhere until a review system exists.
 
 **Maps:** `DealMap` lazy-loads its engine only when a map view opens. `VITE_MAP_PROVIDER=leaflet`
@@ -164,8 +171,12 @@ No ratings anywhere until a review system exists.
 `GET /deals` (`sort=relevance|price_asc|price_desc|distance|newest|discount`, `vendorIds`,
 `branchIds` comma lists, `radiusKm` with `latitude`/`longitude`, `minPrice`/`maxPrice`, paging
 with `meta.total`), `GET /deals/facets` (vendor / branch / distance-bucket counts + price range,
-each facet ignoring its own selection), `GET /products` (price sorts), `GET /therapists`. With
-coordinates the deal list is ranked in memory (`services/deal-ranking.ts`).
+each facet ignoring its own selection, plus tag counts), `GET /products` (sorts, `categoryIds`,
+`tags`) + `GET /products/facets`, `GET /therapists` (server-side `sort`, price = lowest package,
+`radiusKm`, `city`, `vendorIds`, `branchIds`) + `GET /therapists/facets`. Deals and products carry
+a computed `tag` (`services/offer-tag.ts`, rule in `docs/msd/PLANNING.md` §4) and accept `tags=`.
+With coordinates the deal and therapist lists are ranked in memory (`deal-ranking.ts`,
+`therapist-ranking.ts`).
 
 **Testing gotchas (msd, Vitest + jsdom):**
 - `@lit/react` resolves to its Node/SSR build under Vitest, so shared-ui React **wrappers**

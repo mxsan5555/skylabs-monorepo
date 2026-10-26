@@ -101,17 +101,18 @@ afterEach(() => {
 });
 
 describe('useSearchSuggestions', () => {
-  it('returns nothing below the minimum query length, without calling any API', () => {
+  it('lists the top categories below the minimum query length, without calling any API', () => {
     const { result } = renderHook(() => useSearchSuggestions('m', CATEGORIES, NO_LOCATION));
-    expect(result.current.groups).toEqual([]);
+    expect(result.current.groups.map((g) => g.key)).toEqual(['browse']);
+    expect(result.current.groups[0].items).toEqual([{ id: 'cat-1', label: 'Massage', href: '/category/massage' }]);
     expect(result.current.loading).toBe(false);
     expect(listCatalogDealsMock).not.toHaveBeenCalled();
   });
 
   it('matches categories and subcategories synchronously, before the debounced API calls resolve', () => {
     const { result } = renderHook(() => useSearchSuggestions('swed', CATEGORIES, NO_LOCATION));
-    const sub = result.current.groups.find((g) => g.key === 'subcategories');
-    expect(sub?.items).toEqual([{ id: 'sub-1', label: 'Swedish', sublabel: 'Massage', href: '/category/massage?sub=swedish' }]);
+    const matched = result.current.groups.find((g) => g.key === 'categories');
+    expect(matched?.items).toEqual([{ id: 'sub-1', label: 'Swedish', sublabel: 'Massage', href: '/category/massage?sub=swedish' }]);
     expect(result.current.loading).toBe(true);
   });
 
@@ -133,7 +134,15 @@ describe('useSearchSuggestions', () => {
       expect.objectContaining({ search: 'massage', latitude: 18.5, longitude: 73.8 }),
     );
     const dealsGroup = result.current.groups.find((g) => g.key === 'deals');
-    expect(dealsGroup?.items).toEqual([{ id: 'd1', label: 'Hot Stone Massage', sublabel: undefined, href: '/deal/d1' }]);
+    expect(dealsGroup?.rich).toBe(true);
+    expect(dealsGroup?.items[0]).toMatchObject({
+      id: 'd1',
+      label: 'Hot Stone Massage',
+      href: '/deal/d1',
+      price: '₹699',
+      originalPrice: '₹999',
+      discount: '-30%',
+    });
   });
 
   it('collapses rapid keystrokes into a single fetch for the latest query only', async () => {
@@ -187,12 +196,89 @@ describe('useSearchSuggestions', () => {
       await vi.advanceTimersByTimeAsync(250);
     });
 
-    expect(result.current.groups.find((g) => g.key === 'products')?.items).toEqual([
-      { id: 'p1', label: 'Massage Oil', sublabel: 'AromaCo', href: '/products/p1' },
-    ]);
-    expect(result.current.groups.find((g) => g.key === 'therapists')?.items).toEqual([
-      { id: 't1', label: 'Asha Kumar', sublabel: 'Legs Therapist', href: '/therapist/t1' },
-    ]);
+    expect(result.current.groups.find((g) => g.key === 'products')?.items[0]).toMatchObject({
+      id: 'p1',
+      label: 'Massage Oil',
+      sublabel: 'AromaCo',
+      href: '/products/p1',
+      price: '₹299',
+    });
+    expect(result.current.groups.find((g) => g.key === 'therapists')?.items[0]).toMatchObject({
+      id: 't1',
+      label: 'Asha Kumar',
+      sublabel: 'Legs Therapist',
+      href: '/therapist/t1',
+    });
+  });
+
+  it('formats therapist distance and lowest package price, and sums the API totals', async () => {
+    listCatalogDealsMock.mockResolvedValue({ data: [], meta: { total: 12 } });
+    listCatalogTherapistsMock.mockResolvedValue({
+      data: [
+        therapist({
+          id: 't1',
+          distanceKm: 3.46,
+          packages: [{ sellingPrice: '900' }, { sellingPrice: '600' }] as unknown as CatalogTherapist['packages'],
+        }),
+      ],
+      meta: { total: 3 },
+    });
+    const { result } = renderHook(() => useSearchSuggestions('massage', CATEGORIES, NO_LOCATION));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(result.current.groups.find((g) => g.key === 'therapists')?.items[0]).toMatchObject({
+      distance: '3.5 km',
+      price: 'From ₹600',
+    });
+    expect(result.current.total).toBe(15);
+  });
+
+  it('re-runs the search when the location changes', async () => {
+    const { rerender } = renderHook(({ loc }) => useSearchSuggestions('massage', CATEGORIES, loc), {
+      initialProps: { loc: NO_LOCATION as { city: string | null; state: string | null; coords: null } },
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    rerender({ loc: { city: 'Gorakhpur', state: 'Uttar Pradesh', coords: null } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(listCatalogDealsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ city: 'Gorakhpur', state: 'Uttar Pradesh' }),
+    );
+  });
+
+  it('falls back to deals outside the visitor city, nearest first, with a note and no total', async () => {
+    listCatalogDealsMock
+      .mockResolvedValueOnce({ data: [], meta: { total: 0 } })
+      .mockResolvedValueOnce({ data: [deal({ id: 'far', title: 'Classic Body Massage' })], meta: { total: 6 } });
+    const location = { city: 'Gorakhpur', state: 'Uttar Pradesh', coords: { latitude: 26.7, longitude: 83.3 } };
+    const { result } = renderHook(() => useSearchSuggestions('massage', CATEGORIES, location));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(listCatalogDealsMock).toHaveBeenCalledTimes(2);
+    const wider = listCatalogDealsMock.mock.calls[1][0];
+    expect(wider).toMatchObject({ search: 'massage', latitude: 26.7, longitude: 83.3 });
+    expect(wider.city).toBeUndefined();
+    expect(wider.state).toBeUndefined();
+    const dealsGroup = result.current.groups.find((g) => g.key === 'deals');
+    expect(dealsGroup?.items.map((i) => i.id)).toEqual(['far']);
+    expect(dealsGroup?.note).toBe('No deals in Gorakhpur yet. These are from other states.');
+    expect(result.current.total).toBeNull();
+  });
+
+  it('keeps the deals group note-free when the visitor city has deals', async () => {
+    listCatalogDealsMock.mockResolvedValue({ data: [deal({ id: 'local' })] });
+    const location = { city: 'Pune', state: 'Maharashtra', coords: null };
+    const { result } = renderHook(() => useSearchSuggestions('massage', CATEGORIES, location));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(listCatalogDealsMock).toHaveBeenCalledTimes(1);
+    expect(result.current.groups.find((g) => g.key === 'deals')?.note).toBeUndefined();
   });
 
   it('reports no groups once every source settles empty', async () => {

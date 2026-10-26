@@ -26,3 +26,7 @@ export function readPrerenderPayload(): PrerenderPayload {
 }
 
 export const categoryDataKey = (slug: string, city?: string) => (city ? `category:${slug}:${city}` : `category:${slug}`);
+
+/** Key for a listing page's first page (`/deals`, `/products`, `/therapists`, optionally a city). */
+export const listingDataKey = (kind: 'deals' | 'products' | 'therapists', city?: string) =>
+  city ? `listing:${kind}:${city}` : `listing:${kind}`;

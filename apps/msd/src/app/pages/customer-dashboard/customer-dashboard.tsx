@@ -5,7 +5,6 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getCustomerDashboardSummary } from '../../../api/customer-dashboard';
 import { ApiRequestError } from '../../../api/rbac/client';
 import './customer-dashboard.css';
-import { Breadcrumb } from '../../components/breadcrumb';
 interface DashboardStats {
     deals: number;
     products: number;
@@ -90,14 +89,14 @@ export function CustomerDashboard() {
                     headline="Deals"
                     text={`${stats.deals} booked deals`}
                     variant="outlined"
-                    iconStyle="plain"
+                    icon-style="plain"
                     href="/orders?type=SERVICE"
                 />
                 <sky-tile-card
                     icon="inventory_2"
                     headline="Products"
                     text={`${stats.products} purchased products`}
-                    iconStyle="plain"
+                    icon-style="plain"
                     variant="outlined"
                     href="/orders?type=PRODUCT"
                 />
@@ -107,7 +106,7 @@ export function CustomerDashboard() {
                     headline="Cart"
                     text={`${stats.cart} items in cart`}
                     variant="outlined"
-                    iconStyle="plain"
+                    icon-style="plain"
                     href="/cart"
                 />
 
@@ -116,7 +115,7 @@ export function CustomerDashboard() {
                     headline="Wishlist"
                     text={`${stats.wishlist} saved items`}
                     variant="outlined"
-                    iconStyle="plain"
+                    icon-style="plain"
                     href="/wishlist"
                 />
             </div>

@@ -3,6 +3,7 @@ import { live } from 'lit/directives/live.js';
 import '@material/web/icon/icon.js';
 import '@material/web/button/filled-button.js';
 import '@material/web/iconbutton/filled-icon-button.js';
+import '@material/web/iconbutton/icon-button.js';
 import { hostBase } from '../shared-styles.js';
 import { shapeScale, type SkyShape } from '../m3-surface.js';
 
@@ -23,6 +24,12 @@ import { shapeScale, type SkyShape } from '../m3-surface.js';
  *   variant  filled | outlined          shape  M3 corner scale (default full)
  *   dense    48dp container              icon   leading Material Symbol
  *   action-label / action-icon          type / name / autocomplete / enterkeyhint
+ *   clearable  a Clear icon button while there is a value (`clear-label` names it); clearing
+ *              empties the value, fires a composed `input` event and refocuses the input
+ *   combobox   the input becomes an ARIA combobox (`aria-autocomplete="list"`, `expanded`);
+ *              `controlsElement` / `activeOption` point it at a popup in the page and its active
+ *              option. IDs cannot cross the shadow boundary, so these go through ARIA element
+ *              reflection (`ariaControlsElements`, `ariaActiveDescendantElement`).
  *
  * @fires sky-submit — CustomEvent<{ value: string }>
  *
@@ -51,6 +58,12 @@ export class SkyActionField extends LitElement {
     dense: { type: Boolean, reflect: true },
     required: { type: Boolean },
     disabled: { type: Boolean, reflect: true },
+    clearable: { type: Boolean },
+    clearLabel: { type: String, attribute: 'clear-label' },
+    combobox: { type: Boolean },
+    expanded: { type: Boolean },
+    controlsElement: { attribute: false },
+    activeOption: { attribute: false },
   };
 
   /** Accessible name of the input (also names an icon-only action). */
@@ -69,6 +82,14 @@ export class SkyActionField extends LitElement {
   declare dense: boolean;
   declare required: boolean;
   declare disabled: boolean;
+  declare clearable: boolean;
+  declare clearLabel: string;
+  declare combobox: boolean;
+  declare expanded: boolean;
+  /** The popup the combobox controls (e.g. a listbox in the page). */
+  declare controlsElement: Element | null;
+  /** The popup's active option, announced while focus stays in the input. */
+  declare activeOption: Element | null;
 
   constructor() {
     super();
@@ -80,6 +101,12 @@ export class SkyActionField extends LitElement {
     this.dense = false;
     this.required = false;
     this.disabled = false;
+    this.clearable = false;
+    this.clearLabel = 'Clear';
+    this.combobox = false;
+    this.expanded = false;
+    this.controlsElement = null;
+    this.activeOption = null;
   }
 
   static override styles = css`
@@ -149,7 +176,8 @@ export class SkyActionField extends LitElement {
     input::-webkit-search-cancel-button {
       display: none;
     }
-    .action {
+    .action,
+    .clear {
       flex-shrink: 0;
       position: relative;
     }
@@ -169,6 +197,29 @@ export class SkyActionField extends LitElement {
       new CustomEvent('sky-submit', { detail: { value: this.value.trim() }, bubbles: true, composed: true }),
     );
   };
+
+  private readonly onClear = () => {
+    this.value = '';
+    this.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+    this.renderRoot.querySelector('input')?.focus();
+  };
+
+  protected override updated() {
+    if (!this.combobox) return;
+    const input = this.renderRoot.querySelector('input') as
+      | (HTMLInputElement & { ariaControlsElements?: Element[] | null; ariaActiveDescendantElement?: Element | null })
+      | null;
+    if (!input || !('ariaActiveDescendantElement' in input)) return;
+    input.ariaControlsElements = this.controlsElement ? [this.controlsElement] : null;
+    input.ariaActiveDescendantElement = this.activeOption;
+  }
+
+  private renderClear() {
+    if (!this.clearable || !this.value) return nothing;
+    return html`<md-icon-button class="clear" type="button" aria-label=${this.clearLabel} ?disabled=${this.disabled} @click=${this.onClear}>
+      <md-icon aria-hidden="true">close</md-icon>
+    </md-icon-button>`;
+  }
 
   private renderAction() {
     if (this.actionLabel) {
@@ -199,9 +250,12 @@ export class SkyActionField extends LitElement {
           enterkeyhint=${this.enterkeyhint ?? nothing}
           ?required=${this.required}
           ?disabled=${this.disabled}
+          role=${this.combobox ? 'combobox' : nothing}
+          aria-autocomplete=${this.combobox ? 'list' : nothing}
+          aria-expanded=${this.combobox ? String(this.expanded) : nothing}
           @input=${this.onInput}
         />
-        ${this.renderAction()}
+        ${this.renderClear()}${this.renderAction()}
       </form>
     `;
   }

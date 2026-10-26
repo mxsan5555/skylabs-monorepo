@@ -1,16 +1,23 @@
 import { createElement, type ChangeEvent } from 'react';
 import '@skylabs-monorepo/shared-ui';
-import type { CatalogDealFacets } from '../../../api/catalog';
+import type { CatalogDealFacets, CatalogOfferTag, CatalogProductFacets } from '../../../api/catalog';
 import { CheckboxFacet } from '../checkbox-facet/checkbox-facet';
 import { PriceRangeField, type PriceRange } from '../price-range-field/price-range-field';
-import type content from '../../../content.json';
+import content from '../../../content.json';
 import './filter-panel.css';
 
 type FilterPanelCopy = (typeof content)['category']['filterPanel'];
+type TagLabels = (typeof content)['offerCard']['tags'];
+
+/** Any listing's facets: deal and therapist facets, product facets, or a mix (explore). */
+export type ListingFacets = Partial<CatalogDealFacets & CatalogProductFacets>;
 
 export interface FilterPanelProps {
-  kind: 'deals' | 'products';
-  facets: CatalogDealFacets | null;
+  /** Picks the sections (PLANNING §4): deals = location, distance, price, tags, business,
+   *  branches; products = category (with `onCategories`), price, tags; therapists = deals
+   *  without tags; all (explore's mixed list) = location, distance, price. */
+  kind: 'deals' | 'products' | 'therapists' | 'all';
+  facets: ListingFacets | null;
   location: { city: string | null; hasCoords: boolean };
   onChangeLocation: () => void;
   radiusKm?: number;
@@ -22,15 +29,23 @@ export interface FilterPanelProps {
   onVendors: (ids: string[]) => void;
   branchIds: string[];
   onBranches: (ids: string[]) => void;
+  tags: CatalogOfferTag[];
+  onTags: (tags: CatalogOfferTag[]) => void;
+  /** Products only: a Category section when given (the all-products page). */
+  categoryIds?: string[];
+  onCategories?: (ids: string[]) => void;
   onClearAll: () => void;
   copy: FilterPanelCopy;
+  tagLabels?: TagLabels;
 }
+
+const defaultTagLabels = content.offerCard.tags;
 
 const textButton = (props: Record<string, unknown>, label: string) => createElement('md-text-button', props, label);
 
-/** Groupon-style filter side panel: location, distance, price, business and branch facets in an
- *  accordion. Deal-only sections are skipped for `kind="products"`. Raw M3 elements (radios,
- *  buttons) so tests can drive them directly. */
+/** Groupon-style filter side panel: location, distance, category, price, tags, business and
+ *  branch facets in an accordion, per `kind`. Raw M3 elements (radios, buttons) so tests can drive
+ *  them directly. */
 export function FilterPanel({
   kind,
   facets,
@@ -45,11 +60,19 @@ export function FilterPanel({
   onVendors,
   branchIds,
   onBranches,
+  tags,
+  onTags,
+  categoryIds = [],
+  onCategories,
   onClearAll,
   copy,
+  tagLabels = defaultTagLabels,
 }: FilterPanelProps) {
   const countLabel = (count: number) => (count === 1 ? copy.countOne : copy.countMany.replace('{count}', String(count)));
-  const isDeals = kind === 'deals';
+  const located = kind !== 'products';
+  const hasTags = kind === 'deals' || kind === 'products';
+  const hasMembers = kind === 'deals' || kind === 'therapists';
+  const facetCopy = { showMore: copy.showMore, showLess: copy.showLess, countLabel };
   const distance = facets?.distance ?? [];
   const distanceDisabled = !location.hasCoords;
 
@@ -62,7 +85,7 @@ export function FilterPanel({
     <div className="filter-panel">
       <h2 className="filter-panel__title title-medium">{copy.title}</h2>
       <sky-accordion>
-        {isDeals && (
+        {located && (
           <sky-accordion-item header={copy.location.title} open>
             <div className="filter-panel__location">
               <p className="body-medium">{location.city ?? copy.location.notSet}</p>
@@ -71,7 +94,7 @@ export function FilterPanel({
           </sky-accordion-item>
         )}
 
-        {isDeals && (
+        {located && (
           <sky-accordion-item header={copy.distance.title} open>
             <div className="filter-panel__distance">
               <ul className="checkbox-facet__list">
@@ -113,11 +136,35 @@ export function FilterPanel({
           </sky-accordion-item>
         )}
 
+        {kind === 'products' && onCategories && (
+          <sky-accordion-item header={copy.category.title} open>
+            <CheckboxFacet
+              options={(facets?.categories ?? []).map((c) => ({ value: c.id, label: c.name, count: c.count }))}
+              selected={categoryIds}
+              onChange={onCategories}
+              searchLabel={copy.category.search}
+              {...facetCopy}
+            />
+          </sky-accordion-item>
+        )}
+
         <sky-accordion-item header={copy.price.title} open>
           <PriceRangeField bounds={priceBounds} value={price} onChange={onPrice} copy={copy.price} />
         </sky-accordion-item>
 
-        {isDeals && (
+        {hasTags && (
+          <sky-accordion-item header={copy.tags.title} open>
+            <CheckboxFacet
+              options={(facets?.tags ?? []).map((t) => ({ value: t.tag, label: tagLabels[t.tag], count: t.count }))}
+              selected={tags}
+              onChange={(values) => onTags(values as CatalogOfferTag[])}
+              searchLabel={copy.tags.search}
+              {...facetCopy}
+            />
+          </sky-accordion-item>
+        )}
+
+        {hasMembers && (
           <sky-accordion-item header={copy.business.title} open>
             <CheckboxFacet
               options={(facets?.vendors ?? []).map((v) => ({ value: v.id, label: v.name, count: v.count }))}
@@ -131,7 +178,7 @@ export function FilterPanel({
           </sky-accordion-item>
         )}
 
-        {isDeals && (
+        {hasMembers && (
           <sky-accordion-item header={copy.branches.title} open>
             <CheckboxFacet
               options={(facets?.branches ?? []).map((b) => ({

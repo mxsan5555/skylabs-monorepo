@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { validateParams, validateQuery } from '../middleware/validate';
-import { CatalogDealQuerySchema, CatalogDealFacetQuerySchema, CatalogProductQuerySchema, CatalogTherapistQuerySchema, CatalogVendorQuerySchema, splitIds } from '../schemas/catalog.schema';
+import { CatalogDealQuerySchema, CatalogDealFacetQuerySchema, CatalogProductQuerySchema, CatalogTherapistQuerySchema, CatalogVendorQuerySchema, splitIds, CatalogProductFacetQuerySchema, CatalogTherapistFacetQuerySchema, splitTags } from '../schemas/catalog.schema';
 import { PublicBlogPostListQuerySchema } from '../schemas/blog-post.schema';
 import { z } from 'zod';
 import * as catalogService from '../services/catalog.service';
@@ -77,7 +77,7 @@ router.get('/categories/:slug', validateParams(z.object({ slug: z.string().min(1
 
 router.get('/deals', validateQuery(CatalogDealQuerySchema), async (req, res, next) => {
   try {
-    const { page, pageSize, categoryId, subcategoryId, vendorId, branchId, vendorIds, branchIds, search, state, city, sort, minPrice, maxPrice, radiusKm, latitude, longitude } =
+    const { page, pageSize, categoryId, subcategoryId, vendorId, branchId, vendorIds, branchIds, search, state, city, sort, minPrice, maxPrice, radiusKm, latitude, longitude, tags } =
       req.validatedQuery as ReturnType<typeof CatalogDealQuerySchema.parse>;
     const { items, total } = await catalogService.listPublicDeals({
       page,
@@ -97,6 +97,7 @@ router.get('/deals', validateQuery(CatalogDealQuerySchema), async (req, res, nex
       radiusKm,
       latitude,
       longitude,
+      tags: splitTags(tags),
     });
     sendData(res, items, { meta: { total, page, pageSize } });
   } catch (err) {
@@ -108,7 +109,7 @@ router.get('/deals', validateQuery(CatalogDealQuerySchema), async (req, res, nex
 // UUID-validated param, so `/deals/facets` must come first or it would 422 as an invalid UUID.
 router.get('/deals/facets', validateQuery(CatalogDealFacetQuerySchema), async (req, res, next) => {
   try {
-    const { categoryId, subcategoryId, vendorIds, branchIds, search, state, city, minPrice, maxPrice, radiusKm, latitude, longitude } =
+    const { categoryId, subcategoryId, vendorIds, branchIds, search, state, city, minPrice, maxPrice, radiusKm, latitude, longitude, tags } =
       req.validatedQuery as ReturnType<typeof CatalogDealFacetQuerySchema.parse>;
     sendData(
       res,
@@ -125,6 +126,7 @@ router.get('/deals/facets', validateQuery(CatalogDealFacetQuerySchema), async (r
         radiusKm,
         latitude,
         longitude,
+        tags: splitTags(tags),
       }),
     );
   } catch (err) {
@@ -142,10 +144,19 @@ router.get('/deals/:id', validateParams(z.object({ id: z.string().uuid() })), as
 
 router.get('/products', validateQuery(CatalogProductQuerySchema), async (req, res, next) => {
   try {
-    const { page, pageSize, categoryId, subcategoryId, vendorId, search, sort, minPrice, maxPrice } =
-      req.validatedQuery as ReturnType<typeof CatalogProductQuerySchema.parse>;
-    const { items, total } = await catalogService.listPublicProducts({ page, pageSize, categoryId, subcategoryId, vendorId, search, sort, minPrice, maxPrice });
-    sendData(res, items, { meta: { total, page, pageSize } });
+    const { categoryIds, tags, ...query } = req.validatedQuery as ReturnType<typeof CatalogProductQuerySchema.parse>;
+    const { items, total } = await catalogService.listPublicProducts({ ...query, categoryIds: splitIds(categoryIds), tags: splitTags(tags) });
+    sendData(res, items, { meta: { total, page: query.page, pageSize: query.pageSize } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Before `/products/:id` (UUID-validated), same as `/deals/facets`.
+router.get('/products/facets', validateQuery(CatalogProductFacetQuerySchema), async (req, res, next) => {
+  try {
+    const { categoryIds, tags, ...query } = req.validatedQuery as ReturnType<typeof CatalogProductFacetQuerySchema.parse>;
+    sendData(res, await catalogService.getPublicProductFacets({ ...query, categoryIds: splitIds(categoryIds), tags: splitTags(tags) }));
   } catch (err) {
     next(err);
   }
@@ -180,10 +191,19 @@ router.get('/vendors/:slug', validateParams(z.object({ slug: z.string().min(1) }
 
 router.get('/therapists', validateQuery(CatalogTherapistQuerySchema), async (req, res, next) => {
   try {
-    const { page, pageSize, categoryId, subcategoryId, vendorId, branchId, search, latitude, longitude } =
-      req.validatedQuery as ReturnType<typeof CatalogTherapistQuerySchema.parse>;
-    const { items, total } = await catalogService.listPublicTherapists({ page, pageSize, categoryId, subcategoryId, vendorId, branchId, search, latitude, longitude });
-    sendData(res, items, { meta: { total, page, pageSize } });
+    const { vendorIds, branchIds, ...query } = req.validatedQuery as ReturnType<typeof CatalogTherapistQuerySchema.parse>;
+    const { items, total } = await catalogService.listPublicTherapists({ ...query, vendorIds: splitIds(vendorIds), branchIds: splitIds(branchIds) });
+    sendData(res, items, { meta: { total, page: query.page, pageSize: query.pageSize } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Before `/therapists/:id` (UUID-validated), same as `/deals/facets`.
+router.get('/therapists/facets', validateQuery(CatalogTherapistFacetQuerySchema), async (req, res, next) => {
+  try {
+    const { vendorIds, branchIds, ...query } = req.validatedQuery as ReturnType<typeof CatalogTherapistFacetQuerySchema.parse>;
+    sendData(res, await catalogService.getPublicTherapistFacets({ ...query, vendorIds: splitIds(vendorIds), branchIds: splitIds(branchIds) }));
   } catch (err) {
     next(err);
   }

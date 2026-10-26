@@ -204,7 +204,22 @@ one grouped Filter menu, with distinct tonal colours per status.
   confirmation. No rating badge until reviews exist (task ST-22).
 - **Location:** saved choice, then browser location (only if already granted or on user action),
   then Vercel IP, then none. Coordinates map to the nearest partner city within 75 km.
-- **Home:** hero with search, shop by category, deals near you (category tabs, distance sorted),
+- **Header search** (`SearchPanel` under the header field, task ST-38): focusing the field opens
+  a panel. Its first row names the visitor's location ("Near {city}", Change) or asks for one
+  ("Set your location to see what's near you"). With no query it lists the top categories. From 2
+  characters it shows, in order: matching categories and subcategories (text rows), Deals
+  (nearest first with distance when there are coordinates, else the visitor's city; when the
+  city has none, deals from other cities, nearest first, under "No deals in {city} yet. These are
+  from other states.", and Show all then has no count),
+  Therapists (nearest first), Products (not location bound); each a row with image, member, title,
+  place, distance and price, 4 per group. The footer "Show all results" opens `/explore?q=` and
+  carries the result count from the API. Change switches the panel to a location step: filter
+  the partner cities, pick one, or "Use my current location"; when the browser refuses or fails,
+  an error says so and points to the browser's location setting and the city list. Picking a
+  location re-runs the search for it and returns to the results. Combobox keyboard path: arrows
+  move through result rows, Enter opens one, Escape closes, Tab reaches Change and Show all. No
+  new API: existing `/catalog/deals`, `/catalog/therapists`, `/catalog/products`.
+- **Home:** hero with search, deals by category (5x2 tile grid from 840px, 2 columns below), deals near you (category tabs, distance sorted),
   how it works, therapists, offers, products, popular treatments, FAQ, partner banner.
 - **Offer card** (`sky-product-card price-first`, showcase "Offer card", to replace listing cards
   page by page in task ST-31): tag on the image (New, Deal, Hot, Expire soon, each a theme role
@@ -220,25 +235,60 @@ one grouped Filter menu, with distinct tonal colours per status.
   explore, products, wishlist and "You May Also Like".
 - **Therapist card** (`TherapistCard`): image slider, member, area, distance and "From" lowest
   package price; used on home, explore, category, therapists and the therapist page rail.
-- **Explore** (`/explore`): list and grid show the same offer and therapist cards as the category
-  page (list = horizontal cards), each with a kind tag (Deal, Product, Therapist).
 - **Detail pages** (`/deal/:id`, `/therapist/:id`): one layout. Breadcrumb; gallery with
   thumbnails and the discount tag; buy box with chips, h1, price, package list, quantity, total,
   Add to cart, wishlist (deals) and share; Details accordions beside Location (Get directions)
   and Hours; then a rail (deals: same category; therapists: same member). A therapist is added
   to cart from its own page with the chosen package, never through a deal.
-- **Category page** (`/category/:slug`, `/category/:slug/:city`): h1 and total, clamped
-  description, subcategory pills, Filters, List/Grid/Map, sort (Relevance, Price low to high, high
-  to low, Distance when the visitor has coordinates), filter panel (Your location, Distance,
-  Price, Business, Branches, Clear all), 12 cards per page with infinite scroll. All view state is
-  in the URL.
+- **Category page** (`/category/:slug`, `/category/:slug/:city`): h1, clamped description,
+  subcategory pills with the total at the end of their row, Filters, List/Grid/Map, sort
+  (Relevance, Price low to high, high to low, Distance when the visitor has coordinates), filter
+  panel per category type (table below) with Clear all, 12 cards per page with infinite scroll.
+  All view state is in the URL.
+- **Listing pages share the category layout** (D29, tasks ST-40 to ST-43): `/deals`,
+  `/products`, `/therapists` and `/explore` use the category page's blocks (breadcrumb, h1 + clamped description, chip row, toolbar with Filters, List/Grid(/Map)
+  and Sort, `FilterPanel` beside the cards, 12 per page with infinite scroll, all view state in
+  the URL). One listing shell, per-kind config; no page-specific CSS.
+  - **Result count** sits at the end of the chip row (`ChipNav` start, "{n} deals" end; it wraps
+    under the chips on phones), on the category page too. Not in the h1 row any more.
+  - **Chips are links where a page exists** (SEO): on `/deals`, `/products` and `/therapists` the
+    chips are the top-level SERVICE, PRODUCT and THERAPY categories and link to
+    `/category/:slug`; on a category page they stay the subcategory pills (`?sub=`). On
+    `/explore` the chips are the kinds (All, Deals, Products, Therapists; `?kind=`), each with
+    its count; they replace the old per-card kind label, so the image keeps the offer tag. "All"
+    lists a page of each kind together and sorts by relevance only. `?category=<slug>` (treatment
+    links) narrows to that category and picks its kind.
+  - **Routes:** `/deals` and `/deals/:city` (new), `/products`, `/therapists` and
+    `/therapists/:city` (new), prerendered with ItemList + BreadcrumbList JSON-LD and listed in
+    `sitemap.xml` (city pages only for partner cities with results). `/explore?q=` stays a
+    search page: `noindex, follow`, canonical `/explore`.
+  - **Filters per kind** (`FilterPanel kind`):
+    | Kind | Sections | Sort |
+    |---|---|---|
+    | Deals (`/deals`, SERVICE category) | Your location, Distance, Price, Tags, Business, Branches | Relevance, Price low-high / high-low, Distance (with coordinates) |
+    | Products (`/products`, PRODUCT category) | Category (`/products` only), Price, Tags; no location or distance | Relevance, Newest, Price low-high / high-low, Discount |
+    | Therapists (`/therapists`, THERAPY category) | Your location, Distance, Price ("From" price), Business, Branches | Relevance, Price low-high / high-low, Distance (with coordinates) |
+    | Explore | the selected kind's sections; "All" shows Your location, Distance, Price | the selected kind's sorts |
+    No Reviews filter until a review system exists (ST-22).
+  - **Tags** (New, Deal, Hot, Expire soon; one per card on the image, theme role via
+    `badge-color` / `badge-tone` as in the showcase): a Tags checkbox facet with counts on deal,
+    product, category and explore pages, `?tag=new,hot`. They replace the popular-tag label on
+    the card image. Product's free-text `badge` stays a member field and is not a tag.
+  - **Tag rule** (D30, computed by the API on every request, no admin field), first match wins:
+    1. **Expire soon** (`error`, tonal): a deal whose `endDate` is within the next 7 days.
+    2. **Hot** (`error`, filled): in the top 10% of its kind by paid order lines (order
+       `CONFIRMED` or `COMPLETED`) in the last 30 days, with at least 5 lines.
+    3. **New** (`tertiary`, tonal): created in the last 14 days.
+    4. **Deal** (`primary`, filled): 30% off or more.
+    Otherwise no tag. Thresholds live in one API constant. Therapists have no tags.
+  - **Sorting and filtering happen in the API** for every kind, so page 2 continues page 1's
+    order (endpoints: `API.md` §4).
 - **SEO, GEO, AEO:** public routes are prerendered at build time with JSON-LD (Organization,
   WebSite search, ItemList, FAQPage, BreadcrumbList); `sitemap.xml`, `robots.txt`, `llms.txt`;
   `noindex` on account, cart, checkout and auth pages.
 - **Maps:** Leaflet + OpenStreetMap by default (free, attribution visible); Google Maps behind a
   switch.
-- Open questions: ST-03 (staff "Account" on phones), ST-13 (index product and therapy category
-  pages or redirect).
+- Open questions: ST-03 (staff "Account" on phones).
 
 ## 5. Static content
 
@@ -403,6 +453,9 @@ expire after 5 minutes (ARCHITECTURE.md §12.3).
 | D26 | Home hero layout | Keep h1 and search on the left; larger mixed deal and product card carousel on the right (2026-10-18) |
 | D28 | Home slider console | Overview table of every state slider, then a two-pane builder with no dialogs (2026-10-18) |
 | D27 | Member order changes | None: members view own orders only (2026-10-18) |
+| D29 | Listing pages | `/deals`, `/products`, `/therapists` and `/explore` use the category layout with per-kind filters; result count on the chip row (2026-10-24) |
+| D30 | Card tags | Computed by the API, one per card: Expire soon, Hot, New, Deal (rules in §4); no admin field (2026-10-24) |
+| D31 | Product and therapy category pages (ST-13) | Indexable: `/category/:slug` lists one category, `/products` and `/therapists` list all; chips link the two (2026-10-24) |
 | B2 | Vendor rename | Prisma `Vendor` → `Member`, `VendorDocument` → `MemberDocument` with `@@map`; FK columns stay `vendorId` |
 | B5 | Permission key | `vendors` → `members`; role `vendor` → `member`; role `support` added |
 | N1 | Reminder decisions (2026-10-17) | Clear the flag when documents complete; bell alert to `members:status_change` holders; Remind now in this release |

@@ -14,8 +14,12 @@ export interface LocationValue {
   state: string | null;
   coords: Coordinates | null;
   setCity: (location: CatalogLocation) => void;
-  requestBrowser: () => void;
+  /** Asks the browser for coordinates. Resolves `failed` when the visitor refused or the lookup
+   *  failed, `superseded` when a newer request or a city pick won meanwhile. */
+  requestBrowser: () => Promise<BrowserLocateResult>;
 }
+
+export type BrowserLocateResult = 'located' | 'failed' | 'superseded';
 
 interface Resolved {
   status: LocationStatus;
@@ -32,8 +36,9 @@ interface Resolved {
 const STORAGE_KEY = 'msd.location';
 const NONE: Resolved = { status: 'none', source: 'none', city: null, state: null, coords: null };
 const noop = () => undefined;
+const failed = () => Promise.resolve<BrowserLocateResult>('failed');
 
-const LocationContext = createContext<LocationValue>({ ...NONE, setCity: noop, requestBrowser: noop });
+const LocationContext = createContext<LocationValue>({ ...NONE, setCity: noop, requestBrowser: failed });
 
 const coordsOf = (v: { latitude?: number | null; longitude?: number | null }): Coordinates | null =>
   v.latitude != null && v.longitude != null ? { latitude: v.latitude, longitude: v.longitude } : null;
@@ -168,22 +173,21 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     setResolved({ status: 'ready', source: 'saved', city: location.city, state: location.state, coords: coordsOf(location) });
   }, []);
 
-  const requestBrowser = useCallback(() => {
+  const requestBrowser = useCallback(async (): Promise<BrowserLocateResult> => {
     const myBrowserId = ++browserRequestId.current;
     const myChoiceGen = choiceGen.current;
     setResolved((r) => ({ ...r, status: 'locating' }));
-    void (async () => {
-      const coords = await readBrowserCoords();
-      // A newer requestBrowser() call superseded this one, or the visitor picked a city while
-      // this lookup was in flight — either way, this result is stale and must not be applied.
-      if (browserRequestId.current !== myBrowserId || choiceGen.current !== myChoiceGen) return;
-      if (coords) {
-        writeSaved(null);
-        setResolved({ status: 'ready', source: 'browser', city: null, state: null, coords });
-      } else {
-        setResolved((r) => ({ ...r, status: r.city || r.coords || r.ipCity ? 'ready' : 'none' }));
-      }
-    })();
+    const coords = await readBrowserCoords();
+    // A newer requestBrowser() call superseded this one, or the visitor picked a city while
+    // this lookup was in flight — either way, this result is stale and must not be applied.
+    if (browserRequestId.current !== myBrowserId || choiceGen.current !== myChoiceGen) return 'superseded';
+    if (coords) {
+      writeSaved(null);
+      setResolved({ status: 'ready', source: 'browser', city: null, state: null, coords });
+      return 'located';
+    }
+    setResolved((r) => ({ ...r, status: r.city || r.coords || r.ipCity ? 'ready' : 'none' }));
+    return 'failed';
   }, []);
 
   const value = useMemo<LocationValue>(() => {

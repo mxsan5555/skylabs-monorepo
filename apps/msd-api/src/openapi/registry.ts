@@ -76,7 +76,7 @@ import {
   PopularTagMapSchema,
 } from '../schemas/popular-tag.schema';
 import { ProductCreateSchema, ProductUpdateSchema, ProductStatusUpdateSchema } from '../schemas/product.schema';
-import { CatalogDealQuerySchema, CatalogDealFacetQuerySchema, CatalogProductQuerySchema, CatalogTherapistQuerySchema, CatalogVendorQuerySchema } from '../schemas/catalog.schema';
+import { CatalogDealQuerySchema, CatalogDealFacetQuerySchema, CatalogProductQuerySchema, CatalogProductFacetQuerySchema, CatalogTherapistQuerySchema, CatalogTherapistFacetQuerySchema, CatalogVendorQuerySchema } from '../schemas/catalog.schema';
 import { CartAddItemSchema, CartUpdateItemSchema } from '../schemas/cart.schema';
 import { WishlistAddItemSchema } from '../schemas/wishlist.schema';
 import { OrderCheckoutSchema, OrderCustomerCancelSchema, OrderStatusUpdateSchema } from '../schemas/order.schema';
@@ -1577,7 +1577,7 @@ export function buildOpenApiDocument() {
       'Registered before /catalog/deals/{id} so "facets" is never parsed as a deal id.',
     tags: ['Catalogue (public)'],
     request: { query: CatalogDealFacetQuerySchema },
-    responses: { 200: { description: 'Deal facets: { vendors[], branches[], distance[], price | null }' } },
+    responses: { 200: { description: 'Deal facets: { vendors[], branches[], distance[], price | null, tags[] }' } },
   });
 
   registry.registerPath({
@@ -1594,10 +1594,22 @@ export function buildOpenApiDocument() {
     path: '/catalog/products',
     summary:
       'Public product listing — Product is a fully independent catalog entity (no Deal wrapper); ' +
-      'active products with an active vendor; sort=newest|discount (default newest), minPrice/maxPrice filter on price',
+      'active products with an active vendor; sort=newest|discount (default newest), minPrice/maxPrice filter on price, ' +
+      'categoryIds and tags (card tag) filters; each item carries its card `tag`',
     tags: ['Catalogue (public)'],
     request: { query: CatalogProductQuerySchema },
     responses: { 200: { description: 'Products' } },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/catalog/products/facets',
+    summary:
+      'Filter-panel counts for the product list — same filters as GET /catalog/products minus paging/sort; ' +
+      'category, tag and price each ignore their own selection. Registered before /catalog/products/{id}.',
+    tags: ['Catalogue (public)'],
+    request: { query: CatalogProductFacetQuerySchema },
+    responses: { 200: { description: 'Product facets: { categories[], tags[], price | null }' } },
   });
 
   registry.registerPath({
@@ -1734,6 +1746,17 @@ export function buildOpenApiDocument() {
     tags: ['Catalogue (public)'],
     request: { query: CatalogTherapistQuerySchema },
     responses: { 200: { description: 'Therapists' } },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/catalog/therapists/facets',
+    summary:
+      'Filter-panel counts for the therapist list — same filters as GET /catalog/therapists minus paging/sort; ' +
+      'vendors, branches, distance and price (lowest active package), each ignoring its own selection.',
+    tags: ['Catalogue (public)'],
+    request: { query: CatalogTherapistFacetQuerySchema },
+    responses: { 200: { description: 'Therapist facets: { vendors[], branches[], distance[], price | null }' } },
   });
 
   registry.registerPath({
