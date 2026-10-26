@@ -40,7 +40,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 1 | Admin and staff | 2 | 31 | 6 |
 | 2 | Members | 32 | 87 | 37 |
 | 3 | Customers and orders | 2 | 12 | 17 |
-| 4 | Storefront | 2 | 32 | 6 |
+| 4 | Storefront | 16 | 42 | 38 |
 | 5 | Static content | 0 | 5 | 0 |
 | 6 | CTA banners | 4 | 5 | 80 |
 | 7 | Home slider | 7 | 8 | 88 |
@@ -49,7 +49,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
 | 12 | Platform, security and release | 7 | 69 | 10 |
-| | **Total** | **56** | **265** | **21** |
+| | **Total** | **70** | **275** | **25** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -222,21 +222,15 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | ST-10 | OPS | When the custom domain goes live, set `VITE_SITE_URL` (website origin, not the API) for Vercel Production and redeploy; until then canonicals, OG, most JSON-LD and sitemap/robots/llms are omitted. The Vercel build must reach the Railway msd-api (prerender data) | S | X-01 | Canonical tags and sitemap present on production |
 | [ ] | ST-11 | OPS | On the first Vercel preview, verify `/api/geo`, that `/category/x/` and `/spa.html` 308 to `/category/x` and `/spa`, and that non-prerendered routes get the SPA shell | S | - | Checklist ticked |
 | [ ] | ST-12 | OPS | Vercel deploy hook (cron or on catalog change) so prerendered pages rebuild when deals change | S | - | Hook fires, pages refresh |
-| [ ] | ST-13 | BIZ | Decide whether `/category/product` and `/category/therapy` are indexable or redirect to `/products` and `/therapists` | S | - | Decision recorded in PLANNING.md §4 |
+| [x] | ST-13 | BIZ | Decide whether `/category/product` and `/category/therapy` are indexable or redirect to `/products` and `/therapists` | S | - | Done 2026-10-24: D31, both indexable; chips link listing and category pages |
 | [ ] | ST-14 | FE | Add `prerender/` to a tsconfig so it is type-checked | S | - | `tsc` covers prerender |
-| [ ] | ST-15 | FE | `showcase.tsx` and unused `product-card.tsx` pass camelCase props to raw custom elements; fix, and delete `product-card.tsx` if unused | S | - | grep clean |
+| [x] | ST-15 | FE | `showcase.tsx` and unused `product-card.tsx` pass camelCase props to raw custom elements; fix, and delete `product-card.tsx` if unused | S | - | Done 2026-10-24: 80 props in 9 files moved to kebab-case (incl. `OfferCard` `price-first`, `image-alt`, `badge-color`/`badge-tone`, `original-price`, header `clear-label`), `product-card.tsx`/`.css` deleted, `SkyProductCardWC` writes `favorite`/`favorite-active` as attributes; guard `src/sky-element-props.test.ts`, hydration case in `offer-card.test.tsx` |
 | [ ] | ST-16 | FE | Audit app-level CSS in the dark theme (the footer theme switch exposes it) | S | - | No hardcoded light colours |
-| [ ] | ST-17 | BE | City filter for the products and therapists catalog APIs, so Product and Therapy city pages and popular searches can include them | M | - | Query param works, tests |
 | [ ] | ST-18 | FE | Popular searches render only on the client until the catalog is seeded into the prerender | S | - | Present in prerendered HTML |
 | [ ] | ST-19 | FE | Shared `--sky-content-max` token for the 1280px / 16px containers (header, footer, home) | S | - | One token, no repeated values |
-| [ ] | ST-20 | FE | Move the remaining `useCurrentLocation` callers (category, search, therapists, vendor) to `useVisitorLocation` | S | - | `useCurrentLocation` deleted |
+| [ ] | ST-20 | FE | Move the remaining `useCurrentLocation` callers (category, search, therapists, vendor) to `useVisitorLocation` | S | - | `useCurrentLocation` deleted (category, search and therapists move with ST-41 to ST-43) |
 | [x] | ST-21 | FE | Move `/categories`, therapists, orders, invoices and payments off `category.css` onto `PageSection`/`CardGrid`, then delete `category.css` | M | - | Done 2026-10-22: pages migrated, `category.css` deleted |
-| [ ] | ST-33 | BE | Public contact message endpoint (`POST /catalog/contact-messages`, table, console list) so the Contact form stores messages instead of opening the email app | M | - | Message stored; form posts; tests |
-| [ ] | ST-34 | BIZ | Owner supplies the real office address, phone and email (CMS Contact Us), replacing the `content.contact.defaults` placeholders | S | - | CMS row filled |
-| [x] | ST-35 | FE | Static page headers show the brand logo in the right column; Contact gets details + form + map; Become a member uses the same layout; 8 default FAQs; About copy describes a marketplace | M | - | Tests in contact, become-vendor, section-head |
 | [ ] | ST-22 | BIZ | Reviews system (customers rate completed orders) so the category page can add a rating sort, rating filter and card ratings | L | - | Module rules written in PLANNING.md |
-| [ ] | ST-23 | FE | Explore page adopts `FilterPanel`/`SidebarLayout` and the horizontal card list view | M | - | Same behaviour as category page (list/grid now use `OfferCard`/`TherapistCard` in `CardGrid`, 2026-10-22; filter panel left) |
-| [ ] | ST-24 | BE | Product vendor facet for the product category filter panel | S | - | Facet returned, tests |
 | [ ] | ST-25 | FE | Filter panel polish: keep selected Business/Branch options visible outside the facet list or past "Show more"; clamp URL min/max into the slider bounds when facets narrow | S | - | Tests |
 | [ ] | ST-26 | FE | Deal page single-location map using `DealMap` | S | - | Map shows the branch |
 | [ ] | ST-27 | OPS | Before traffic grows, move `VITE_MAP_TILE_URL` off `tile.openstreetmap.org` to a free-tier tile provider (OSM tile policy) | S | - | Env changed on Vercel |
@@ -244,8 +238,21 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [x] | ST-29 | SEC | JSON-LD on deal, product, products and member pages goes through `<JsonLd>` (escapes `</script>`); a member-supplied name could run script before | S | - | Merged: guard test `seo/json-ld-usage.test.ts` fails on any raw `application/ld+json` |
 | [x] | ST-30 | FE | Offer card (`OfferCard` in `app/components/offer-card`, used by the home hero with `color="surface-high"` `variant="plain"` and the showcase): `sky-product-card` `price-first`, `description`, `badge-color`/`badge-tone` (theme-role tags), `color` (M3 roles, shared `actionRoles` for slotted buttons), shared `lineClamp` and `mediaCorner` styles; real deal and product with Add to cart (`showCartAdded`), wishlist and the shared `useRequireSignIn` guard; grid and list | M | - | Merged: `sky-product-card.test.ts`, `offer-card.test.tsx`, `home.test.tsx` hero, `use-require-sign-in.test.tsx`; checked at 1440 and 390 px |
 | [ ] | ST-31 | FE | Replace listing cards with the offer card page by page (home, category, explore, search, member, wishlist) and move the ~40 inline sign-in redirects onto `useRequireSignIn` | L | ST-30 | Each page's tests; no visual regressions (done 2026-10-22: home, hero, category, explore/search, products, wishlist, deal and product "You May Also Like"; left: member page, remaining inline redirects) |
+| [ ] | ST-33 | BE | Public contact message endpoint (`POST /catalog/contact-messages`, table, console list) so the Contact form stores messages instead of opening the email app | M | - | Message stored; form posts; tests |
+| [ ] | ST-34 | BIZ | Owner supplies the real office address, phone and email (CMS Contact Us), replacing the `content.contact.defaults` placeholders | S | - | CMS row filled |
+| [x] | ST-35 | FE | Static page headers show the brand logo in the right column; Contact gets details + form + map; Become a member uses the same layout; 8 default FAQs; About copy describes a marketplace | M | - | Tests in contact, become-vendor, section-head |
 | [x] | ST-36 | FE | Offer card for services: title only, `divided` (hairline, then member and place on one line each; shared-ui `sky-product-card` option); `slider` prop (image slider with previous / next and dots via `ProductCardGallery fill`, on every listing); `TherapistCard` + `lowestPackagePrice` / `formatDistance` replace four hand-built therapist cards; list-layout images no longer stretch the row | M | ST-30 | Merged: `sky-product-card.test.ts` (divided), `offer-card.test.tsx` (slider), `search.test.tsx`; checked at 1366 and 390 px |
 | [x] | ST-37 | FE | Therapist detail laid out like the deal page: shared `components/detail-page` (gallery, price, quantity + total + Add to cart + share, location and hours, not found), one generic `DurationPackageSelector` (therapist selector removed), therapist cart line from the page, "More therapists at {member}" rail; deal page moved onto the same blocks | M | - | Merged: `therapist-detail.test.tsx`; deal and therapist pages checked at 1366 and 390 px |
+| [x] | ST-38 | FE | Header search panel: location row (Near {city} / set location), inline location step (`CityPicker`, shared with `CityPickerDialog`: city filter, current location, refused-location error), rich Deals / Therapists / Products rows, Show all with total; `sky-action-field` gains `clearable` and combobox wiring (`expanded`, `controlsElement`, `activeOption`) | M | - | `site-header.test.tsx`, `use-search-suggestions.test.ts`, `city-picker.test.tsx`, `sky-action-field.test.ts`; checked at 1366 and 390 px |
+| [x] | ST-39 | BIZ | Decide how a card gets its tag | S | - | Done 2026-10-24: D30, computed by the API (PLANNING §4 tag rule) |
+| [x] | ST-40 | BE | Catalog API for the listing pages: `tag` on deals/products + `tags` filter + tag facet counts; `GET /catalog/products/facets` and `categoryIds`; therapists sort, price, radius, city, member/branch filters and `GET /catalog/therapists/facets` | L | ST-39 | Done 2026-10-24: `offer-tag.test.ts`, `therapist-ranking.test.ts`, `product-facets.test.ts`, `deal-ranking.test.ts` tag facet, 13 new `catalog.routes.test.ts` cases; checked live on :3333 |
+| [x] | ST-41 | FE | One listing shell from the category page (count on the chip row, per-kind `FilterPanel` with Category and Tags facets, card tags); category page moved onto it | M | ST-40 | Done 2026-10-24: `components/listing/`, `filter-panel.test.tsx`, `chip-nav.test.tsx`, `category.test.tsx` (tag filter, server-side therapist sort); checked at 1366 and 390 px |
+| [x] | ST-42 | FE | `/deals`, `/deals/:city`, `/products`, `/therapists`, `/therapists/:city` on the shell, category chips as links, prerender + JSON-LD + sitemap | L | ST-41 | Done 2026-10-24: `ListingPage` (`listing-page.test.tsx`), prerender routes + `loadListingData` (`routes.test.ts`); old products and therapists pages removed; checked at 1366 and 390 px |
+| [x] | ST-43 | FE | `/explore` on the shell with kind chips and counts, `noindex, follow` | M | ST-41 | Done 2026-10-24: `search.test.tsx` rewritten (kind chips, counts, category param, `noindex, follow`, sign-in path); state/city dialogs replaced by the shared filter panel; checked at 1366 and 390 px |
+| [x] | ST-44 | FE | Home "Shop by category" becomes "Deals by category" with all 10 categories in a 5x2 grid from 840px (2 columns below) | S | - | Done 2026-10-24 (b01a585) |
+| [x] | ST-45 | FE | Category tiles get the M3 hover/press state layer (`sky-tile-card` with a slotted headline link); card rails and the home hero stop clipping card shadows and focus rings (padding inside Swiper's `::part(container)`) | S | - | Done 2026-10-24 (26981d8): `sky-tile-card.test.ts`; checked at 1280 px |
+
+Removed 2026-10-24: ST-17 (therapist city filter is in ST-40; products are not location bound, D29), ST-23 (explore filter panel is ST-43), ST-24 (products have no Business filter, D29).
 
 ## 5. Static content
 

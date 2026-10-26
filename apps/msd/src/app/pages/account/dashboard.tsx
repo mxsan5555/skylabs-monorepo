@@ -74,7 +74,7 @@ export function Dashboard() {
         <sky-feature-card
           color="tertiary"
           icon="error"
-          iconStyle="surface"
+          icon-style="surface"
           headline="Unable to load dashboard statistics"
           text={statsError}
         />

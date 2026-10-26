@@ -11,7 +11,9 @@ export interface SeoProps {
   path: string;
   /** Absolute image URL for social cards. */
   image?: string;
-  noindex?: boolean;
+  /** `true` = noindex, nofollow; `'follow'` = noindex, follow (search results whose links should
+   *  still be crawled). */
+  noindex?: boolean | 'follow';
   jsonLd?: JsonLdObject | JsonLdObject[];
 }
 
@@ -25,7 +27,7 @@ export function Seo({ title, description, path, image, noindex, jsonLd }: SeoPro
       <title>{title}</title>
       <meta name="description" content={description} />
       {url && <link rel="canonical" href={url} />}
-      {noindex && <meta name="robots" content="noindex, nofollow" />}
+      {noindex && <meta name="robots" content={noindex === 'follow' ? 'noindex, follow' : 'noindex, nofollow'} />}
       <meta property="og:type" content="website" />
       <meta property="og:site_name" content={content.site.fullName} />
       <meta property="og:title" content={title} />

@@ -27,6 +27,10 @@ Needs Postgres (local, never Neon production): `prisma migrate dev`, seed twice,
   an icon also contains the icon ligature text, so match on "contains", not equality.
 - Prerendered pages must hydrate cleanly: never pass `prop={undefined}` to a custom element; gate
   client-only state behind effects or `useHydrated`. `src/hydration.test.tsx` guards this.
+- `sky-*` options whose LIT attribute is kebab-case go in JSX in that form (`price-first`,
+  `image-alt`, also as `{...spread}` keys): server rendering writes `priceFirst` as `pricefirst` and
+  hydration never sets the property. `src/sky-element-props.test.ts` fails on the camelCase form and
+  on unknown attributes.
 - ESLint rejects empty functions, including in tests: use `vi.fn()`.
 - Tests that assert snackbar copy render `<SnackbarHost />` next to the page.
 - API route tests: 401 without a token, 403 without the permission, 200 with it; 422 for invalid
@@ -40,7 +44,7 @@ Known failures at 2026-10-18; they must not grow. Anything else failing is a reg
 
 | Project | Failing | Where |
 |---|---|---|
-| msd | 23 tests in 13 files | `permission-matrix` 9, `india-locations` 3, `contact-us` 2, and 1 each in `app.spec`, `widget-registry`, `deal-card`, `media-uploader`, `sky-product-card-wc`, `site-footer`, `wishlist`, `roles`, `settings`; `entry-server.test.tsx` fails to load. Regressions since commit e756759 (NewOfferCard), not yet fixed: `home` 4 (FAQ section no longer rendered, deal favourite), `category` 1 (product wishlist heart) |
+| msd | 22 tests in 12 files | `permission-matrix` 9, `india-locations` 3, `contact-us` 2, and 1 each in `app.spec`, `widget-registry`, `deal-card`, `media-uploader`, `site-footer`, `wishlist`, `roles`, `settings`; `entry-server.test.tsx` fails to load (`sky-product-card-wc` fixed 2026-10-24). Regressions since commit e756759 (NewOfferCard), not yet fixed: `home` 4 (FAQ section no longer rendered, deal favourite), `category` 1 (product wishlist heart) |
 | msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; the other 1,163 pass) |
 | shared-menu | 5 | `index.test.ts` |
 
@@ -114,17 +118,54 @@ mapPopularTag" (both pass alone).
 - `slider`: off by default (first image only); with 2+ images every slide renders, the buttons are
   named "Previous / Next image of {title}" and never change the page; one image keeps the plain
   image (`offer-card.test.tsx`). List cards keep one height whatever the photo ratio.
-- Explore: list and grid render offer and therapist cards; signed-out Add to cart goes to sign in
-  with the query kept (`search.test.tsx`); one (visually hidden) h1.
-- Category: a prerendered 404 renders not found on the first render; filter counts reload when
-  the city resolves (`category.test.tsx`).
+- Header search (ST-38, `site-header.test.tsx`, `use-search-suggestions.test.ts`,
+  `city-picker.test.tsx`, `sky-action-field.test.ts`): focus opens the panel with "Near {city}" and
+  Change, or the set-location prompt without a location; an empty query lists categories without
+  any API call; a query shows categories, Deals, Therapists and Products rows (image, title,
+  price, distance) with deals sent the city, state and coordinates; a location change re-runs the
+  search; a city with no matching deal shows other cities' deals under the note and Show all
+  without a count; Change shows the city filter, a pick calls `setCity` and returns to results; a refused
+  browser location shows the error alert; Show all opens `/explore?q=` with the total; arrows,
+  Enter and Escape work (Escape leaves the location step first) and the field's `activeOption` is the
+  active row (ARIA element reflection on the inner combobox input);
+  `sky-action-field clearable` clears and refocuses, default rendering unchanged. Checked at 1366
+  and 390 px.
 - Therapist detail (`therapist-detail.test.tsx`): type as h1, person and experience, Details and
   the location aside, the rail leaves out the current therapist; the price follows the chosen
   package; signed-out Add to cart goes to sign in; a 404 shows the not-found state.
 - One `<h1>` per page; prerendered `/` contains the hero `<h1>`, category links and JSON-LD; no
   hydration warnings; `sitemap.xml`, `robots.txt`, `llms.txt` written when `VITE_SITE_URL` is set.
-- Category page: pills set `?sub=`; sort and filters send the right API params; count shows
-  `meta.total`; page 2 requested on scroll; map hidden for products and therapists.
+- Category page (`category.test.tsx`): pills set `?sub=`; sort and filters send the right API
+  params; the count shows `meta.total` at the end of the chip row; page 2 requested on scroll;
+  map hidden for products and therapists; a prerendered 404 renders not found on the first
+  render; filter counts reload when the city resolves.
+- Card tags (ST-40, `offer-tag.test.ts`, `catalog.routes.test.ts`): a deal ending in 7 days or
+  less is Expire soon even when it is also hot, new or 30% off; ended deals get no Expire soon;
+  Hot needs the top 10% of paid lines in 30 days and at least 5 (4 lines → not hot; pending and
+  cancelled orders ignored); New is created within 14 days; Deal is 30% off or more (29% → none);
+  products never get Expire soon; `tags=hot,new` returns only items whose shown tag is one of
+  them; tag facet counts equal the filtered list totals; `tags=foo` → 422.
+- Catalog API for listings (ST-40, `catalog.routes.test.ts`): no new params → same items and
+  order as before plus `tag`; `products?categoryIds=` narrows; products facets return category,
+  tag and price counts, each ignoring its own selection; therapists `sort=price_asc` orders by
+  the lowest active package across pages (page 2 continues page 1); `distance` without
+  coordinates behaves like `relevance`; `radiusKm`, `city`, `vendorIds`, `branchIds`,
+  `minPrice` / `maxPrice` narrow and `meta.total` matches; therapist facets match the list.
+- Listing shell (ST-41, `filter-panel.test.tsx`, `chip-nav.test.tsx`, `category.test.tsx`): deals show Your location,
+  Distance, Price, Tags, Business, Branches; products show Category (on `/products`), Price and
+  Tags with no location or distance; therapists show Your location, Distance, Price, Business,
+  Branches; Clear all empties every filter param; a tag checkbox writes `?tag=` and the card
+  image shows the API tag with its theme role; no Reviews section.
+- Listing pages (ST-42, `listing-page.test.tsx`, `prerender/routes.test.ts`): `/deals`, `/deals/:city`, `/products`,
+  `/therapists` and `/therapists/:city` render one h1, breadcrumb, category chips as links to
+  `/category/:slug`, the count on the chip row and 12 cards then page 2 on scroll; unknown city
+  → not found and `noindex`; prerendered HTML holds the cards, ItemList and BreadcrumbList
+  JSON-LD and hydrates without warnings; `sitemap.xml` lists the new routes and only cities
+  with results. Checked at 1366 and 390 px, light and dark, no horizontal scroll at 320 px.
+- Explore (ST-43, `search.test.tsx`): kind chips All, Deals, Products, Therapists with counts set
+  `?kind=`; the filter panel follows the kind; list and grid render offer and therapist cards;
+  signed-out Add to cart goes to sign in with the query kept; one (visually hidden) h1;
+  `noindex, follow` and canonical `/explore`; `?category=` narrows to that category's kind.
 - axe (WCAG 2.2 AA) clean on `/` in light, dark and high-contrast; no horizontal scroll at 320,
   390, 768 and 1280 px; full keyboard path (skip link, header, panels, tab bar, footer); Lighthouse
   SEO and Accessibility 100 and LCP under 2.5 s on mobile for `/`.

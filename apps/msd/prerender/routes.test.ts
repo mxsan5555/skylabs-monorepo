@@ -16,7 +16,7 @@ const shell: ShellData = {
 };
 
 describe('buildRoutes', () => {
-  it('returns home, every category and every deal-category x unique city', () => {
+  it('returns home, every category, every deal-category x unique city, then the listing pages', () => {
     expect(buildRoutes(shell).map((r) => r.path)).toEqual([
       '/',
       '/category/massage',
@@ -27,7 +27,20 @@ describe('buildRoutes', () => {
       '/category/massage/navi-mumbai',
       '/category/spa/pune',
       '/category/spa/navi-mumbai',
+      '/deals',
+      '/products',
+      '/therapists',
+      '/deals/pune',
+      '/deals/navi-mumbai',
+      '/therapists/pune',
+      '/therapists/navi-mumbai',
     ]);
+  });
+
+  it('marks listing routes with their kind and city (ST-42)', () => {
+    const routes = buildRoutes(shell);
+    expect(routes.find((r) => r.path === '/products')).toEqual({ path: '/products', listing: 'products' });
+    expect(routes.find((r) => r.path === '/therapists/pune')).toEqual({ path: '/therapists/pune', listing: 'therapists', city: 'Pune', state: 'Maharashtra' });
   });
 
   it('keeps the first location for a duplicate city slug and carries its name and state', () => {
@@ -36,7 +49,12 @@ describe('buildRoutes', () => {
   });
 
   it('returns only home for an empty shell', () => {
-    expect(buildRoutes({ categories: [], locations: [], socialLinks: [] })).toEqual([{ path: '/' }]);
+    expect(buildRoutes({ categories: [], locations: [], socialLinks: [] })).toEqual([
+      { path: '/' },
+      { path: '/deals', listing: 'deals' },
+      { path: '/products', listing: 'products' },
+      { path: '/therapists', listing: 'therapists' },
+    ]);
   });
 });
 
@@ -48,6 +66,10 @@ describe('isEmptyCityPage', () => {
   it('is false for a city route with deals', () => {
     expect(isEmptyCityPage(route, { deals: [{}] })).toBe(false);
   });
+  it('reads listing payloads too: a city listing with no items is empty (ST-42)', () => {
+    expect(isEmptyCityPage({ path: '/deals/pune', listing: 'deals', city: 'Pune' }, { items: [] })).toBe(true);
+    expect(isEmptyCityPage({ path: '/deals/pune', listing: 'deals', city: 'Pune' }, { items: [{}] })).toBe(false);
+  });
   it('is false for a plain category route, even with no deals', () => {
     expect(isEmptyCityPage({ path: '/category/massage', slug: 'massage' }, { deals: [] })).toBe(false);
   });
@@ -56,7 +78,7 @@ describe('isEmptyCityPage', () => {
 describe('STATIC_PUBLIC_PATHS', () => {
   it('lists the public pages for the sitemap', () => {
     expect(STATIC_PUBLIC_PATHS).toEqual([
-      '/', '/explore', '/categories', '/products', '/therapists', '/blog', '/about', '/how-it-works',
+      '/', '/categories', '/deals', '/products', '/therapists', '/blog', '/about', '/how-it-works',
       '/contact', '/careers', '/become-vendor', '/privacy', '/terms', '/accessibility', '/cookies',
     ]);
   });

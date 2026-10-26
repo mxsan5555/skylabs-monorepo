@@ -148,11 +148,18 @@
    136px min keeps 2 columns in a 288px content box (320px viewport). */
 .home-cats {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+  /* 10 top-level categories: 2 columns on phones/tablets, 5x2 from 840px (M3 expanded). */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+@media (min-width: 840px) {
+  .home-cats {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
 }
 
 .home-cats__name {
@@ -381,6 +388,12 @@
 
 .home-hero__carousel {
   --hero-slide-gap: 16px;
+  margin: -8px;
+}
+
+/* Room inside Swiper's clip for the card hover shadow and focus ring (see card-rail.css). */
+.home-hero__carousel::part(container) {
+  padding: 8px 8px 12px;
 }
 
 .home-hero__slide {

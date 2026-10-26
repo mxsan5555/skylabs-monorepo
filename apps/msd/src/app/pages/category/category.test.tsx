@@ -14,6 +14,8 @@ const {
   listCatalogProductsMock,
   listCatalogTherapistsMock,
   getCatalogDealFacetsMock,
+  getCatalogProductFacetsMock,
+  getCatalogTherapistFacetsMock,
   shellState,
   defaultShell,
   authState,
@@ -36,6 +38,8 @@ const {
     listCatalogProductsMock: vi.fn(),
     listCatalogTherapistsMock: vi.fn(),
     getCatalogDealFacetsMock: vi.fn(),
+    getCatalogProductFacetsMock: vi.fn(),
+    getCatalogTherapistFacetsMock: vi.fn(),
     authState: { value: { isAuthenticated: false, token: null as string | null } },
     wishlistState: {
       toggle: vi.fn(),
@@ -58,6 +62,8 @@ vi.mock('../../../api/catalog', async () => {
     listCatalogProducts: (...args: unknown[]) => listCatalogProductsMock(...args),
     listCatalogTherapists: (...args: unknown[]) => listCatalogTherapistsMock(...args),
     getCatalogDealFacets: (...args: unknown[]) => getCatalogDealFacetsMock(...args),
+    getCatalogProductFacets: (...args: unknown[]) => getCatalogProductFacetsMock(...args),
+    getCatalogTherapistFacets: (...args: unknown[]) => getCatalogTherapistFacetsMock(...args),
   };
 });
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
@@ -131,6 +137,12 @@ const FACETS_DEFAULT = {
   branches: [{ id: BRANCH_A, name: 'Main', city: 'Pune', vendorName: 'Glow', count: 2 }],
   distance: [] as { km: number; count: number }[],
   price: { min: 299, max: 3499 },
+  tags: [
+    { tag: 'expire_soon' as const, count: 0 },
+    { tag: 'hot' as const, count: 1 },
+    { tag: 'new' as const, count: 2 },
+    { tag: 'deal' as const, count: 0 },
+  ],
 };
 
 function stubMedia(matches: boolean) {
@@ -163,6 +175,8 @@ beforeEach(() => {
   listCatalogProductsMock.mockResolvedValue({ data: [] });
   listCatalogTherapistsMock.mockResolvedValue({ data: [] });
   getCatalogDealFacetsMock.mockResolvedValue({ data: FACETS_DEFAULT });
+  getCatalogProductFacetsMock.mockResolvedValue({ data: { categories: [], tags: [], price: null } });
+  getCatalogTherapistFacetsMock.mockResolvedValue({ data: FACETS_DEFAULT });
   authState.value = { isAuthenticated: false, token: null };
   wishlistState.toggle.mockReset();
   wishlistState.has.mockReset().mockReturnValue(false);
@@ -333,8 +347,8 @@ describe('Category page with prerendered data', () => {
         </MemoryRouter>
       </PrerenderDataProvider>,
     );
-  const countText = () =>
-    document.getElementById('category-heading')?.closest('.section-head')?.querySelector('[aria-live]')?.textContent;
+  // The total sits at the end of the chip row (PLANNING §4, ST-41).
+  const countText = () => document.querySelector('.chip-nav-row__end [aria-live]')?.textContent;
 
   it('renders the prerendered category and deals first, then refreshes both once in the background', async () => {
     let resolveCategory!: (v: { data: CatalogCategoryWithChildren }) => void;
@@ -518,6 +532,35 @@ describe('Category page layout', () => {
       await waitFor(() => expect(getCatalogDealFacetsMock.mock.calls.at(-1)?.[0]?.vendorIds).toEqual([VENDOR_A]));
     });
 
+    it('ticking a tag sets ?tag= and sends tags to the deals and facets calls (ST-41)', async () => {
+      stubMedia(true);
+      renderAt('/category/massage');
+      await waitFor(() => expect(controlByLabel('md-checkbox', content.offerCard.tags.hot)).toBeTruthy());
+      const checkbox = requireControl('md-checkbox', content.offerCard.tags.hot);
+      checkbox.checked = true;
+      fireEvent.change(checkbox);
+      await waitFor(() => expect(screen.getByTestId('location-bar').textContent).toBe('/category/massage?tag=hot'));
+      await waitFor(() => expect(listCatalogDealsMock.mock.calls.at(-1)?.[0]?.tags).toEqual(['hot']));
+      await waitFor(() => expect(getCatalogDealFacetsMock.mock.calls.at(-1)?.[0]?.tags).toEqual(['hot']));
+    });
+
+    it('therapy category: sort goes to the API, therapist facets load and the panel has no tags (ST-41)', async () => {
+      stubMedia(true);
+      getCatalogCategoryMock.mockResolvedValue({ data: { ...CATEGORY, type: 'THERAPY' } });
+      renderAt('/category/massage?sort=price_asc');
+      await waitFor(() => expect(listCatalogTherapistsMock.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ sort: 'price_asc', page: 1 })));
+      await waitFor(() => expect(getCatalogTherapistFacetsMock).toHaveBeenCalled());
+      const aside = await screen.findByRole('complementary', { name: content.category.filterPanel.title });
+      const headers = Array.from(aside.querySelectorAll('sky-accordion-item')).map((s) => (s as HTMLElement & { header?: string }).header ?? s.getAttribute('header'));
+      expect(headers).toEqual([
+        content.category.filterPanel.location.title,
+        content.category.filterPanel.distance.title,
+        content.category.filterPanel.price.title,
+        content.category.filterPanel.business.title,
+        content.category.filterPanel.branches.title,
+      ]);
+    });
+
     it('ticking a branch checkbox sets ?branch= and sends branchIds', async () => {
       stubMedia(true);
       renderAt('/category/massage');
@@ -595,15 +638,19 @@ describe('Category page layout', () => {
       expect(await screen.findByRole('dialog', { name: content.category.filterPanel.title })).toBeTruthy();
     });
 
-    it('product category: does not request facets; the panel shows only Price', async () => {
+    it('product category: requests product facets; the panel shows Price and Tags, no location (ST-41)', async () => {
       stubMedia(true);
       getCatalogCategoryMock.mockResolvedValue({ data: { ...CATEGORY, type: 'PRODUCT' } });
       renderAt('/category/massage');
       await waitFor(() => expect(listCatalogProductsMock).toHaveBeenCalled());
       const aside = await screen.findByRole('complementary', { name: content.category.filterPanel.title });
       const sections = Array.from(aside.querySelectorAll('sky-accordion-item')) as (HTMLElement & { header?: string })[];
-      expect(sections.map((s) => s.header ?? s.getAttribute('header'))).toEqual([content.category.filterPanel.price.title]);
+      expect(sections.map((s) => s.header ?? s.getAttribute('header'))).toEqual([
+        content.category.filterPanel.price.title,
+        content.category.filterPanel.tags.title,
+      ]);
       expect(getCatalogDealFacetsMock).not.toHaveBeenCalled();
+      await waitFor(() => expect(getCatalogProductFacetsMock).toHaveBeenCalledWith(expect.objectContaining({ categoryId: CATEGORY.id })));
     });
   });
 

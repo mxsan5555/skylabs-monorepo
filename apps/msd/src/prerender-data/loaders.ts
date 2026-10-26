@@ -48,6 +48,13 @@ export interface CategoryData {
 /** Cards per page on the category page (and its prerendered first page). */
 export const CATEGORY_PAGE_SIZE = 12;
 
+/** Payload for key `listingDataKey(kind, city)` (read by `ListingPage`): the default view's
+ *  first page and the API total. */
+export interface ListingData<T = CatalogDeal | CatalogProduct | CatalogTherapist> {
+  items: T[];
+  total: number;
+}
+
 /** Copies only `keys` that are present, so the embedded payload carries no `undefined` noise. */
 function pick<T extends object, K extends keyof T>(obj: T, keys: readonly K[]): Pick<T, K> {
   const out = {} as Pick<T, K>;
@@ -73,7 +80,7 @@ const trimBranch = (b: CatalogDeal['branch']) => b && pick(b, ['id', 'name', 'ci
  */
 export const trimDeal = (d: CatalogDeal): CatalogDeal =>
   ({
-    ...pick(d, ['id', 'title', 'originalPrice', 'salePrice', 'discountPercent', 'durationMinutes', 'images', 'vendor', 'packages', 'popularTags', 'distanceKm']),
+    ...pick(d, ['id', 'title', 'originalPrice', 'salePrice', 'discountPercent', 'durationMinutes', 'images', 'vendor', 'packages', 'popularTags', 'distanceKm', 'tag']),
     // The home "Deals near you" tabs group deals by category id.
     ...(d.category !== undefined ? { category: d.category && pick(d.category, ['id', 'name', 'slug']) } : {}),
     ...(d.branch !== undefined ? { branch: trimBranch(d.branch) } : {}),
@@ -81,7 +88,7 @@ export const trimDeal = (d: CatalogDeal): CatalogDeal =>
   }) as CatalogDeal;
 
 export const trimProduct = (p: CatalogProduct): CatalogProduct =>
-  pick(p, ['id', 'name', 'image', 'imageAlt', 'price', 'originalPrice', 'discount', 'vendor', 'popularTags']) as CatalogProduct;
+  pick(p, ['id', 'name', 'image', 'imageAlt', 'price', 'originalPrice', 'discount', 'vendor', 'popularTags', 'tag']) as CatalogProduct;
 
 export const trimTherapist = (t: CatalogTherapist): CatalogTherapist =>
   ({
@@ -141,4 +148,20 @@ export async function loadCategoryData(slug: string, city?: string, state?: stri
     ...(state ? { state } : {}),
   });
   return { category, deals: (data ?? []).map(trimDeal), total: meta?.total ?? (data ?? []).length };
+}
+
+/** The first page of `/deals`, `/products` or `/therapists` (optionally one city) in its default
+ *  view. Rejects when the list call fails. */
+export async function loadListingData(kind: 'deals' | 'products' | 'therapists', city?: string, state?: string): Promise<ListingData> {
+  const where = { pageSize: CATEGORY_PAGE_SIZE, ...(city ? { city } : {}), ...(state ? { state } : {}) };
+  if (kind === 'products') {
+    const { data, meta } = await listCatalogProducts({ pageSize: CATEGORY_PAGE_SIZE });
+    return { items: (data ?? []).map(trimProduct), total: meta?.total ?? (data ?? []).length };
+  }
+  if (kind === 'therapists') {
+    const { data, meta } = await listCatalogTherapists(where);
+    return { items: (data ?? []).map(trimTherapist), total: meta?.total ?? (data ?? []).length };
+  }
+  const { data, meta } = await listCatalogDeals(where);
+  return { items: (data ?? []).map(trimDeal), total: meta?.total ?? (data ?? []).length };
 }

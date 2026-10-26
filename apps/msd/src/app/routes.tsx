@@ -74,10 +74,9 @@ import DealDetail from './pages/deal-detail/deal-detail';
 import { Cart } from './pages/cart/cart';
 import Wishlist from './pages/wishlist/wishlist';
 import Checkout from './pages/checkout/checkout';
-import ProductListing from './pages/products/products';
+import { ListingPage } from './pages/listing/listing-page';
 import ProductDetail from './pages/product-detail/product-detail';
 import VendorPage from './pages/vendor/vendor';
-import { Therapists } from './pages/therapists/therapists';
 import TherapistDetail from './pages/therapist-detail/therapist-detail';
 import { MyAccountLayout } from './pages/my-account/my-account-layout';
 import { MyAccountProfile } from './pages/my-account/profile';
@@ -147,12 +146,15 @@ export function AppRoutes() {
           <Route path="/category/:slug" element={<Category />} />
           <Route path="/category/:slug/:city" element={<Category />} />
           <Route path="/deal/:id" element={<DealDetail />} />
-          <Route path="/products" element={<ProductListing />} />
+          <Route path="/deals" element={<ListingPage key="deals" kind="deals" />} />
+          <Route path="/deals/:city" element={<ListingPage key="deals" kind="deals" />} />
+          <Route path="/products" element={<ListingPage key="products" kind="products" />} />
           <Route path="/products/:id" element={<ProductDetail />} />
           <Route path="/vendor/:slug" element={<VendorPage />} />
           {/* Therapist as an independent, directly browsable/purchasable entity — never reachable
             only via a Deal's page (see msd-api's Therapist schema doc comment). */}
-          <Route path="/therapists" element={<Therapists />} />
+          <Route path="/therapists" element={<ListingPage key="therapists" kind="therapists" />} />
+          <Route path="/therapists/:city" element={<ListingPage key="therapists" kind="therapists" />} />
           <Route path="/therapist/:id" element={<TherapistDetail />} />
           {/* Cart / Wishlist / Checkout — plain PublicLayout children (Header+Footer, no sidebar),
             exactly as they worked before the Customer Sidebar fix. These are NOT part of the

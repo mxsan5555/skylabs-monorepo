@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './showcase.css';
 import { LOGO_SRC as logo } from '../../../brand';
 // Opt-in: registers <swiper-container> / <swiper-slide> for the carousel demos.
@@ -662,11 +662,11 @@ export function Showcase() {
         <h2>Action field</h2>
         <p className="demo-label">Text input + action button: search, newsletter, coupon, pincode</p>
         <div className="demo-stack">
-          <sky-action-field role="search" type="search" enterkeyhint="search" icon="search" label="Search spas and treatments" placeholder="Search spas, treatments, locations" actionLabel="Search" />
-          <sky-action-field type="email" autocomplete="email" icon="mail" variant="outlined" label="Email address" placeholder="Your email address" actionLabel="Subscribe" required />
-          <sky-action-field dense icon="sell" label="Coupon code" placeholder="Enter coupon code" actionLabel="Apply" shape="small" />
-          <sky-action-field dense icon="location_on" label="Check availability by pincode" placeholder="Pincode" actionIcon="arrow_forward" variant="outlined" />
-          <sky-action-field label="Disabled field" placeholder="Disabled" actionLabel="Send" actionIcon="send" disabled />
+          <sky-action-field role="search" type="search" enterkeyhint="search" icon="search" label="Search spas and treatments" placeholder="Search spas, treatments, locations" action-label="Search" />
+          <sky-action-field type="email" autocomplete="email" icon="mail" variant="outlined" label="Email address" placeholder="Your email address" action-label="Subscribe" required />
+          <sky-action-field dense icon="sell" label="Coupon code" placeholder="Enter coupon code" action-label="Apply" shape="small" />
+          <sky-action-field dense icon="location_on" label="Check availability by pincode" placeholder="Pincode" action-icon="arrow_forward" variant="outlined" />
+          <sky-action-field label="Disabled field" placeholder="Disabled" action-label="Send" action-icon="send" disabled />
         </div>
       </section>
 
@@ -689,7 +689,7 @@ export function Showcase() {
         <div className="cards-grid">
           <sky-product-card
             image="https://picsum.photos/seed/spa/600/400"
-            imageAlt="Massage therapy"
+            image-alt="Massage therapy"
             badge="Popular Gift"
             favorite
             eyebrow="Just Relax Spa"
@@ -698,36 +698,36 @@ export function Showcase() {
             distance="11 mi"
             rating={4.7}
             reviews={783}
-            originalPrice="$220"
+            original-price="$220"
             price="$159"
             discount="-28%"
-            priceNote="$119.25 with code SUMMER"
+            price-note="$119.25 with code SUMMER"
           />
           <sky-product-card
             variant="outlined"
             image="https://picsum.photos/seed/grandhotel/600/400"
-            imageAlt="The Grand Hotel at night"
+            image-alt="The Grand Hotel at night"
             favorite
             tag="Hotel"
-            tagIcon="hotel"
+            tag-icon="hotel"
             heading="The Grand Hotel at the Grand Canyon"
             location="Tusayan, United States"
             score={8.5}
-            scoreLabel="Very Good"
+            score-label="Very Good"
             reviews={4798}
-            pricePrefix="Starting from"
-            originalPrice="$215"
+            price-prefix="Starting from"
+            original-price="$215"
             price="$172"
           />
           <sky-image-card
             image="https://picsum.photos/seed/cottages/600/800"
-            imageAlt="Children playing in a cottage garden"
+            image-alt="Children playing in a cottage garden"
             label="Cottages"
             href="#cottages"
           />
           <sky-category-card
             image="https://picsum.photos/seed/losangeles/600/600"
-            imageAlt="Los Angeles hills"
+            image-alt="Los Angeles hills"
             heading="Los Angeles"
             subheading="4,781 properties"
             href="#los-angeles"
@@ -747,12 +747,12 @@ export function Showcase() {
         <div className="cards-grid">
           <sky-product-card
             image="https://picsum.photos/seed/giftset/600/400"
-            imageAlt="Aromatherapy diffuser gift set"
+            image-alt="Aromatherapy diffuser gift set"
             badge="Best Seller"
             eyebrow="Serenity Co."
             heading="Aromatherapy Diffuser Gift Set"
             href="/showcase#cards"
-            originalPrice="$89"
+            original-price="$89"
             price="$64"
             discount="-28%"
           >
@@ -766,7 +766,7 @@ export function Showcase() {
           <sky-product-card
             variant="outlined"
             image="https://picsum.photos/seed/saltlamp/600/400"
-            imageAlt="Himalayan salt lamp"
+            image-alt="Himalayan salt lamp"
             eyebrow="Serenity Co."
             heading="Himalayan Salt Lamp"
             href="/showcase#cards"
@@ -786,7 +786,7 @@ export function Showcase() {
           <sky-product-card
             layout="horizontal"
             image="https://picsum.photos/seed/candleset/600/400"
-            imageAlt="Scented candle trio"
+            image-alt="Scented candle trio"
             eyebrow="Serenity Co."
             heading="Scented Candle Trio — Lavender, Sandalwood, Citrus"
             href="/showcase#cards"
@@ -803,7 +803,7 @@ export function Showcase() {
             variant="outlined"
             layout="horizontal"
             image="https://picsum.photos/seed/saltlamp2/600/400"
-            imageAlt="Himalayan salt lamp, bedside"
+            image-alt="Himalayan salt lamp, bedside"
             eyebrow="Serenity Co."
             heading="Himalayan Salt Lamp — Bedside Edition"
             href="/showcase#cards"
@@ -932,10 +932,10 @@ export function Showcase() {
       <section className="showcase__card" id="cta-banner">
         <h2>CTA banner</h2>
         <div className="demo-stack">
-          <sky-cta-banner color="inverse" icon="card_giftcard" iconStyle="tonal" iconShape="full" headline="Give the gift of wellness" text="Gift cards work at 200+ partner spas across India." ctaLabel="Buy gift card" ctaHref="/showcase#cta-banner" />
-          <sky-cta-banner color="primary" icon="percent" iconStyle="surface" headline="Flat 40% off your first booking" text="New members only. Applied at checkout." ctaLabel="Browse deals" ctaHref="/showcase#cta-banner" ctaIcon="arrow_forward" />
-          <sky-cta-banner color="none" variant="outlined" icon="storefront" iconStyle="tonal" headline="Own a spa?" text="List your services and reach customers near you." ctaLabel="Partner with us" ctaHref="/showcase#cta-banner" />
-          <sky-cta-banner color="tertiary" headline="No icon, tertiary container" text="Every option from the feature card works here." ctaLabel="See options" ctaHref="/showcase#feature-card" />
+          <sky-cta-banner color="inverse" icon="card_giftcard" icon-style="tonal" icon-shape="full" headline="Give the gift of wellness" text="Gift cards work at 200+ partner spas across India." cta-label="Buy gift card" cta-href="/showcase#cta-banner" />
+          <sky-cta-banner color="primary" icon="percent" icon-style="surface" headline="Flat 40% off your first booking" text="New members only. Applied at checkout." cta-label="Browse deals" cta-href="/showcase#cta-banner" cta-icon="arrow_forward" />
+          <sky-cta-banner color="none" variant="outlined" icon="storefront" icon-style="tonal" headline="Own a spa?" text="List your services and reach customers near you." cta-label="Partner with us" cta-href="/showcase#cta-banner" />
+          <sky-cta-banner color="tertiary" headline="No icon, tertiary container" text="Every option from the feature card works here." cta-label="See options" cta-href="/showcase#feature-card" />
         </div>
       </section>
 
@@ -1064,16 +1064,16 @@ export function Showcase() {
         <h2>Feature card</h2>
         <p className="demo-label">Container colors with a CTA</p>
         <div className="demo-grid demo-grid--wide">
-          <sky-feature-card color="primary" icon="card_giftcard" iconStyle="surface" headline="Give the gift of wellness" text="Gift a spa day. Redeemable at 200+ partner spas across India." ctaLabel="Buy gift card" ctaHref="/showcase#feature-card" />
-          <sky-feature-card color="surface-high" icon="payments" iconStyle="surface" headline="Unlock member-only pricing" text="Sign in to save deals, track bookings and see exclusive rates." ctaLabel="Sign in" ctaHref="/showcase#feature-card" />
-          <sky-feature-card color="secondary" icon="event_available" iconStyle="surface" headline="Book in 30 seconds" text="Pick a slot, pay online and get instant confirmation." ctaLabel="Browse deals" ctaHref="/showcase#feature-card" ctaIcon="arrow_forward" />
-          <sky-feature-card color="tertiary" icon="verified" iconStyle="surface" headline="Verified partners" text="Every spa is checked for hygiene, licensing and reviews." />
-          <sky-feature-card color="inverse" icon="support_agent" iconStyle="tonal" iconShape="full" headline="Talk to a wellness expert" text="Not sure what to book? We will help you choose." ctaLabel="Chat with us" ctaHref="/showcase#feature-card" />
+          <sky-feature-card color="primary" icon="card_giftcard" icon-style="surface" headline="Give the gift of wellness" text="Gift a spa day. Redeemable at 200+ partner spas across India." cta-label="Buy gift card" cta-href="/showcase#feature-card" />
+          <sky-feature-card color="surface-high" icon="payments" icon-style="surface" headline="Unlock member-only pricing" text="Sign in to save deals, track bookings and see exclusive rates." cta-label="Sign in" cta-href="/showcase#feature-card" />
+          <sky-feature-card color="secondary" icon="event_available" icon-style="surface" headline="Book in 30 seconds" text="Pick a slot, pay online and get instant confirmation." cta-label="Browse deals" cta-href="/showcase#feature-card" cta-icon="arrow_forward" />
+          <sky-feature-card color="tertiary" icon="verified" icon-style="surface" headline="Verified partners" text="Every spa is checked for hygiene, licensing and reviews." />
+          <sky-feature-card color="inverse" icon="support_agent" icon-style="tonal" icon-shape="full" headline="Talk to a wellness expert" text="Not sure what to book? We will help you choose." cta-label="Chat with us" cta-href="/showcase#feature-card" />
         </div>
         <p className="demo-label">No background, outlined, elevated, no icon, custom actions slot</p>
         <div className="demo-grid demo-grid--wide">
-          <sky-feature-card color="none" variant="outlined" icon="spa" iconStyle="tonal" headline="Outlined, no fill" text="variant outlined, color none" ctaLabel="Learn more" ctaHref="/showcase#feature-card" />
-          <sky-feature-card variant="elevated" icon="spa" iconStyle="plain" headline="Elevated, plain icon" text="variant elevated, icon-style plain" />
+          <sky-feature-card color="none" variant="outlined" icon="spa" icon-style="tonal" headline="Outlined, no fill" text="variant outlined, color none" cta-label="Learn more" cta-href="/showcase#feature-card" />
+          <sky-feature-card variant="elevated" icon="spa" icon-style="plain" headline="Elevated, plain icon" text="variant elevated, icon-style plain" />
           <sky-feature-card shape="medium" headline="No icon" text="Headline and text only, medium shape.">
             <div slot="actions">
               <FilledButton>Primary</FilledButton>
@@ -1113,7 +1113,7 @@ export function Showcase() {
           <sky-image src="https://picsum.photos/seed/sky-spa-room/600/400" alt="Candle-lit spa treatment room" href="/showcase#image" ratio="3 / 2" shape="extra-large" />
           <sky-image src="https://picsum.photos/seed/sky-therapist/400/400" alt="Therapist portrait" shape="full" />
           <sky-image alt="Photo coming soon" ratio="3 / 2" />
-          <sky-image src="/broken-image.jpg" alt="Broken source falls back" ratio="3 / 2" variant="outlined" color="none" placeholderIcon="broken_image" />
+          <sky-image src="/broken-image.jpg" alt="Broken source falls back" ratio="3 / 2" variant="outlined" color="none" placeholder-icon="broken_image" />
         </div>
       </section>
 
@@ -1457,19 +1457,19 @@ export function Showcase() {
           <sky-tile-card icon="healing" headline="Therapy" text="12 deals" href="/showcase#tile-card" />
           <sky-tile-card icon="self_improvement" headline="Massage" text="48 deals" variant="filled" color="surface-high" href="/showcase#tile-card" />
           <sky-tile-card icon="hot_tub" headline="Spa & retreats" text="9 deals" variant="elevated" href="/showcase#tile-card" />
-          <sky-tile-card icon="spa" headline="Wellness" text="21 deals" variant="filled" color="primary" iconStyle="surface" href="/showcase#tile-card" />
-          <sky-tile-card icon="content_cut" headline="Hair & nails" text="17 deals" variant="filled" color="secondary" iconStyle="surface" iconShape="full" />
-          <sky-tile-card icon="face_retouching_natural" headline="Skin & beauty" text="30 deals" variant="filled" color="tertiary" iconStyle="surface" />
+          <sky-tile-card icon="spa" headline="Wellness" text="21 deals" variant="filled" color="primary" icon-style="surface" href="/showcase#tile-card" />
+          <sky-tile-card icon="content_cut" headline="Hair & nails" text="17 deals" variant="filled" color="secondary" icon-style="surface" icon-shape="full" />
+          <sky-tile-card icon="face_retouching_natural" headline="Skin & beauty" text="30 deals" variant="filled" color="tertiary" icon-style="surface" />
         </div>
         <p className="demo-label">Icon styles, icon shapes, shapes, alignment, no icon</p>
         <div className="demo-grid">
-          <sky-tile-card icon="favorite" headline="Tonal icon" text="icon-style tonal" iconStyle="tonal" />
-          <sky-tile-card icon="favorite" headline="Plain icon" text="icon-style plain" iconStyle="plain" />
-          <sky-tile-card icon="favorite" headline="Round icon" text="icon-shape full" iconShape="full" />
-          <sky-tile-card icon="favorite" headline="Square corners" text="shape small" shape="small" iconShape="small" />
+          <sky-tile-card icon="favorite" headline="Tonal icon" text="icon-style tonal" icon-style="tonal" />
+          <sky-tile-card icon="favorite" headline="Plain icon" text="icon-style plain" icon-style="plain" />
+          <sky-tile-card icon="favorite" headline="Round icon" text="icon-shape full" icon-shape="full" />
+          <sky-tile-card icon="favorite" headline="Square corners" text="shape small" shape="small" icon-shape="small" />
           <sky-tile-card icon="favorite" headline="Centered" text="align center" align="center" />
           <sky-tile-card headline="No icon" text="Text only, no background" color="none" />
-          <sky-tile-card icon="nightlight" headline="Inverse" text="color inverse" variant="filled" color="inverse" iconStyle="tonal" />
+          <sky-tile-card icon="nightlight" headline="Inverse" text="color inverse" variant="filled" color="inverse" icon-style="tonal" />
         </div>
       </section>
     </main>

@@ -5,9 +5,11 @@
  * in main.tsx. This file only teaches TSX about the tags and their props so raw
  * `<sky-*>` tags type-check without `any`.
  *
- * React 19 passes unknown camelCase props as DOM properties, which LIT reads
- * natively — so prop names here match the LIT class property names (camelCase),
- * not the HTML attribute names (kebab-case).
+ * Prop names here match the LIT class property names. On the client React 19
+ * sets them as DOM properties, but server rendering writes them as attributes and
+ * hydration does not set them again, so `priceFirst` is lost as `pricefirst`.
+ * In JSX write any option whose attribute is kebab-case in that form
+ * (`price-first`, `image-alt`); `src/sky-element-props.test.ts` enforces it.
  */
 import type { DetailedHTMLProps, HTMLAttributes } from 'react';
 
@@ -169,6 +171,12 @@ declare module 'react' {
         dense?: boolean;
         required?: boolean;
         disabled?: boolean;
+        clearable?: boolean;
+        clearLabel?: string;
+        combobox?: boolean;
+        expanded?: boolean;
+        controlsElement?: globalThis.Element | null;
+        activeOption?: globalThis.Element | null;
         /** React 19 attaches on<event> props on custom elements as listeners. */
         'onsky-submit'?: (event: CustomEvent<{ value: string }>) => void;
       }>;

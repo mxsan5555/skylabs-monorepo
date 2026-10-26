@@ -1,6 +1,6 @@
 import { useMemo, type ReactNode } from 'react';
 import '@skylabs-monorepo/shared-ui/carousel';
-import { OfferCard, popularTag } from '../../components/offer-card/offer-card';
+import { OfferCard } from '../../components/offer-card/offer-card';
 import { formatINR } from '../../../utils/format';
 import { primaryImage, resolveDealMedia, resolveTherapistMedia } from '../../../utils/media';
 import { CardRail } from '../../components/card-rail/card-rail';
@@ -54,7 +54,6 @@ export function Home() {
     <swiper-slide key={deal.id} className="card-rail__slide">
       <OfferCard slider
         item={{ type: 'deal', deal }}
-        tag={popularTag(deal.popularTags)}
         variant="outlined"
         layout="vertical"
       />
@@ -102,7 +101,6 @@ export function Home() {
               <swiper-slide key={product.id} className="card-rail__slide">
                 <OfferCard slider
                   item={{ type: 'product', product }}
-                  tag={popularTag(product.popularTags)}
                   variant="outlined"
                   layout="vertical"
                 />
