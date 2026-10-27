@@ -72,6 +72,12 @@ export function useCatalogShell(): CatalogShellValue {
   return useContext(CatalogShellContext);
 }
 
+/** The one place deal page URLs are built: `/deal/<slug>` (PLANNING §2.7), the id when a row has
+ *  no slug. */
+export function dealHref(deal: { id: string; slug?: string | null }): string {
+  return `/deal/${encodeURIComponent(deal.slug || deal.id)}`;
+}
+
 /** The one place category URLs are built: `/category/<slug>`, plus `?sub=<subSlug>` to open the
  *  category page on that subcategory tab. */
 export function categoryHref(categorySlug: string, subSlug?: string): string {

@@ -40,7 +40,6 @@ const ADMIN_INCLUDE = {
       title: true,
       slug: true,
       status: true,
-      approvalStatus: true,
       salePrice: true,
       vendor: { select: { id: true, businessName: true, status: true } },
       branch: { select: { id: true, name: true, state: true, isActive: true } },
@@ -64,7 +63,7 @@ const ADMIN_INCLUDE = {
 type AdminSlideRow = Prisma.HomeHeroSlideGetPayload<{ include: typeof ADMIN_INCLUDE }>;
 
 type EligibilityFields = {
-  deal: { status: string; approvalStatus: string; vendor: { status: string }; branch: { isActive: boolean } } | null;
+  deal: { status: string; vendor: { status: string }; branch: { isActive: boolean } } | null;
   product: { isActive: boolean; vendor: { status: string } } | null;
 };
 
@@ -76,7 +75,6 @@ export function ineligibleReason({ deal, product }: EligibilityFields): string |
     if (deal.vendor.status !== 'ACTIVE') return `Member is ${lower(deal.vendor.status)}`;
     if (!deal.branch.isActive) return 'Branch paused';
     if (deal.status !== 'ACTIVE') return `Deal is ${lower(deal.status)}`;
-    if (deal.approvalStatus !== 'APPROVED') return `Deal is ${lower(deal.approvalStatus)}`;
     return null;
   }
   if (!product) return 'Item removed';
@@ -128,7 +126,7 @@ export async function listSliderOverview() {
       state: true,
       isActive: true,
       updatedAt: true,
-      deal: { select: { status: true, approvalStatus: true, vendor: { select: { status: true } }, branch: { select: { isActive: true } } } },
+      deal: { select: { status: true, vendor: { select: { status: true } }, branch: { select: { isActive: true } } } },
       product: { select: { isActive: true, vendor: { select: { status: true } } } },
     },
   });

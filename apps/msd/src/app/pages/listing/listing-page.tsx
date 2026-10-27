@@ -24,7 +24,7 @@ import { LISTING_FACETS, useListingFacets } from '../../components/listing/use-l
 import { lowestPackagePrice } from '../../components/therapist-card/therapist-card';
 import { usePagedList } from '../../../hooks/use-paged-list';
 import { useVisitorLocation } from '../../../location/location-context';
-import { categoryHref, citySlug, useCatalogShell } from '../../../catalog/catalog-shell';
+import { categoryHref, citySlug, dealHref, useCatalogShell } from '../../../catalog/catalog-shell';
 import { listingDataKey, usePrerenderedData } from '../../../prerender-data/prerender-data';
 import { CATEGORY_PAGE_SIZE, type ListingData } from '../../../prerender-data/loaders';
 import { Seo } from '../../seo/seo';
@@ -141,7 +141,7 @@ export function ListingPage({ kind }: { kind: ListingKind }) {
                   const price = lowestPackagePrice(x.packages);
                   return price == null ? [] : [{ name: x.therapistType, path: `/therapist/${x.id}`, price }];
                 })
-              : deals.map((d) => ({ name: d.title, path: `/deal/${d.id}`, price: Number(d.salePrice) })),
+              : deals.map((d) => ({ name: d.title, path: dealHref(d), price: Number(d.salePrice) })),
         )
       : undefined;
 

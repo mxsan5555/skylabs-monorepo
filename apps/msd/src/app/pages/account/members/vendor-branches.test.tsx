@@ -3,16 +3,12 @@ import type { MdDialog } from '@material/web/dialog/dialog.js';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SnackbarHost } from '../../../../snackbar/snackbar';
-import type { BranchCategoryAccessRow, Category, Deal, Branch } from '../../../../api/rbac/vendors';
+import type { Category, Branch } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 
-// Category/Subcategory options are now branch-scoped (`getBranchCategoryAccess`/
-// `getMyBranchCategoryAccess`), not sourced directly from the `categories` prop any more (that
-// prop now only backs the "stale value" name lookup) — see `DealDialog`'s own doc comment in
-// vendor-branches.tsx. Mocked here the same way vendor-wizard-deals.test.tsx/
-// vendor-wizard-therapists.test.tsx mock this module. `listCategories`/`setBranchCategoryAccess`
-// back `BranchDialog`'s own Categories & Subcategories section (folded in from the now-deleted
-// `branch-category-access-dialog.tsx`).
+// `listCategories` / `getBranchCategoryAccess` / `setBranchCategoryAccess` back `BranchDialog`'s
+// Categories & Subcategories section. Deals are edited on the shared deal form now
+// (deal-form-page.tsx, PLANNING §2.7), so DealDialog and its tests are gone.
 const getBranchCategoryAccessMock = vi.fn();
 const getMyBranchCategoryAccessMock = vi.fn();
 const listCategoriesMock = vi.fn();
@@ -29,85 +25,10 @@ vi.mock('../../../../api/rbac/vendors', async () => {
   };
 });
 
-import { DealDialog, BranchDialog } from './vendor-branches';
+import { BranchDialog } from './vendor-branches';
 
-/**
- * Feature: DealDialog — Deal is a pure service offering (no Product concept at all)
- * Scenario: `Deal` has no `productId` field any more — Product is a fully independent catalog
- * entity purchased directly via Cart/Order, never wrapped in a Deal. The Deal Add/Edit form
- * always shows the Category/Subcategory selects and always requires at least one package; there
- * is no read-only "pre-existing Product deal" branch left to test, because a Deal can no longer
- * carry a product reference in any form (current or historical).
- *
- * Given: the active branch's own category/subcategory mapping (`BranchCategoryAccess`/
- *        `BranchSubcategoryAccess`, 2- and 3-level branches, including a legacy Type-tier row
- *        from before the "Category Types" master screen was removed)
- * When: DealDialog renders (fresh Add or editing an existing Service deal)
- * Then: Category/Subcategory selects always render, scoped to the branch's own mapping (not the
- *       vendor-wide `categories` prop), and no Product-related control (select, "Offering type"
- *       text, read-only category hint) ever appears
- *
- * NOTE: like `categories.test.tsx`'s suite, live select-interaction can't be simulated under this
- * jsdom + `@lit/react` + React 19 combination (documented in `search.test.tsx`), so this suite
- * verifies via each dialog's already-resolved initial state rather than driving a live pick or a
- * full submit — the snackbar wording change (`Deal created/updated successfully`) is a one-line
- * string change verified by direct code review + manual/live testing, not re-asserted here.
- */
-
-const TOP_MASSAGE: Category = { id: 'top-massage', name: 'Massage', slug: 'massage', parentId: null, isActive: true, type: 'SERVICE' };
-const SUB_BODY_MASSAGE: Category = { id: 'sub-body-massage', name: 'Body Massage', slug: 'body-massage', parentId: 'top-massage', isActive: true };
-// A pre-existing Type-tier row — the "Category Types" Master screen that created rows like this
-// is gone, but old Deal rows may still reference one; it must still resolve correctly.
-const LEGACY_TYPE_SWEDISH: Category = { id: 'type-swedish', name: 'Swedish Massage', slug: 'swedish-massage', parentId: 'sub-body-massage', isActive: true };
-const TOP_HOME: Category = { id: 'top-home', name: 'Home Services', slug: 'home-services', parentId: null, isActive: true, type: 'SERVICE' };
-const SUB_CLEANING: Category = { id: 'sub-cleaning', name: 'Cleaning', slug: 'cleaning', parentId: 'top-home', isActive: true };
-
-const CATEGORIES: Category[] = [TOP_MASSAGE, SUB_BODY_MASSAGE, LEGACY_TYPE_SWEDISH, TOP_HOME, SUB_CLEANING];
-
-// Branch A's own mapping — only DIRECT children are ever representable as a
-// `BranchSubcategoryAccess` row (see that model's schema doc comment), so the legacy Type-tier
-// grandchild (`LEGACY_TYPE_SWEDISH`) deliberately has no row of its own here, same as production.
-const BRANCH_CATEGORY_ACCESS: BranchCategoryAccessRow[] = [
-  {
-    id: 'bca-massage',
-    branchId: 'branch-1',
-    categoryId: TOP_MASSAGE.id,
-    createdAt: '2026-01-01T00:00:00Z',
-    category: TOP_MASSAGE,
-    subcategories: [{ id: 'bsa-body-massage', subcategoryId: SUB_BODY_MASSAGE.id, subcategory: SUB_BODY_MASSAGE }],
-  },
-  {
-    id: 'bca-home',
-    branchId: 'branch-1',
-    categoryId: TOP_HOME.id,
-    createdAt: '2026-01-01T00:00:00Z',
-    category: TOP_HOME,
-    subcategories: [{ id: 'bsa-cleaning', subcategoryId: SUB_CLEANING.id, subcategory: SUB_CLEANING }],
-  },
-];
-
-const DEAL_BASE: Omit<Deal, 'categoryId' | 'subcategoryId'> = {
-  id: 'deal-1',
-  vendorId: 'vendor-1',
-  branchId: 'branch-1',
-  title: 'Signature Massage',
-  slug: 'signature-massage',
-  originalPrice: '1000',
-  salePrice: '800',
-  status: 'ACTIVE',
-  approvalStatus: 'APPROVED',
-  createdAt: '2026-01-01T00:00:00Z',
-  updatedAt: '2026-01-01T00:00:00Z',
-};
-
-function optionLabelsOf(select: Element): (string | undefined)[] {
-  return Array.from(select.querySelectorAll('md-select-option')).map((o) => o.textContent?.trim());
-}
-
-// Fixtures for BranchDialog's own Categories & Subcategories section — deliberately distinct ids
-// from the DealDialog fixtures above (they exercise unrelated code paths: DealDialog reads a
-// branch's already-saved mapping, BranchDialog's own fetch is the unfiltered SERVICE+THERAPY
-// Category Master list used to BUILD that mapping).
+// Fixtures for BranchDialog's own Categories & Subcategories section: the unfiltered
+// SERVICE + THERAPY Category Master list used to build a branch's mapping.
 const BD_TOP_MASSAGE: Category = { id: 'bd-top-massage', name: 'Massage', slug: 'massage', parentId: null, isActive: true, type: 'SERVICE' };
 const BD_SUB_BODY_MASSAGE: Category = { id: 'bd-sub-body-massage', name: 'Body Massage', slug: 'body-massage', parentId: 'bd-top-massage', isActive: true };
 const BD_SUB_FOOT_MASSAGE: Category = { id: 'bd-sub-foot-massage', name: 'Foot Massage', slug: 'foot-massage', parentId: 'bd-top-massage', isActive: true };
@@ -118,119 +39,12 @@ const BD_THERAPY_CATEGORIES: Category[] = [BD_TOP_THERAPY];
 
 beforeEach(() => {
   vi.clearAllMocks();
-  getBranchCategoryAccessMock.mockResolvedValue({ data: BRANCH_CATEGORY_ACCESS });
-  getMyBranchCategoryAccessMock.mockResolvedValue({ data: BRANCH_CATEGORY_ACCESS });
+  getBranchCategoryAccessMock.mockResolvedValue({ data: [] });
+  getMyBranchCategoryAccessMock.mockResolvedValue({ data: [] });
   listCategoriesMock.mockImplementation((_token: string | null, opts: { type: string }) =>
     Promise.resolve({ data: opts.type === 'THERAPY' ? BD_THERAPY_CATEGORIES : BD_SERVICE_CATEGORIES }),
   );
   setBranchCategoryAccessMock.mockResolvedValue({ data: [] });
-});
-
-function renderDialog(deal?: Deal) {
-  return render(
-    <>
-      <DealDialog categories={CATEGORIES} products={[]} token="tok" vendorId="vendor-1" fixedBranchId="branch-1" deal={deal} onSave={async () => undefined} />
-      <SnackbarHost />
-    </>,
-  );
-}
-
-describe('DealDialog — Deal is a pure service offering (no Product concept)', () => {
-  it('a fresh Add dialog shows only the Category select, scoped to the branch mapping — no Product select, no Subcategory yet', async () => {
-    renderDialog();
-    await waitFor(() => expect(getBranchCategoryAccessMock).toHaveBeenCalledWith('tok', 'vendor-1', 'branch-1'));
-    await waitFor(() => {
-      const selects = document.querySelectorAll('md-outlined-select');
-      expect(optionLabelsOf(selects[0])).toEqual(['Select a category', 'Massage', 'Home Services']);
-    });
-    expect(document.querySelectorAll('md-outlined-select').length).toBe(1);
-  });
-
-  it("editing a Deal whose subcategoryId is a legacy Type-tier row (Swedish Massage, not directly mapped) preserves the value and shows a stale-mapping warning banner", async () => {
-    renderDialog({ ...DEAL_BASE, categoryId: TOP_MASSAGE.id, subcategoryId: LEGACY_TYPE_SWEDISH.id });
-    await waitFor(() => expect(getBranchCategoryAccessMock).toHaveBeenCalled());
-    // Category itself is still mapped -> only 2 selects (Category, Subcategory), never a 3rd/Type select.
-    await waitFor(() => expect(document.querySelectorAll('md-outlined-select').length).toBe(2));
-    const selects = document.querySelectorAll('md-outlined-select');
-    // The stale value is preserved as an extra option (never silently dropped), alongside the
-    // branch's real mapped subcategory.
-    expect(optionLabelsOf(selects[1])).toEqual(['None', 'Swedish Massage', 'Body Massage']);
-    expect(
-      screen.getByText(
-        'This subcategory is no longer mapped to this branch/category. Saving without changing it keeps the existing value — or pick a currently mapped option.',
-      ),
-    ).toBeTruthy();
-  });
-
-  it('editing a Deal whose subcategoryId is a real, currently-mapped Subcategory (Body Massage) shows it normally with no warning', async () => {
-    renderDialog({ ...DEAL_BASE, categoryId: TOP_MASSAGE.id, subcategoryId: SUB_BODY_MASSAGE.id });
-    await waitFor(() => expect(document.querySelectorAll('md-outlined-select').length).toBe(2));
-    const selects = document.querySelectorAll('md-outlined-select');
-    expect(optionLabelsOf(selects[1])).toEqual(['None', 'Body Massage']);
-    expect(screen.queryByText(/no longer mapped/)).toBeNull();
-  });
-
-  it('editing a Deal under a different branch-mapped category (Home Services -> Cleaning) shows Category/Subcategory only, no warning', async () => {
-    renderDialog({ ...DEAL_BASE, categoryId: TOP_HOME.id, subcategoryId: SUB_CLEANING.id });
-    await waitFor(() => expect(document.querySelectorAll('md-outlined-select').length).toBe(2));
-    expect(screen.queryByText(/no longer mapped/)).toBeNull();
-  });
-
-  // Edge case: a category that has fallen out of the branch's mapping entirely (not just its
-  // subcategory) is likewise preserved with its own warning, and the Subcategory select is
-  // suppressed (no meaningful subcategory list to offer against an unmapped category).
-  it('editing a Deal whose categoryId itself is no longer mapped to this branch preserves it and warns, without rendering a Subcategory select', async () => {
-    const UNMAPPED_CATEGORY: Category = { id: 'top-unmapped', name: 'Discontinued Module', slug: 'discontinued', parentId: null, isActive: true, type: 'SERVICE' };
-    renderDialog({ ...DEAL_BASE, categoryId: UNMAPPED_CATEGORY.id, subcategoryId: undefined });
-    await waitFor(() => expect(getBranchCategoryAccessMock).toHaveBeenCalled());
-    await waitFor(() =>
-      expect(
-        screen.getByText(
-          'This category is no longer mapped to this branch. Saving without changing it keeps the existing value — or pick a currently mapped option.',
-        ),
-      ).toBeTruthy(),
-    );
-    // categoryStale suppresses the Subcategory select entirely (no valid subcategory list for an
-    // unmapped category) — only the Category select renders.
-    expect(document.querySelectorAll('md-outlined-select').length).toBe(1);
-  });
-
-  it('self-service (isSelf) fetches the branch mapping via getMyBranchCategoryAccess, never the admin-scoped function', async () => {
-    render(
-      <>
-        <DealDialog categories={CATEGORIES} products={[]} token="tok" vendorId="vendor-1" isSelf fixedBranchId="branch-1" onSave={async () => undefined} />
-        <SnackbarHost />
-      </>,
-    );
-    await waitFor(() => expect(getMyBranchCategoryAccessMock).toHaveBeenCalledWith('tok', 'branch-1'));
-    expect(getBranchCategoryAccessMock).not.toHaveBeenCalled();
-  });
-
-  // This dialog is never remounted when the caller's `fixedBranchId` prop changes (e.g.
-  // VendorBranches's left-pane branch switch) — the branch-access fetch effect reads the prop
-  // directly (not the `branchId` state) precisely so a prop-only change still refetches, per this
-  // component's own doc comment.
-  it('re-fetches the branch category mapping when the caller switches fixedBranchId without remounting the dialog', async () => {
-    const { rerender } = renderDialog();
-    await waitFor(() => expect(getBranchCategoryAccessMock).toHaveBeenCalledWith('tok', 'vendor-1', 'branch-1'));
-    getBranchCategoryAccessMock.mockClear();
-
-    rerender(
-      <>
-        <DealDialog categories={CATEGORIES} products={[]} token="tok" vendorId="vendor-1" fixedBranchId="branch-2" onSave={async () => undefined} />
-        <SnackbarHost />
-      </>,
-    );
-    await waitFor(() => expect(getBranchCategoryAccessMock).toHaveBeenCalledWith('tok', 'vendor-1', 'branch-2'));
-  });
-
-  it('never renders a Product select, a read-only "Category:" hint, "— None (Service deal) —" option, "Select a product" hint, or "Offering type" control, for any deal', () => {
-    renderDialog({ ...DEAL_BASE, categoryId: TOP_MASSAGE.id, subcategoryId: SUB_BODY_MASSAGE.id });
-    expect(screen.queryByText(/^Category:/)).toBeNull();
-    expect(screen.queryByText('Product (leave as None for a service deal)')).toBeNull();
-    expect(screen.queryByText('— None (Service deal) —')).toBeNull();
-    expect(screen.queryByText('Offering type')).toBeNull();
-  });
 });
 
 /**
@@ -252,6 +66,8 @@ const BRANCH_WITH_LOCATION: Branch = {
   id: 'branch-1',
   vendorId: 'vendor-1',
   name: 'Golghar Branch',
+  state: 'Uttar Pradesh',
+  city: 'Gorakhpur',
   isActive: true,
   mapLocationUrl: 'https://maps.app.goo.gl/existingLink',
   createdAt: '2026-01-01T00:00:00Z',
@@ -272,21 +88,21 @@ describe('BranchDialog — Map Location URL', () => {
   // `useLayoutEffect`-timed ref callback that (per this repo's own documented gap — see
   // `search.test.tsx`'s doc comment) never actually fires under this installed `@lit/react@1.0.8`
   // + React 19.2.7 + jsdom combination, so neither the property nor a reflected attribute is ever
-  // observable here. Verified instead via the field COUNT (exactly 4: Branch Name, Address, PIN
-  // Code, Map Location — never a 5th/6th field for Latitude/Longitude, which this component's
+  // observable here. Verified instead via the field COUNT (exactly 5: Branch Name, Address,
+  // Address line 2, PIN Code, Map Location — never a field for Latitude/Longitude, which this component's
   // source contains no markup for at all) and, for the error-surfacing test below, via the
   // `errors.mapLocationUrl && <p role="alert">` sibling paragraph, which IS plain rendered DOM
   // text (not a custom-element property) and so is reliably queryable.
-  it('renders exactly 4 text fields (Branch Name, Address, PIN Code, Map Location) — never a separate Latitude/Longitude field — for a fresh Add dialog', () => {
+  it('renders exactly 5 text fields (Branch Name, Address, Address line 2, PIN Code, Map Location) — never a separate Latitude/Longitude field — for a fresh Add dialog', () => {
     renderBranchDialog({ onSave: vi.fn() });
-    expect(document.querySelectorAll('md-outlined-text-field').length).toBe(4);
+    expect(document.querySelectorAll('md-outlined-text-field').length).toBe(5);
     expect(screen.queryByText('Latitude')).toBeNull();
     expect(screen.queryByText('Longitude')).toBeNull();
   });
 
-  it('renders the same 4 fields (no lat/lng) when editing an existing branch', () => {
+  it('renders the same 5 fields (no lat/lng) when editing an existing branch', () => {
     renderBranchDialog({ branch: BRANCH_WITH_LOCATION, onSave: vi.fn() });
-    expect(document.querySelectorAll('md-outlined-text-field').length).toBe(4);
+    expect(document.querySelectorAll('md-outlined-text-field').length).toBe(5);
     expect(screen.queryByText('Latitude')).toBeNull();
     expect(screen.queryByText('Longitude')).toBeNull();
   });
@@ -344,6 +160,27 @@ describe('BranchDialog — Map Location URL', () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
+  it('a branch with no state or city is not saved: state first, then its city (PLANNING §2.7)', async () => {
+    const onSave = vi.fn();
+    renderBranchDialog({ branch: { ...BRANCH_WITH_LOCATION, state: null, city: null }, onSave });
+
+    fireEvent.click(findSaveButton());
+
+    await waitFor(() => expect(screen.getByText('Select the state first.')).toBeTruthy());
+    expect(screen.getByText('Select a city.')).toBeTruthy();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('submits the state, city and address line 2 of the branch', async () => {
+    const onSave = vi.fn().mockResolvedValue(BRANCH_WITH_LOCATION);
+    renderBranchDialog({ branch: { ...BRANCH_WITH_LOCATION, addressLine2: 'Near clock tower' }, onSave });
+
+    fireEvent.click(findSaveButton());
+
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0][0]).toMatchObject({ state: 'Uttar Pradesh', city: 'Gorakhpur', addressLine2: 'Near clock tower' });
+  });
+
   /**
    * Regression suite for the real bug: editing ANY field of a branch and saving failed with a
    * generic "Invalid request body", wrongly appearing to be caused by Map Location. Root cause
@@ -397,7 +234,7 @@ describe('BranchDialog — Map Location URL', () => {
     fireEvent.click(findSaveButton());
 
     await waitFor(() => expect(screen.getByText(resolverMessage)).toBeTruthy());
-    expect(document.querySelectorAll('md-outlined-text-field').length).toBe(4);
+    expect(document.querySelectorAll('md-outlined-text-field').length).toBe(5);
   });
 
   it('saving with Map Location left exactly as loaded still submits branch details AND category/subcategory access together', async () => {

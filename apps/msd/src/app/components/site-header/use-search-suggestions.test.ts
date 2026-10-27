@@ -138,7 +138,7 @@ describe('useSearchSuggestions', () => {
     expect(dealsGroup?.items[0]).toMatchObject({
       id: 'd1',
       label: 'Hot Stone Massage',
-      href: '/deal/d1',
+      href: '/deal/full-body-massage', // PLANNING §2.7 slug URLs
       price: '₹699',
       originalPrice: '₹999',
       discount: '-30%',

@@ -32,3 +32,5 @@ export function debounce<Args extends unknown[]>(
     timer = setTimeout(() => fn(...args), waitMs);
   };
 }
+
+export { INDIA_LOCATIONS, STATES, citiesForState, isIndiaLocation, type IndiaState } from './india-locations';

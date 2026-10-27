@@ -1,6 +1,4 @@
-import { useEffect, useState } from 'react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { listCategories, type Category } from '../../../../api/rbac/vendors';
 import { VendorBranches } from './vendor-branches';
 import { useMyVendor } from './members';
 
@@ -14,15 +12,6 @@ import { useMyVendor } from './members';
 export function VendorBranchesDeals() {
   const { token } = useAuth();
   const { vendor, loading, error } = useMyVendor(token);
-  const [categories, setCategories] = useState<Category[]>([]);
-
-  useEffect(() => {
-    if (!vendor) {
-      setCategories([]);
-      return;
-    }
-    listCategories(token, { type: 'SERVICE', vendorId: vendor.id }).then(({ data }) => setCategories(data)).catch(() => setCategories([]));
-  }, [token, vendor?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- keyed on id, not object identity
 
   if (loading) {
     return (
@@ -49,7 +38,7 @@ export function VendorBranchesDeals() {
           Your business profile must be approved and active before you can manage branches and deals.
         </p>
       ) : (
-        <VendorBranches token={token} vendorId={vendor.id} isSelf canEdit canApproveDeal={false} categories={categories} />
+        <VendorBranches token={token} vendorId={vendor.id} isSelf canEdit />
       )}
     </div>
   );

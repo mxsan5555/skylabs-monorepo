@@ -1,4 +1,4 @@
-import { createElement, useCallback, useEffect, useState, type ChangeEvent } from 'react';
+import { createElement, useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import '@skylabs-monorepo/shared-ui';
 import {
@@ -17,88 +17,22 @@ import {
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
-import { STATES, citiesForState } from '../../../../data/india-locations';
+import { STATES, citiesForState } from '@skylabs-monorepo/shared-utils';
 import { normalizeOpeningHours, OpeningHoursEditor, validateBranchPincode, validateMapLocationUrl } from './vendor-branches';
+import { renderSelect, renderTextField } from './form-controls';
+
+/** The shared selects take value/label pairs; states and cities are both. */
+const asOptions = (values: string[]) => values.map((value) => ({ value, label: value }));
 
 interface BranchFormPageProps {
   token: string | null;
 }
 
-type DrivenChangeEvent = ChangeEvent<HTMLElement & { value: string }>;
-
-/** Raw M3 `<md-outlined-select>` + `<md-select-option>` (not the shared-ui React wrappers) so
- *  tests can drive the field's `disabled` state and its native `change` event directly — same
- *  convention as `PriceRangeField`/`CheckboxFacet` (see those files' own doc comments: the
- *  shared-ui React wrappers set element state via an imperative property effect that does not
- *  run under Vitest's `@lit/react` resolution). */
 /** Same convention as `MemberDetailPage`'s `name` derivation: business name first, owner name as
  *  a fallback, `null` (not a literal) when neither is known yet — the breadcrumb itself supplies
  *  the transient/failure fallback label. */
 function vendorDisplayName(vendor: Vendor): string | null {
   return vendor.businessName || vendor.owner?.name || null;
-}
-
-function renderSelect({
-  label,
-  value,
-  disabled,
-  placeholder,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  disabled?: boolean;
-  placeholder: string;
-  options: string[];
-  onChange: (value: string) => void;
-}) {
-  return createElement(
-    'md-outlined-select',
-    { label, value, disabled, onChange: (e: DrivenChangeEvent) => onChange(e.currentTarget.value) },
-    [
-      createElement('md-select-option', { key: '__placeholder__', value: '' }, createElement('div', { slot: 'headline' }, placeholder)),
-      ...options.map((option) => createElement('md-select-option', { key: option, value: option }, createElement('div', { slot: 'headline' }, option))),
-    ],
-  );
-}
-
-/** Raw M3 `<md-outlined-text-field>` — see `renderSelect`'s doc comment above for why. */
-function renderTextField({
-  label,
-  value,
-  disabled,
-  required,
-  error,
-  type,
-  placeholder,
-  inputmode,
-  maxlength,
-  onInput,
-}: {
-  label: string;
-  value: string;
-  disabled?: boolean;
-  required?: boolean;
-  error?: boolean;
-  type?: string;
-  placeholder?: string;
-  inputmode?: string;
-  maxlength?: number;
-  onInput: (value: string) => void;
-}) {
-  return createElement('md-outlined-text-field', {
-    label,
-    value,
-    disabled,
-    required,
-    error,
-    type,
-    placeholder,
-    inputmode,
-    maxlength,
-    onInput: (e: DrivenChangeEvent) => onInput(e.currentTarget.value),
-  });
 }
 
 /** Add/Edit branch — `/account/members/:vendorId/branches/new` and `.../branches/:branchId`.
@@ -120,9 +54,9 @@ export function BranchFormPage({ token }: BranchFormPageProps) {
 
   const [vendorName, setVendorName] = useState<string | null>(null);
 
-  const [form, setForm] = useState({ name: '', address: '', city: '', state: '', pincode: '', mapLocationUrl: '' });
+  const [form, setForm] = useState({ name: '', address: '', addressLine2: '', city: '', state: '', pincode: '', mapLocationUrl: '' });
   const [openingHours, setOpeningHours] = useState<OpeningHours>({});
-  const [errors, setErrors] = useState<Partial<Record<'name' | 'pincode' | 'mapLocationUrl', string>>>({});
+  const [errors, setErrors] = useState<Partial<Record<'name' | 'state' | 'city' | 'pincode' | 'mapLocationUrl', string>>>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
 
@@ -154,6 +88,7 @@ export function BranchFormPage({ token }: BranchFormPageProps) {
         setForm({
           name: found.name,
           address: found.address ?? '',
+          addressLine2: found.addressLine2 ?? '',
           city: found.city ?? '',
           state: found.state ?? '',
           pincode: found.pincode ?? '',
@@ -225,6 +160,9 @@ export function BranchFormPage({ token }: BranchFormPageProps) {
     if (!vendorId) return;
     const nextErrors: typeof errors = {
       name: form.name.trim() ? undefined : 'Branch name is required.',
+      // PLANNING §2.7: state and city from the India list, so deals line up with the storefront.
+      state: form.state ? undefined : 'Select the state first.',
+      city: form.city ? undefined : 'Select a city.',
       pincode: validateBranchPincode(form.pincode) ?? undefined,
       mapLocationUrl: validateMapLocationUrl(form.mapLocationUrl) ?? undefined,
     };
@@ -239,8 +177,9 @@ export function BranchFormPage({ token }: BranchFormPageProps) {
       const input: BranchInput = {
         name: form.name,
         address: form.address || undefined,
-        city: form.city || undefined,
-        state: form.state || undefined,
+        addressLine2: form.addressLine2 || undefined,
+        city: form.city,
+        state: form.state,
         pincode: form.pincode || undefined,
         mapLocationUrl: form.mapLocationUrl.trim() || undefined,
         openingHours: Object.keys(openingHours).length > 0 ? openingHours : undefined,
@@ -285,8 +224,19 @@ export function BranchFormPage({ token }: BranchFormPageProps) {
       <sky-accordion>
         <sky-accordion-item header="Location" open>
           <div className="form-grid">
-            {renderSelect({ label: 'State', value: form.state, placeholder: 'Select a state', options: STATES, onChange: (value) => set('state', value) })}
+            {renderSelect({ label: 'State', value: form.state, placeholder: 'Select a state', options: asOptions(STATES), onChange: (value) => set('state', value) })}
+            {errors.state && <p className="error-state" role="alert">{errors.state}</p>}
             {!locationUnlocked && <p className="field-hint">Pick a state to fill in the rest.</p>}
+
+            {renderSelect({
+              label: 'City',
+              value: form.city,
+              disabled: !locationUnlocked,
+              placeholder: locationUnlocked ? 'Select a city' : 'Select a state first',
+              options: asOptions(citiesForState(form.state)),
+              onChange: (value) => set('city', value),
+            })}
+            {errors.city && <p className="error-state" role="alert">{errors.city}</p>}
 
             {renderTextField({
               label: 'Branch Name',
@@ -304,21 +254,18 @@ export function BranchFormPage({ token }: BranchFormPageProps) {
               value: form.address,
               onInput: (value) => set('address', value),
             })}
-
-            {renderSelect({
-              label: 'City',
-              value: form.city,
+            {renderTextField({
+              label: 'Address line 2 (optional)',
               disabled: !locationUnlocked,
-              placeholder: locationUnlocked ? 'Select a city' : 'Select a state first',
-              options: citiesForState(form.state),
-              onChange: (value) => set('city', value),
+              value: form.addressLine2,
+              onInput: (value) => set('addressLine2', value),
             })}
 
             {renderTextField({
               label: 'PIN Code',
               disabled: !locationUnlocked,
-              inputmode: 'numeric',
-              maxlength: 6,
+              inputMode: 'numeric',
+              maxLength: 6,
               value: form.pincode,
               error: Boolean(errors.pincode),
               onInput: (value) => set('pincode', value.replace(/\D/g, '').slice(0, 6)),

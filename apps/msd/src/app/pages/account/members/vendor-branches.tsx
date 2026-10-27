@@ -1,57 +1,42 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
-import type { MdFilledButton } from '@material/web/button/filled-button.js';
-import { Dialog, FilledButton, OutlinedButton, OutlinedTextField, OutlinedSelect, SelectOption, TextButton, Icon, Tabs, PrimaryTab } from '@skylabs-monorepo/shared-ui/react';
+import { Dialog, FilledButton, OutlinedButton, OutlinedTextField, OutlinedSelect, SelectOption, TextButton, Icon } from '@skylabs-monorepo/shared-ui/react';
 import {
-  approveDeal,
   createBranch,
-  createDeal,
   createMyBranch,
-  createMyDeal,
   deleteDeal,
   getBranchCategoryAccess,
-  getMyBranchCategoryAccess,
   listBranches,
   listCategories,
   listDeals,
   listMyBranches,
   listMyDeals,
-  listMyProducts,
-  listVendorProducts,
-  rejectDeal,
   setBranchCategoryAccess,
   setBranchStatus,
   setDealStatus,
   setMyBranchStatus,
   setMyDealStatus,
   updateBranch,
-  updateDeal,
   updateMyBranch,
-  updateMyDeal,
   type Branch,
-  type BranchCategoryAccessRow,
   type BranchInput,
   type Category,
   type Deal,
-  type DealInput,
-  type DealPackageInput,
   type OpeningHours,
-  type VendorProduct,
   type WeekdayKey,
 } from '../../../../api/rbac/vendors';
+import { fromPriceLabel } from './deal-format';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { MediaUploader } from '../../../components/media-uploader';
 import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { showSnackbar } from '../../../../snackbar/snackbar';
-import { STATES, citiesForState } from '../../../../data/india-locations';
+import { STATES, citiesForState } from '@skylabs-monorepo/shared-utils';
 
 interface VendorBranchesProps {
   token: string | null;
   vendorId: string;
   isSelf: boolean;
   canEdit: boolean;
-  canApproveDeal: boolean;
   /** Superadmin-only hard delete — no self-service equivalent exists (vendors can only
    *  Activate/Deactivate their own deals), so this is always `false` on the `isSelf` surface. */
   canDeleteDeal?: boolean;
@@ -64,9 +49,6 @@ interface VendorBranchesProps {
    * on the `isSelf` surface's call site below since `BranchDialog` never fires it there anyway.
    */
   onVendorRefresh?: () => void;
-  /** The vendor's granted SERVICE categories (`listCategories({ type: 'SERVICE', vendorId })`)
-   *  — a service Deal picks directly from these, no global Service master any more. */
-  categories: Category[];
 }
 
 /** Groups branches by their `state` field for a "N branches across M states" summary — states
@@ -87,7 +69,11 @@ export function groupBranchesByState(branches: Branch[]): { state: string; branc
 
 /** Branch list + nested Deal list for a single vendor — reused for both the admin
  *  (`/vendors/:vendorId/branches...`) and self-service (`/vendors/me/branches...`) surfaces. */
-export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDeal, canDeleteDeal = false, categories, onVendorRefresh }: VendorBranchesProps) {
+export function VendorBranches({ token, vendorId, isSelf, canEdit, canDeleteDeal = false, onVendorRefresh }: VendorBranchesProps) {
+  const navigate = useNavigate();
+  // Deals are added and edited on the shared deal form (PLANNING §2.7).
+  const dealFormPath = (dealId?: string) =>
+    isSelf ? `/account/vendor-deals/${dealId ?? 'new'}` : `/account/members/${vendorId}/deals/${dealId ?? 'new'}`;
   // Deep-link support for a "New Deal Pending Approval" notification click (see
   // notification-bell.tsx) — both params are optional and purely additive; this page behaves
   // exactly as before when neither is present.
@@ -101,7 +87,6 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDea
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [dealsLoading, setDealsLoading] = useState(false);
-  const [products, setProducts] = useState<VendorProduct[]>([]);
   // Guards against an in-flight branches/deals fetch for a PREVIOUS vendorId resolving after
   // the caller has already switched to a different vendorId (e.g. an admin browsing from one
   // vendor's detail page to another's without a full remount). Without this, a slower request
@@ -114,14 +99,6 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDea
   // token still matches the latest one.
   const branchesRequestToken = useRef(0);
   const dealsRequestToken = useRef(0);
-
-  useEffect(() => {
-    // pageSize is capped at 100 server-side (PaginationQuerySchema) — 200 here 500s, which
-    // would silently leave `products` empty and hide the "Add deal" button entirely.
-    (isSelf ? listMyProducts(token, { status: 'active', pageSize: 100 }) : listVendorProducts(token, vendorId, { status: 'active', pageSize: 100 }))
-      .then(({ data }) => setProducts(data))
-      .catch(() => setProducts([]));
-  }, [token, vendorId, isSelf]);
 
   const loadBranches = async () => {
     const requestId = ++branchesRequestToken.current;
@@ -212,24 +189,6 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDea
     }
   };
 
-  const saveDeal = async (input: DealInput, existing?: Deal) => {
-    if (!selectedBranchId) return;
-    let result: Deal | undefined;
-    if (existing) {
-      const { data } = isSelf
-        ? await updateMyDeal(token, selectedBranchId, existing.id, input)
-        : await updateDeal(token, vendorId, selectedBranchId, existing.id, input);
-      result = data;
-    } else {
-      const { data } = isSelf
-        ? await createMyDeal(token, selectedBranchId, input)
-        : await createDeal(token, vendorId, selectedBranchId, input);
-      result = data;
-    }
-    reloadDeals();
-    return result;
-  };
-
   const toggleDealActive = async (deal: Deal) => {
     if (!selectedBranchId) return;
     try {
@@ -241,20 +200,6 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDea
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Could not change deal status.');
     }
-  };
-
-  const doApproveDeal = async (deal: Deal) => {
-    if (!selectedBranchId) return;
-    await approveDeal(token, vendorId, selectedBranchId, deal.id);
-    reloadDeals();
-  };
-
-  const doRejectDeal = async (deal: Deal) => {
-    if (!selectedBranchId) return;
-    const reason = window.prompt('Reason for rejecting this deal?');
-    if (!reason) return;
-    await rejectDeal(token, vendorId, selectedBranchId, deal.id, reason);
-    reloadDeals();
   };
 
   const doDeleteDeal = async (deal: Deal) => {
@@ -332,8 +277,11 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDea
           <>
             <div className="page-head">
               <h2>Deals</h2>
-              {canEdit && (categories.length > 0 || products.length > 0) && (
-                <DealDialog categories={categories} products={products} token={token} vendorId={vendorId} isSelf={isSelf} fixedBranchId={selectedBranchId ?? undefined} onSave={(input) => saveDeal(input)} />
+              {canEdit && (
+                <OutlinedButton onClick={() => navigate(`${dealFormPath()}?branchId=${selectedBranchId}`)}>
+                  <Icon slot="icon" aria-hidden="true">add</Icon>
+                  Add deal
+                </OutlinedButton>
               )}
             </div>
             {dealsLoading ? (
@@ -347,29 +295,21 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDea
                     <div className={`entity-list__item${deal.id === dealIdParam ? ' entity-list__item--highlighted' : ''}`}>
                       <span className="role-list__name">
                         {deal.title}
-                        <span className="field-hint">
-                          {' '}
-                          · ₹{deal.salePrice} (was ₹{deal.originalPrice})
-                          {deal.durationMinutes && ` · ${deal.durationMinutes} min`}
-                        </span>
+                        <span className="field-hint"> · {fromPriceLabel(deal)}</span>
                       </span>
-                      <span className={`status-pill ${deal.status === 'ACTIVE' ? 'status-pill--active' : 'status-pill--inactive'}`}>
-                        {deal.status} / {deal.approvalStatus}
-                      </span>
+                      <span className={`status-pill ${deal.status === 'ACTIVE' ? 'status-pill--active' : 'status-pill--inactive'}`}>{deal.status}</span>
                     </div>
-                    {deal.approvalRejectionReason && <p className="error-state">Rejected: {deal.approvalRejectionReason}</p>}
                     <div className="page-head__actions">
-                      {canEdit && <DealDialog categories={categories} products={products} deal={deal} token={token} vendorId={vendorId} isSelf={isSelf} fixedBranchId={selectedBranchId ?? undefined} onSave={(input) => saveDeal(input, deal)} />}
+                      {canEdit && (
+                        <OutlinedButton onClick={() => navigate(dealFormPath(deal.id))}>
+                          <Icon slot="icon" aria-hidden="true">edit</Icon>
+                          Edit
+                        </OutlinedButton>
+                      )}
                       {canEdit && (
                         <OutlinedButton onClick={() => toggleDealActive(deal)}>
                           {deal.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
                         </OutlinedButton>
-                      )}
-                      {canApproveDeal && deal.approvalStatus === 'PENDING' && (
-                        <>
-                          <FilledButton onClick={() => doApproveDeal(deal)}>Approve</FilledButton>
-                          <OutlinedButton onClick={() => doRejectDeal(deal)}>Reject</OutlinedButton>
-                        </>
                       )}
                       {canDeleteDeal && <OutlinedButton onClick={() => doDeleteDeal(deal)}>Delete</OutlinedButton>}
                     </div>
@@ -575,13 +515,14 @@ export function BranchDialog({
   const [form, setForm] = useState({
     name: branch?.name ?? '',
     address: branch?.address ?? '',
+    addressLine2: branch?.addressLine2 ?? '',
     city: branch?.city ?? '',
     state: branch?.state ?? '',
     pincode: branch?.pincode ?? '',
     mapLocationUrl: branch?.mapLocationUrl ?? '',
   });
   const [openingHours, setOpeningHours] = useState<OpeningHours>(() => normalizeOpeningHours(branch?.openingHours));
-  const [errors, setErrors] = useState<Partial<Record<'name' | 'pincode' | 'mapLocationUrl', string>>>({});
+  const [errors, setErrors] = useState<Partial<Record<'name' | 'state' | 'city' | 'pincode' | 'mapLocationUrl', string>>>({});
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   // Same double-submit guard convention used elsewhere in this file (DealDialog's submittingRef).
@@ -672,6 +613,8 @@ export function BranchDialog({
     if (submittingRef.current) return;
     const nextErrors: typeof errors = {
       name: form.name.trim() ? undefined : 'Branch name is required.',
+      state: form.state ? undefined : 'Select the state first.',
+      city: form.city ? undefined : 'Select a city.',
       pincode: validateBranchPincode(form.pincode) ?? undefined,
       mapLocationUrl: validateMapLocationUrl(form.mapLocationUrl) ?? undefined,
     };
@@ -688,8 +631,9 @@ export function BranchDialog({
       const input: BranchInput = {
         name: form.name,
         address: form.address || undefined,
-        city: form.city || undefined,
-        state: form.state || undefined,
+        addressLine2: form.addressLine2 || undefined,
+        city: form.city,
+        state: form.state,
         pincode: form.pincode || undefined,
         mapLocationUrl: form.mapLocationUrl.trim() || undefined,
         openingHours: Object.keys(openingHours).length > 0 ? openingHours : undefined,
@@ -731,7 +675,7 @@ export function BranchDialog({
           const other: string[] = [];
           for (const [field, messages] of Object.entries(fieldErrors)) {
             const message = messages[0];
-            if (field === 'name' || field === 'pincode' || field === 'mapLocationUrl') {
+            if (field === 'name' || field === 'state' || field === 'city' || field === 'pincode' || field === 'mapLocationUrl') {
               known[field] = message;
             } else {
               other.push(`${field}: ${message}`);
@@ -773,9 +717,9 @@ export function BranchDialog({
             error={Boolean(errors.name)}
           />
           {errors.name && <p className="error-state" role="alert">{errors.name}</p>}
-          <OutlinedTextField label="Address" value={form.address} onInput={(e: Event) => set('address', (e.target as HTMLInputElement).value)} />
 
-          <OutlinedSelect label="State" value={form.state} onChange={(e: Event) => set('state', (e.target as HTMLSelectElement).value)}>
+          {/* State first, then its city: the branch lines up with the storefront location. */}
+          <OutlinedSelect label="State" required value={form.state} error={Boolean(errors.state)} onChange={(e: Event) => set('state', (e.target as HTMLSelectElement).value)}>
             <SelectOption value="">
               <div slot="headline">Select a state</div>
             </SelectOption>
@@ -786,7 +730,8 @@ export function BranchDialog({
             ))}
           </OutlinedSelect>
 
-          <OutlinedSelect label="City" value={form.city} onChange={(e: Event) => set('city', (e.target as HTMLSelectElement).value)} disabled={!form.state}>
+          {errors.state && <p className="error-state" role="alert">{errors.state}</p>}
+          <OutlinedSelect label="City" required value={form.city} error={Boolean(errors.city)} onChange={(e: Event) => set('city', (e.target as HTMLSelectElement).value)} disabled={!form.state}>
             <SelectOption value="">
               <div slot="headline">{form.state ? 'Select a city' : 'Select a state first'}</div>
             </SelectOption>
@@ -796,6 +741,9 @@ export function BranchDialog({
               </SelectOption>
             ))}
           </OutlinedSelect>
+          {errors.city && <p className="error-state" role="alert">{errors.city}</p>}
+          <OutlinedTextField label="Address" value={form.address} onInput={(e: Event) => set('address', (e.target as HTMLInputElement).value)} />
+          <OutlinedTextField label="Address line 2 (optional)" value={form.addressLine2} onInput={(e: Event) => set('addressLine2', (e.target as HTMLInputElement).value)} />
 
           <OutlinedTextField
             label="PIN Code"
@@ -865,479 +813,6 @@ export function BranchDialog({
         <div slot="actions">
           <TextButton onClick={() => dialogRef.current?.close()}>Cancel</TextButton>
           <FilledButton onClick={submit} disabled={submitting || categoriesLoading}>{submitting ? 'Saving…' : 'Save'}</FilledButton>
-        </div>
-      </Dialog>
-    </>
-  );
-}
-
-/**
- * A Deal always represents a bookable Service — needs a duration, priced via its own child
- * `DealPackage` rows (enforced server-side in vendor.service.ts). Product is a fully independent,
- * directly-purchasable catalog entity now (see msd-api's Product schema doc comment), never a
- * Deal — there is no global Service master either (see the direct-category-access plan): a deal
- * picks its own `categoryId`/`subcategoryId` directly, restricted to the `categories` prop (the
- * vendor's granted SERVICE categories).
- *
- * Exported so the flat, cross-branch "Deals / Packages" page (`vendor-deals.tsx`) can reuse
- * this exact form instead of duplicating it. That page isn't already scoped to a single
- * branch the way this two-pane page is (branch is picked on the left before any deal shows),
- * so two optional additions support it without touching this page's own behavior:
- *  - `branches`: when supplied, an add-mode "Branch" selector is prepended to the form (and
- *    an edit-mode deal's branch is shown read-only, resolved from this list) — omitted here
- *    on this page's own two call sites, so no branch field renders and nothing changes.
- *  - `dialogRef`/`hideTrigger`: let a caller drive the dialog open/closed itself (e.g. from a
- *    `sky-data-table` row action) instead of using this component's own built-in trigger
- *    button — again opt-in, this page's own two call sites don't pass them.
- *
- * Category/Subcategory are now branch-scoped: whichever branch is active (the `branches`
- * selector's current pick, or `fixedBranchId` when there's no selector) drives a
- * `getBranchCategoryAccess` fetch, and the Category/Subcategory pickers below list only what
- * THIS branch has been mapped to (`branch-category-access-dialog.tsx`'s Step 2 config) — never
- * the vendor-wide `categories` prop, which now only backs the "no longer mapped" stale-value
- * name lookup (see `categoryStale`/`subcategoryStale` below). The backend hard-validates the
- * same mapping server-side regardless of what this form sends (see `vendor.service.ts`).
- */
-export function DealDialog({
-  deal,
-  categories,
-  products,
-  branches,
-  token,
-  vendorId,
-  isSelf = false,
-  fixedBranchId,
-  dialogRef: externalDialogRef,
-  hideTrigger,
-  onSave,
-  onClose,
-}: {
-  deal?: Deal;
-  /** The vendor's granted SERVICE categories (`listCategories({ type: 'SERVICE', vendorId })`)
-   *  — a flat list containing both top-level rows and their subcategories (parentId set). No
-   *  longer the source of the Category/Subcategory picker options (that's branch-scoped now,
-   *  see this component's own doc comment) — kept only as a name-lookup fallback for a stale
-   *  category/subcategory value that's no longer in the branch's mapping. */
-  categories: Category[];
-  products: VendorProduct[];
-  branches?: Branch[];
-  token: string | null;
-  /** The vendor this deal belongs to — needed (alongside the active branch) to fetch that
-   *  branch's `getBranchCategoryAccess` mapping. */
-  vendorId: string;
-  /** True on the self-service surface (`VendorBranches`/`vendor-deals.tsx` with `isSelf`), where
-   *  the caller only holds `vendors:custom`, not `vendors:view` — routes the category-access
-   *  fetch below to `getMyBranchCategoryAccess` (`/vendors/me/branches/:branchId/category-access`)
-   *  instead of the admin-scoped `getBranchCategoryAccess`, which would otherwise 403. Defaults
-   *  to `false` since most call sites (the admin wizard) are admin-scoped. */
-  isSelf?: boolean;
-  /** The branch this dialog is already scoped to when the caller doesn't pass a `branches`
-   *  selector (e.g. `VendorBranches`'s per-branch "Deals" tab, which knows its own
-   *  `selectedBranchId` but never lets this dialog switch branches) — needed so `MediaUploader`
-   *  knows the right branch to upload against even before the create-flow's own `branchId`
-   *  state would otherwise resolve to one, and now also so the category-access fetch tracks a
-   *  branch switch made in the caller (e.g. picking a different branch in the left pane) even
-   *  though this dialog never remounts for it. */
-  fixedBranchId?: string;
-  dialogRef?: RefObject<MdDialog | null>;
-  hideTrigger?: boolean;
-  onSave: (input: DealInput, branchId?: string) => Promise<Deal | void>;
-  onClose?: () => void;
-}) {
-  const internalDialogRef = useRef<MdDialog>(null);
-  const dialogRef = externalDialogRef ?? internalDialogRef;
-  // Checked/set synchronously at the very top of submit(), before any await — a `submitting`
-  // state guard alone can't stop a second click/tap/Enter that fires before React commits the
-  // disabling re-render (same gap already fixed this session for TherapistFormDialog/
-  // PackageFormDialog/checkout.tsx; DealDialog had the identical gap).
-  const submittingRef = useRef(false);
-  // Belt-and-suspenders on top of submittingRef: disables the actual DOM element synchronously,
-  // in the same tick as the click, rather than waiting on React's `disabled={submitting}`
-  // re-render to commit — closes the residual window where two clicks issued close enough
-  // together can both reach submit() before either state update has visibly taken effect.
-  const saveButtonRef = useRef<MdFilledButton>(null);
-  const [branchId, setBranchId] = useState<string>(deal?.branchId ?? fixedBranchId ?? branches?.[0]?.id ?? '');
-  const [form, setForm] = useState<DealInput>({
-    categoryId: deal?.categoryId ?? '',
-    subcategoryId: deal?.subcategoryId ?? undefined,
-    title: deal?.title ?? '',
-    slug: deal?.slug ?? '',
-    originalPrice: deal?.originalPrice ?? '',
-    salePrice: deal?.salePrice ?? '',
-    durationMinutes: deal?.durationMinutes ?? undefined,
-    shortDescription: deal?.shortDescription ?? undefined,
-    description: deal?.description ?? undefined,
-    notes: deal?.notes ?? undefined,
-    policy: deal?.policy ?? undefined,
-    termsAndConditions: deal?.termsAndConditions ?? undefined,
-  });
-  const [error, setError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  // Tracks the entity MediaUploader should upload against — starts as the existing deal being
-  // edited (already has an id), or undefined for a fresh create; set to the server's response
-  // the moment `onSave` resolves, so a brand-new deal's id becomes available to MediaUploader
-  // within the same dialog session instead of requiring a separate edit pass.
-  const [savedDeal, setSavedDeal] = useState<Deal | undefined>(deal);
-  // Purely a display grouping — every field still lives in the same `form`/`packages` state and
-  // is still validated by `submit()` regardless of which tab is active. The "Pricing" tab shows
-  // the Packages repeater (that IS a Deal's pricing — see DealPackage's schema doc comment in
-  // msd-api).
-  const [activeDealTab, setActiveDealTab] = useState<'general' | 'pricing' | 'media'>('general');
-  const DEAL_TAB_DEFS = [
-    { key: 'general' as const, label: 'General' },
-    { key: 'pricing' as const, label: 'Packages' },
-    { key: 'media' as const, label: 'Media' },
-  ];
-
-  // A service deal's own duration/price menu — a real child table (DealPackage), never a
-  // top-level single duration+price (see DealPackage's schema doc comment in msd-api). `id`
-  // present on an entry = update that existing row on save; absent = create a new one — the
-  // whole array is diffed server-side by `id` (vendor.service.ts#updateDeal).
-  const [packages, setPackages] = useState<DealPackageInput[]>(
-    deal?.packages?.map((p) => ({
-      id: p.id,
-      durationMinutes: p.durationMinutes,
-      sellingPrice: Number(p.sellingPrice),
-      originalPrice: p.originalPrice != null ? Number(p.originalPrice) : undefined,
-      isActive: p.isActive,
-      sortOrder: p.sortOrder,
-    })) ?? [],
-  );
-  const setPackage = (index: number, patch: Partial<DealPackageInput>) =>
-    setPackages((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)));
-  const addPackage = () => setPackages((prev) => [...prev, { durationMinutes: 30, sellingPrice: 0 }]);
-  const removePackage = (index: number) => setPackages((prev) => prev.filter((_, i) => i !== index));
-
-  // The branch whose category access mapping actually drives the pickers below: the `branches`
-  // selector's live pick when one is rendered, otherwise `fixedBranchId` read directly (not the
-  // `branchId` state, which never changes in that mode) — this dialog is never remounted when
-  // the caller's `fixedBranchId` prop changes (e.g. VendorBranches's left-pane branch switch), so
-  // reading the prop directly here is what lets the fetch below react to that switch anyway.
-  const activeBranchId = branches ? branchId : (fixedBranchId ?? '');
-  const [branchCategoryAccess, setBranchCategoryAccess] = useState<BranchCategoryAccessRow[]>([]);
-  // Starts `true` so the very first render (before the effect below has had a chance to run)
-  // never briefly flags the deal's existing category/subcategory as "stale" just because
-  // `branchCategoryAccess` hasn't loaded yet.
-  const [branchCategoryAccessLoading, setBranchCategoryAccessLoading] = useState(true);
-  const [branchCategoryAccessError, setBranchCategoryAccessError] = useState('');
-
-  useEffect(() => {
-    if (!activeBranchId || !vendorId) {
-      setBranchCategoryAccess([]);
-      setBranchCategoryAccessError('');
-      setBranchCategoryAccessLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setBranchCategoryAccessLoading(true);
-    setBranchCategoryAccessError('');
-    (isSelf ? getMyBranchCategoryAccess(token, activeBranchId) : getBranchCategoryAccess(token, vendorId, activeBranchId))
-      .then(({ data }) => {
-        if (cancelled) return;
-        setBranchCategoryAccess(data);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setBranchCategoryAccess([]);
-        setBranchCategoryAccessError(err instanceof ApiRequestError ? err.message : "Could not load this branch's category access.");
-      })
-      .finally(() => {
-        if (!cancelled) setBranchCategoryAccessLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [token, vendorId, activeBranchId, isSelf]);
-
-  /** Service offering only — category/subcategory are picked directly (no catalog item to
-   *  derive them from any more), restricted to whatever THIS branch has been mapped to in Step 2
-   *  (`branch-category-access-dialog.tsx`), not merely the vendor-wide grant. A deal's existing
-   *  category/subcategory that's since fallen out of the branch's mapping (branch remapped after
-   *  the deal was created) is never silently cleared — `categoryStale`/`subcategoryStale` drive an
-   *  injected option + warning banner instead, so saving without touching the field keeps the
-   *  existing value (the backend re-validates it regardless — see `vendor.service.ts`). */
-  const matchedCategoryRow = branchCategoryAccess.find((row) => row.categoryId === form.categoryId);
-  const subcategoryOptions = matchedCategoryRow?.subcategories.map((s) => s.subcategory) ?? [];
-  const branchCategoryAccessReady = !branchCategoryAccessLoading && !branchCategoryAccessError;
-  const categoryStale = branchCategoryAccessReady && Boolean(form.categoryId) && !matchedCategoryRow;
-  const subcategoryStale =
-    branchCategoryAccessReady &&
-    !categoryStale &&
-    Boolean(form.subcategoryId) &&
-    !subcategoryOptions.some((c) => c.id === form.subcategoryId);
-  const staleCategoryName = deal?.category?.name ?? categories.find((c) => c.id === form.categoryId)?.name ?? 'Unknown category';
-  const staleSubcategoryName =
-    deal?.subcategory?.name ?? categories.find((c) => c.id === form.subcategoryId)?.name ?? 'Unknown subcategory';
-
-  const submit = async () => {
-    if (submittingRef.current) return;
-    if (branches && !deal && !branchId) {
-      setError('Select a branch.');
-      return;
-    }
-    if (!form.title.trim() || !form.slug.trim() || !form.categoryId) {
-      setError('Title, slug, and category are required.');
-      return;
-    }
-    if (packages.length === 0) {
-      setError('At least one package (duration + price) is required for a deal.');
-      return;
-    }
-    for (const p of packages) {
-      if (!p.durationMinutes || p.durationMinutes <= 0) {
-        setError('Every package needs a duration greater than 0.');
-        return;
-      }
-      if (p.sellingPrice == null || p.sellingPrice < 0) {
-        setError('Every package needs a selling price of 0 or more.');
-        return;
-      }
-      if (p.originalPrice !== undefined && p.originalPrice < p.sellingPrice) {
-        setError("Each package's original price must be greater than or equal to its selling price.");
-        return;
-      }
-    }
-    // The Deal's own originalPrice/salePrice/durationMinutes are a synced "from price"/
-    // default-duration display cache (see DealPackage's schema doc comment in msd-api) — the
-    // server re-syncs them to the cheapest active package right after save regardless, but the
-    // create/update schema still requires *some* value up front, so derive one here from the
-    // cheapest package the admin actually entered rather than asking them to fill a redundant,
-    // now-meaningless single duration+price pair.
-    const cheapest = packages.reduce((min, p) => (p.sellingPrice < min.sellingPrice ? p : min), packages[0]);
-    const payload: DealInput = {
-      ...form,
-      durationMinutes: cheapest.durationMinutes,
-      salePrice: String(cheapest.sellingPrice),
-      originalPrice: String(cheapest.originalPrice ?? cheapest.sellingPrice),
-      packages,
-    };
-
-    submittingRef.current = true;
-    // Disables the real DOM element in the same synchronous tick, rather than waiting on
-    // React's `disabled={submitting}` re-render to commit — see saveButtonRef's own doc comment.
-    if (saveButtonRef.current) saveButtonRef.current.disabled = true;
-    setSubmitting(true);
-    setError('');
-    try {
-      const result = await onSave(payload, branches ? branchId : undefined);
-      // Fired only here, after the API call has actually resolved — never optimistically, and
-      // never for a failed request (see the catch block below, which shows an inline error
-      // instead); `submittingRef`/`saveButtonRef` above already guard against a double-submit
-      // firing this twice.
-      showSnackbar(`Deal ${deal ? 'updated' : 'created'} successfully`, { variant: 'success' });
-      if (!deal && result) {
-        // A fresh create — keep the dialog open so MediaUploader can flush any staged photos/
-        // video against the new id; an edit's dialog closes immediately as before, since
-        // MediaUploader already had a real entityId the whole time (nothing was staged).
-        setSavedDeal(result);
-      } else {
-        dialogRef.current?.close();
-      }
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not save deal.');
-    } finally {
-      submittingRef.current = false;
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <>
-      {!hideTrigger && (
-        <OutlinedButton onClick={() => dialogRef.current?.show()}>
-          <Icon slot="icon" aria-hidden="true">{deal ? 'edit' : 'add'}</Icon>
-          {deal ? 'Edit' : 'Add deal'}
-        </OutlinedButton>
-      )}
-      <Dialog ref={dialogRef} onClose={onClose}>
-        <div slot="headline">{deal ? 'Edit deal' : 'Add deal'}</div>
-        <div slot="content">
-          <div className="admin-tabs-wrap">
-            <Tabs
-              className="admin-tabs"
-              onChange={(e) => setActiveDealTab(DEAL_TAB_DEFS[(e.target as unknown as { activeTabIndex: number }).activeTabIndex].key)}
-            >
-              {DEAL_TAB_DEFS.map((tab) => (
-                <PrimaryTab key={tab.key} active={activeDealTab === tab.key}>{tab.label}</PrimaryTab>
-              ))}
-            </Tabs>
-          </div>
-
-          {activeDealTab === 'general' && (
-            <div className="form-grid">
-              {branches && (
-                deal ? (
-                  <p className="field-hint">Branch: {branches.find((b) => b.id === deal.branchId)?.name ?? deal.branch?.name ?? '—'} (cannot be changed)</p>
-                ) : (
-                  <OutlinedSelect
-                    label="Branch"
-                    value={branchId}
-                    onChange={(e: Event) => {
-                      const value = (e.target as HTMLSelectElement).value;
-                      // Same reset-in-same-update idiom as BranchDialog's State→City cascade —
-                      // a category/subcategory picked for the previous branch is never valid
-                      // (or even meaningful) under a newly-picked branch's own mapping.
-                      setBranchId(value);
-                      setForm((f) => ({ ...f, categoryId: '', subcategoryId: undefined }));
-                    }}
-                  >
-                    {branches.map((b) => (
-                      <SelectOption key={b.id} value={b.id}>
-                        <div slot="headline">{b.name}</div>
-                      </SelectOption>
-                    ))}
-                  </OutlinedSelect>
-                )
-              )}
-              <OutlinedSelect
-                label="Category"
-                value={form.categoryId}
-                disabled={branchCategoryAccessLoading}
-                onChange={(e: Event) => setForm((f) => ({ ...f, categoryId: (e.target as HTMLSelectElement).value, subcategoryId: undefined }))}
-              >
-                <SelectOption value="">
-                  <div slot="headline">{branchCategoryAccessLoading ? 'Loading categories…' : 'Select a category'}</div>
-                </SelectOption>
-                {categoryStale && (
-                  <SelectOption value={form.categoryId}>
-                    <div slot="headline">{staleCategoryName}</div>
-                  </SelectOption>
-                )}
-                {branchCategoryAccess.map((row) => (
-                  <SelectOption key={row.categoryId} value={row.categoryId}>
-                    <div slot="headline">{row.category.name}</div>
-                  </SelectOption>
-                ))}
-              </OutlinedSelect>
-              {categoryStale && (
-                <p className="error-state" role="alert">
-                  This category is no longer mapped to this branch. Saving without changing it keeps the existing value — or pick a currently mapped option.
-                </p>
-              )}
-
-              {(subcategoryOptions.length > 0 || subcategoryStale) && (
-                <OutlinedSelect
-                  label="Subcategory (optional)"
-                  value={form.subcategoryId ?? ''}
-                  disabled={branchCategoryAccessLoading}
-                  onChange={(e: Event) => setForm((f) => ({ ...f, subcategoryId: (e.target as HTMLSelectElement).value || undefined }))}
-                >
-                  <SelectOption value="">
-                    <div slot="headline">None</div>
-                  </SelectOption>
-                  {subcategoryStale && (
-                    <SelectOption value={form.subcategoryId ?? ''}>
-                      <div slot="headline">{staleSubcategoryName}</div>
-                    </SelectOption>
-                  )}
-                  {subcategoryOptions.map((c) => (
-                    <SelectOption key={c.id} value={c.id}>
-                      <div slot="headline">{c.name}</div>
-                    </SelectOption>
-                  ))}
-                </OutlinedSelect>
-              )}
-              {subcategoryStale && (
-                <p className="error-state" role="alert">
-                  This subcategory is no longer mapped to this branch/category. Saving without changing it keeps the existing value — or pick a currently mapped option.
-                </p>
-              )}
-
-              {branchCategoryAccessError && <p className="error-state" role="alert">{branchCategoryAccessError}</p>}
-
-              {!branchCategoryAccessLoading && !branchCategoryAccessError && branchCategoryAccess.length === 0 && !categoryStale && (
-                <p className="empty-state">No categories are mapped to this branch yet — map one under Business Modules &amp; Category Access first.</p>
-              )}
-
-              <OutlinedTextField label="Title" value={form.title} onInput={(e: Event) => setForm((f) => ({ ...f, title: (e.target as HTMLInputElement).value }))} />
-              <OutlinedTextField label="Slug" value={form.slug} onInput={(e: Event) => setForm((f) => ({ ...f, slug: (e.target as HTMLInputElement).value }))} />
-              <OutlinedTextField label="Short description" value={form.shortDescription ?? ''} onInput={(e: Event) => setForm((f) => ({ ...f, shortDescription: (e.target as HTMLInputElement).value }))} />
-              <OutlinedTextField
-                label="Description"
-                type="textarea"
-                rows={4}
-                value={form.description ?? ''}
-                onInput={(e: Event) => setForm((f) => ({ ...f, description: (e.target as HTMLTextAreaElement).value }))}
-              />
-              <OutlinedTextField
-                label="Notes"
-                type="textarea"
-                rows={3}
-                value={form.notes ?? ''}
-                onInput={(e: Event) => setForm((f) => ({ ...f, notes: (e.target as HTMLTextAreaElement).value }))}
-              />
-              <OutlinedTextField
-                label="Policy"
-                type="textarea"
-                rows={3}
-                value={form.policy ?? ''}
-                onInput={(e: Event) => setForm((f) => ({ ...f, policy: (e.target as HTMLTextAreaElement).value }))}
-              />
-              <OutlinedTextField
-                label="Terms & Conditions"
-                type="textarea"
-                rows={3}
-                value={form.termsAndConditions ?? ''}
-                onInput={(e: Event) => setForm((f) => ({ ...f, termsAndConditions: (e.target as HTMLTextAreaElement).value }))}
-              />
-            </div>
-          )}
-
-          {activeDealTab === 'pricing' && (
-            <div className="form-grid">
-              <fieldset>
-                <legend>Packages</legend>
-                <p className="field-hint">Every duration/price option a customer can select — at least one is required. For example: 30 Min → ₹999, 60 Min → ₹1,499.</p>
-                {packages.map((pkg, i) => (
-                  <div className="form-grid" key={pkg.id ?? `new-${i}`}>
-                    <OutlinedTextField
-                      label="Duration (minutes)"
-                      type="number"
-                      value={pkg.durationMinutes ? String(pkg.durationMinutes) : ''}
-                      onInput={(e: Event) => setPackage(i, { durationMinutes: Number((e.target as HTMLInputElement).value) || 0 })}
-                    />
-                    <OutlinedTextField
-                      label="Selling price"
-                      type="number"
-                      value={pkg.sellingPrice ? String(pkg.sellingPrice) : ''}
-                      onInput={(e: Event) => setPackage(i, { sellingPrice: Number((e.target as HTMLInputElement).value) || 0 })}
-                    />
-                    <OutlinedTextField
-                      label="Original price (optional)"
-                      type="number"
-                      value={pkg.originalPrice !== undefined ? String(pkg.originalPrice) : ''}
-                      onInput={(e: Event) => setPackage(i, { originalPrice: Number((e.target as HTMLInputElement).value) || undefined })}
-                    />
-                    <OutlinedButton onClick={() => removePackage(i)}>
-                      <Icon slot="icon" aria-hidden="true">delete</Icon>
-                      Remove
-                    </OutlinedButton>
-                  </div>
-                ))}
-                <OutlinedButton onClick={addPackage}>
-                  <Icon slot="icon" aria-hidden="true">add</Icon>
-                  Add package
-                </OutlinedButton>
-              </fieldset>
-            </div>
-          )}
-
-          {activeDealTab === 'media' && (
-            <MediaUploader
-              entityType="deal"
-              entityId={savedDeal?.id ?? null}
-              branchId={savedDeal?.branchId ?? (branches ? branchId : fixedBranchId)}
-              existingImages={savedDeal?.mediaImages ?? []}
-              existingVideo={savedDeal?.mediaVideo ?? null}
-              token={token}
-            />
-          )}
-
-          {error && <p className="error-state" role="alert">{error}</p>}
-        </div>
-        <div slot="actions">
-          <TextButton onClick={() => dialogRef.current?.close()}>Cancel</TextButton>
-          <FilledButton ref={saveButtonRef} onClick={submit} disabled={submitting}>{submitting ? 'Saving…' : 'Save'}</FilledButton>
         </div>
       </Dialog>
     </>

@@ -73,8 +73,8 @@ const EXTRA_ACTIONS_BY_MENU_KEY: Record<string, PermissionAction[]> = {
   // the Role Permission Matrix shows a disabled dash for that cell, same as any other
   // not-yet-grantable action (see permission-matrix.tsx's own doc comment).
   'vendors.branches': ['create', 'edit', 'status_change'],
-  // Admin-on-behalf Deal CRUD, including the admin-only approve/reject moderation actions.
-  'vendors.deals': ['create', 'edit', 'delete', 'status_change', 'approve', 'reject'],
+  // Admin-on-behalf Deal CRUD. No approve/reject: deals publish without approval (D6).
+  'vendors.deals': ['create', 'edit', 'delete', 'status_change'],
   // Admin-on-behalf Therapist CRUD — no delete-via-status distinction beyond status_change/delete
   // both existing as real endpoints.
   'vendors.therapists': ['create', 'edit', 'delete', 'status_change'],
@@ -232,6 +232,19 @@ export const MEMBER_GRANTS: Record<'admin' | 'sales' | 'marketing' | 'support' |
   member: ['members:custom'],
 };
 
+/** The Deals row of the role matrix (docs/msd/PLANNING.md §2.7): staff who build a member's
+ *  catalog get the branch, deal and therapist screens it needs (branch first, then deal, then
+ *  therapists inline). Delete stays with Super Admin. */
+const CATALOG_WRITE = ['view', 'create', 'edit', 'status_change'];
+const catalogKeys = (actions: string[]) =>
+  ['vendors.branches', 'vendors.deals', 'vendors.therapists'].flatMap((key) => actions.map((action) => `${key}:${action}`));
+export const DEAL_GRANTS: Record<'admin' | 'sales' | 'marketing' | 'support', string[]> = {
+  admin: catalogKeys(CATALOG_WRITE),
+  sales: catalogKeys(CATALOG_WRITE),
+  marketing: catalogKeys(['view']),
+  support: catalogKeys(['view']),
+};
+
 /** A reasonable starter grant for the non-super-admin staff roles, so the app isn't empty on first login. */
 async function grantStarterPermissions(
   roles: Map<string, { id: string; isSuperAdmin: boolean }>,
@@ -272,6 +285,7 @@ async function grantStarterPermissions(
     'dashboard:view',
     'customers:view', 'customers:create', 'customers:edit', 'customers:delete', 'customers:status_change',
     ...MEMBER_GRANTS.admin,
+    ...DEAL_GRANTS.admin,
     'orders:view', 'orders:edit', 'orders:status_change',
     'products:view', 'products:create', 'products:edit', 'products:delete',
     'services:view', 'services:create', 'services:edit', 'services:delete',
@@ -299,6 +313,7 @@ async function grantStarterPermissions(
   await grant('marketing', [
     'dashboard:view',
     ...MEMBER_GRANTS.marketing,
+    ...DEAL_GRANTS.marketing,
     'masters:view', 'masters.categories:view', 'masters.categories:create', 'masters.categories:edit',
     'masters.sub-categories:view', 'masters.sub-categories:create', 'masters.sub-categories:edit',
     'masters.tags:view', 'masters.tags:create', 'masters.tags:edit', 'masters.tags:delete',
@@ -319,6 +334,7 @@ async function grantStarterPermissions(
   await grant('sales', [
     'dashboard:view',
     ...MEMBER_GRANTS.sales,
+    ...DEAL_GRANTS.sales,
     'orders:view', 'orders:export',
     'reports:view', 'reports:export',
   ]);
@@ -326,6 +342,7 @@ async function grantStarterPermissions(
   await grant('support', [
     'dashboard:view',
     ...MEMBER_GRANTS.support,
+    ...DEAL_GRANTS.support,
     'customers:view',
     'orders:view',
   ]);
@@ -1119,7 +1136,7 @@ const PACKAGE_MULTIPLIERS = [1, 1.6, 2.2] as const;
  *  requires selecting a package before a service Deal can be added to cart (see CartItem's own
  *  schema doc comment), so demo data needs real packages to exercise that flow. Priced as a
  *  multiple of the deal's own base price, rounded to a clean ten. Idempotent via DealPackage's
- *  own `@@unique([dealId, durationMinutes])` upsert key. */
+ *  own `@@unique([dealId, durationMinutes, persons])` key (1 person). */
 async function seedDealPackages(): Promise<number> {
   const serviceDeals = await prisma.deal.findMany({ select: { id: true, salePrice: true, originalPrice: true } });
   let created = 0;
@@ -1127,7 +1144,7 @@ async function seedDealPackages(): Promise<number> {
     const base = deal.salePrice.toNumber();
     const baseOriginal = deal.originalPrice ? deal.originalPrice.toNumber() : null;
     for (const [i, durationMinutes] of PACKAGE_DURATIONS.entries()) {
-      const existing = await prisma.dealPackage.findUnique({ where: { dealId_durationMinutes: { dealId: deal.id, durationMinutes } } });
+      const existing = await prisma.dealPackage.findUnique({ where: { dealId_durationMinutes_persons: { dealId: deal.id, durationMinutes, persons: 1 } } });
       if (existing) continue;
       const multiplier = PACKAGE_MULTIPLIERS[i];
       await prisma.dealPackage.create({

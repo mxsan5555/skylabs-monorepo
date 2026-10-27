@@ -133,6 +133,7 @@ beforeEach(() => {
 // as HTML attributes — true for both the shared-ui React wrappers and raw elements alike.
 const branchNameField = () => document.querySelectorAll('md-outlined-text-field')[0] as (HTMLElement & { value?: string }) | undefined;
 const stateField = () => document.querySelectorAll('md-outlined-select')[0] as HTMLElement | undefined;
+const cityField = () => document.querySelectorAll('md-outlined-select')[1] as HTMLElement | undefined;
 
 // `md-outlined-select`'s own `value` setter resolves against its slotted `<md-select-option>`
 // children via an internal DOM query (`this.menu.items`) that isn't reliably populated
@@ -189,6 +190,13 @@ describe('BranchFormPage — Add', () => {
     await screen.findByRole('heading', { name: 'Add branch' });
     const state = stateField() as HTMLElement;
     pickOption(state, 'Maharashtra');
+    // The city list renders once the state is set; pick a city after that.
+    const city = await waitFor(() => {
+      const el = cityField();
+      if (!el || el.hasAttribute('disabled')) throw new Error('city not enabled yet');
+      return el;
+    });
+    pickOption(city, 'Pune');
     const name = await waitFor(() => {
       const el = branchNameField();
       if (!el || el.hasAttribute('disabled')) throw new Error('not enabled yet');
@@ -198,9 +206,19 @@ describe('BranchFormPage — Add', () => {
     fireEvent.input(name);
     const save = await getEnabledSaveButton();
     fireEvent.click(save);
-    await waitFor(() => expect(createBranchMock).toHaveBeenCalledWith('tok', 'v1', expect.objectContaining({ name: 'New Branch', state: 'Maharashtra' })));
+    await waitFor(() => expect(createBranchMock).toHaveBeenCalledWith('tok', 'v1', expect.objectContaining({ name: 'New Branch', state: 'Maharashtra', city: 'Pune' })));
     await waitFor(() => expect(setBranchCategoryAccessMock).toHaveBeenCalledWith('tok', 'v1', 'new-1', { mappings: [] }));
     await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/account/members/v1/branches/new-1', { replace: true }));
+  });
+
+  it('needs a city of the picked state before it saves (PLANNING §2.7)', async () => {
+    renderAt('/account/members/v1/branches/new');
+    await screen.findByRole('heading', { name: 'Add branch' });
+    pickOption(stateField() as HTMLElement, 'Maharashtra');
+    const save = await getEnabledSaveButton();
+    fireEvent.click(save);
+    await waitFor(() => expect(screen.getByText('Select a city.')).toBeTruthy());
+    expect(createBranchMock).not.toHaveBeenCalled();
   });
 
   it('shows a required-name error and never calls createBranch when Branch Name is left empty', async () => {
@@ -221,6 +239,13 @@ describe('BranchFormPage — Add', () => {
     await screen.findByRole('heading', { name: 'Add branch' });
     const state = stateField() as HTMLElement;
     pickOption(state, 'Maharashtra');
+    // The city list renders once the state is set; pick a city after that.
+    const city = await waitFor(() => {
+      const el = cityField();
+      if (!el || el.hasAttribute('disabled')) throw new Error('city not enabled yet');
+      return el;
+    });
+    pickOption(city, 'Pune');
     const name = await waitFor(() => {
       const el = branchNameField();
       if (!el || el.hasAttribute('disabled')) throw new Error('not enabled yet');

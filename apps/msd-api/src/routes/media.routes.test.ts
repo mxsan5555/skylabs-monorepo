@@ -102,7 +102,7 @@ describe('POST /api/v1/vendors/me/branches/:branchId/deals/:dealId/images', () =
     expect(prismaMock.dealImage.create).not.toHaveBeenCalled();
   });
 
-  it('403s when the deal belongs to a different vendor (cross-tenant ownership check)', async () => {
+  it('404s when the deal belongs to a different vendor (cross-tenant ownership check, never confirms it exists)', async () => {
     resolveMock.mockResolvedValue(['members:custom']);
     prismaMock.member.findUnique.mockResolvedValue(vendorAFixture); // caller is vendor A
     prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
@@ -113,7 +113,7 @@ describe('POST /api/v1/vendors/me/branches/:branchId/deals/:dealId/images', () =
       .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
       .attach('file', validJpeg(), { filename: 'photo.jpg', contentType: 'image/jpeg' });
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
     expect(prismaMock.dealImage.create).not.toHaveBeenCalled();
   });
 });

@@ -366,7 +366,7 @@ describe('Home', () => {
     expect(option(dealCard, 'variant')).toBe('plain');
     expect(option(dealCard, 'heading')).toBe(deals[0].title);
     expect(option(dealCard, 'badge')).toBe(content.offerCard.serviceTag);
-    expect(option(dealCard, 'href')).toBe(`/deal/${deals[0].id}`);
+    expect(option(dealCard, 'href')).toBe(`/deal/${deals[0].slug}`); // PLANNING §2.7 slug URLs
     expect(option(productCard, 'badge')).toBe(content.offerCard.productTag);
     expect(option(productCard, 'href')).toBe('/products/prod-1');
     expect(option(productCard, 'price')).toBe('₹499');

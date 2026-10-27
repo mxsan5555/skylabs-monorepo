@@ -169,15 +169,154 @@ one grouped Filter menu, with distinct tonal colours per status.
    several deals of that branch.
 3. A product belongs to the member, not a branch.
 4. Sales and Admin create the same objects on a member's behalf; only Super Admin deletes.
-5. Creation order: member → (staff-made categories) → branch (name and state required) →
-   therapists → deals (at least one package; therapists from the same branch) → products.
+5. Creation order: member → (staff-made categories) → branch (state first, then city, from the
+   India location list) → deals (at least one package; therapists picked from that branch or
+   created inline) → products. No branch, no deal (§2.7).
 6. Categories and subcategories are created by staff and open to every member (D10). Type rules
    stay: deals need a `SERVICE` category, products `PRODUCT`, therapist specialization `THERAPY`.
-7. One deal holds duration and price options only (`DealPackage`); options that differ by service
-   become separate deals (D13).
+7. One deal holds package options (`DealPackage`: name, duration, people, price, inclusions);
+   options that differ by service become separate deals (D13, widened by D32).
 8. Deals publish without an approval step (D6, task P3-15).
 9. All long text is written in the rich text editor and stored as sanitized HTML; titles, brand,
    badge, short description, summary, benefits and how-to-use items stay plain text (D18, D20).
+
+### 2.7 Deals: fields, forms, page and search (decided 2026-10-26, built 2026-10-27)
+
+One field set used by the schema, the API, the console form and the storefront page, grouped the
+same way everywhere. Tasks DL-01 to DL-14 (`TASKS.md` §2); data `DATABASE.md` §2 (S18 to S24);
+endpoints `API.md` §2.1, §2.2, §4.
+
+**Order of creation (member or staff on the member's behalf)**
+
+1. **Branch first.** The branch form starts with **State** (select from the India location list),
+   then **City** (cities of that state), then name, address lines, pincode, Google Maps link,
+   phone, email and opening hours. State and city are required and must match the list exactly, so
+   the branch lines up with the storefront location (city chip, `/deals/:city`, the per-state home
+   slider). An unknown state or city returns 422.
+2. **Then the deal.** The deal form asks for the branch first. A member with no branch sees "Add
+   a branch first" with a link to the branch form instead of the deal form; the API refuses a
+   deal whose branch is missing or belongs to another member (404). The branch can't change after creation; use **Copy to branch** to sell the
+   same deal at another branch.
+3. **Therapists on the deal** come only from the deal's branch: tick existing ones, or create a
+   new one inline (type, name, gender optional). The new therapist always gets the deal's branch
+   and member from the server. Therapists stay optional on a deal.
+
+**Fields, in form and page order**
+
+| Group | Field | Rule | Who sets it |
+|---|---|---|---|
+| Basics | Branch | Required, own member's branch, fixed after create | member, staff |
+| | Category, Subcategory | Active `SERVICE` category; subcategory its child, optional | member, staff |
+| | Title | 5 to 120 characters, plain text | member, staff |
+| | Tagline | Up to 140 characters (today's `shortDescription`); h1 subtitle and meta description | member, staff |
+| | Slug | Generated from title + member + city (see URLs); the member edits it while Draft only; staff may change it later | server, member, staff |
+| Media | Images | 1 to 10, JPG/PNG/WebP up to 5 MB each, drag to reorder, one cover, alt text per image (up to 125 characters, defaults to the title) | member, staff |
+| | Video | Optional, one | member, staff |
+| Packages | Package cards | 1 to 10 active packages (see Packages) | member, staff |
+| Description | Highlights | Up to 6 bullets, 80 characters each, plain text | member, staff |
+| | Description | Rich text, up to 5000 characters ("What you get") | member, staff |
+| Availability | Sale starts, sale ends | Optional dates; ends after starts; drives "Ends in" and the Expire soon tag | member, staff |
+| | Valid for | Days after purchase the voucher can be used, 1 to 365, optional | member, staff |
+| | Total stock | Optional; sold out at 0 | member, staff |
+| | Limit per customer | Optional, 1 to 20 units | member, staff |
+| Redemption | Booking required | Yes / No, default Yes | member, staff |
+| | Booking instructions | Rich text, up to 2000 characters (today's `notes`) | member, staff |
+| Fine print | Cancellation | Free up to 24 h before, Free up to 48 h before, or Non-refundable; plus an optional note (500) | member, staff |
+| | Eligibility | Up to 6 short items, 40 characters each ("Women only", "18+") | member, staff |
+| | Terms and conditions | Rich text, up to 5000 characters; the page links the site Terms of Service under it | member, staff |
+| FAQs | Questions | Up to 10 question (200) and answer (1000) pairs, ordered | member, staff |
+| Therapists | Linked therapists | From the deal's branch, or created inline | member, staff |
+| Publish | Status | Draft, Active, Inactive | member, staff |
+| Computed | Prices "from", discount %, currency INR, tag, bought count, sold out | Never typed in, never accepted from the client | server |
+
+Removed fields: `policy` (moves to the cancellation note), `notes` (becomes booking
+instructions), `discountPercent`, `salePrice`, `originalPrice` and `durationMinutes` as inputs
+(the server derives them from the packages), legacy `images` JSON. Not added: redemption type
+(msd has one flow: buy, then visit the branch), blackout dates (no slot booking yet; members write
+them in the terms), regulatory disclaimers (site-wide Terms of Service), "why grab this offer"
+(covered by highlights, tag, countdown and discount), ratings and reviews (ST-22).
+
+**Packages (cards)**
+
+- Each package is a card: name (optional, 80; shown as "{duration} min" when empty), duration in
+  minutes (15 to 480), people (1 to 6, "For 2 people"), price, original price (optional, not
+  below the price), what's included (up to 8 items of 80), Active switch. The card shows the
+  discount % it computes.
+- **Create screen:** add, edit and remove cards before the first save; all cards are sent with
+  the deal.
+- **Edit screen:** each card saves on its own (Add package, Edit, Delete); the order is drag to
+  reorder.
+- Duration plus people must be unique within a deal (a 60-min single and a 60-min couple package
+  can sit together).
+- Delete: refused with 409 "Deactivate it instead" when the package is in a cart or an order;
+  the last active package can't be deleted or deactivated (409 `LAST_PACKAGE`).
+- The cheapest active package sets the deal's "from" price, original price and discount.
+
+**Publishing**
+
+- No approval step (D6). A member's new deal starts as Draft; the member or staff set Active.
+- Active needs: at least 1 image, 1 active package, an active branch and an active member.
+  Otherwise 422 lists what is missing, and the console shows it as a checklist.
+- Members never delete deals (§2.6). Delete is Super Admin only and refused with 409 when the
+  deal has orders or cart lines.
+
+**Who does what** (matrix §1.2, row Deals)
+
+| Action | Member (own) | Sales | Admin | Super Admin | Marketing | Support |
+|---|---|---|---|---|---|---|
+| View deals in the console | yes | all | all | all | all | all |
+| Create, edit, packages, media, therapists, Copy to branch | yes | all | all | all | no | no |
+| Status (Draft, Active, Inactive) | yes | all | all | all | no | no |
+| Delete | no | no | no | yes | no | no |
+| Popular tags, promotions, home slider picks | no | no | no | yes | yes | no |
+
+A member who opens another member's deal, branch, package or therapist gets 404.
+
+**Storefront deal page** (`/deal/:slug`)
+
+1. Breadcrumb: Home › Deals in {City} › {Category} › {Title} (BreadcrumbList JSON-LD).
+2. Gallery: large image with the tag and discount, a thumbnail strip on desktop, swipe with dots
+   on phones, video as the last slide; a click opens a full-screen view with arrow keys, Escape
+   and a counter ("3 of 7"). Real alt text on every image.
+3. Chips: subcategory or category, member name (links to the member page), city.
+4. h1 title, tagline, highlights list.
+5. Price for the selected package: price, struck original price, % off.
+6. Package cards (radio group): name, duration, "For N people", what's included, price.
+7. Buy box: quantity (capped by stock and the per-customer limit), total, Add to cart, wishlist,
+   share; "Sold out" replaces Add to cart at 0 stock; "{n} bought" from 10 paid order lines;
+   "Ends in {d}d {h}h" within 7 days of the sale end.
+8. Accordions: What you get (description), How to redeem (booking required, instructions, valid
+   for N days), Cancellation (policy and note), Fine print (eligibility, terms, link to Terms of
+   Service).
+9. Therapists at this deal (`TherapistCard` rail), when linked.
+10. Location and hours: branch name, address lines, city, phone, Get directions, single-branch map
+    (ST-26), opening hours.
+11. About the business: logo, business name, about text, website, "See all deals from {member}".
+12. FAQs (accordion, FAQPage JSON-LD).
+13. More deals in {Category} near {City}, then the `DEAL_BOTTOM` banner.
+
+**URLs and search engines**
+
+- Deal URL: `/deal/{slug}`, slug = `{title}-{member}-{city}` in lowercase ASCII with hyphens, up
+  to 90 characters, for example `/deal/swedish-full-body-massage-zen-spa-pune`; a numeric suffix
+  on conflict. The slug is fixed once the deal first goes Active, so shared links never break;
+  only staff can change it after that, and the old slug is kept on the deal and still opens it.
+- Old `/deal/{uuid}` links and old slugs open the deal and replace the URL with the current slug;
+  the canonical tag always carries the current slug.
+- Title tag: "{Title} at {Member}, {City} | MSD" (up to 60 characters, the member and city kept
+  first when trimmed). Meta description: the tagline, else the first 155 characters of the
+  description. Open Graph image: the cover image.
+- JSON-LD: `Service` (name, description, image list, `areaServed` city, provider `LocalBusiness`
+  with address, geo, phone, opening hours), `AggregateOffer` (low and high package price, INR,
+  offer count, `availability` InStock or SoldOut, `validThrough` = sale end), BreadcrumbList,
+  FAQPage when FAQs exist. No rating markup until reviews exist.
+- Every Active deal is prerendered and listed in `sitemap.xml` with `lastmod` = updated date.
+  Draft, Inactive or hidden deals return the not-found page with `noindex`.
+- Search: the header search, `/explore?q=` and `GET /catalog/deals?search=` match the deal
+  title, the member's business name, the category and subcategory names and the branch city,
+  case-insensitive, ranked title match first, then member, then the rest.
+  The member page (`/vendor/:slug`) lists all of the member's active deals, so a search for the
+  member name lands on both.
 
 ## 3. Customers and orders
 
@@ -235,7 +374,7 @@ one grouped Filter menu, with distinct tonal colours per status.
   explore, products, wishlist and "You May Also Like".
 - **Therapist card** (`TherapistCard`): image slider, member, area, distance and "From" lowest
   package price; used on home, explore, category, therapists and the therapist page rail.
-- **Detail pages** (`/deal/:id`, `/therapist/:id`): one layout. Breadcrumb; gallery with
+- **Detail pages** (`/deal/:slug` per §2.7, `/therapist/:id`): one layout. Breadcrumb; gallery with
   thumbnails and the discount tag; buy box with chips, h1, price, package list, quantity, total,
   Add to cart, wishlist (deals) and share; Details accordions beside Location (Get directions)
   and Hours; then a rail (deals: same category; therapists: same member). A therapist is added
@@ -432,14 +571,14 @@ expire after 5 minutes (ARCHITECTURE.md §12.3).
 | D2 | Payout rule | As section 9 |
 | D3 | Aadhaar and PAN storage | Full number encrypted at rest (AES-256-GCM), masked in responses, hash for duplicates; a switch to stop storing the full number later (task P5-16) |
 | D4 | Review flag day | Day 35, one week after the final reminder (decided 2026-10-17) |
-| D6 | Deal approval gate | Remove it |
+| D6 | Deal approval gate | Remove it (done 2026-10-27, P3-15) |
 | D7 | Member delete | Super Admin only, only from Suspended; zero orders = delete, otherwise archive |
 | D8 | Masters and dashboard | Super Admin VCED, Admin VCE, Marketing V only; dashboard for all console roles with scoped data |
 | D9 | Onboarding | Staff create members and share logins; member gets own-scope customers view |
 | D10 | Category access | Categories open to every member; no per-member grants |
 | D11 | Refund policy | Section 3 |
 | D12 | Support access to customer data | Section 3 |
-| D13 | Package label | Keep `DealPackage` as duration plus price |
+| D13 | Package label | Keep `DealPackage` as duration plus price (widened by D32) |
 | D14 | Scheduler | Railway cron calling a secured endpoint, daily 10:00 IST (decided 2026-10-17) |
 | D17 | Payout commission | 1% |
 | D18 | Content authoring | Rich text editor for all long text, stored as sanitized HTML |
@@ -456,6 +595,10 @@ expire after 5 minutes (ARCHITECTURE.md §12.3).
 | D29 | Listing pages | `/deals`, `/products`, `/therapists` and `/explore` use the category layout with per-kind filters; result count on the chip row (2026-10-24) |
 | D30 | Card tags | Computed by the API, one per card: Expire soon, Hot, New, Deal (rules in §4); no admin field (2026-10-24) |
 | D31 | Product and therapy category pages (ST-13) | Indexable: `/category/:slug` lists one category, `/products` and `/therapists` list all; chips link the two (2026-10-24) |
+| D32 | Deal fields and packages (2026-10-26) | Field set, package cards (name, duration, people, price, inclusions) and page order of §2.7 |
+| D33 | Branch before deal (2026-10-26) | Branch state and city required from the India location list; no deal without a branch; one branch per deal plus Copy to branch |
+| D34 | Deal URLs (2026-10-26) | `/deal/{title}-{member}-{city}` slug, fixed once Active; old UUID links and old slugs still open the deal |
+| D35 | Deal FAQs and reviews (2026-10-26) | Per-deal FAQs now; ratings and reviews wait for ST-22 |
 | B2 | Vendor rename | Prisma `Vendor` → `Member`, `VendorDocument` → `MemberDocument` with `@@map`; FK columns stay `vendorId` |
 | B5 | Permission key | `vendors` → `members`; role `vendor` → `member`; role `support` added |
 | N1 | Reminder decisions (2026-10-17) | Clear the flag when documents complete; bell alert to `members:status_change` holders; Remind now in this release |

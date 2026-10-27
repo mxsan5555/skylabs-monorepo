@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FilledButton, Icon, OutlinedButton, OutlinedIconButton } from '@skylabs-monorepo/shared-ui/react';
 import { getCatalogVendor, type CatalogVendorBranch } from '../../../api/catalog';
@@ -7,6 +7,9 @@ import content from '../../../content.json';
 import './detail-page.css';
 
 const t = content.detailPage;
+const g = t.gallery;
+/** Horizontal travel that counts as a swipe to the next or previous image. */
+const SWIPE_MIN_PX = 40;
 const days = content.vendor.days;
 const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
 
@@ -15,40 +18,174 @@ export function discountPercent(price: number, original?: number | null): number
   return original != null && original > price ? Math.round(((original - price) / original) * 100) : 0;
 }
 
-/** Main image (with the discount tag), thumbnails to switch it, and the video when there is one. */
-export function DetailGallery({ images, video, alt, discountPct = 0 }: { images: string[]; video?: string | null; alt: string; discountPct?: number }) {
-  const [active, setActive] = useState(0);
-  useEffect(() => setActive(0), [images]);
-  const count = String(images.length);
+/**
+ * Deal and therapist gallery (PLANNING §2.7): the main image with the discount tag, previous /
+ * next buttons, swipe on touch screens, thumbnails from 600px and dots below it, the video under
+ * it, and a full-screen view (native `<dialog>`: arrow keys, Escape, "3 of 7"). `alts[i]` is the
+ * image's own description; `alt` (the item's name) is the fallback.
+ */
+export function DetailGallery({
+  images,
+  alts = [],
+  video,
+  alt,
+  discountPct = 0,
+}: {
+  images: string[];
+  alts?: (string | null | undefined)[];
+  video?: string | null;
+  alt: string;
+  discountPct?: number;
+}) {
+  // The active image belongs to one set of images: a new set starts at the first image again.
+  // Kept with the set's key (callers build a new array every render, so the array itself can't be).
+  const imagesKey = images.join('|');
+  const [selection, setSelection] = useState({ key: imagesKey, index: 0 });
+  const active = selection.key === imagesKey ? selection.index : 0;
+  const setActive = (next: number | ((index: number) => number)) =>
+    setSelection((prev) => {
+      const current = prev.key === imagesKey ? prev.index : 0;
+      return { key: imagesKey, index: typeof next === 'function' ? next(current) : next };
+    });
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const openerRef = useRef<HTMLButtonElement>(null);
+  const swipeStart = useRef<number | null>(null);
+
+  const count = images.length;
+  const altOf = (index: number) => alts[index]?.trim() || alt;
+  const go = (delta: number) => setActive((i) => (i + delta + count) % count);
+  const counter = (n: number) => fillTemplate(g.counter, { n: String(n + 1), count: String(count) });
+
+  const onKey = (e: KeyboardEvent<HTMLElement>) => {
+    if (count < 2) return;
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      go(-1);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      go(1);
+    }
+  };
+  const onPointerDown = (e: PointerEvent<HTMLElement>) => {
+    swipeStart.current = e.clientX;
+  };
+  const onPointerUp = (e: PointerEvent<HTMLElement>) => {
+    if (swipeStart.current === null || count < 2) return;
+    const dx = e.clientX - swipeStart.current;
+    swipeStart.current = null;
+    if (Math.abs(dx) > SWIPE_MIN_PX) go(dx < 0 ? 1 : -1);
+  };
+
+  const openFullScreen = () => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (typeof dialog.showModal === 'function') dialog.showModal();
+    else dialog.setAttribute('open', '');
+  };
+  const closeFullScreen = () => {
+    const dialog = dialogRef.current;
+    if (dialog && typeof dialog.close === 'function') dialog.close();
+    else dialog?.removeAttribute('open');
+    openerRef.current?.focus();
+  };
+
   return (
-    <div className="detail-page__gallery">
-      <div className="detail-page__main-img-wrap">
+    <div className="detail-page__gallery" role="group" aria-roledescription="carousel" aria-label={alt} onKeyDown={onKey}>
+      <div className="detail-page__main-img-wrap" onPointerDown={onPointerDown} onPointerUp={onPointerUp}>
         {images[active] && (
-          <img key={active} className="detail-page__main-img" src={images[active]} alt={alt} width={800} height={450} />
+          <button
+            ref={openerRef}
+            type="button"
+            className="detail-page__main-btn"
+            aria-label={fillTemplate(g.open, { n: String(active + 1), count: String(count) })}
+            onClick={openFullScreen}
+          >
+            <img key={active} className="detail-page__main-img" src={images[active]} alt={altOf(active)} width={800} height={450} />
+          </button>
         )}
         {discountPct > 0 && (
           <sky-badge className="detail-page__badge" variant="error" size="large">
             {fillTemplate(t.off, { percent: String(discountPct) })}
           </sky-badge>
         )}
+        {count > 1 && (
+          <>
+            <OutlinedIconButton className="detail-page__nav detail-page__nav--prev" aria-label={g.previous} onClick={() => go(-1)}>
+              <Icon aria-hidden="true">chevron_left</Icon>
+            </OutlinedIconButton>
+            <OutlinedIconButton className="detail-page__nav detail-page__nav--next" aria-label={g.next} onClick={() => go(1)}>
+              <Icon aria-hidden="true">chevron_right</Icon>
+            </OutlinedIconButton>
+            <span className="detail-page__counter label-medium" aria-live="polite">{counter(active)}</span>
+          </>
+        )}
       </div>
-      {images.length > 1 && (
-        <div className="detail-page__thumbs" role="group" aria-label={t.thumbnails}>
-          {images.map((image, index) => (
-            <button
-              key={`${image}-${index}`}
-              type="button"
-              className="detail-page__thumb"
-              onClick={() => setActive(index)}
-              aria-label={fillTemplate(t.viewImage, { n: String(index + 1), count })}
-              aria-pressed={index === active}
-            >
-              <img src={image} alt="" width={80} height={60} loading="lazy" />
-            </button>
-          ))}
-        </div>
+      {count > 1 && (
+        <>
+          <div className="detail-page__thumbs" role="group" aria-label={t.thumbnails}>
+            {images.map((image, index) => (
+              <button
+                key={`${image}-${index}`}
+                type="button"
+                className="detail-page__thumb"
+                onClick={() => setActive(index)}
+                aria-label={fillTemplate(t.viewImage, { n: String(index + 1), count: String(count) })}
+                aria-pressed={index === active}
+              >
+                <img src={image} alt="" width={80} height={60} loading="lazy" />
+              </button>
+            ))}
+          </div>
+          <div className="detail-page__dots" role="group" aria-label={t.thumbnails}>
+            {images.map((image, index) => (
+              <button
+                key={`dot-${image}-${index}`}
+                type="button"
+                className="detail-page__dot"
+                onClick={() => setActive(index)}
+                aria-label={fillTemplate(t.viewImage, { n: String(index + 1), count: String(count) })}
+                aria-pressed={index === active}
+              />
+            ))}
+          </div>
+        </>
       )}
       {video && <video className="detail-page__video" controls src={video} />}
+
+      <dialog
+        ref={dialogRef}
+        className="detail-page__lightbox"
+        aria-label={fillTemplate(g.dialog, { title: alt })}
+        onCancel={(e) => {
+          e.preventDefault();
+          closeFullScreen();
+        }}
+        onKeyDown={(e) => {
+          // The gallery around it listens too; handle the key once.
+          e.stopPropagation();
+          onKey(e);
+        }}
+      >
+        <div className="detail-page__lightbox-bar">
+          <span className="label-large" aria-live="polite">{counter(active)}</span>
+          <OutlinedIconButton aria-label={g.close} onClick={closeFullScreen}>
+            <Icon aria-hidden="true">close</Icon>
+          </OutlinedIconButton>
+        </div>
+        <div className="detail-page__lightbox-stage" onPointerDown={onPointerDown} onPointerUp={onPointerUp}>
+          {count > 1 && (
+            <OutlinedIconButton aria-label={g.previous} onClick={() => go(-1)}>
+              <Icon aria-hidden="true">chevron_left</Icon>
+            </OutlinedIconButton>
+          )}
+          {images[active] && <img className="detail-page__lightbox-img" src={images[active]} alt={altOf(active)} />}
+          {count > 1 && (
+            <OutlinedIconButton aria-label={g.next} onClick={() => go(1)}>
+              <Icon aria-hidden="true">chevron_right</Icon>
+            </OutlinedIconButton>
+          )}
+        </div>
+      </dialog>
     </div>
   );
 }
@@ -94,13 +231,20 @@ export interface DetailPurchaseProps {
   onQuantityChange: (quantity: number) => void;
   onAdd: () => void;
   addDisabled?: boolean;
+  /** Highest quantity allowed (stock left, per-customer limit); no cap when omitted. */
+  maxQuantity?: number;
+  /** Replaces Add to cart with a disabled "Sold out". */
+  soldOut?: boolean;
   /** Extra icon buttons before Share (e.g. the wishlist heart). */
   actions?: ReactNode;
+  /** Short lines under the buttons (bought count, ends in, limit). */
+  notes?: ReactNode;
   error?: string;
 }
 
 /** Quantity stepper, total, Add to cart and the icon actions (extra + Share). */
-export function DetailPurchase({ unitPrice, quantity, onQuantityChange, onAdd, addDisabled, actions, error }: DetailPurchaseProps) {
+export function DetailPurchase({ unitPrice, quantity, onQuantityChange, onAdd, addDisabled, maxQuantity, soldOut, actions, notes, error }: DetailPurchaseProps) {
+  const atMax = maxQuantity !== undefined && quantity >= maxQuantity;
   return (
     <>
       <div className="detail-page__row body-large">
@@ -110,7 +254,7 @@ export function DetailPurchase({ unitPrice, quantity, onQuantityChange, onAdd, a
             <Icon aria-hidden="true">remove</Icon>
           </OutlinedIconButton>
           <output aria-live="polite">{quantity}</output>
-          <OutlinedIconButton aria-label={t.increase} onClick={() => onQuantityChange(quantity + 1)}>
+          <OutlinedIconButton aria-label={t.increase} disabled={soldOut || atMax} onClick={() => onQuantityChange(quantity + 1)}>
             <Icon aria-hidden="true">add</Icon>
           </OutlinedIconButton>
         </div>
@@ -120,13 +264,14 @@ export function DetailPurchase({ unitPrice, quantity, onQuantityChange, onAdd, a
         <strong className="detail-page__total title-large">{formatINR(unitPrice * quantity)}</strong>
       </div>
       <div className="detail-page__actions">
-        <FilledButton type="button" className="detail-page__add-btn" onClick={onAdd} disabled={addDisabled}>
-          <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
-          {t.addToCart}
+        <FilledButton type="button" className="detail-page__add-btn" onClick={onAdd} disabled={addDisabled || soldOut}>
+          <Icon slot="icon" aria-hidden="true">{soldOut ? 'block' : 'shopping_bag'}</Icon>
+          {soldOut ? t.soldOut : t.addToCart}
         </FilledButton>
         {actions}
         <ShareButton />
       </div>
+      {notes}
       {error && (
         <p className="error-state" role="alert">
           {error}
@@ -140,9 +285,13 @@ export interface DetailBranch {
   id: string;
   name: string;
   address: string | null;
+  addressLine2?: string | null;
   city: string | null;
   latitude: string | null;
   longitude: string | null;
+  phone?: string | null;
+  /** When the page already has the hours (deal page), no member lookup is made. */
+  openingHours?: CatalogVendorBranch['openingHours'] | null;
 }
 
 function directionsUrl(branch: DetailBranch): string | undefined {
@@ -153,13 +302,19 @@ function directionsUrl(branch: DetailBranch): string | undefined {
   return query ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(query)}` : undefined;
 }
 
-/** Location (address + Get directions) and the branch's weekly hours (from the member's public
- *  page, `GET /catalog/vendors/:slug`). */
+/** Location (address, Get directions, call) and the branch's weekly hours: given by the page, or
+ *  read from the member's public page (`GET /catalog/vendors/:slug`). */
 export function BranchPanels({ branch, vendorSlug }: { branch: DetailBranch; vendorSlug?: string | null }) {
-  const [hours, setHours] = useState<CatalogVendorBranch['openingHours'] | null>(null);
-  const [hoursLoaded, setHoursLoaded] = useState(false);
+  const given = branch.openingHours !== undefined;
+  const [hours, setHours] = useState<CatalogVendorBranch['openingHours'] | null>(branch.openingHours ?? null);
+  const [hoursLoaded, setHoursLoaded] = useState(given);
 
   useEffect(() => {
+    if (given) {
+      setHours(branch.openingHours ?? null);
+      setHoursLoaded(true);
+      return;
+    }
     if (!vendorSlug) {
       setHours(null);
       setHoursLoaded(true);
@@ -172,9 +327,10 @@ export function BranchPanels({ branch, vendorSlug }: { branch: DetailBranch; ven
       .catch(() => { if (!cancelled) setHours(null); })
       .finally(() => { if (!cancelled) setHoursLoaded(true); });
     return () => { cancelled = true; };
-  }, [vendorSlug, branch.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- branch.openingHours is read through `given`
+  }, [vendorSlug, branch.id, given]);
 
-  const address = [branch.name, [branch.address, branch.city].filter(Boolean).join(', ')].filter(Boolean).join(' — ');
+  const address = [branch.name, [branch.address, branch.addressLine2, branch.city].filter(Boolean).join(', ')].filter(Boolean).join(' — ');
   const directions = directionsUrl(branch);
   return (
     <aside className="detail-page__aside" aria-label={t.locationAndHours}>
@@ -184,12 +340,20 @@ export function BranchPanels({ branch, vendorSlug }: { branch: DetailBranch; ven
           <Icon aria-hidden="true">location_on</Icon>
           <span>{address}</span>
         </p>
-        {directions && (
-          <OutlinedButton href={directions} target="_blank" rel="noopener noreferrer" className="detail-page__directions">
-            <Icon slot="icon" aria-hidden="true">directions</Icon>
-            {t.getDirections}
-          </OutlinedButton>
-        )}
+        <div className="detail-page__panel-actions">
+          {directions && (
+            <OutlinedButton href={directions} target="_blank" rel="noopener noreferrer" className="detail-page__directions">
+              <Icon slot="icon" aria-hidden="true">directions</Icon>
+              {t.getDirections}
+            </OutlinedButton>
+          )}
+          {branch.phone && (
+            <OutlinedButton href={`tel:${branch.phone.replace(/\s+/g, '')}`} className="detail-page__directions">
+              <Icon slot="icon" aria-hidden="true">call</Icon>
+              {fillTemplate(t.call, { phone: branch.phone })}
+            </OutlinedButton>
+          )}
+        </div>
       </section>
       {hoursLoaded && (
         <section className="detail-page__panel" aria-labelledby="detail-hours-heading">

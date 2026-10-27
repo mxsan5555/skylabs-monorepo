@@ -168,10 +168,12 @@ Planned: `GET /rbac/bootstrap` adds `scopes`; role create, clone and delete retu
 | PUT | `/api/v1/vendors/:vendorId/branches/:branchId/category-access` | `vendors.branches:edit` |
 | GET | `/api/v1/vendors/:vendorId/branches/:branchId/deals` | `vendors.deals:view` |
 | POST | `/api/v1/vendors/:vendorId/branches/:branchId/deals` | `vendors.deals:create` |
+| GET | `/api/v1/vendors/:vendorId/branches/:branchId/deals/:dealId` | `vendors.deals:view` |
 | PATCH | `/api/v1/vendors/:vendorId/branches/:branchId/deals/:dealId` | `vendors.deals:edit` |
-| DELETE | `/api/v1/vendors/:vendorId/branches/:branchId/deals/:dealId` | `vendors.deals:delete` |
-| PATCH | `/api/v1/vendors/:vendorId/branches/:branchId/deals/:dealId/approve` | `vendors.deals:approve` |
-| PATCH | `/api/v1/vendors/:vendorId/branches/:branchId/deals/:dealId/reject` | `vendors.deals:reject` |
+| DELETE | `/api/v1/vendors/:vendorId/branches/:branchId/deals/:dealId` | `vendors.deals:delete` + Super Admin |
+| POST | `/api/v1/vendors/:vendorId/branches/:branchId/deals/:dealId/copy` | `vendors.deals:create` |
+| POST, PATCH, DELETE | `/api/v1/vendors/:vendorId/branches/:branchId/deals/:dealId/packages[/reorder, /:packageId]` | `vendors.deals:edit` |
+| POST, PATCH, DELETE | `/api/v1/vendors/:vendorId/branches/:branchId/deals/:dealId/images[/reorder, /:imageId, /:imageId/primary]`, `/video` | `vendors.deals:edit` |
 | PATCH | `/api/v1/vendors/:vendorId/branches/:branchId/deals/:dealId/status` | `vendors.deals:status_change` |
 | PATCH | `/api/v1/vendors/:vendorId/branches/:branchId/status` | `vendors.branches:status_change` |
 | POST | `/api/v1/vendors/:vendorId/branches/:branchId/therapists` | `vendors.therapists:create` |
@@ -209,7 +211,12 @@ Planned: `GET /rbac/bootstrap` adds `scopes`; role create, clone and delete retu
 | POST | `/api/v1/vendors/me/branches` | `members:custom` |
 | PATCH | `/api/v1/vendors/me/branches/:branchId` | `members:custom` |
 | GET | `/api/v1/vendors/me/branches/:branchId/category-access` | `members:custom` |
+| GET | `/api/v1/vendors/me/deals` | `members:custom` |
 | GET | `/api/v1/vendors/me/branches/:branchId/deals` | `members:custom` |
+| GET | `/api/v1/vendors/me/branches/:branchId/deals/:dealId` | `members:custom` |
+| POST | `/api/v1/vendors/me/branches/:branchId/deals/:dealId/copy` | `members:custom` |
+| POST, PATCH, DELETE | `/api/v1/vendors/me/branches/:branchId/deals/:dealId/packages[/reorder, /:packageId]` | `members:custom` |
+| PATCH | `/api/v1/vendors/me/branches/:branchId/deals/:dealId/images/:imageId` (alt text) | `members:custom` |
 | POST | `/api/v1/vendors/me/branches/:branchId/deals` | `members:custom` |
 | PATCH | `/api/v1/vendors/me/branches/:branchId/deals/:dealId` | `members:custom` |
 | POST | `/api/v1/vendors/me/branches/:branchId/deals/:dealId/images` | `members:custom` |
@@ -285,6 +292,35 @@ discount to be computed on the server, C-05); `startDate`, `endDate`; at least o
 per duration; update replaces the set); `therapistIds` (same branch); status `DRAFT | ACTIVE |
 INACTIVE | EXPIRED` via `PATCH .../status`.
 
+Deal (PLANNING §2.7, built 2026-10-27, `schemas/vendor.schema.ts`, `services/deal.service.ts`). `.strict()` schemas:
+
+- **Branch:** `state` and `city` required, both from the India location list (422 otherwise,
+  C-03); `addressLine2` up to 200.
+- **DealCreate:** `categoryId`, `subcategoryId?`, `title` 5 to 120, `tagline?` 140 (stored in
+  `shortDescription`), `slug?` (generated when empty: `{title}-{member}-{city}`, 90, numeric
+  suffix on conflict; the member may change it only while the deal was never Active),
+  `highlights` up to 6 × 80, `description?` rich text 5000, `startDate?` and `endDate?` (end
+  after start), `validityDays?` 1 to 365, `maxBookings?` ≥ 0, `limitPerCustomer?` 1 to 20,
+  `bookingRequired` (default true), `bookingInstructions?` rich text 2000,
+  `cancellationPolicy` `FREE_24H | FREE_48H | NON_REFUNDABLE`, `cancellationNote?` 500,
+  `eligibility` up to 6 × 40, `termsAndConditions?` rich text 5000, `faqs` up to 10
+  `{question 200, answer 1000}` (array order = display order), `therapistIds` (same branch),
+  `packages` 1 to 10.
+- **Package:** `name?` 80, `durationMinutes` 15 to 480, `persons` 1 to 6 (default 1),
+  `sellingPrice` ≥ 0, `originalPrice?` ≥ `sellingPrice`, `inclusions` up to 8 × 80, `isActive`;
+  `durationMinutes` + `persons` unique within the deal.
+- **DealUpdate:** the same fields, all optional; `faqs` and `therapistIds` replace the set when
+  sent; packages are not accepted here (use the package routes).
+- **Refused with 422 as unknown keys:** `salePrice`, `originalPrice`, `discountPercent`,
+  `durationMinutes`, `images`, `notes`, `policy`, `status`, `approvalStatus`. The server derives
+  the deal's prices, discount and duration from the cheapest active package.
+- **Status:** `PATCH .../status {status: DRAFT | ACTIVE | INACTIVE}`. Active needs at least 1
+  image, 1 active package, an active branch and an active member; otherwise 422
+  `DEAL_NOT_READY` with `missing: ["image" | "package" | "branch" | "member"]`. The first Active
+  sets `publishedAt`.
+- **Image:** `PATCH .../images/:imageId {altText}` (up to 125); 1 to 10 images per deal (422
+  over the limit).
+
 Product (`ProductCreate`): `name` 1 to 200; `slug`; `brand`; `categoryId` (`PRODUCT`) required,
 `subcategoryId`; `description` (rich text, 5000); `summary` 2000; `benefits`, `howToUse` (items of
 300); `ingredients`, `returnPolicy` (rich text); `badge`; `price`, `originalPrice`; `isNew`,
@@ -304,6 +340,12 @@ never returned. Upload without `R2_PRIVATE_BUCKET` configured returns 503.
 |---|---|---|
 | `GET`, `POST /branches`, `/deals`, `/therapists`, `/products`; `GET`, `PATCH /<res>/:id`; `PATCH /<res>/:id/status`; `DELETE /<res>/:id` (Super Admin) | `<res>:<action>` with scope | NEW (C-09) |
 | `PUT /deals/:id/therapists`, `/therapists/:id/packages*`, `/<res>/:id/images*`, `/<res>/:id/video` | `<res>:edit` | NEW (C-09) |
+| `GET .../deals` (all of a member's deals) and `GET .../branches/:branchId/deals/:dealId` (one deal with packages, FAQs, therapists, media), staff and `/me` | `vendors.deals:view` / `members:custom` | done (DL-03) |
+| `POST .../deals/:dealId/packages`, `PATCH .../packages/:packageId`, `DELETE .../packages/:packageId`, `PATCH .../packages/reorder` (staff and `/me`); delete 409 when in a cart or order, 409 `LAST_PACKAGE` for the last active one | `vendors.deals:edit` / `members:custom` | done (DL-04) |
+| Staff deal media: `POST`, `DELETE .../deals/:dealId/images[/:imageId]`, `PATCH .../images/reorder`, `.../images/:imageId/primary`, `.../images/:imageId` (alt text), `POST`, `DELETE .../video` | `vendors.deals:edit` | done (DL-05) |
+| `POST .../deals/:dealId/copy {branchId}` (staff and `/me`): copies fields, packages, FAQs (not media, therapists or stock) to another branch of the same member as Draft | `vendors.deals:create` / `members:custom` | done (DL-06) |
+| `DELETE .../deals/:dealId`: Super Admin only (`isSuperAdmin` check besides the permission), 409 with orders or cart lines | `vendors.deals:delete` | done (DL-03) |
+| `PATCH .../deals/:dealId/approve`, `/reject` | - | removed, 404 (P3-15, D6) |
 | `GET /members/:id/documents/:type/download-url` (5 min signed link, not for Support) | `members:view` | NEW (P5-14) |
 | `GET`, `PATCH /members/me` | `profile:view` / `edit` | alias of `/vendors/me` |
 
@@ -356,7 +398,7 @@ OpenAPI.
 | GET | `/api/v1/catalog/categories` | public |
 | GET | `/api/v1/catalog/categories/:slug` | public |
 | GET | `/api/v1/catalog/deals` | public |
-| GET | `/api/v1/catalog/deals/:id` | public |
+| GET | `/api/v1/catalog/deals/:idOrSlug` | public |
 | GET | `/api/v1/catalog/deals/facets` | public |
 | GET | `/api/v1/catalog/locations` | public |
 | GET | `/api/v1/catalog/products` | public |
@@ -389,6 +431,25 @@ returns today's response plus the new `tag` field.
   `meta.total`. `GET /catalog/therapists/facets` returns `vendors`, `branches`, `distance` and
   `price` in the deal facet shape.
 - Static paths (`/products/facets`, `/therapists/facets`) are registered before `/:id`.
+
+Deal page (PLANNING §2.7, built 2026-10-27, `catalog.service.ts#getPublicDealOrThrow`):
+
+- `GET /catalog/deals/:idOrSlug` accepts a UUID, the current slug or a previous slug and always
+  returns the current `slug`, so the page replaces the URL. Hidden deals return 404.
+- The detail response adds: `tagline`, `highlights`, `currency: "INR"`, `tag`, `boughtCount`
+  (paid order lines, `null` under 10), `isSoldOut`, `stockLeft`, `limitPerCustomer`, `startDate`,
+  `endDate`, `validityDays`, `bookingRequired`, `bookingInstructions`, `cancellationPolicy`,
+  `cancellationNote`, `eligibility`, `faqs [{question, answer}]`, `mediaImages[].altText`;
+  packages gain `name`, `persons`, `inclusions`, `discountPercent`; `branch` gains `addressLine2`,
+  `state`, `pincode`, `phone`, `mapLocationUrl`, `openingHours`; `vendor` gains
+  `businessDescription`, `website`; `therapists` (active, linked, card fields). The page needs no
+  second call for hours.
+- `GET /catalog/deals?search=` matches title, member business name, category and subcategory
+  names and branch city (case-insensitive), ranked title first, then member, then the rest
+  (relevance sort without coordinates ranks the first 500 matches; `meta.total` is capped there).
+- Cart: adding a deal beyond `limitPerCustomer` returns 409 `DEAL_LIMIT_REACHED`; beyond stock 409
+  `DEAL_SOLD_OUT`. Both are checked again at checkout.
+
 
 ## 5. Static content
 

@@ -66,7 +66,7 @@ export interface Promotion {
   createdAt: string;
   updatedAt: string;
   category: { id: string; name: string; slug: string; isActive: boolean } | null;
-  deal: { id: string; title: string; slug: string; status: string; approvalStatus: string } | null;
+  deal: { id: string; title: string; slug: string; status: string } | null;
   product: { id: string; name: string; slug: string; isActive: boolean } | null;
   placements: { slot: BannerSlot }[];
   mediaImages?: MediaImage[];

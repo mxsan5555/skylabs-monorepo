@@ -7,6 +7,8 @@ export interface PrerenderRoute {
   path: string;
   slug?: string;
   listing?: 'deals' | 'products' | 'therapists';
+  /** Deal page slug (`/deal/<slug>`). */
+  deal?: string;
   city?: string;
   state?: string;
 }
@@ -40,8 +42,9 @@ const hasDeals = (type: string | null | undefined) => type !== 'PRODUCT' && type
 
 /** `/`, every `/category/<slug>`, `/category/<slug>/<city>` for each deal category x unique city
  *  slug (first location wins, matching the category page's `locations.find`), then `/deals`,
- *  `/products`, `/therapists` and `/deals/<city>`, `/therapists/<city>` (PLANNING §4). */
-export function buildRoutes(shell: ShellData): PrerenderRoute[] {
+ *  `/products`, `/therapists` and `/deals/<city>`, `/therapists/<city>` (PLANNING §4), then every
+ *  visible deal's `/deal/<slug>` (PLANNING §2.7). */
+export function buildRoutes(shell: ShellData, dealSlugs: readonly string[] = []): PrerenderRoute[] {
   const cities = new Map<string, { city: string; state: string }>();
   for (const { city, state } of shell.locations) {
     const key = citySlug(city);
@@ -57,5 +60,6 @@ export function buildRoutes(shell: ShellData): PrerenderRoute[] {
   for (const listing of ['deals', 'therapists'] as const) {
     for (const { city, state } of cities.values()) routes.push({ path: `/${listing}/${citySlug(city)}`, listing, city, state });
   }
+  for (const slug of dealSlugs) routes.push({ path: `/deal/${slug}`, deal: slug });
   return routes;
 }

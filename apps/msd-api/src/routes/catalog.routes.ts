@@ -134,7 +134,10 @@ router.get('/deals/facets', validateQuery(CatalogDealFacetQuerySchema), async (r
   }
 });
 
-router.get('/deals/:id', validateParams(z.object({ id: z.string().uuid() })), async (req, res, next) => {
+/** A UUID, the current slug or an old slug (PLANNING §2.7 URLs). */
+const DealIdOrSlugParamSchema = z.object({ id: z.string().min(1).max(160).regex(/^[A-Za-z0-9-]+$/) });
+
+router.get('/deals/:id', validateParams(DealIdOrSlugParamSchema), async (req, res, next) => {
   try {
     sendData(res, await catalogService.getPublicDealOrThrow(req.params.id));
   } catch (err) {

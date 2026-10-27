@@ -11,8 +11,6 @@ import {
   createVendorOwner,
   checkVendorOwnerAvailability,
   createTherapist,
-  createDeal,
-  updateDeal,
   listVendors,
 } from './vendor.service';
 
@@ -250,136 +248,31 @@ function branchFixture(overrides: Partial<{ id: string; vendorId: string }> = {}
 }
 
 /**
- * Feature: branch-level Therapy access is a real, backend-enforced gate — never just a
- * frontend branch-picker filter.
- * Scenario: a branch with zero `BranchCategoryAccess` rows of type THERAPY must be rejected by
- * `createTherapist` even when the caller simply omits `specializationCategoryId` (the one field
- * the pre-existing code already validated) — this is the exact bypass the Issue #2 fix closes.
+ * Feature: therapists need no category grant (D10, P4-15): a branch with no category mapping
+ * still gets therapists (the deal form creates them inline); a specialization must be THERAPY.
  */
-describe('createTherapist — branch-level Therapy access gate', () => {
-  it('rejects with VALIDATION_ERROR when the branch has zero THERAPY category access, even with no specializationCategoryId given', async () => {
+describe('createTherapist — no category grants (D10)', () => {
+  it('creates the therapist on a branch with no category mapping at all', async () => {
     prismaMock.branch.findUnique.mockResolvedValue(branchFixture());
-    prismaMock.branchCategoryAccess.findFirst.mockResolvedValue(null);
-
-    await expect(
-      createTherapist(VENDOR_ID, BRANCH_ID, { therapistType: 'Physio', personName: 'Alex' }),
-    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
-    expect(prismaMock.therapist.create).not.toHaveBeenCalled();
-  });
-
-  it('creates the therapist when the branch has at least one THERAPY category access row', async () => {
-    prismaMock.branch.findUnique.mockResolvedValue(branchFixture());
-    prismaMock.branchCategoryAccess.findFirst.mockResolvedValue({ id: 'bca-1' });
     prismaMock.therapist.findFirst.mockResolvedValue(null);
     prismaMock.therapist.create.mockResolvedValue({ id: 'th-1' });
 
     const result = await createTherapist(VENDOR_ID, BRANCH_ID, { therapistType: 'Physio', personName: 'Alex' });
 
     expect(result).toEqual({ id: 'th-1' });
-    expect(prismaMock.therapist.create).toHaveBeenCalled();
+    expect(prismaMock.branchCategoryAccess.findFirst).not.toHaveBeenCalled();
+    expect(prismaMock.therapist.create.mock.calls[0][0]!.data).toMatchObject({ vendorId: VENDOR_ID, branchId: BRANCH_ID });
   });
-});
 
-const DEAL_ID = 'a1a1a1a1-0000-4000-8000-000000000007';
-const CATEGORY_ID = 'b1b1b1b1-0000-4000-8000-000000000008';
-const OTHER_BRANCH_ID = 'c2c2c2c2-0000-4000-8000-000000000009';
-const THERAPIST_ID = 'd3d3d3d3-0000-4000-8000-00000000000a';
-
-const serviceCategoryFixture = { id: CATEGORY_ID, name: 'Beauty', parentId: null, type: 'SERVICE' };
-const baseDealInput = {
-  categoryId: CATEGORY_ID,
-  title: 'Deep tissue',
-  slug: 'deep-tissue',
-  originalPrice: '399.00',
-  salePrice: '299.00',
-  durationMinutes: 30,
-  packages: [{ durationMinutes: 30, sellingPrice: 299 }],
-};
-
-/** Arranges every category/branch-access check `createDeal`/`updateDeal` makes before it ever
- *  touches therapist linking, so each test below only needs to vary the therapist-related mocks. */
-function arrangeDealOfferingChecksPass() {
-  prismaMock.category.findUnique.mockResolvedValue(serviceCategoryFixture as never);
-  prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue({ id: 'grant-1' } as never);
-  prismaMock.branchCategoryAccess.findUnique.mockResolvedValue({ id: 'branch-grant-1' } as never);
-  prismaMock.deal.findUnique.mockResolvedValue(null); // slug free
-  prismaMock.dealPackage.findFirst.mockResolvedValue(null); // syncDealPriceFromPackages no-op
-}
-
-/**
- * Feature: a Deal may link the Therapist(s) who perform it, but only ones that actually work at
- * the same branch as the Deal (the real security boundary — see
- * vendor.service.ts#assertTherapistsBelongToBranch).
- */
-describe('createDeal / updateDeal — therapist linking', () => {
-  beforeEach(() => {
+  it('rejects a specialization that is not a THERAPY category', async () => {
     prismaMock.branch.findUnique.mockResolvedValue(branchFixture());
-  });
-
-  it('rejects with VALIDATION_ERROR and creates nothing when a therapistId belongs to a different branch', async () => {
-    arrangeDealOfferingChecksPass();
-    prismaMock.therapist.findMany.mockResolvedValue([{ id: THERAPIST_ID, vendorId: VENDOR_ID, branchId: OTHER_BRANCH_ID }] as never);
+    prismaMock.therapist.findFirst.mockResolvedValue(null);
+    prismaMock.category.findUnique.mockResolvedValue({ id: 'cat-1', parentId: null, type: 'SERVICE' } as never);
 
     await expect(
-      createDeal(VENDOR_ID, BRANCH_ID, { ...baseDealInput, therapistIds: [THERAPIST_ID] } as never, true),
+      createTherapist(VENDOR_ID, BRANCH_ID, { therapistType: 'Physio', personName: 'Alex', specializationCategoryId: 'b1b1b1b1-0000-4000-8000-000000000008' }),
     ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
-    expect(prismaMock.deal.create).not.toHaveBeenCalled();
-  });
-
-  it('rejects with VALIDATION_ERROR when a therapistId does not exist at all', async () => {
-    arrangeDealOfferingChecksPass();
-    prismaMock.therapist.findMany.mockResolvedValue([]);
-
-    await expect(
-      createDeal(VENDOR_ID, BRANCH_ID, { ...baseDealInput, therapistIds: [THERAPIST_ID] } as never, true),
-    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
-    expect(prismaMock.deal.create).not.toHaveBeenCalled();
-  });
-
-  it('creates the deal and writes DealTherapist rows for each valid, branch-matching therapistId', async () => {
-    arrangeDealOfferingChecksPass();
-    prismaMock.therapist.findMany.mockResolvedValue([{ id: THERAPIST_ID, vendorId: VENDOR_ID, branchId: BRANCH_ID }] as never);
-    prismaMock.deal.create.mockResolvedValue({ id: DEAL_ID } as never);
-    prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ id: DEAL_ID, therapistLinks: [] } as never);
-
-    await createDeal(VENDOR_ID, BRANCH_ID, { ...baseDealInput, therapistIds: [THERAPIST_ID] } as never, true);
-
-    expect(prismaMock.dealTherapist.createMany).toHaveBeenCalledWith({
-      data: [{ dealId: DEAL_ID, therapistId: THERAPIST_ID }],
-    });
-  });
-
-  it('createDeal never touches DealTherapist when therapistIds is omitted', async () => {
-    arrangeDealOfferingChecksPass();
-    prismaMock.deal.create.mockResolvedValue({ id: DEAL_ID } as never);
-    prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ id: DEAL_ID, therapistLinks: [] } as never);
-
-    await createDeal(VENDOR_ID, BRANCH_ID, baseDealInput as never, true);
-
-    expect(prismaMock.therapist.findMany).not.toHaveBeenCalled();
-    expect(prismaMock.dealTherapist.createMany).not.toHaveBeenCalled();
-  });
-
-  it('updateDeal with therapistIds: [] clears every existing link without re-adding any', async () => {
-    prismaMock.deal.findUnique.mockResolvedValue({ id: DEAL_ID, vendorId: VENDOR_ID, branchId: BRANCH_ID, categoryId: CATEGORY_ID } as never);
-    prismaMock.therapist.findMany.mockResolvedValue([]);
-    prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ id: DEAL_ID, therapistLinks: [] } as never);
-
-    await updateDeal(VENDOR_ID, BRANCH_ID, DEAL_ID, { therapistIds: [] } as never);
-
-    expect(prismaMock.dealTherapist.deleteMany).toHaveBeenCalledWith({ where: { dealId: DEAL_ID } });
-    expect(prismaMock.dealTherapist.createMany).not.toHaveBeenCalled();
-  });
-
-  it('updateDeal omitting therapistIds leaves existing links completely untouched', async () => {
-    prismaMock.deal.findUnique.mockResolvedValue({ id: DEAL_ID, vendorId: VENDOR_ID, branchId: BRANCH_ID, categoryId: CATEGORY_ID } as never);
-    prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ id: DEAL_ID, therapistLinks: [] } as never);
-
-    await updateDeal(VENDOR_ID, BRANCH_ID, DEAL_ID, { title: 'Renamed' } as never);
-
-    expect(prismaMock.therapist.findMany).not.toHaveBeenCalled();
-    expect(prismaMock.dealTherapist.deleteMany).not.toHaveBeenCalled();
-    expect(prismaMock.dealTherapist.createMany).not.toHaveBeenCalled();
+    expect(prismaMock.therapist.create).not.toHaveBeenCalled();
   });
 });
 
