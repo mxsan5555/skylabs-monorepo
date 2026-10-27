@@ -171,6 +171,20 @@ describe('ListingPage', () => {
     expect(await panelHeaders()).not.toContain(content.category.filterPanel.tags.title);
   });
 
+  it('ItemList JSON-LD leaves out a therapist with no package price (it would read as free)', async () => {
+    const priced = { id: 't1', therapistType: 'Masseur', personName: 'A', packages: [{ id: 'k', durationMinutes: 60, sellingPrice: '800', originalPrice: '900' }], vendor: null, branch: null };
+    const unpriced = { ...priced, id: 't2', therapistType: 'Physio', packages: [] };
+    m.listTherapists.mockResolvedValue({ data: [priced, unpriced], meta: { total: 2 } });
+    renderAt('/therapists');
+    await waitFor(() => {
+      const list = Array.from(document.querySelectorAll('script[type="application/ld+json"]'))
+        .map((s) => JSON.parse(s.textContent ?? '{}'))
+        .flat()
+        .find((j) => j['@type'] === 'ItemList');
+      expect(list?.itemListElement.map((e: { item: { name: string } }) => e.item.name)).toEqual(['Masseur']);
+    });
+  });
+
   it('an unknown city shows not found and is noindex', async () => {
     renderAt('/deals/atlantis');
     await waitFor(() => {
@@ -179,6 +193,7 @@ describe('ListingPage', () => {
     });
     await waitFor(() => expect(robots()).toContain('noindex'));
     expect(m.listDeals).not.toHaveBeenCalled();
+    expect(screen.getAllByRole('heading', { level: 1 }).map((h) => h.textContent)).toEqual([content.category.notFound.heading]);
   });
 
   it('renders the prerendered first page without a loading state, then refreshes', async () => {

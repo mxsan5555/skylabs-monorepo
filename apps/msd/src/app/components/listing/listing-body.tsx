@@ -14,6 +14,7 @@ import { LoadMore } from '../load-more/load-more';
 import { CityPickerDialog } from '../city-picker-dialog/city-picker-dialog';
 import type { PriceRange } from '../price-range-field/price-range-field';
 import { FILTER_PARAMS, type ListingParams } from './listing-params';
+import { listingCopy } from './listing-cards';
 import content from '../../../content.json';
 
 const t = content.category;
@@ -31,7 +32,6 @@ export interface ListingBodyProps {
   sort?: string;
   list: Pick<PagedList<unknown>, 'status' | 'items' | 'total' | 'hasMore' | 'loadingMore' | 'error' | 'loadMore'>;
   cards: ReactNode;
-  empty: { heading: string; subheading: string };
   /** Deal map markers; the Map view is offered only when there are some. */
   mapPoints?: DealMapPoint[];
   /** Products only: the Category facet (the all-products page). */
@@ -53,7 +53,6 @@ export function ListingBody({
   sort,
   list,
   cards,
-  empty,
   mapPoints = [],
   withCategoryFacet = false,
 }: ListingBodyProps) {
@@ -65,6 +64,7 @@ export function ListingBody({
   const [cityPickerOpen, setCityPickerOpen] = useState(false);
   const { setParams, view, minPrice, maxPrice, radius, vendorIds, branchIds, tags, categoryIds } = params;
   const located = kind !== 'products';
+  const copy = listingCopy(kind);
 
   const activeFilters = [
     located && hasCoords && radius != null,
@@ -108,13 +108,13 @@ export function ListingBody({
 
   const fallback =
     list.status === 'loading' ? (
-      <p className="loading-state">{t.loadingDeals}</p>
+      <p className="loading-state">{copy.loading}</p>
     ) : list.status === 'error' ? (
       <p className="error-state" role="alert">
         {list.error}
       </p>
     ) : list.items.length === 0 ? (
-      <sky-info-card icon="sentiment_dissatisfied" heading={empty.heading} subheading={empty.subheading} />
+      <sky-info-card icon="sentiment_dissatisfied" heading={copy.empty.heading} subheading={copy.empty.subheading} />
     ) : undefined;
 
   const shownOnMap = mapPoints.length;

@@ -1,11 +1,7 @@
-import { useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { FilledButton } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import {
-  getCatalogDealFacets,
-  getCatalogProductFacets,
-  getCatalogTherapistFacets,
   listCatalogDeals,
   listCatalogProducts,
   listCatalogTherapists,
@@ -16,21 +12,17 @@ import {
   type CatalogTherapist,
   type CatalogTherapistSort,
 } from '../../../api/catalog';
-import { ApiRequestError } from '../../../api/rbac/client';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { PageSection } from '../../components/page-section/page-section';
 import { SectionHead } from '../../components/section-head/section-head';
 import { PageHeadLogo } from '../../components/section-head/page-head-logo';
 import { ChipNav } from '../../components/chip-nav/chip-nav';
 import { ListingBody } from '../../components/listing/listing-body';
-import { listingCards, listingNoun } from '../../components/listing/listing-cards';
-import { countText, pickSort, sortOptionsFor, sortValuesFor, useListingParams, type ListingKind } from '../../components/listing/listing-params';
-import { useListingFacets } from '../../components/listing/use-listing-facets';
-import type { ListingFacets } from '../../components/filter-panel/filter-panel';
-import type { DealMapPoint } from '../../components/deal-map/deal-map';
+import { dealMapPoints, listingCards, listingLoadError, listingNoun } from '../../components/listing/listing-cards';
+import { countText, kindOfCategoryType, pickSort, sortOptionsFor, sortValuesFor, useListingParams, type ListingKind } from '../../components/listing/listing-params';
+import { LISTING_FACETS, useListingFacets } from '../../components/listing/use-listing-facets';
 import { lowestPackagePrice } from '../../components/therapist-card/therapist-card';
 import { usePagedList } from '../../../hooks/use-paged-list';
-import { formatINR } from '../../../utils/format';
 import { useVisitorLocation } from '../../../location/location-context';
 import { categoryHref, citySlug, useCatalogShell } from '../../../catalog/catalog-shell';
 import { listingDataKey, usePrerenderedData } from '../../../prerender-data/prerender-data';
@@ -42,14 +34,6 @@ import content from '../../../content.json';
 
 const t = content.category;
 
-/** The kind a top-level category lists (untyped legacy categories list deals, as on the category page). */
-const kindOfType = (type: string | null | undefined): ListingKind =>
-  type === 'PRODUCT' ? 'products' : type === 'THERAPY' ? 'therapists' : 'deals';
-const FACETS: Record<ListingKind, (opts: object) => Promise<{ data: ListingFacets | null | undefined }>> = {
-  deals: getCatalogDealFacets,
-  products: getCatalogProductFacets,
-  therapists: getCatalogTherapistFacets,
-};
 
 /** `/deals`, `/products`, `/therapists`, and `/<kind>/<city>` for deals and therapists. */
 export const listingHref = (kind: ListingKind, city?: string) => (city ? `/${kind}/${citySlug(city)}` : `/${kind}`);
@@ -101,7 +85,7 @@ export function ListingPage({ kind }: { kind: ListingKind }) {
   const isDefaultView = !sort && minPrice == null && maxPrice == null && lat == null && lng == null && radius == null &&
     vendorIds.length === 0 && branchIds.length === 0 && tags.length === 0 && categoryIds.length === 0;
   const seed = initial && isDefaultView ? initial : undefined;
-  const loadError = (err: unknown) => (err instanceof ApiRequestError ? err.message : t.errors.loadDeals);
+  const loadError = listingLoadError(kind);
 
   const dealList = usePagedList<CatalogDeal>(
     (page) => listCatalogDeals({ ...base, page, pageSize: CATEGORY_PAGE_SIZE, sort: sort as CatalogDealSort | undefined }),
@@ -119,26 +103,15 @@ export function ListingPage({ kind }: { kind: ListingKind }) {
     { enabled: ready && kind === 'therapists', errorMessage: loadError, initial: kind === 'therapists' ? (seed as ListingData<CatalogTherapist>) : undefined },
   );
   const list = kind === 'therapists' ? therapistList : kind === 'products' ? productList : dealList;
-  const facets = useListingFacets<typeof base>(ready ? FACETS[kind] : null, base, kind);
+  const facets = useListingFacets<typeof base>(ready ? LISTING_FACETS[kind] : null, base, kind);
 
   const deals = dealList.items;
-  const mapPoints = useMemo<DealMapPoint[]>(
-    () =>
-      kind !== 'deals'
-        ? []
-        : deals.flatMap((d) =>
-            d.branch?.latitude != null && d.branch?.longitude != null
-              ? [{ id: d.id, lat: Number(d.branch.latitude), lng: Number(d.branch.longitude), label: formatINR(Number(d.salePrice)), title: d.title, href: `/deal/${d.id}` }]
-              : [],
-          ),
-    [deals, kind],
-  );
-
   if (cityPending) return <p className="loading-state">{t.loading}</p>;
   if (cityMissing) {
     return (
       <PageSection stack aria-label={t.notFound.heading}>
         <Seo title={t.notFound.metaTitle} description={t.notFound.subheading} path={listingHref(kind)} noindex />
+        <h1 className="sr-only">{t.notFound.heading}</h1>
         <sky-info-card icon="search_off" heading={t.notFound.heading} subheading={t.notFound.subheading} />
         <div>
           <FilledButton onClick={() => navigate(listingHref(kind))}>{copy.all}</FilledButton>
@@ -164,14 +137,17 @@ export function ListingPage({ kind }: { kind: ListingKind }) {
           kind === 'products'
             ? productList.items.map((p) => ({ name: p.name, path: `/products/${p.id}`, price: Number(p.price) }))
             : kind === 'therapists'
-              ? therapistList.items.map((x) => ({ name: x.therapistType, path: `/therapist/${x.id}`, price: lowestPackagePrice(x.packages) ?? 0 }))
+              ? therapistList.items.flatMap((x) => {
+                  const price = lowestPackagePrice(x.packages);
+                  return price == null ? [] : [{ name: x.therapistType, path: `/therapist/${x.id}`, price }];
+                })
               : deals.map((d) => ({ name: d.title, path: `/deal/${d.id}`, price: Number(d.salePrice) })),
         )
       : undefined;
 
   const chips = [
     { value: '', label: copy.all, href: listingHref(kind, city) },
-    ...categories.filter((c) => kindOfType(c.type) === kind).map((c) => ({ value: c.slug, label: c.name, href: categoryHref(c.slug) })),
+    ...categories.filter((c) => kindOfCategoryType(c.type) === kind).map((c) => ({ value: c.slug, label: c.name, href: categoryHref(c.slug) })),
   ];
   const count = (
     <span className="body-medium" aria-live="polite" aria-atomic="true">
@@ -218,8 +194,7 @@ export function ListingPage({ kind }: { kind: ListingKind }) {
         sort={sort}
         list={list}
         cards={cards}
-        empty={kind === 'therapists' ? t.emptyTherapists : kind === 'products' ? content.listingPages.products.empty : t.emptyDeals}
-        mapPoints={mapPoints}
+        mapPoints={kind === 'deals' ? dealMapPoints(deals) : undefined}
         withCategoryFacet={kind === 'products'}
       />
     </>

@@ -84,6 +84,11 @@ export function countText(status: string, total: number, noun: { singular: strin
 
 export type ListingKind = 'deals' | 'products' | 'therapists';
 
+/** The kind a top-level category lists; untyped legacy categories list deals. */
+export function kindOfCategoryType(type: string | null | undefined): ListingKind {
+  return type === 'PRODUCT' ? 'products' : type === 'THERAPY' ? 'therapists' : 'deals';
+}
+
 /** Sorts per kind (PLANNING §4 filter table); Distance only with the visitor's coordinates. */
 const SORTS: Record<ListingKind, string[]> = {
   deals: ['relevance', 'price_asc', 'price_desc', 'distance'],

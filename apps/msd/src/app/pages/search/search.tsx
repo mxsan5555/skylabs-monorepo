@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import {
   getCatalogDealFacets,
@@ -14,20 +14,17 @@ import {
   type CatalogTherapist,
   type CatalogTherapistSort,
 } from '../../../api/catalog';
-import { ApiRequestError } from '../../../api/rbac/client';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { PageSection } from '../../components/page-section/page-section';
 import { SectionHead } from '../../components/section-head/section-head';
 import { ChipNav } from '../../components/chip-nav/chip-nav';
 import { ListingBody } from '../../components/listing/listing-body';
-import { listingCards } from '../../components/listing/listing-cards';
-import { countText, pickSort, sortOptionsFor, sortValuesFor, useListingParams, type ListingKind } from '../../components/listing/listing-params';
-import { useListingFacets } from '../../components/listing/use-listing-facets';
+import { dealMapPoints, listingCards, listingLoadError } from '../../components/listing/listing-cards';
+import { countText, kindOfCategoryType, pickSort, sortOptionsFor, sortValuesFor, useListingParams, type ListingKind } from '../../components/listing/listing-params';
+import { LISTING_FACETS, useListingFacets, type FacetFetcher } from '../../components/listing/use-listing-facets';
 import type { ListingFacets } from '../../components/filter-panel/filter-panel';
-import type { DealMapPoint } from '../../components/deal-map/deal-map';
 import { BannerSlot } from '../../components/banner-slot/banner-slot';
 import { usePagedList } from '../../../hooks/use-paged-list';
-import { formatINR } from '../../../utils/format';
 import { useVisitorLocation } from '../../../location/location-context';
 import { useCatalogShell } from '../../../catalog/catalog-shell';
 import { CATEGORY_PAGE_SIZE } from '../../../prerender-data/loaders';
@@ -45,8 +42,6 @@ type ExploreItem =
   | { type: 'therapists'; item: CatalogTherapist };
 
 
-const kindOfType = (type: string | null | undefined): ListingKind =>
-  type === 'PRODUCT' ? 'products' : type === 'THERAPY' ? 'therapists' : 'deals';
 
 /** Explore's "All" facets: distance counts of deals + therapists, price across the three kinds. */
 function mergeFacets(parts: (ListingFacets | null | undefined)[]): ListingFacets {
@@ -62,12 +57,7 @@ const allFacets = (opts: object) =>
   Promise.all([getCatalogDealFacets(opts), getCatalogProductFacets(opts), getCatalogTherapistFacets(opts)]).then((r) => ({
     data: mergeFacets(r.map((x) => x.data)),
   }));
-const FACETS: Record<ExploreKind, (opts: object) => Promise<{ data: ListingFacets | null | undefined }>> = {
-  all: allFacets,
-  deals: getCatalogDealFacets,
-  products: getCatalogProductFacets,
-  therapists: getCatalogTherapistFacets,
-};
+const FACETS: Record<ExploreKind, FacetFetcher> = { all: allFacets, ...LISTING_FACETS };
 
 /**
  * Explore / search results (`/explore?q=`, PLANNING §4): the listing layout with kind chips (All,
@@ -86,7 +76,7 @@ export function Search() {
   const kind: ExploreKind = KINDS.includes(kindParam as ExploreKind)
     ? (kindParam as ExploreKind)
     : category
-      ? kindOfType(category.type)
+      ? kindOfCategoryType(category.type)
       : 'all';
   const { coords } = useVisitorLocation();
   const hasCoords = coords?.latitude != null && coords?.longitude != null;
@@ -97,7 +87,7 @@ export function Search() {
     search: q,
     minPrice,
     maxPrice,
-    ...(category && (kind === 'all' || kindOfType(category.type) === kind) ? { categoryId: category.id } : {}),
+    ...(category && (kind === 'all' || kindOfCategoryType(category.type) === kind) ? { categoryId: category.id } : {}),
   };
   const near = { latitude: coords?.latitude ?? undefined, longitude: coords?.longitude ?? undefined, radiusKm: hasCoords ? radius : undefined };
   const members = kind === 'all' ? {} : { vendorIds, branchIds };
@@ -106,7 +96,7 @@ export function Search() {
   const therapistOpts = { ...shared, ...near, ...members };
   const base = kind === 'products' ? productOpts : kind === 'therapists' ? therapistOpts : dealOpts;
   const listKey = JSON.stringify([kind, dealOpts, productOpts, therapistOpts, sort]);
-  const loadError = (err: unknown) => (err instanceof ApiRequestError ? err.message : t.errors.loadDeals);
+  const loadError = listingLoadError(kind);
 
   const list = usePagedList<ExploreItem>(
     async (page) => {
@@ -146,7 +136,7 @@ export function Search() {
   // Chip counts: one total per kind for the shared filters (one-row requests).
   const [totals, setTotals] = useState<Partial<Record<ListingKind, number>>>({});
   const categoryId = category?.id;
-  const categoryKind = category ? kindOfType(category.type) : undefined;
+  const categoryKind = category ? kindOfCategoryType(category.type) : undefined;
   const { latitude, longitude, radiusKm } = near;
   useEffect(() => {
     let cancelled = false;
@@ -169,15 +159,7 @@ export function Search() {
 
   const facets = useListingFacets<object>(FACETS[kind], base, kind);
 
-  const mapPoints = useMemo<DealMapPoint[]>(
-    () =>
-      list.items.flatMap((x) =>
-        x.type === 'deals' && x.item.branch?.latitude != null && x.item.branch?.longitude != null
-          ? [{ id: x.item.id, lat: Number(x.item.branch.latitude), lng: Number(x.item.branch.longitude), label: formatINR(Number(x.item.salePrice)), title: x.item.title, href: `/deal/${x.item.id}` }]
-          : [],
-      ),
-    [list.items],
-  );
+  const mapPoints = dealMapPoints(list.items.flatMap((x) => (x.type === 'deals' ? [x.item] : [])));
 
   const chipLabel = (k: ExploreKind) => {
     const n = k === 'all' ? (['deals', 'products', 'therapists'] as const).reduce<number | undefined>((sum, x) => (sum === undefined || totals[x] === undefined ? undefined : sum + (totals[x] ?? 0)), 0) : totals[k];
@@ -220,7 +202,6 @@ export function Search() {
         sort={sort}
         list={list}
         cards={cards}
-        empty={t.empty}
         mapPoints={mapPoints}
       />
     </>

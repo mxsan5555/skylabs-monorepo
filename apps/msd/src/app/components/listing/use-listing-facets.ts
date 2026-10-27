@@ -1,5 +1,16 @@
 import { useEffect, useState } from 'react';
+import { getCatalogDealFacets, getCatalogProductFacets, getCatalogTherapistFacets } from '../../../api/catalog';
 import type { ListingFacets } from '../filter-panel/filter-panel';
+import type { ListingKind } from './listing-params';
+
+export type FacetFetcher = (opts: object) => Promise<{ data: ListingFacets | null | undefined }>;
+
+/** The facets endpoint per listing kind. */
+export const LISTING_FACETS: Record<ListingKind, FacetFetcher> = {
+  deals: getCatalogDealFacets,
+  products: getCatalogProductFacets,
+  therapists: getCatalogTherapistFacets,
+};
 
 /**
  * Filter-panel counts for a listing: calls `fetcher(opts)` whenever the options change (compared

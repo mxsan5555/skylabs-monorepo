@@ -240,6 +240,8 @@ describe('Category page /:city', () => {
       ),
     );
     expect(listCatalogDealsMock).not.toHaveBeenCalled();
+    // One h1 per page, not-found included (the card's heading is inside its shadow DOM).
+    expect(screen.getAllByRole('heading', { level: 1 }).map((h) => h.textContent)).toEqual([content.category.notFound.heading]);
   });
 
   it('waits for cities before fetching city deals, showing the loading state without Seo', async () => {
@@ -487,6 +489,22 @@ describe('Category page layout', () => {
     fireEvent.click(more);
     await waitFor(() => expect(screen.getByText('Showing 13 of 13')).toBeTruthy());
     expect(listCatalogDealsMock.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ page: 2 }));
+  });
+
+  it('a therapy category under a city URL does not filter therapists by that city (city pages are for deal categories)', async () => {
+    getCatalogCategoryMock.mockResolvedValue({ data: { ...CATEGORY, type: 'THERAPY' } });
+    renderAt('/category/massage/pune');
+    await waitFor(() => expect(listCatalogTherapistsMock).toHaveBeenCalled());
+    expect(listCatalogTherapistsMock.mock.calls.at(-1)?.[0]?.city).toBeUndefined();
+  });
+
+  it('uses the product empty copy for an empty product category', async () => {
+    getCatalogCategoryMock.mockResolvedValue({ data: { ...CATEGORY, type: 'PRODUCT' } });
+    renderAt('/category/massage');
+    await waitFor(() => {
+      const card = document.querySelector('sky-info-card') as (HTMLElement & { heading?: string }) | null;
+      expect(card?.getAttribute('heading') ?? card?.heading).toBe(content.listingPages.products.empty.heading);
+    });
   });
 
   it('uses the therapist empty copy from content', async () => {
