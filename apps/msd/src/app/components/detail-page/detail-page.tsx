@@ -330,7 +330,10 @@ export function BranchPanels({ branch, vendorSlug }: { branch: DetailBranch; ven
     // eslint-disable-next-line react-hooks/exhaustive-deps -- branch.openingHours is read through `given`
   }, [vendorSlug, branch.id, given]);
 
-  const address = [branch.name, [branch.address, branch.addressLine2, branch.city].filter(Boolean).join(', ')].filter(Boolean).join(' — ');
+  // Many addresses already end with the city ("Indiranagar, Bengaluru"): don't repeat it.
+  const cityInAddress = Boolean(branch.city && branch.address?.trim().toLowerCase().endsWith(branch.city.toLowerCase()));
+  const street = [branch.address, branch.addressLine2, cityInAddress ? null : branch.city].filter(Boolean).join(', ');
+  const address = [branch.name, street].filter(Boolean).join(' — ');
   const directions = directionsUrl(branch);
   return (
     <aside className="detail-page__aside" aria-label={t.locationAndHours}>

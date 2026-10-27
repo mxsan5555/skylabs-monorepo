@@ -140,8 +140,8 @@ async function resolveNewSlug(input: { slug?: string; title: string }, vendorId:
 // ─── Prices ────────────────────────────────────────────────────────────────
 
 /** The cheapest active package becomes the deal's "from" price, original price, discount and
- *  duration (the cache that listing sorts, filters and tags read). */
-async function syncDealPriceFromPackages(tx: Prisma.TransactionClient, dealId: string) {
+ *  duration (the cache that listing sorts, filters and tags read). Also used by the seed. */
+export async function syncDealPriceFromPackages(tx: Prisma.TransactionClient, dealId: string) {
   const cheapest = await tx.dealPackage.findFirst({
     where: { dealId, isActive: true },
     orderBy: [{ sellingPrice: 'asc' }, { sortOrder: 'asc' }],

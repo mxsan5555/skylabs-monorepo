@@ -158,6 +158,17 @@ describe('DealDetail', () => {
     expect(screen.getByText(t.availability.limit.replace('{limit}', '2'))).toBeTruthy();
   });
 
+  it('shows the branch name, address, address line 2 and city', async () => {
+    renderAt('/deal/swedish-massage-zen-spa-pune');
+    expect(await screen.findByText('Kothrud — Karve Road, Near the park, Pune')).toBeTruthy();
+  });
+
+  it('does not repeat the city when the address already ends with it', async () => {
+    m.deal.mockResolvedValue({ data: { ...DEAL, branch: { ...DEAL.branch, address: 'Karve Road, Pune', addressLine2: null } } });
+    renderAt('/deal/swedish-massage-zen-spa-pune');
+    expect(await screen.findByText('Kothrud — Karve Road, Pune')).toBeTruthy();
+  });
+
   it('sold out replaces Add to cart', async () => {
     m.deal.mockResolvedValue({ data: { ...DEAL, isSoldOut: true, stockLeft: 0 } });
     renderAt('/deal/swedish-massage-zen-spa-pune');
@@ -188,6 +199,13 @@ describe('DealDetail', () => {
     expect(data.find((x) => x['@type'] === 'BreadcrumbList').itemListElement).toHaveLength(4);
     expect(data.find((x) => x['@type'] === 'FAQPage').mainEntity[0].name).toBe('Can I walk in?');
     expect(document.title).toContain('Swedish massage at Zen Spa, Pune');
+  });
+
+  it('shortens a long title on a word break and keeps the member and city', async () => {
+    m.deal.mockResolvedValue({ data: { ...DEAL, title: 'Premium Nail Extensions', vendor: { ...DEAL.vendor, businessName: 'Serenity Spa & Wellness' }, branch: { ...DEAL.branch, city: 'Bengaluru' } } });
+    renderAt('/deal/swedish-massage-zen-spa-pune');
+    await screen.findByRole('heading', { level: 1, name: 'Premium Nail Extensions' });
+    expect(document.title).toBe('Premium Nail… at Serenity Spa & Wellness, Bengaluru');
   });
 
   it('renders from the prerendered payload without a request', async () => {

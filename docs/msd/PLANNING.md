@@ -304,7 +304,7 @@ A member who opens another member's deal, branch, package or therapist gets 404.
 - Old `/deal/{uuid}` links and old slugs open the deal and replace the URL with the current slug;
   the canonical tag always carries the current slug.
 - Title tag: "{Title} at {Member}, {City} | MSD" (up to 60 characters, the member and city kept
-  first when trimmed). Meta description: the tagline, else the first 155 characters of the
+  first when trimmed; the deal title is cut on a word break). Meta description: the tagline, else the first 155 characters of the
   description. Open Graph image: the cover image.
 - JSON-LD: `Service` (name, description, image list, `areaServed` city, provider `LocalBusiness`
   with address, geo, phone, opening hours), `AggregateOffer` (low and high package price, INR,

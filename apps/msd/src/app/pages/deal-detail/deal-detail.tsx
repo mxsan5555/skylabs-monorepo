@@ -62,7 +62,10 @@ function pageTitle(deal: CatalogDealDetail): string {
   const full = build(deal.title);
   if (full.length <= TITLE_MAX) return full;
   const room = Math.max(10, deal.title.length - (full.length - TITLE_MAX) - 1);
-  return build(`${deal.title.slice(0, room).trimEnd()}…`);
+  const cut = deal.title.slice(0, room);
+  // End on a whole word ("Premium Nail…", not "Premium Nail Extensio…") unless that drops most of it.
+  const lastSpace = cut.lastIndexOf(' ');
+  return build(`${(lastSpace >= room / 2 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`);
 }
 
 function metaDescription(deal: CatalogDealDetail): string {

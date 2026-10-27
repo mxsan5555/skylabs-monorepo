@@ -53,7 +53,6 @@ export function DurationPackageSelector({ selection, emptyText }: { selection: P
                 className={`dps__package-row${isSel ? ' dps__package-row--selected' : ''}`}
                 onClick={() => selectPackage(pkg.id)}
                 aria-pressed={isSel}
-                aria-label={[label, meta, formatINR(price)].filter(Boolean).join(' — ')}
               >
                 <span className="dps__package-text">
                   <span className="dps__package-label">{label}</span>
@@ -67,7 +66,9 @@ export function DurationPackageSelector({ selection, emptyText }: { selection: P
                 <span className="dps__package-price-wrap">
                   <strong className="dps__package-price">{formatINR(price)}</strong>
                   {pkg.originalPrice != null && Number(pkg.originalPrice) !== price && (
-                    <s className="dps__package-orig">{formatINR(Number(pkg.originalPrice))}</s>
+                    <s className="dps__package-orig" aria-label={fillTemplate(t.originalPrice, { price: formatINR(Number(pkg.originalPrice)) })}>
+                      {formatINR(Number(pkg.originalPrice))}
+                    </s>
                   )}
                 </span>
               </button>
