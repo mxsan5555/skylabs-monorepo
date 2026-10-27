@@ -39,6 +39,7 @@ import dashboardRoutes from './routes/dashboard.routes';
 import notificationsRoutes from './routes/notifications.routes';
 import customerRoutes from './routes/customersummary.routes';
 import supportRoutes from './routes/support.routes';
+import contactRoutes from './routes/contact.routes';
 /**
  * The Express app, wired up but not listening. Split out of main.ts so Supertest can
  * `import app from '../app'` and drive requests in-process without opening a real port
@@ -119,7 +120,7 @@ export function createApp(): express.Express {
   api.use('/reports', reportsRoutes);
   api.use('/dashboard', dashboardRoutes);
   api.use('/notifications', notificationsRoutes);
-
+  api.use('/contact', contactRoutes);
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);

@@ -149,7 +149,6 @@ console.log("Can Change Status:", can('rbac.roles', 'status_change'));
 
     getPermissionCatalog(token)
       .then(({ data }) => {
-        console.log("Permission Catalog Data:", data);
         if (!cancelled) {
           setCatalog(data);
         }

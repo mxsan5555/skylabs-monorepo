@@ -11,7 +11,6 @@ import { sendError } from '../lib/http';
  * to a role takes effect for every route that guards on it without touching route code.
  */
 export function requirePermission(menuKey: string, action: PermissionAction = 'view') {
-  console.log(`requirePermission: ${menuKey}:${action}`);
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     if (!req.user) {
       sendError(res, 'UNAUTHORIZED', 'Authentication required');
