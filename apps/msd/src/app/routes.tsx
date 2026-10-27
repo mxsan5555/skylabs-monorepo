@@ -234,10 +234,15 @@ export function AppRoutes() {
             <Route path="/my-account/wishlist" element={<Wishlist />} />
           </Route>
 
-          {/* =====================================================
-              ORDER DETAIL — standalone storefront page
-              NO MyAccountLayout / NO account sidebar
-             ===================================================== */}
+          {/* Customer Orders — storefront layout, without account sidebar */}
+          {/* <Route
+            path="/orders"
+            element={
+              <RequireAuth>
+                <Orders />
+              </RequireAuth>
+            }
+          /> */}
           <Route
             path="/orders/:id"
             element={

@@ -1,9 +1,11 @@
+
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { FilledButton, OutlinedButton, Icon, } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getCustomerDashboardSummary } from '../../../api/customer-dashboard';
 import { ApiRequestError } from '../../../api/rbac/client';
+import content from '../../../content.json';
 import './customer-dashboard.css';
 interface DashboardStats {
     deals: number;
@@ -11,6 +13,7 @@ interface DashboardStats {
     cart: number;
     wishlist: number;
 }
+const t = content.customerDashboard;
 export function CustomerDashboard() {
     const { token, signOut } = useAuth();
     const navigate = useNavigate();
@@ -38,197 +41,108 @@ export function CustomerDashboard() {
                 });
             } catch (err) {
                 if (cancelled) return;
-                setError(
-                    err instanceof ApiRequestError ? err.message : 'Could not load your dashboard.',
-                );
-            } finally {
-                if (!cancelled) {
-                    setLoading(false);
-                }
-            }
+                setError(err instanceof ApiRequestError ? err.message : t.errors.load,);
+            } finally { if (!cancelled) { setLoading(false); } }
         }
-
-        loadDashboard();
-
-        return () => {
-            cancelled = true;
-        };
+        void loadDashboard();
+        return () => { cancelled = true; };
     }, [token]);
     const logout = () => {
         signOut();
         navigate('/sign-in', { replace: true });
     };
-
     if (loading) {
         return (
-            <div className="customer-dashboard">
+            <div className="dashboard-page">
                 <sky-info-card
                     icon="dashboard"
-                    heading="Loading your dashboard"
-                    subheading="Please wait..."
+                    heading={t.loading.heading}
+                    subheading={t.loading.subheading}
                 />
             </div>
         );
     }
-
+    const statItems = [
+        {
+            key: 'deals',
+            value: stats.deals, ...t.stats.deals,
+            to: '/orders?type=SERVICE',
+        },
+        {
+            key: 'products',
+            value: stats.products, ...t.stats.products,
+            to: '/orders?type=PRODUCT',
+        },
+        {
+            key: 'cart',
+            value: stats.cart, ...t.stats.cart,
+            to: '/cart',
+        },
+        {
+            key: 'wishlist',
+            value: stats.wishlist, ...t.stats.wishlist,
+            to: '/wishlist',
+        },
+    ];
     return (
-        <div className="customer-dashboard">
-            <title>My Dashboard</title>
-           
+        <div className="dashboard-page">
+            <title>{t.metaTitle}</title>
             {error && (
                 <sky-card className="customer-dashboard__error">
                     <div className="customer-dashboard__error-content">
-                        <Icon aria-hidden="true">error_outline</Icon>
+                        <Icon aria-hidden="true">{t.errors.icon}</Icon>
                         <span>{error}</span>
                     </div>
                 </sky-card>
             )}
-            <div className="customer-dashboard__stats">
-                <sky-tile-card
-                    icon="spa"
-                    headline="Deals"
-                    text={`${stats.deals} booked deals`}
-                    variant="outlined"
-                    icon-style="plain"
-                    href="/orders?type=SERVICE"
-                />
-                <sky-tile-card
-                    icon="inventory_2"
-                    headline="Products"
-                    text={`${stats.products} purchased products`}
-                    icon-style="plain"
-                    variant="outlined"
-                    href="/orders?type=PRODUCT"
-                />
-
-                <sky-tile-card
-                    icon="shopping_cart"
-                    headline="Cart"
-                    text={`${stats.cart} items in cart`}
-                    variant="outlined"
-                    icon-style="plain"
-                    href="/cart"
-                />
-
-                <sky-tile-card
-                    icon="favorite"
-                    headline="Wishlist"
-                    text={`${stats.wishlist} saved items`}
-                    variant="outlined"
-                    icon-style="plain"
-                    href="/wishlist"
-                />
+            <div className="dashboard-stats customer-dashboard__stats">
+                {statItems.map((item) => (
+                    <Link
+                        key={item.key}
+                        to={item.to}
+                        className="dashboard-stat"
+                    >
+                        <span className="dashboard-stat__icon"><Icon aria-hidden="true">{item.icon}</Icon></span>
+                        <span className="dashboard-stat__text">
+                            <p className="dashboard-stat__value title-large">{item.value}</p>
+                            <p className="dashboard-stat__label body-medium">{item.label}</p>
+                        </span>
+                        <span className="dashboard-stat__go">
+                            <Icon aria-hidden="true">{t.stats.linkIcon}</Icon>
+                        </span>
+                    </Link>
+                ))}
             </div>
             <div className="customer-dashboard__quick-actions">
                 <sky-info-card
-                    icon="receipt_long"
-                    heading="Your orders"
-                    subheading="Track booked deals and purchased products."
+                    icon={t.quickActions.orders.icon}
+                    heading={t.quickActions.orders.heading}
+                    subheading={t.quickActions.orders.subheading}
                 >
-                    <OutlinedButton onClick={() => navigate('/orders')}>
-                        View Orders
-                        <Icon slot="icon" aria-hidden="true">
-                            arrow_forward
-                        </Icon>
+                    <OutlinedButton onClick={() => navigate('/orders')}>{t.quickActions.orders.button}
+                        <Icon slot="icon" aria-hidden="true">{t.icons.arrowForward}</Icon>
                     </OutlinedButton>
                 </sky-info-card>
                 <sky-info-card
-                    icon="person"
-                    heading="Manage your profile"
-                    subheading="View and update your personal account information."
+                    icon={t.quickActions.profile.icon}
+                    heading={t.quickActions.profile.heading}
+                    subheading={t.quickActions.profile.subheading}
                 >
-                    <OutlinedButton onClick={() => navigate('/my-account')}>
-                        View Profile
-                        <Icon slot="icon" aria-hidden="true">
-                            arrow_forward
-                        </Icon>
+                    <OutlinedButton onClick={() => navigate('/my-account')}>{t.quickActions.profile.button}
+                        <Icon slot="icon" aria-hidden="true">{t.icons.arrowForward}</Icon>
                     </OutlinedButton>
                 </sky-info-card>
                 <sky-info-card
-                    icon="logout"
-                    heading="Sign out"
-                    subheading="Sign out from your MySpaDeal account."
+                    icon={t.quickActions.logout.icon}
+                    heading={t.quickActions.logout.heading}
+                    subheading={t.quickActions.logout.subheading}
                 >
-                    <FilledButton onClick={logout}>
-                        Logout
-                        <Icon slot="icon" aria-hidden="true">
-                            logout
-                        </Icon>
+                    <FilledButton onClick={logout}>{t.quickActions.logout.button}
+                        <Icon slot="icon" aria-hidden="true">{t.icons.logout}</Icon>
                     </FilledButton>
                 </sky-info-card>
             </div>
-            {/* <div className="customer-dashboard__quick-actions">
-                <sky-card className="customer-dashboard__quick-action">
-                    <div className="customer-dashboard__quick-action-content">
-                        <Icon aria-hidden="true">person</Icon>
-
-                        <div className="customer-dashboard__quick-action-info">
-                            <h3>Profile</h3>
-                            <p>Manage your personal account information.</p>
-                        </div>
-
-                        <OutlinedButton
-                            onClick={() => navigate('/my-account')}
-                        >
-                            View Profile
-                        </OutlinedButton>
-                    </div>
-                </sky-card>
-
-                <sky-card className="customer-dashboard__quick-action">
-                    <div className="customer-dashboard__quick-action-content">
-                        <Icon aria-hidden="true">logout</Icon>
-
-                        <div className="customer-dashboard__quick-action-info">
-                            <h3>Logout</h3>
-                            <p>Sign out from your MySpaDeal account.</p>
-                        </div>
-
-                        <FilledButton onClick={logout}>
-                            Logout
-                        </FilledButton>
-                    </div>
-                </sky-card>
-            </div> */}
-            {/* <sky-card className="customer-dashboard__profile">
-                <div className="customer-dashboard__section-content">
-                    <div>
-                        <h2>Profile</h2>
-                        <p>
-                            View and update your personal account information.
-                        </p>
-                    </div>
-
-                    <OutlinedButton
-                        onClick={() => navigate('/my-account')}
-                    >
-                        <Icon slot="icon" aria-hidden="true">
-                            person
-                        </Icon>
-                        View Profile
-                    </OutlinedButton>
-                </div>
-            </sky-card>
-
-            <sky-card className="customer-dashboard__logout">
-                <div className="customer-dashboard__section-content">
-                    <div>
-                        <h2>Logout</h2>
-                        <p>
-                            Sign out from your MySpaDeal account.
-                        </p>
-                    </div>
-
-                    <FilledButton onClick={logout}>
-                        <Icon slot="icon" aria-hidden="true">
-                            logout
-                        </Icon>
-                        Logout
-                    </FilledButton>
-                </div>
-            </sky-card> */}
         </div>
     );
 }
-
 export default CustomerDashboard;

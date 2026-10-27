@@ -28,6 +28,11 @@ export default function LeafletMap({ points }: { points: DealMapPoint[] }) {
     L.tileLayer(TILE_URL, { attribution: TILE_ATTRIBUTION, maxZoom: 19 }).addTo(map);
     mapRef.current = map;
     layerRef.current = L.layerGroup().addTo(map);
+    const resizeObserver = new ResizeObserver(() => {
+  map.invalidateSize({ pan: false });
+});
+
+resizeObserver.observe(el);
     // Marker links navigate in-app (plain clicks only; modified clicks open normally).
     const onClick = (e: MouseEvent) => {
       const link = (e.target as Element).closest<HTMLAnchorElement>('a.deal-map__marker');
@@ -38,6 +43,7 @@ export default function LeafletMap({ points }: { points: DealMapPoint[] }) {
     el.addEventListener('click', onClick);
     return () => {
       el.removeEventListener('click', onClick);
+      resizeObserver.disconnect();
       map.remove();
       mapRef.current = null;
       layerRef.current = null;
@@ -47,41 +53,61 @@ export default function LeafletMap({ points }: { points: DealMapPoint[] }) {
   useEffect(() => {
     const map = mapRef.current;
     const layer = layerRef.current;
-    if (!map || !layer || points.length === 0) return;
+
+    if (!map || !layer) return;
+
     layer.clearLayers();
-    for (const point of points) {
-      const icon = L.divIcon({ className: 'deal-map__marker-host', html: markerHtml(point), iconSize: MARKER_SIZE });
-      L.marker([point.lat, point.lng], { icon, keyboard: false, riseOnHover: true }).addTo(layer);
+
+    // Validate coordinates before adding markers or calculating bounds.
+    const validPoints = points.filter(
+      (point) =>
+        Number.isFinite(point.lat) &&
+        Number.isFinite(point.lng) &&
+        point.lat >= -90 &&
+        point.lat <= 90 &&
+        point.lng >= -180 &&
+        point.lng <= 180,
+    );
+
+    if (validPoints.length === 0) return;
+
+    // Add markers only for valid locations.
+    for (const point of validPoints) {
+      const icon = L.divIcon({
+        className: 'deal-map__marker-host',
+        html: markerHtml(point),
+        iconSize: MARKER_SIZE,
+      });
+
+      L.marker([point.lat, point.lng], {
+        icon,
+        keyboard: false,
+        riseOnHover: true,
+      }).addTo(layer);
     }
- const validPoints = points.filter(
-  (point) =>
-    Number.isFinite(point.lat) &&
-    Number.isFinite(point.lng) &&
-    point.lat >= -90 &&
-    point.lat <= 90 &&
-    point.lng >= -180 &&
-    point.lng <= 180,
-);
 
-if (validPoints.length === 0) return;
+    const bounds = L.latLngBounds(
+      validPoints.map(
+        (point) => [point.lat, point.lng] as L.LatLngTuple,
+      ),
+    );
 
-const bounds = L.latLngBounds(
-  validPoints.map(
-    (point) => [point.lat, point.lng] as L.LatLngTuple,
-  ),
-);
+    // One location: use a useful street-level zoom.
+    if (validPoints.length === 1) {
+      map.setView(
+        [validPoints[0].lat, validPoints[0].lng],
+        15,
+      );
+      return;
+    }
 
-if (validPoints.length === 1 || bounds.getNorthEast().equals(bounds.getSouthWest())) {
-  map.setView(
-    [validPoints[0].lat, validPoints[0].lng],
-    13,
-  );
-} else {
-  map.fitBounds(bounds, {
-    padding: [48, 48],
-    maxZoom: 13,
-  });
-} }, [points]);
+    // Multiple locations: fit all deals into the visible map.
+    map.fitBounds(bounds, {
+      padding: [32, 32],
+      maxZoom: 15,
+      animate: true,
+    });
+  }, [points]);
 
   return <div ref={container} className="deal-map__canvas" />;
 }

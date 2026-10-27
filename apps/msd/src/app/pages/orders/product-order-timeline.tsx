@@ -1,48 +1,40 @@
 import { Icon } from '@skylabs-monorepo/shared-ui/react';
 import type { Order } from '../../../api/orders';
 import './product-order-timeline.css';
-
 interface ProductOrderTimelineProps {
     status: Order['status'];
+    paymentStatus?: string;
 }
 type TimelineStep = {
     label: string;
     icon: string;
 };
 const PRODUCT_STEPS: TimelineStep[] = [
-    { label: 'Order Placed', icon: 'shopping_bag', },
-    { label: 'Confirmed', icon: 'check_circle', },
-    { label: 'Delivered', icon: 'local_shipping', },
+    { label: 'Ordered', icon: 'shopping_bag' },
+    { label: 'Payment Successful', icon: 'payments' },
+    { label: 'Order Dispatched', icon: 'local_shipping' },
+    { label: 'Delivered', icon: 'inventory_2' },
 ];
-function getCurrentStep(status: Order['status']): number {
-    switch (status) {
-        case 'PENDING_PAYMENT': return 0;
-        case 'CONFIRMED': return 1;
-        case 'COMPLETED': return 2;
-        case 'CANCELLED': return 1;
-        default: return 0;
-    }
+function getCurrentStep(
+    status: Order['status'],
+    paymentStatus?: string,
+): number {
+    if (status === 'COMPLETED') { return 3; }
+    if (status === 'CONFIRMED' && paymentStatus === 'PAID') { return 1; }
+    return 0;
 }
-export function ProductOrderTimeline({
-    status,
+export function ProductOrderTimeline({ status, paymentStatus,
 }: ProductOrderTimelineProps) {
-    const isCancelled = status === 'CANCELLED';
-    const currentStep = getCurrentStep(status);
-    const steps: TimelineStep[] = isCancelled
-        ? [
-            { label: 'Order Placed', icon: 'shopping_bag', },
-            { label: 'Cancelled', icon: 'cancel', },
-        ] : PRODUCT_STEPS;
+    const currentStep = getCurrentStep(status, paymentStatus);
     return (
-        <div className="product-order-timeline">
-            {steps.map((step, index) => {
-                const isCompleted = isCancelled ? index <= currentStep : index <= currentStep;
+        <div className="product-order-timeline" aria-label="Product order progress">
+            {PRODUCT_STEPS.map((step, index) => {
+                const isCompleted = index <= currentStep;
                 const isCurrent = index === currentStep;
                 return (
-                    <div key={step.label} className="product-order-timeline__step">
+                    <div key={step.label} className="product-order-timeline__step" >
                         <div
-                            className={[
-                                'product-order-timeline__indicator',
+                            className={['product-order-timeline__indicator',
                                 isCompleted ? 'product-order-timeline__indicator--completed' : '',
                                 isCurrent ? 'product-order-timeline__indicator--current' : '',
                             ].filter(Boolean).join(' ')}>
@@ -54,10 +46,9 @@ export function ProductOrderTimeline({
                                 <span className="product-order-timeline__current">Current status</span>
                             )}
                         </div>
-                        {index < steps.length - 1 && (
+                        {index < PRODUCT_STEPS.length - 1 && (
                             <div
-                                className={[
-                                    'product-order-timeline__connector',
+                                className={['product-order-timeline__connector',
                                     index < currentStep ? 'product-order-timeline__connector--completed' : '',
                                 ].filter(Boolean).join(' ')}
                                 aria-hidden="true"

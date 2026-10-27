@@ -1,8 +1,7 @@
 import { useMemo, type ReactNode } from 'react';
 import '@skylabs-monorepo/shared-ui/carousel';
-import { OfferCard } from '../../components/offer-card/offer-card';
-import { formatINR } from '../../../utils/format';
-import { primaryImage, resolveDealMedia, resolveTherapistMedia } from '../../../utils/media';
+import { OfferCard, type OfferTag,} from '../../components/offer-card/offer-card';
+import { primaryImage, resolveDealMedia } from '../../../utils/media';
 import { CardRail } from '../../components/card-rail/card-rail';
 import { TherapistCard } from '../../components/therapist-card/therapist-card';
 import { PageSection } from '../../components/page-section/page-section';
@@ -22,7 +21,22 @@ import { useCatalogShell } from '../../../catalog/catalog-shell';
 import { useVisitorLocation } from '../../../location/location-context';
 import type { CatalogDeal } from '../../../api/catalog';
 const { home } = content;
-
+const HOME_DEAL_TAGS: Record<'new' | 'hot' | 'expirySoon', OfferTag> = {
+  new: {
+    label: 'New',
+    color: 'tertiary',
+    tone: 'tonal',
+  },
+  hot: {
+    label: 'Hot',
+    color: 'error',
+  },
+  expirySoon: {
+    label: 'Expire soon',
+    color: 'error',
+    tone: 'tonal',
+  },
+};
 export function Home() {
   const { categories } = useCatalogShell();
   const { status: locationStatus, coords } = useVisitorLocation();
@@ -50,15 +64,41 @@ export function Home() {
     if (catalog.faqs.length > 0) blocks.push(faqPageJsonLd(catalog.faqs));
     return blocks.length > 0 ? blocks : undefined;
   }, [catalog.deals, catalog.faqs]);
-  const renderDeal = (deal: CatalogDeal): ReactNode => (
-    <swiper-slide key={deal.id} className="card-rail__slide">
-      <OfferCard slider
-        item={{ type: 'deal', deal }}
-        variant="outlined"
-        layout="vertical"
-      />
-    </swiper-slide>
-  );
+ const renderDeal = (
+  deal: CatalogDeal,
+  tag?: OfferTag,
+): ReactNode => (
+  <swiper-slide key={deal.id} className="card-rail__slide">
+    <OfferCard
+      slider
+      item={{ type: 'deal', deal }}
+      {...(tag ? { tag } : {})}
+      variant="outlined"
+      layout="vertical"
+    />
+  </swiper-slide>
+);
+  // tag wise sections
+const renderDealSection = (
+  id: string,
+  heading: string,
+  seeAllTo: string,
+  tag: OfferTag,
+  tone: 'tint' | 'surface' = 'surface',
+) => (
+  <PageSection tone={tone} aria-labelledby={id}>
+    <CardRail
+      id={id}
+      heading={heading}
+      seeAll="See All Deals"
+      seeAllTo={seeAllTo}
+    >
+      {catalog.deals
+        .slice(0, HOME_RAIL_SIZE)
+        .map((deal) => renderDeal(deal, tag))}
+    </CardRail>
+  </PageSection>
+);
   return (
     <div className="home">
       <Seo title={content.meta.home.title} description={content.meta.home.description} path="/" jsonLd={jsonLd} />
@@ -71,6 +111,33 @@ export function Home() {
         categories={categories}
         renderDeal={renderDeal}
       />
+      {/* tagwise sections */}
+      {ready && catalog.deals.length > 0 && (
+        <>
+     {renderDealSection(
+  'new-heading',
+  'New Arrivals',
+  '/deals?tag=new',
+  HOME_DEAL_TAGS.new,
+  'surface',
+)}
+
+{renderDealSection(
+  'hot-heading',
+  '	Trending Deals',
+  '/deals?tag=hot',
+  HOME_DEAL_TAGS.hot,
+  'tint',
+)}
+
+{renderDealSection(
+  'expiry-soon-heading',
+  'Ending Soon',
+  '/deals?tag=expiry-soon',
+  HOME_DEAL_TAGS.expirySoon,
+  'surface',
+)}  </>
+      )}
       <HowItWorks />
       {ready && catalog.therapists.length > 0 && (
         <PageSection tone="tint" aria-labelledby="therapists-heading">
