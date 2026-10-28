@@ -373,6 +373,7 @@ model Member {
 
   @@index([status])
   @@index([ownerUserId])
+  @@index([businessName(ops: raw("gin_trgm_ops"))], type: Gin, map: "Vendor_businessName_trgm_idx")
   @@map("Vendor")
 }
 
@@ -492,8 +493,10 @@ model Branch {
   vendorId       String
   name           String
   address        String?
-  city           String?
-  state          String?
+  addressLine2   String?
+  /// From the India location list (`@skylabs-monorepo/shared-utils`); required since S22 (DL-02).
+  city           String
+  state          String
   country        String?
   pincode        String?
   latitude       Decimal?               @db.Decimal(10, 6)
@@ -503,12 +506,11 @@ model Branch {
   mapLocationUrl String?
   phone          String?
   email          String?
-  isActive       Boolean                @default(true)
-  createdAt      DateTime               @default(now())
-  updatedAt      DateTime               @updatedAt
-  /// Loosely-structured weekly hours, e.g. {"mon":"09:00-20:00",...,"sun":"closed"} — same
-  /// no-upload-pipeline-style Json field as Vendor.kycDocuments/Deal.images. Nullable: existing
-  /// seeded branches predate this column.
+  isActive       Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  /// Weekly hours per day key `mon`..`sun`: `{ open, start?, end? }` (`OpeningHoursSchema`).
+  /// Nullable: branches may leave hours unset.
   openingHours   Json?
   vendor         Member                 @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   deals          Deal[]
@@ -538,7 +540,7 @@ model Therapist {
   /// Free-text, historical display only — kept untouched (never backfilled/repointed) for
   /// existing rows. Going forward, `specializationCategoryId` below is the restricted-choice
   /// field new Therapist create/update flows validate against (must be a top-level Category
-  /// with `type: THERAPY` the vendor has been granted, or one of its subcategories).
+  /// with `type: THERAPY`, or one of its subcategories; open to every member, D10).
   specialization           String?
   bio                      String?
   experienceYears          Int?
@@ -550,7 +552,7 @@ model Therapist {
   /// Nullable — no non-fabricated default exists for rows that predate this field.
   gender                   String?
   /// Restricted choice, added alongside the free-text `specialization` above — validated in
-  /// vendor.service.ts's createTherapist/updateTherapist via assertVendorHasCategoryAccess.
+  /// vendor.service.ts's createTherapist/updateTherapist via assertCategoryOfType.
   /// Nullable: not required, and every pre-existing Therapist row predates this column.
   specializationCategoryId String?
   cartItems                CartItem[]
@@ -1272,8 +1274,28 @@ model Deal {
   updatedAt               DateTime           @updatedAt
   /// A bookable time slot — required for every Deal (Deal is always a service offering now).
   durationMinutes         Int?
-  notes                   String?
+  /// Deal page "How to redeem" text (rich text). Was `notes` before the deal page rework
+  /// (docs/msd/PLANNING.md §2.7); renamed in place, data kept.
+  bookingInstructions     String?
+  /// Legacy free text, superseded by `cancellationPolicy` + `cancellationNote` (copied there by
+  /// the deal page migration). Never written; dropped in the contract step.
   policy                  String?
+  /// Plain-text selling points shown under the title (PLANNING §2.7: up to 6 × 80).
+  highlights              String[]                @default([])
+  /// Short plain-text eligibility items, e.g. "Women only", "18+" (up to 6 × 40).
+  eligibility             String[]                @default([])
+  bookingRequired         Boolean                 @default(true)
+  /// Days after purchase the voucher can be used; null = no limit stated.
+  validityDays            Int?
+  /// Units one customer may buy; null = no limit.
+  limitPerCustomer        Int?
+  cancellationPolicy      DealCancellationPolicy  @default(FREE_24H)
+  cancellationNote        String?
+  /// Slugs this deal had before; they still open the deal (PLANNING §2.7 URLs).
+  previousSlugs           String[]                @default([])
+  /// First time the deal went ACTIVE; from then on only staff change the slug.
+  publishedAt             DateTime?
+  faqs                    DealFaq[]
   cartItems               CartItem[]
   branch                  Branch             @relation(fields: [branchId], references: [id], onDelete: Cascade)
   category                Category           @relation("DealCategory", fields: [categoryId], references: [id])
@@ -1292,6 +1314,22 @@ model Deal {
   @@index([vendorId])
   @@index([branchId])
   @@index([status])
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "Deal_title_trgm_idx")
+}
+
+/// One question and answer on a deal page (PLANNING §2.7, up to 10 per deal), ordered by
+/// `sortOrder`. Plain text; replaced as a set on deal update.
+model DealFaq {
+  id        String   @id @default(uuid())
+  dealId    String
+  question  String
+  answer    String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId, sortOrder])
 }
 
 /// A service Deal's own duration/price menu — the authoritative child entity a customer actually
@@ -1306,6 +1344,12 @@ model Deal {
 model DealPackage {
   id              String      @id @default(uuid())
   dealId          String
+  /// Optional label, e.g. "Couple Swedish + steam"; the page shows "{duration} min" when empty.
+  name            String?
+  /// People one package covers ("For 2 people").
+  persons         Int         @default(1)
+  /// Plain-text "what's included" items (up to 8 × 80).
+  inclusions      String[]    @default([])
   durationMinutes Int
   sellingPrice    Decimal     @db.Decimal(10, 2)
   originalPrice   Decimal?    @db.Decimal(10, 2)
@@ -1317,7 +1361,7 @@ model DealPackage {
   deal            Deal        @relation(fields: [dealId], references: [id], onDelete: Cascade)
   orderItems      OrderItem[]
 
-  @@unique([dealId, durationMinutes])
+  @@unique([dealId, durationMinutes, persons])
   @@index([dealId])
 }
 
@@ -1339,6 +1383,8 @@ model DealImage {
   sizeBytes        Int
   sortOrder        Int      @default(0)
   isPrimary        Boolean  @default(false)
+  /// Up to 125 characters; the page falls back to the deal title.
+  altText          String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   deal             Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
@@ -1795,6 +1841,13 @@ enum DealStatus {
   ACTIVE
   INACTIVE
   EXPIRED
+}
+
+/// Deal page cancellation rule (PLANNING §2.7).
+enum DealCancellationPolicy {
+  FREE_24H
+  FREE_48H
+  NON_REFUNDABLE
 }
 
 enum DealApprovalStatus {

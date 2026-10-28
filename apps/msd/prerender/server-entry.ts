@@ -5,4 +5,4 @@ export * from '../src/entry-server';
 export { buildRoutes, isEmptyCityPage, STATIC_PUBLIC_PATHS, type PrerenderRoute } from './routes';
 export { assembleHtml } from './html';
 export { llmsTxt, robotsTxt, sitemapXml } from './crawler-files';
-export { categoryDataKey, listingDataKey } from '../src/prerender-data/prerender-data';
+export { categoryDataKey, dealDataKey, listingDataKey } from '../src/prerender-data/prerender-data';

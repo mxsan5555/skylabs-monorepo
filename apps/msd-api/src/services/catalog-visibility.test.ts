@@ -40,6 +40,13 @@ describe('storefront visibility requires an ACTIVE member', () => {
     expect(arg.where.vendor).toEqual({ status: 'ACTIVE' });
   });
 
+  it('the city list has no null filter on state or city (required columns since S22; Prisma rejects `not: null` on them)', async () => {
+    prismaMock.branch.groupBy.mockResolvedValue([] as never);
+    await listPublicLocations();
+    const arg = prismaMock.branch.groupBy.mock.calls[0][0] as { where: Record<string, unknown> };
+    expect(arg.where).toEqual({ isActive: true, vendor: { status: 'ACTIVE' } });
+  });
+
   it('deal list, deal facets, product list and therapist list query with the ACTIVE member filter', async () => {
     prismaMock.deal.findMany.mockResolvedValue([] as never);
     prismaMock.deal.count.mockResolvedValue(0 as never);

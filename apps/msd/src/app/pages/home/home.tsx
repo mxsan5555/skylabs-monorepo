@@ -18,7 +18,7 @@ import { TreatmentDirectory } from './treatment-directory';
 import { HOME_RAIL_SIZE, useHomeCatalog, } from './home-data';
 import content from '../../../content.json';
 import './home.css';
-import { useCatalogShell } from '../../../catalog/catalog-shell';
+import { dealHref, useCatalogShell } from '../../../catalog/catalog-shell';
 import { useVisitorLocation } from '../../../location/location-context';
 import type { CatalogDeal } from '../../../api/catalog';
 const { home } = content;
@@ -40,7 +40,7 @@ export function Home() {
             .slice(0, HOME_RAIL_SIZE)
             .map((d) => ({
               name: d.title,
-              path: `/deal/${d.id}`,
+              path: dealHref(d),
               price: Number(d.salePrice),
               image: primaryImage(resolveDealMedia(d)) || undefined,
             })),

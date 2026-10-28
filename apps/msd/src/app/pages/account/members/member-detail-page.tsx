@@ -267,9 +267,19 @@ export function MemberDetailPage() {
           />
         )}
 
-        {tab === 'branches' && <BranchesListPage token={token} vendorId={member.id} canEdit={canEdit} />}
-        {tab === 'deals' && <DealsListPage token={token} vendorId={member.id} canEdit={canEdit} canDelete={canDelete} />}
-        {tab === 'therapists' && <TherapistsListPage token={token} vendorId={member.id} canEdit={canEdit} canDelete={canDelete} />}
+        {/* Catalog tabs follow the vendors.* keys the API checks (PLANNING §2.7). */}
+        {tab === 'branches' && <BranchesListPage token={token} vendorId={member.id} canEdit={can('vendors.branches', 'edit')} />}
+        {tab === 'deals' && (
+          <DealsListPage token={token} vendorId={member.id} canEdit={can('vendors.deals', 'edit')} canDelete={can('vendors.deals', 'delete')} />
+        )}
+        {tab === 'therapists' && (
+          <TherapistsListPage
+            token={token}
+            vendorId={member.id}
+            canEdit={can('vendors.therapists', 'edit')}
+            canDelete={can('vendors.therapists', 'delete')}
+          />
+        )}
         {tab === 'products' && <ProductsListPage token={token} vendorId={member.id} canEdit={canEdit} canDelete={canDelete} />}
 
         {tab === 'activity' && <MemberActivityTab token={token} memberId={member.id} refreshKey={activityKey} />}

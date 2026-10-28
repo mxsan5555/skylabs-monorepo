@@ -37,14 +37,16 @@ import {
   DealCreateSchema,
   DealUpdateSchema,
   DealStatusUpdateSchema,
-  DealRejectSchema,
+  DealCopySchema,
+  DealImageUpdateSchema,
+  DealPackageCreateSchema,
+  DealPackageUpdateSchema,
+  DealPackageReorderSchema,
   TherapistCreateSchema,
   TherapistUpdateSchema,
   TherapistStatusUpdateSchema,
   TherapistPackageCreateSchema,
   TherapistPackageUpdateSchema,
-  VendorModulesAndCategoryAccessSchema,
-  BranchCategoryAccessInputSchema,
 } from '../schemas/vendor.schema';
 import { CategoryCreateSchema, CategoryUpdateSchema, CategoryStatusUpdateSchema } from '../schemas/category.schema';
 import {
@@ -599,29 +601,6 @@ export function buildOpenApiDocument() {
 
   registry.registerPath({
     method: 'get',
-    path: '/vendors/me/branches/{branchId}/deals',
-    summary: "Deals for one of the caller's own branches",
-    tags: ['Vendors - Self-service'],
-    security: bearer,
-    request: { params: z.object({ branchId: z.string().uuid() }) },
-    responses: { 200: { description: 'Deals' }, 403: errorResponse },
-  });
-
-  registry.registerPath({
-    method: 'post',
-    path: '/vendors/me/branches/{branchId}/deals',
-    summary: "Create a deal on one of the caller's own branches (starts PENDING/DRAFT)",
-    tags: ['Vendors - Self-service'],
-    security: bearer,
-    request: {
-      params: z.object({ branchId: z.string().uuid() }),
-      body: { content: { 'application/json': { schema: DealCreateSchema } } },
-    },
-    responses: { 201: { description: 'Created' }, 403: errorResponse },
-  });
-
-  registry.registerPath({
-    method: 'get',
     path: '/vendors/me/branches/{branchId}/therapists',
     summary: "Therapists for one of the caller's own branches",
     tags: ['Vendors - Self-service'],
@@ -727,12 +706,6 @@ export function buildOpenApiDocument() {
     },
   };
   const mediaEntities: Array<{ base: string; params: z.ZodRawShape; tag: string; label: string }> = [
-    {
-      base: '/vendors/me/branches/{branchId}/deals/{dealId}',
-      params: { branchId: z.string().uuid(), dealId: z.string().uuid() },
-      tag: 'Vendors - Self-service',
-      label: 'deal',
-    },
     {
       base: '/vendors/me/therapists/{therapistId}',
       params: { therapistId: z.string().uuid() },
@@ -1105,87 +1078,56 @@ export function buildOpenApiDocument() {
     responses: { 200: { description: 'Updated' } },
   });
 
-  registry.registerPath({
-    method: 'get',
-    path: '/vendors/{vendorId}/branches/{branchId}/deals',
-    summary: "A branch's deals (admin)",
-    tags: ['Vendors - Admin'],
-    security: bearer,
-    request: { params: z.object({ vendorId: z.string().uuid(), branchId: z.string().uuid() }) },
-    responses: { 200: { description: 'Deals' } },
-  });
-
-  registry.registerPath({
-    method: 'post',
-    path: '/vendors/{vendorId}/branches/{branchId}/deals',
-    summary: 'Create a deal on a branch (admin — starts APPROVED/ACTIVE)',
-    tags: ['Vendors - Admin'],
-    security: bearer,
-    request: {
-      params: z.object({ vendorId: z.string().uuid(), branchId: z.string().uuid() }),
-      body: { content: { 'application/json': { schema: DealCreateSchema } } },
-    },
-    responses: { 201: { description: 'Created' } },
-  });
-
-  registry.registerPath({
-    method: 'patch',
-    path: '/vendors/{vendorId}/branches/{branchId}/deals/{dealId}',
-    summary: 'Update a deal (admin)',
-    tags: ['Vendors - Admin'],
-    security: bearer,
-    request: {
-      params: z.object({ vendorId: z.string().uuid(), branchId: z.string().uuid(), dealId: z.string().uuid() }),
-      body: { content: { 'application/json': { schema: DealUpdateSchema } } },
-    },
-    responses: { 200: { description: 'Updated' } },
-  });
-
-  registry.registerPath({
-    method: 'patch',
-    path: '/vendors/{vendorId}/branches/{branchId}/deals/{dealId}/status',
-    summary: 'Activate/deactivate/expire a deal (admin)',
-    tags: ['Vendors - Admin'],
-    security: bearer,
-    request: {
-      params: z.object({ vendorId: z.string().uuid(), branchId: z.string().uuid(), dealId: z.string().uuid() }),
-      body: { content: { 'application/json': { schema: DealStatusUpdateSchema } } },
-    },
-    responses: { 200: { description: 'Updated' } },
-  });
-
-  registry.registerPath({
-    method: 'patch',
-    path: '/vendors/{vendorId}/branches/{branchId}/deals/{dealId}/approve',
-    summary: 'Approve a deal — jumps straight to ACTIVE',
-    tags: ['Vendors - Admin'],
-    security: bearer,
-    request: { params: z.object({ vendorId: z.string().uuid(), branchId: z.string().uuid(), dealId: z.string().uuid() }) },
-    responses: { 200: { description: 'Approved' } },
-  });
-
-  registry.registerPath({
-    method: 'patch',
-    path: '/vendors/{vendorId}/branches/{branchId}/deals/{dealId}/reject',
-    summary: 'Reject a deal with a mandatory reason',
-    tags: ['Vendors - Admin'],
-    security: bearer,
-    request: {
-      params: z.object({ vendorId: z.string().uuid(), branchId: z.string().uuid(), dealId: z.string().uuid() }),
-      body: { content: { 'application/json': { schema: DealRejectSchema } } },
-    },
-    responses: { 200: { description: 'Rejected' } },
-  });
-
-  registry.registerPath({
-    method: 'delete',
-    path: '/vendors/{vendorId}/branches/{branchId}/deals/{dealId}',
-    summary: 'Hard-delete a deal (blocked if it has real order/cart history)',
-    tags: ['Vendors - Admin'],
-    security: bearer,
-    request: { params: z.object({ vendorId: z.string().uuid(), branchId: z.string().uuid(), dealId: z.string().uuid() }) },
-    responses: { 200: { description: 'Deleted' }, 409: errorResponse },
-  });
+  // ─── Deals (docs/msd/API.md §2.1, §2.2): the same routes for the member (`/vendors/me`,
+  // `members:custom`) and staff (`/vendors/{vendorId}`, `vendors.deals:<action>`) ──────────────
+  const dealSurfaces: Array<{ prefix: string; params: z.ZodRawShape; tag: string; staff: boolean }> = [
+    { prefix: '/vendors/me', params: {}, tag: 'Vendors - Self-service', staff: false },
+    { prefix: '/vendors/{vendorId}', params: { vendorId: z.string().uuid() }, tag: 'Vendors - Admin', staff: true },
+  ];
+  const dealMediaBody = {
+    content: { 'multipart/form-data': { schema: z.object({ file: z.any().openapi({ type: 'string', format: 'binary' }) }) } },
+  };
+  for (const surface of dealSurfaces) {
+    const base = z.object(surface.params);
+    const branch = base.extend({ branchId: z.string().uuid() });
+    const deal = branch.extend({ dealId: z.string().uuid() });
+    const dealPath = `${surface.prefix}/branches/{branchId}/deals/{dealId}`;
+    const json = <T extends z.ZodTypeAny>(schema: T) => ({ content: { 'application/json': { schema } } });
+    const paths: Array<{ method: 'get' | 'post' | 'patch' | 'delete'; path: string; summary: string; params: z.ZodObject<z.ZodRawShape>; body?: ReturnType<typeof json> | typeof dealMediaBody; ok?: number }> = [
+      { method: 'get', path: `${surface.prefix}/deals`, summary: "All of the member's deals, every branch and status", params: base },
+      { method: 'get', path: `${surface.prefix}/branches/{branchId}/deals`, summary: "A branch's deals", params: branch },
+      { method: 'post', path: `${surface.prefix}/branches/{branchId}/deals`, summary: 'Create a deal (starts as Draft; slug generated when empty)', params: branch, body: json(DealCreateSchema), ok: 201 },
+      { method: 'get', path: dealPath, summary: 'One deal with packages, FAQs, therapists and media', params: deal },
+      { method: 'patch', path: dealPath, summary: 'Update a deal (packages have their own routes)', params: deal, body: json(DealUpdateSchema) },
+      { method: 'patch', path: `${dealPath}/status`, summary: 'Draft, Active or Inactive; Active needs an image and an active package (422 DEAL_NOT_READY)', params: deal, body: json(DealStatusUpdateSchema) },
+      { method: 'post', path: `${dealPath}/copy`, summary: 'Copy to another branch of the same member as Draft', params: deal, body: json(DealCopySchema), ok: 201 },
+      { method: 'post', path: `${dealPath}/packages`, summary: 'Add a package card', params: deal, body: json(DealPackageCreateSchema), ok: 201 },
+      { method: 'patch', path: `${dealPath}/packages/reorder`, summary: 'Reorder packages', params: deal, body: json(DealPackageReorderSchema) },
+      { method: 'patch', path: `${dealPath}/packages/{packageId}`, summary: 'Edit a package (409 LAST_PACKAGE when deactivating the last active one)', params: deal.extend({ packageId: z.string().uuid() }), body: json(DealPackageUpdateSchema) },
+      { method: 'delete', path: `${dealPath}/packages/{packageId}`, summary: 'Delete a package (409 when in a cart or order)', params: deal.extend({ packageId: z.string().uuid() }) },
+      { method: 'post', path: `${dealPath}/images`, summary: 'Upload an image (up to 10 per deal)', params: deal, body: dealMediaBody, ok: 201 },
+      { method: 'patch', path: `${dealPath}/images/reorder`, summary: 'Reorder images', params: deal, body: json(MediaReorderSchema) },
+      { method: 'patch', path: `${dealPath}/images/{imageId}/primary`, summary: 'Set the cover image', params: deal.extend({ imageId: z.string().uuid() }) },
+      { method: 'patch', path: `${dealPath}/images/{imageId}`, summary: 'Set the alt text of an image', params: deal.extend({ imageId: z.string().uuid() }), body: json(DealImageUpdateSchema) },
+      { method: 'delete', path: `${dealPath}/images/{imageId}`, summary: 'Delete an image', params: deal.extend({ imageId: z.string().uuid() }) },
+      { method: 'post', path: `${dealPath}/video`, summary: 'Upload or replace the video', params: deal, body: dealMediaBody, ok: 201 },
+      { method: 'delete', path: `${dealPath}/video`, summary: 'Delete the video', params: deal },
+      ...(surface.staff
+        ? [{ method: 'delete' as const, path: dealPath, summary: 'Delete a deal: Super Admin only, 409 with orders or cart lines', params: deal }]
+        : []),
+    ];
+    for (const op of paths) {
+      registry.registerPath({
+        method: op.method,
+        path: op.path,
+        summary: op.summary,
+        tags: [surface.tag],
+        security: bearer,
+        request: { params: op.params, ...(op.body ? { body: op.body } : {}) },
+        responses: { [op.ok ?? 200]: { description: 'OK' }, 403: errorResponse, 404: errorResponse, 409: errorResponse, 422: errorResponse },
+      });
+    }
+  }
 
   // ─── Categories / Sub Categories ──────────────────────────────────────────────
 
@@ -1478,83 +1420,6 @@ export function buildOpenApiDocument() {
       responses: { 200: { description: 'Deleted' }, 403: errorResponse, 404: errorResponse },
     });
   }
-
-  // ─── Vendor business modules + Category access (onboarding wizard Step 2) ───────────────────
-
-  registry.registerPath({
-    method: 'get',
-    path: '/vendors/me/category-access',
-    summary: "The caller's own vendor's granted top-level categories",
-    tags: ['Vendors - Self-service'],
-    security: bearer,
-    responses: { 200: { description: 'Grants' } },
-  });
-
-  registry.registerPath({
-    method: 'put',
-    path: '/vendors/me/category-access',
-    summary: "Replace the caller's own vendor's business modules + granted top-level categories",
-    tags: ['Vendors - Self-service'],
-    security: bearer,
-    request: { body: { content: { 'application/json': { schema: VendorModulesAndCategoryAccessSchema } } } },
-    responses: { 200: { description: 'Updated' }, 422: errorResponse },
-  });
-
-  registry.registerPath({
-    method: 'get',
-    path: '/vendors/me/branches/{branchId}/category-access',
-    summary: "A branch's own category/subcategory access map, for the caller's own vendor (read-only)",
-    tags: ['Vendors - Self-service'],
-    security: bearer,
-    request: { params: z.object({ branchId: z.string().uuid() }) },
-    responses: { 200: { description: 'Branch category access' }, 404: errorResponse },
-  });
-
-  registry.registerPath({
-    method: 'get',
-    path: '/vendors/{vendorId}/category-access',
-    summary: "A vendor's granted top-level categories (admin)",
-    tags: ['Vendors - Admin'],
-    security: bearer,
-    request: { params: z.object({ vendorId: z.string().uuid() }) },
-    responses: { 200: { description: 'Grants' } },
-  });
-
-  registry.registerPath({
-    method: 'put',
-    path: '/vendors/{vendorId}/category-access',
-    summary: "Replace a vendor's business modules + granted top-level categories (admin)",
-    tags: ['Vendors - Admin'],
-    security: bearer,
-    request: {
-      params: z.object({ vendorId: z.string().uuid() }),
-      body: { content: { 'application/json': { schema: VendorModulesAndCategoryAccessSchema } } },
-    },
-    responses: { 200: { description: 'Updated' }, 422: errorResponse },
-  });
-
-  registry.registerPath({
-    method: 'get',
-    path: '/vendors/{vendorId}/branches/{branchId}/category-access',
-    summary: "A branch's own category/subcategory access map (narrows the vendor's grants)",
-    tags: ['Vendors - Admin'],
-    security: bearer,
-    request: { params: z.object({ vendorId: z.string().uuid(), branchId: z.string().uuid() }) },
-    responses: { 200: { description: 'Grants' } },
-  });
-
-  registry.registerPath({
-    method: 'put',
-    path: '/vendors/{vendorId}/branches/{branchId}/category-access',
-    summary: "Replace a branch's category/subcategory access map",
-    tags: ['Vendors - Admin'],
-    security: bearer,
-    request: {
-      params: z.object({ vendorId: z.string().uuid(), branchId: z.string().uuid() }),
-      body: { content: { 'application/json': { schema: BranchCategoryAccessInputSchema } } },
-    },
-    responses: { 200: { description: 'Updated' }, 422: errorResponse },
-  });
 
   // ─── Public customer catalogue (no auth) ──────────────────────────────────────
 

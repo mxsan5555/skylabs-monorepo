@@ -102,23 +102,28 @@ list and form pages. Status labels, tones and the review flag copy live once in 
 | # | Gap | Fix | Status |
 |---|---|---|---|
 | C-01 | Member can delete own product | Remove `DELETE /vendors/me/products/:id` | open |
-| C-02 | Deal approval gate | Create deals `approvalStatus=APPROVED`, member publishes with status ACTIVE, stop `DEAL_PENDING_APPROVAL`, remove approval from visibility, home hero and promotions; migrate PENDING rows | open (P3-15) |
-| C-03 | Branch `state` optional free text | Required on create, Indian states allowlist (`lib/india-states.ts`) | open |
-| C-04 | `slug` required from the client | Optional; generate from title with a numeric suffix on conflict | open |
-| C-05 | Discount accepted from the client | Compute from original and sale price | open |
+| C-02 | Deal approval gate | Create deals `approvalStatus=APPROVED`, member publishes with status ACTIVE, stop `DEAL_PENDING_APPROVAL`, remove approval from visibility, home hero and promotions; migrate PENDING rows | done 2026-10-27 (P3-15); column dropped in the contract step |
+| C-03 | Branch `state` optional free text | `state` and `city` required on create, from one India location list moved from `apps/msd/src/data/india-locations.ts` to `packages/shared-utils` (`india-locations`) so the form and the API allowlist can't drift | done 2026-10-27 (DL-02: report script, columns `NOT NULL`) |
+| C-04 | `slug` required from the client | Optional; generate `{title}-{member}-{city}` with a numeric suffix on conflict; fixed once Active, old slugs kept (PLANNING §2.7) | done 2026-10-27 (DL-03) |
+| C-05 | Discount accepted from the client | Compute from the cheapest active package; prices, discount and duration refused as input | done 2026-10-27 (DL-03) |
 | C-06 | `vendors:custom` and `vendors.*` keys | `<resource>:<action>` plus scope | open (P1-05, P4) |
 | C-07 | Product category grant check | Only active `PRODUCT` type and parent check | done 2026-10-16 (P4-14) |
 | C-08 | No branch delete | `DELETE /branches/:id`, Super Admin only, 409 on FK conflict | open |
 | C-09 | Flat catalog routes | `/branches`, `/deals`, `/therapists`, `/products` over the existing services; nested routes become aliases | open |
 | C-11 | Member self-registration and `/me/submit` | Removed; members are created Active with `documentsDueAt` | done (P3-21) |
-| C-12 | Category grants for deals and therapists | Stop the vendor and branch grant checks, retire `PUT .../category-access` | open (P4-15) |
+| C-12 | Category grants for deals and therapists | Stop the vendor and branch grant checks, retire `PUT .../category-access` | done 2026-10-27 (P4-15): no grant checks anywhere, the seven `category-access` routes return 404, branch and therapist forms have no grant step; grant tables dropped in the contract step |
 | C-13 | Member edits while inactive | `blockWhenReadOnly` | done (P2-04) |
 | C-14 | Branch phone format | Reuse the member phone rule | open |
 | C-15 | Rich text storage | Sanitize HTML on write (`lib/sanitize-html.ts` allowlist), plain-text copy for search, meta and JSON-LD, length measured on plain text | open |
 | C-16 | Member customers view | `GET /customers` own scope | open (P4-16) |
+| C-17 | Two deal editors (`DealFormPage` without media, `DealDialog` in `vendor-branches.tsx` without therapists) | One `DealFormPage` for staff and member self-service, sections in PLANNING §2.7 order; `DealDialog` deleted | done 2026-10-27 (DL-10) |
+| C-18 | Seed gives Admin, Sales, Marketing, Support no `vendors.deals` grants; Deals tab gated by `members:edit` | Seed per PLANNING §2.7 matrix; console checks `vendors.deals:<action>` (staff) and `members:custom` (member) | done 2026-10-27 (DL-03) |
+| C-19 | Deal detail page reads `deal.discountPercent` before the selected package, hours from a second vendor call | Price and discount from the selected package; one detail response (API §4) | done 2026-10-27 (DL-12) |
 
-Inline therapist creation inside a deal request is not planned: the UI creates the therapist
-first, then sends `therapistIds`.
+Inline therapist creation inside a deal request is not planned: the deal form's "Add a new
+therapist" calls the branch's therapist create route (the server sets branch and member), then
+ticks the new id in `therapistIds`. Packages on the edit screen use their own routes (API §2.2);
+on the create screen they travel with `DealCreate`.
 
 ## 3. Customers and orders
 

@@ -15,7 +15,7 @@ import {
   extractBecomeVendorFieldErrors,
   type BecomeVendorFieldKey,
 } from '../account/cms/field-errors';
-import { STATES, citiesForState } from '../../../data/india-locations';
+import { STATES, citiesForState } from '@skylabs-monorepo/shared-utils';
 import { getCatalogContactUs } from '../../../api/catalog';
 import { useCmsContent } from '../../../hooks/use-cms-content';
 import {

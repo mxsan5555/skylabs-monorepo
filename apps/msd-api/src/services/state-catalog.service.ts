@@ -65,7 +65,6 @@ export async function searchStateItems(opts: {
             title: true,
             salePrice: true,
             status: true,
-            approvalStatus: true,
             vendor: { select: { businessName: true, status: true } },
             branch: { select: { name: true, isActive: true } },
             mediaImages: PRIMARY_IMAGE,
@@ -104,8 +103,7 @@ export async function searchStateItems(opts: {
         branchName: d.branch.name,
         price: String(d.salePrice),
         image: d.mediaImages[0]?.storageKey ?? null,
-        eligible:
-          d.status === 'ACTIVE' && d.approvalStatus === 'APPROVED' && d.vendor.status === 'ACTIVE' && d.branch.isActive,
+        eligible: d.status === 'ACTIVE' && d.vendor.status === 'ACTIVE' && d.branch.isActive,
       }),
     ),
     ...products.map(

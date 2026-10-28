@@ -8,6 +8,7 @@ import { formatINR } from '../../../utils/format';
 import type { DealMapPoint } from '../deal-map/deal-map';
 import type { ListingKind, ListingView } from './listing-params';
 import content from '../../../content.json';
+import { dealHref } from '../../../catalog/catalog-shell';
 
 export type ListingItems =
   | { kind: 'deals'; items: CatalogDeal[] }
@@ -67,7 +68,7 @@ export const listingLoadError = (kind: ListingKind | 'all') => (err: unknown) =>
 export function dealMapPoints(deals: CatalogDeal[]): DealMapPoint[] {
   return deals.flatMap((d) =>
     d.branch?.latitude != null && d.branch?.longitude != null
-      ? [{ id: d.id, lat: Number(d.branch.latitude), lng: Number(d.branch.longitude), label: formatINR(Number(d.salePrice)), title: d.title, href: `/deal/${d.id}` }]
+      ? [{ id: d.id, lat: Number(d.branch.latitude), lng: Number(d.branch.longitude), label: formatINR(Number(d.salePrice)), title: d.title, href: dealHref(d) }]
       : [],
   );
 }

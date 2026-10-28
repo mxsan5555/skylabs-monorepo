@@ -66,8 +66,6 @@ export interface CatalogDeal {
   shortDescription: string | null;
   description: string | null;
   termsAndConditions: string | null;
-  notes: string | null;
-  policy: string | null;
   /** A synced "from price"/default-duration display cache (kept in sync with the cheapest
    *  active `packages[]` entry server-side — see DealPackage's own schema doc comment in
    *  msd-api) — accurate for listing/sort/filter display, but NEVER the authoritative cart/order
@@ -93,6 +91,54 @@ export interface CatalogDeal {
    *  coordinates are unavailable, never fabricated. Optional (not just nullable) since existing
    *  test fixtures typed as `CatalogDeal` predate this field. */
   distanceKm?: number | null;
+}
+
+export type CatalogCancellationPolicy = 'FREE_24H' | 'FREE_48H' | 'NON_REFUNDABLE';
+
+/** A package on the deal page: the card fields plus name, people, inclusions and its discount. */
+export interface CatalogDealDetailPackage extends CatalogDealPackage {
+  name: string | null;
+  persons: number;
+  inclusions: string[];
+  discountPercent: number | null;
+}
+
+/** `GET /catalog/deals/:idOrSlug` (API.md §4): everything the deal page shows in one call. */
+export interface CatalogDealDetail extends Omit<CatalogDeal, 'packages' | 'branch' | 'vendor' | 'mediaImages'> {
+  tagline: string | null;
+  highlights: string[];
+  eligibility: string[];
+  currency: 'INR';
+  bookingRequired: boolean;
+  bookingInstructions: string | null;
+  validityDays: number | null;
+  limitPerCustomer: number | null;
+  cancellationPolicy: CatalogCancellationPolicy;
+  cancellationNote: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  /** Paid units, or null under 10 (the page shows "{n} bought" from 10). */
+  boughtCount: number | null;
+  isSoldOut: boolean;
+  /** Units left, or null without a stock limit. */
+  stockLeft: number | null;
+  packages: CatalogDealDetailPackage[];
+  faqs: { id: string; question: string; answer: string }[];
+  mediaImages?: (MediaImage & { altText?: string | null })[];
+  vendor: (NonNullable<CatalogDeal['vendor']> & { businessDescription: string | null; website: string | null; mediaImages?: MediaImage[] }) | null;
+  branch:
+    | (NonNullable<CatalogDeal['branch']> & {
+        addressLine2: string | null;
+        state: string | null;
+        pincode: string | null;
+        phone: string | null;
+        mapLocationUrl: string | null;
+        openingHours: CatalogOpeningHours | null;
+      })
+    | null;
+  therapists: CatalogTherapist[];
 }
 
 /** `Branch.openingHours` shape — keys are lowercase 3-letter day codes (`mon`…`sun`); `open:
@@ -296,8 +342,10 @@ export function getCatalogDealFacets(opts: Omit<CatalogDealListOptions, 'page' |
   return apiGet<CatalogDealFacets>(`/catalog/deals/facets${dealQuery(opts)}`, null);
 }
 
-export function getCatalogDeal(id: string) {
-  return apiGet<CatalogDeal>(`/catalog/deals/${id}`, null);
+/** The deal page (`GET /catalog/deals/:idOrSlug`): a UUID, the current slug or an old slug. The
+ *  response always carries the current `slug` (PLANNING §2.7 URLs). */
+export function getCatalogDeal(idOrSlug: string) {
+  return apiGet<CatalogDealDetail>(`/catalog/deals/${encodeURIComponent(idOrSlug)}`, null);
 }
 
 /** Product is a fully independent, directly-purchasable catalog entity (see msd-api's Product

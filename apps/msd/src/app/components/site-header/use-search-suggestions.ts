@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { debounce } from '@skylabs-monorepo/shared-utils';
-import { categoryHref } from '../../../catalog/catalog-shell';
+import { categoryHref, dealHref } from '../../../catalog/catalog-shell';
 import {
   listCatalogDeals,
   listCatalogProducts,
@@ -85,7 +85,7 @@ function dealItem(deal: CatalogDeal): SearchSuggestionItem {
     id: deal.id,
     label: card.title,
     sublabel: card.providerName,
-    href: `/deal/${deal.id}`,
+    href: dealHref(deal),
     image: card.image || undefined,
     imageAlt: '',
     place: deal.branch?.address ?? card.location,

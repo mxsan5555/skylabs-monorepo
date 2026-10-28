@@ -40,12 +40,12 @@ Needs Postgres (local, never Neon production): `prisma migrate dev`, seed twice,
 
 ## 3. Baseline and known failures
 
-Known failures at 2026-10-18; they must not grow. Anything else failing is a regression.
+Known failures at 2026-10-18 (msd recounted 2026-10-27: `india-locations` moved to `shared-utils` and fixed); they must not grow. Anything else failing is a regression.
 
 | Project | Failing | Where |
 |---|---|---|
-| msd | 22 tests in 12 files | `permission-matrix` 9, `india-locations` 3, `contact-us` 2, and 1 each in `app.spec`, `widget-registry`, `deal-card`, `media-uploader`, `site-footer`, `wishlist`, `roles`, `settings`; `entry-server.test.tsx` fails to load (`sky-product-card-wc` fixed 2026-10-24). Regressions since commit e756759 (NewOfferCard), not yet fixed: `home` 4 (FAQ section no longer rendered, deal favourite), `category` 1 (product wishlist heart) |
-| msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; the other 1,163 pass) |
+| msd | 19 tests in 11 files | `permission-matrix` 9, `contact-us` 2, and 1 each in `app.spec`, `widget-registry`, `deal-card`, `media-uploader`, `site-footer`, `wishlist`, `roles`, `settings`; `entry-server.test.tsx` fails to load (`sky-product-card-wc` fixed 2026-10-24). Regressions since commit e756759 (NewOfferCard), not yet fixed: `home` 4 (FAQ section no longer rendered, deal favourite), `category` 1 (product wishlist heart) |
+| msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; recounted 2026-10-27: 1,246 pass) |
 | shared-menu | 5 | `index.test.ts` |
 
 Lint and type drift: 30 msd lint errors (`import/first` and `no-empty-function` in older tests), an ESLint ignore error in the shared packages, and
@@ -93,6 +93,44 @@ mapPopularTag" (both pass alone).
 - Members list: the Filter menu sends exactly one filter per option; status and documents columns
   use their tonal colours.
 - Own scope (after P4): member A reading member B's branch, deal, therapist or product gets 404.
+- Deals (PLANNING §2.7; `deal.service.test.ts`, `vendors.routes.test.ts` "Deal routes" and "Branch state and city", `cart.routes.test.ts`, `deal-form-page.test.tsx`, `deals-list-page.test.tsx`, `branch-form-page.test.tsx`):
+  - Branch: missing `state` or `city`, or a pair not in the India list, returns 422; the form
+    lists cities only after a state is picked.
+  - Deal create: a branch of another member returns 404; with no branch the console shows "Add a
+    branch first" and no form; `salePrice`, `discountPercent`, `notes`, `policy`, `status` or any
+    unknown key returns 422; an empty slug is generated as `{title}-{member}-{city}` with `-2`
+    on conflict; the member can't change the slug once the deal was Active (422), staff can,
+    and the old slug still opens the deal.
+  - Derived prices: after any package change the deal's from price, original and discount equal
+    the cheapest active package; discount is rounded down.
+  - Packages: create with 0 or 11 packages returns 422; a duplicate duration + people returns 409;
+    deleting a package in a cart or order returns 409; deleting or deactivating the last active
+    one returns 409 `LAST_PACKAGE`; reorder keeps the given order.
+  - Therapists: a therapist from another branch returns 422; an inline-created therapist has the
+    deal's branch and member whatever the client sends.
+  - Status: Active without an image or an active package returns 422 `DEAL_NOT_READY` listing
+    both; a member's new deal is Draft and goes Active with no approval; approve and reject
+    routes return 404.
+  - Roles: Sales and Admin create and edit any member's deal; Marketing and Support get 403 on
+    write; only Super Admin deletes (Admin with `vendors.deals:delete` still 403); a member gets
+    404 on another member's deal, package, image or FAQ.
+  - Copy to branch: copy is Draft at the target branch with the same packages and FAQs, no
+    media, no therapists; a target branch of another member returns 404.
+- Categories open to every member (D10, P4-15; `vendors.routes.test.ts` "Category grant routes are
+  retired", `category.service.test.ts`, `categories.routes.test.ts`, `branch-form-page.test.tsx`,
+  `vendor-branches.test.tsx`, `therapist-form-page.test.tsx`):
+  - Each of the seven `.../category-access` routes returns 404 and writes nothing, even with every
+    permission.
+  - `GET /vendors/categories` returns the same list for every member, ignores `vendorId`, and
+    reads no grant; the branch list has no `categoryTypes`.
+  - Deleting a category no deal or product uses succeeds even when old grant rows point at it.
+  - Branch forms (page and dialog) have no category section and save the branch fields only.
+  - The therapist form offers every branch of the member and every active top-level Therapy
+    category.
+- Branch location columns (DL-02, S22): `npm run msd-api:prisma:report-branch-locations` lists
+  branches whose state or city isn't in the India list and exits 1 when any exist; the
+  `20261027100000_branch_location_required` migration stops with a clear message when a branch
+  has no state or city, and otherwise sets both `NOT NULL`.
 
 ### 4.3 Customers and orders
 
@@ -130,6 +168,25 @@ mapPopularTag" (both pass alone).
   active row (ARIA element reflection on the inner combobox input);
   `sky-action-field clearable` clears and refocuses, default rendering unchanged. Checked at 1366
   and 390 px.
+- Deal page (PLANNING §2.7; `deal-detail.test.tsx`, `catalog.routes.test.ts` "GET /api/v1/catalog/deals/:id"):
+  - `/deal/{uuid}` and an old slug replace the URL with the current slug; the canonical carries
+    it; a Draft or hidden deal shows the not-found page with `noindex`.
+  - Sections render in the §2.7 order; one h1; highlights, eligibility and FAQs hidden when empty.
+  - Picking a package changes the price, original price, % off and total; "For 2 people" and the
+    inclusions show on its card.
+  - Sold out replaces Add to cart; quantity stops at the per-customer limit; a cart call beyond
+    it shows the 409 message; "{n} bought" absent under 10; "Ends in" only within 7 days.
+  - Gallery: thumbnails on desktop, swipe and dots at 390 px, full-screen view opens on click with
+    arrows, Escape (focus returns to the image) and "3 of 7"; every image has non-empty alt.
+  - JSON-LD: `Service` + `AggregateOffer` (low and high price, availability from stock,
+    `validThrough`), BreadcrumbList, FAQPage only with FAQs, no rating; passes the Rich Results
+    test.
+  - Search: a query with the member name returns that member's deals; title matches rank first.
+  - Branch map (ST-26, `deal-detail.test.tsx`, `deal-map.test.tsx`, `marker-html.test.ts`): the
+    Location panel shows a compact map labelled "Map of {branch}" with one marker (the branch
+    name, not a link) when the branch has coordinates; no map without coordinates; the prerendered
+    HTML has no map (it appears after hydration); the therapist page has no map.
+  - Prerendered deal page hydrates without warnings; `sitemap.xml` lists Active deal slugs only.
 - Therapist detail (`therapist-detail.test.tsx`): type as h1, person and experience, Details and
   the location aside, the rail leaves out the current therapist; the price follows the chosen
   package; signed-out Add to cart goes to sign in; a 404 shows the not-found state.

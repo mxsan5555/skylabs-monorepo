@@ -5,8 +5,8 @@ import { FilledButton } from '@skylabs-monorepo/shared-ui/react';
 import {
   createVendorTherapist,
   getVendor,
-  getVendorCategoryAccess,
   listBranches,
+  listCategories,
   listVendorTherapistsForAdmin,
   updateVendorTherapist,
   type AdminTherapist,
@@ -89,12 +89,9 @@ const EMPTY_FORM = {
 };
 
 /** Add/Edit therapist — `/account/members/:vendorId/therapists/new` and
- *  `.../therapists/:therapistId`. One page: Branch (only branches with THERAPY category access —
- *  mirrors the self-service `therapyBranches` filter in `vendor-therapists.tsx`), the therapist's
- *  own fields, and a Specialization picker restricted to the vendor's granted THERAPY categories
- *  (same simplified, vendor-wide — not branch-scoped-with-subcategories — picker
- *  `TherapistFormDialog` in `vendor-therapists.tsx` already uses, for consistency with that
- *  shipped UX rather than inventing a different one here).
+ *  `.../therapists/:therapistId`. One page: Branch (any of the member's branches), the therapist's
+ *  own fields, and a Specialization picker of every active top-level Therapy category (D10: no
+ *  category grants; same picker as `TherapistFormDialog` in `vendor-therapists.tsx`).
  *
  *  Adapted from `TherapistFormDialog`'s fields rather than extracted into a shared component —
  *  same known dedup opportunity already flagged for `BranchFormPage`/`DealFormPage`. Renders raw
@@ -137,8 +134,9 @@ export function TherapistFormPage({ token }: TherapistFormPageProps) {
 
   useEffect(() => {
     if (!vendorId) return;
-    getVendorCategoryAccess(token, vendorId)
-      .then(({ data }) => setSpecializationCategories(data.filter((row) => row.category.type === 'THERAPY').map((row) => row.category)))
+    // D10: every active top-level Therapy category, the same list for every member.
+    listCategories(token, { type: 'THERAPY' })
+      .then(({ data }) => setSpecializationCategories(data.filter((c) => !c.parentId)))
       .catch(() => setSpecializationCategories([]));
   }, [token, vendorId]);
 
@@ -182,11 +180,6 @@ export function TherapistFormPage({ token }: TherapistFormPageProps) {
     setForm((f) => ({ ...f, [key]: value }));
     setErrors((e) => (e[key as keyof typeof errors] ? { ...e, [key]: undefined } : e));
   };
-
-  // Only a branch with at least one currently-granted THERAPY category (`categoryTypes`,
-  // computed server-side by `listBranches`) is eligible to host a therapist — mirrors the
-  // self-service `therapyBranches` filter exactly.
-  const therapyBranches = branches.filter((b) => b.categoryTypes?.includes('THERAPY'));
 
   const save = useCallback(async () => {
     if (!vendorId) return;
@@ -245,13 +238,13 @@ export function TherapistFormPage({ token }: TherapistFormPageProps) {
             value: form.branchId,
             disabled: branchesLoading,
             placeholder: branchesLoading ? 'Loading branches…' : 'Select a branch',
-            options: therapyBranches.map((b) => ({ value: b.id, label: b.name })),
+            options: branches.map((b) => ({ value: b.id, label: b.name })),
             onChange: (value) => set('branchId', value),
           })
         )}
         {errors.branchId && <p className="error-state" role="alert">{errors.branchId}</p>}
-        {!branchesLoading && !isEdit && therapyBranches.length === 0 && (
-          <p className="empty-state">No branch currently has Therapy category access — map one on the branch's Category Access first.</p>
+        {!branchesLoading && !isEdit && branches.length === 0 && (
+          <p className="empty-state">This member has no branch yet. Add a branch first.</p>
         )}
 
         {renderTextField({ label: 'Therapist Type / Service Name', required: true, value: form.therapistType, onInput: (value) => set('therapistType', value) })}
@@ -269,7 +262,7 @@ export function TherapistFormPage({ token }: TherapistFormPageProps) {
             onChange: (value) => set('specializationCategoryId', value),
           })
         ) : (
-          <p className="empty-state">No Therapy categories have been granted to this business yet — grant one under Business Modules &amp; Category Access first.</p>
+          <p className="empty-state">No active Therapy categories yet. Staff add them in Category Master.</p>
         )}
         {therapist?.specialization && (
           <p className="field-hint">Previously recorded specialization (historical, read-only): {therapist.specialization}</p>

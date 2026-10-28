@@ -9,6 +9,8 @@ const TILE_URL = import.meta.env.VITE_MAP_TILE_URL || 'https://tile.openstreetma
 const TILE_ATTRIBUTION =
   import.meta.env.VITE_MAP_TILE_ATTRIBUTION ||
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+/** Street-level zoom for one place. */
+const SINGLE_POINT_ZOOM = 14;
 /** Marker box; the pill inside is centred on the point. */
 const MARKER_SIZE: L.PointTuple = [96, 40];
 
@@ -53,7 +55,7 @@ export default function LeafletMap({ points }: { points: DealMapPoint[] }) {
       const icon = L.divIcon({ className: 'deal-map__marker-host', html: markerHtml(point), iconSize: MARKER_SIZE });
       L.marker([point.lat, point.lng], { icon, keyboard: false, riseOnHover: true }).addTo(layer);
     }
-    if (points.length === 1) map.setView([points[0].lat, points[0].lng], 14);
+    if (points.length === 1) map.setView([points[0].lat, points[0].lng], SINGLE_POINT_ZOOM);
     else map.fitBounds(L.latLngBounds(points.map((p) => [p.lat, p.lng] as L.LatLngTuple)), { padding: [48, 48] });
   }, [points]);
 
