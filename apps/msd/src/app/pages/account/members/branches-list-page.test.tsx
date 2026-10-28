@@ -41,7 +41,6 @@ const BRANCH_A: Branch = {
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
   _count: { deals: 3 },
-  categoryTypes: [],
 };
 
 const BRANCH_B: Branch = { ...BRANCH_A, id: 'b2', name: 'Colaba Branch', city: 'Mumbai', isActive: false, _count: { deals: 0 } };

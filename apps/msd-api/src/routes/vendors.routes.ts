@@ -15,14 +15,12 @@ import {
   BranchCreateSchema,
   BranchUpdateSchema,
   BranchStatusUpdateSchema,
-  BranchCategoryAccessInputSchema,
   VendorBranchIdParamSchema,
   TherapistCreateSchema,
   TherapistUpdateSchema,
   TherapistStatusUpdateSchema,
   TherapistPackageCreateSchema,
   TherapistPackageUpdateSchema,
-  VendorModulesAndCategoryAccessSchema,
   VendorIdParamSchema,
   VendorDocumentTypeParamSchema,
   VendorImageIdParamSchema,
@@ -59,13 +57,12 @@ function withCompletion<T extends Record<string, unknown>>(vendor: T) {
 
 const VendorCategoriesQuerySchema = z.object({
   type: z.enum(['SERVICE', 'PRODUCT', 'THERAPY']).optional(),
-  vendorId: z.string().uuid().optional(),
 });
 
 router.get('/categories', validateQuery(VendorCategoriesQuerySchema), async (req, res, next) => {
   try {
-    const { type, vendorId } = req.validatedQuery as ReturnType<typeof VendorCategoriesQuerySchema.parse>;
-    sendData(res, await vendorService.listCategories({ type, vendorId }));
+    const { type } = req.validatedQuery as ReturnType<typeof VendorCategoriesQuerySchema.parse>;
+    sendData(res, await vendorService.listCategories({ type }));
   } catch (err) {
     next(err);
   }
@@ -363,59 +360,6 @@ router.get('/me/branches', requirePermission('members', 'custom'), async (req, r
   try {
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
     sendData(res, await vendorService.listBranches(vendor.id));
-  } catch (err) {
-    next(err);
-  }
-});
-
-// ─── Business modules + Category access (onboarding wizard Step 2) ──────────────────────────
-// Replace-the-full-set pattern, same shape as rbac.routes.ts's PUT /roles/:id/permissions.
-
-router.get('/me/category-access', requirePermission('members', 'custom'), async (req, res, next) => {
-  try {
-    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
-    sendData(res, await vendorService.getVendorCategoryAccess(vendor.id));
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.put(
-  '/me/category-access',
-  requirePermission('members', 'custom'),
-  validateBody(VendorModulesAndCategoryAccessSchema),
-  async (req, res, next) => {
-    try {
-      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
-      const result = await vendorService.setVendorModulesAndCategoryAccess(vendor.id, req.body);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'vendor.category_access.update',
-        targetType: 'Vendor',
-        targetId: vendor.id,
-        after: req.body,
-        ...requestMeta(req),
-      });
-      sendData(res, result);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-/**
- * Self-service read mirror of `/:vendorId/branches/:branchId/category-access` (see that route's
- * doc comment further down) — needed because `DealDialog`'s Category/Subcategory pickers are
- * branch-scoped now and that component is shared between the admin wizard and this self-service
- * surface. Read-only: a vendor owner views but never edits their own branch's category mapping
- * (that stays an admin/Data-Entry action via Step 2 of the onboarding wizard) — no `PUT` mirror.
- * `getBranchCategoryAccess` already calls `getBranchScopedOrThrow`, so a vendor can't reach
- * another vendor's branch here even by guessing a `branchId`.
- */
-router.get('/me/branches/:branchId/category-access', requirePermission('members', 'custom'), async (req, res, next) => {
-  try {
-    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
-    sendData(res, await vendorService.getBranchCategoryAccess(vendor.id, req.params.branchId));
   } catch (err) {
     next(err);
   }
@@ -1151,83 +1095,6 @@ router.get('/:vendorId/branches', requirePermission('vendors.branches', 'view'),
   }
 });
 
-router.get(
-  '/:vendorId/category-access',
-  requirePermission('members', 'view'),
-  validateParams(VendorIdParamSchema),
-  async (req, res, next) => {
-    try {
-      sendData(res, await vendorService.getVendorCategoryAccess(req.params.vendorId));
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-router.put(
-  '/:vendorId/category-access',
-  requirePermission('members', 'edit'),
-  validateParams(VendorIdParamSchema),
-  validateBody(VendorModulesAndCategoryAccessSchema),
-  async (req, res, next) => {
-    try {
-      const result = await vendorService.setVendorModulesAndCategoryAccess(req.params.vendorId, req.body);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'vendor.category_access.update',
-        targetType: 'Vendor',
-        targetId: req.params.vendorId,
-        after: req.body,
-        ...requestMeta(req),
-      });
-      sendData(res, result);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-/**
- * A branch's own category/subcategory access map — narrows the vendor-level grants above (see
- * BranchCategoryAccess's own schema doc comment). Gated on `vendors.branches`, same as every
- * other branch-scoped route in this file.
- */
-router.get(
-  '/:vendorId/branches/:branchId/category-access',
-  requirePermission('vendors.branches', 'view'),
-  validateParams(VendorBranchIdParamSchema),
-  async (req, res, next) => {
-    try {
-      sendData(res, await vendorService.getBranchCategoryAccess(req.params.vendorId, req.params.branchId));
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-router.put(
-  '/:vendorId/branches/:branchId/category-access',
-  requirePermission('vendors.branches', 'edit'),
-  validateParams(VendorBranchIdParamSchema),
-  validateBody(BranchCategoryAccessInputSchema),
-  async (req, res, next) => {
-    try {
-      const result = await vendorService.setBranchCategoryAccess(req.params.vendorId, req.params.branchId, req.body);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'branch_category_access.update',
-        targetType: 'Branch',
-        targetId: req.params.branchId,
-        after: req.body,
-        ...requestMeta(req),
-      });
-      sendData(res, result);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
 /**
  * All of a vendor's therapists (active AND inactive, across every branch) for the admin's
  * vendor detail page. Read-only — the admin-on-behalf create/update/status-change variants live
@@ -1348,8 +1215,8 @@ registerDealRoutes(router, staffDealSurface);
 // can create/edit a Therapist before the vendor has ever logged in (onboarding wizard Step 4).
 // Reuses the exact same createTherapist/updateTherapist/setTherapistStatus service functions the
 // self-service `/me/*` routes call — those already take vendorId as a plain parameter and do no
-// ownership resolution internally, so the `specializationCategoryId` -> assertVendorHasCategoryAccess
-// (THERAPY) check inside them runs unchanged for this path too; no bypass.
+// ownership resolution internally, so the `specializationCategoryId` -> active THERAPY category
+// check inside them runs unchanged for this path too; no bypass.
 
 router.post(
   '/:vendorId/branches/:branchId/therapists',

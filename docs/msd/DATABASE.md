@@ -1,7 +1,7 @@
 # msd database
 
 PostgreSQL database `msd`, schema `apps/msd-api/prisma/schema.prisma` (68 models, 22 enums),
-54 migrations. Business rules behind the data: `PLANNING.md`.
+55 migrations. Business rules behind the data: `PLANNING.md`.
 
 > **Generated tables.** The model and enum tables below were generated from `schema.prisma` on
 > 2026-10-17 ("Columns" counts scalar and enum fields; "Relations" lists Prisma relation fields).
@@ -89,7 +89,8 @@ Relation rules enforced in services (not only by foreign keys):
 - Deal category: active top-level `SERVICE`; subcategory, when given, its active child. Product:
   active top-level `PRODUCT` (+ child). Therapist specialization: active `THERAPY` or its child.
   No per-member or per-branch grant (D10); `VendorCategoryAccess`, `BranchCategoryAccess`,
-  `BranchSubcategoryAccess` are dormant and dropped in the contract phase.
+  `BranchSubcategoryAccess` and the `Member.offersService` / `offersProduct` / `offersTherapy` flags
+  have no readers or writers since P4-15 and are dropped in the contract phase.
 - One member, one owner user (`Member.ownerUserId` unique). A document number used by another
   member returns 409 `DOCUMENT_NUMBER_IN_USE` (`MemberDocument` unique `documentType` + `numberHash`).
 - `MemberDocument`: Missing means no row; one row per type per member. Responses never include
@@ -117,7 +118,7 @@ Deal page schema (PLANNING §2.7, D32 to D35; S18 to S24 below), in `schema.pris
 | DealPackage | add `name String?`, `persons Int @default(1)`, `inclusions String[] @default([])` | Unique changes from `(dealId, durationMinutes)` to `(dealId, durationMinutes, persons)` |
 | DealImage | add `altText String?` | Up to 125 characters; the page falls back to the deal title |
 | DealFaq (new) | `id`, `dealId` (cascade), `question`, `answer`, `sortOrder Int @default(0)`, timestamps | `index(dealId, sortOrder)`; plain text, up to 10 per deal (service rule) |
-| Branch | add `addressLine2 String?`; `state` and `city` required by the API | DB columns stay nullable until existing rows are fixed (report first), then `NOT NULL` in the contract step |
+| Branch | add `addressLine2 String?`; `state` and `city` required | `NOT NULL` since `20261027100000_branch_location_required`, after `npm run msd-api:prisma:report-branch-locations` lists no bad rows |
 | enum | `DealCancellationPolicy`: FREE_24H, FREE_48H, NON_REFUNDABLE | |
 | search | `pg_trgm` extension; GIN trigram indexes on `Deal.title` and `Vendor.businessName` | Raw SQL in the migration (Prisma can't express it); speeds up `ILIKE` search |
 
@@ -292,10 +293,10 @@ No tables (GA4 holds the data).
 | S19 | DealPackage: name, persons, inclusions; unique `(dealId, durationMinutes, persons)` | written (same migration) |
 | S20 | DealImage: `altText` | written (same migration) |
 | S21 | `DealFaq` table | written (same migration) |
-| S22 | Branch: `addressLine2`; report and fix rows whose `state` or `city` is not in the India list, then `NOT NULL` | column written (same migration); the API requires both on create; bad-row report and `NOT NULL` open (DL-02) |
+| S22 | Branch: `addressLine2`; report and fix rows whose `state` or `city` is not in the India list, then `NOT NULL` | done 2026-10-27 (DL-02): column in `20261026100000_deal_page_fields`; report script `prisma/report-branch-locations.ts` (0 bad rows locally); `NOT NULL` in `20261027100000_branch_location_required` (stops with a clear message if a row lacks state or city); Neon run with DL-01 |
 | S23 | Backfill: `policy` → `cancellationNote`; `publishedAt` = `updatedAt` for ACTIVE deals; every deal `approvalStatus = APPROVED` (D6). Existing slugs are kept; new deals get `{title}-{member}-{city}` | written (same migration) |
 | S24 | `pg_trgm` + GIN trigram indexes on `Deal.title` and `Vendor.businessName` | written (same migration; indexes declared in `schema.prisma`, extension in SQL) |
-| - | Contract: drop `kycStatus`, `kycRejectionReason`, legacy GST/PAN/`kycDocuments`, `approvalStatus`, `approvalRejectionReason`, `Deal.images`, `Deal.policy`, category-grant tables; `Branch.state`/`city` `NOT NULL` | after one release without readers (P3-16) |
+| - | Contract: drop `kycStatus`, `kycRejectionReason`, legacy GST/PAN/`kycDocuments`, `approvalStatus`, `approvalRejectionReason`, `Deal.images`, `Deal.policy`, category-grant tables, `Member.offersService`/`offersProduct`/`offersTherapy` | after one release without readers (P3-16) |
 
 `PaymentStatus` gains `REFUNDED`, `PARTIALLY_REFUNDED` with S8.
 

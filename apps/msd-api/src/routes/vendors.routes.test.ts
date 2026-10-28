@@ -1826,446 +1826,49 @@ describe('POST /api/v1/vendors/me/branches/:branchId/therapists — duplicate-su
   });
 });
 
-describe('PUT /api/v1/vendors/me/category-access (business modules + category access)', () => {
-  it('replaces the full set: grants two categories, then a follow-up call with one id revokes the other', async () => {
-    resolveMock.mockResolvedValue(['members:custom']);
+describe('Category grant routes are retired (D10, P4-15)', () => {
+  const ALL = ['members:custom', 'members:view', 'members:edit', 'vendors.branches:view', 'vendors.branches:edit'];
+  const cases: Array<['get' | 'put', string]> = [
+    ['get', '/api/v1/vendors/me/category-access'],
+    ['put', '/api/v1/vendors/me/category-access'],
+    ['get', `/api/v1/vendors/me/branches/${BRANCH_A_ID}/category-access`],
+    ['get', `/api/v1/vendors/${VENDOR_A_ID}/category-access`],
+    ['put', `/api/v1/vendors/${VENDOR_A_ID}/category-access`],
+    ['get', `/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`],
+    ['put', `/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`],
+  ];
+
+  it.each(cases)('%s %s returns 404 and writes nothing', async (method, url) => {
+    resolveMock.mockResolvedValue(ALL);
     prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
-    prismaMock.category.findMany.mockResolvedValue([serviceCategoryFixture, productCategoryFixture]);
-    prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([
-      { id: 'g1', vendorId: VENDOR_A_ID, categoryId: CATEGORY_ID, category: serviceCategoryFixture },
-      { id: 'g2', vendorId: VENDOR_A_ID, categoryId: PRODUCT_CATEGORY_ID, category: productCategoryFixture },
-    ]);
-
-    const res = await request(app)
-      .put('/api/v1/vendors/me/category-access')
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({ offersService: true, offersProduct: true, offersTherapy: false, categoryIds: [CATEGORY_ID, PRODUCT_CATEGORY_ID] });
-
-    expect(res.status).toBe(200);
-    expect(prismaMock.member.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { offersService: true, offersProduct: true, offersTherapy: false } }),
-    );
-    expect(prismaMock.vendorCategoryAccess.deleteMany).toHaveBeenCalledWith({ where: { vendorId: VENDOR_A_ID } });
-    expect(prismaMock.vendorCategoryAccess.createMany).toHaveBeenCalledWith({
-      data: [{ vendorId: VENDOR_A_ID, categoryId: CATEGORY_ID }, { vendorId: VENDOR_A_ID, categoryId: PRODUCT_CATEGORY_ID }],
-    });
+    const res = await request(app)[method](url)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['admin'] }))
+      .send({ offersService: true, offersProduct: false, offersTherapy: false, categoryIds: [CATEGORY_ID], mappings: [] });
+    expect(res.status).toBe(404);
+    expect(prismaMock.vendorCategoryAccess.createMany).not.toHaveBeenCalled();
+    expect(prismaMock.branchCategoryAccess.create).not.toHaveBeenCalled();
   });
 
-  it('revoking down to a single category deletes-then-recreates exactly that one row (replace-the-full-set, not a diff)', async () => {
+  it('GET /vendors/categories lists the same categories for every member and ignores vendorId', async () => {
     resolveMock.mockResolvedValue(['members:custom']);
-    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.category.findMany.mockResolvedValue([serviceCategoryFixture]);
-    prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([
-      { id: 'g1', vendorId: VENDOR_A_ID, categoryId: CATEGORY_ID, category: serviceCategoryFixture },
-    ]);
-
     const res = await request(app)
-      .put('/api/v1/vendors/me/category-access')
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({ offersService: true, offersProduct: false, offersTherapy: false, categoryIds: [CATEGORY_ID] });
-
+      .get(`/api/v1/vendors/categories?type=SERVICE&vendorId=${VENDOR_A_ID}`)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['member'] }));
     expect(res.status).toBe(200);
-    expect(prismaMock.vendorCategoryAccess.deleteMany).toHaveBeenCalledWith({ where: { vendorId: VENDOR_A_ID } });
-    expect(prismaMock.vendorCategoryAccess.createMany).toHaveBeenCalledWith({
-      data: [{ vendorId: VENDOR_A_ID, categoryId: CATEGORY_ID }],
-    });
+    expect(res.body.data).toHaveLength(1);
+    expect(prismaMock.vendorCategoryAccess.findMany).not.toHaveBeenCalled();
   });
 
-  it('rejects granting a category whose type does not match any enabled module', async () => {
-    resolveMock.mockResolvedValue(['members:custom']);
-    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
-    prismaMock.category.findMany.mockResolvedValue([productCategoryFixture]);
-
+  it('the branch list has no categoryTypes and reads no grants', async () => {
+    resolveMock.mockResolvedValue(['vendors.branches:view']);
+    prismaMock.branch.findMany.mockResolvedValue([{ id: BRANCH_A_ID, vendorId: VENDOR_A_ID, name: 'Kothrud', _count: { deals: 0 } }]);
     const res = await request(app)
-      .put('/api/v1/vendors/me/category-access')
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({ offersService: true, offersProduct: false, offersTherapy: false, categoryIds: [PRODUCT_CATEGORY_ID] });
-
-    expect(res.status).toBe(422);
-    expect(prismaMock.vendorCategoryAccess.deleteMany).not.toHaveBeenCalled();
-  });
-
-  it('rejects granting a subcategory instead of its top-level parent', async () => {
-    resolveMock.mockResolvedValue(['members:custom']);
-    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
-    const SUB_ID = 'b6b6b6b6-0000-4000-8000-00000000000f';
-    prismaMock.category.findMany.mockResolvedValue([{ ...serviceCategoryFixture, id: SUB_ID, parentId: CATEGORY_ID }]);
-
-    const res = await request(app)
-      .put('/api/v1/vendors/me/category-access')
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({ offersService: true, offersProduct: false, offersTherapy: false, categoryIds: [SUB_ID] });
-
-    expect(res.status).toBe(422);
-  });
-});
-
-describe('Branch category access (GET/PUT /:vendorId/branches/:branchId/category-access + GET /me mirror)', () => {
-  const SECOND_CATEGORY_ID = 'b9b9b9b9-0000-4000-8000-000000000012'; // a second top-level SERVICE category, distinct grant
-  const secondCategoryFixture = { id: SECOND_CATEGORY_ID, name: 'Fitness', parentId: null, type: 'SERVICE' };
-  const secondCategoryGrantFixture = { id: 'grant-second', vendorId: VENDOR_A_ID, categoryId: SECOND_CATEGORY_ID };
-
-  /** Routes every `category.findUnique` call by the id actually requested, regardless of call
-   *  order/count — `setBranchCategoryAccess`'s per-mapping loop calls this multiple times (once
-   *  for the top-level check, then again inside `assertCategoryChildOf` per subcategory), so a
-   *  single `mockResolvedValue` isn't precise enough once more than one distinct id is involved. */
-  function mockCategoryLookup(byId: Record<string, unknown>) {
-    prismaMock.category.findUnique.mockImplementation(({ where }: { where: { id: string } }) =>
-      Promise.resolve(byId[where.id] ?? null),
-    );
-  }
-
-  describe('GET /:vendorId/branches/:branchId/category-access (admin)', () => {
-    it('returns the branch\'s own mapping', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:view']);
-      prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-      prismaMock.branchCategoryAccess.findMany.mockResolvedValue([
-        {
-          id: 'bca-1',
-          branchId: BRANCH_A_ID,
-          categoryId: CATEGORY_ID,
-          category: serviceCategoryFixture,
-          subcategories: [{ id: 'bsa-1', subcategoryId: SUB_MASSAGE_ID, subcategory: subMassageFixture }],
-        },
-      ]);
-      const res = await request(app)
-        .get(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
-      expect(res.status).toBe(200);
-      expect(res.body.data).toHaveLength(1);
-      expect(res.body.data[0].subcategories[0].subcategoryId).toBe(SUB_MASSAGE_ID);
-    });
-
-    it('403s without members:view', async () => {
-      resolveMock.mockResolvedValue([]);
-      const res = await request(app)
-        .get(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
-      expect(res.status).toBe(403);
-    });
-
-    // The spec draft expected a 404 here ("never confirm existence"), but this route reuses
-    // `getBranchScopedOrThrow`, whose own documented contract (and every other branch-scoped
-    // route's cross-vendor test in this file, e.g. Deal/Therapist above) is 404 only when the
-    // branch doesn't exist AT ALL — 403 when it exists but belongs to a different vendor. Verified
-    // against the actual implementation rather than assumed.
-    it("403s (not 404) when the branch exists but belongs to a different vendor than the URL claims", async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:view']);
-      prismaMock.branch.findUnique.mockResolvedValue(branchBFixture); // belongs to VENDOR_B
-      const res = await request(app)
-        .get(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
-      expect(res.status).toBe(403);
-    });
-
-    it('404s when the branch does not exist at all', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:view']);
-      prismaMock.branch.findUnique.mockResolvedValue(null);
-      const res = await request(app)
-        .get(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
-      expect(res.status).toBe(404);
-    });
-  });
-
-  describe('PUT /:vendorId/branches/:branchId/category-access (admin) — CRUD/validation', () => {
-    beforeEach(() => {
-      prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-    });
-
-    it('CRUD roundtrip: saves a category + subcategory mapping and reads it back', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:edit']);
-      mockCategoryLookup({ [CATEGORY_ID]: serviceCategoryFixture, [SUB_MASSAGE_ID]: subMassageFixture });
-      prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([serviceGrantFixture]);
-      prismaMock.branchCategoryAccess.create.mockResolvedValue({});
-      prismaMock.branchCategoryAccess.findMany.mockResolvedValue([
-        {
-          id: 'bca-1',
-          branchId: BRANCH_A_ID,
-          categoryId: CATEGORY_ID,
-          category: serviceCategoryFixture,
-          subcategories: [{ id: 'bsa-1', subcategoryId: SUB_MASSAGE_ID, subcategory: subMassageFixture }],
-        },
-      ]);
-
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [{ categoryId: CATEGORY_ID, subcategoryIds: [SUB_MASSAGE_ID] }] });
-
-      expect(res.status).toBe(200);
-      expect(prismaMock.branchCategoryAccess.deleteMany).toHaveBeenCalledWith({ where: { branchId: BRANCH_A_ID } });
-      expect(prismaMock.branchCategoryAccess.create).toHaveBeenCalledWith({
-        data: { branchId: BRANCH_A_ID, categoryId: CATEGORY_ID, subcategories: { create: [{ subcategoryId: SUB_MASSAGE_ID }] } },
-      });
-      expect(res.body.data[0].subcategories[0].subcategoryId).toBe(SUB_MASSAGE_ID);
-    });
-
-    it('a duplicate categoryId within the same PUT (DB @@unique(branchId, categoryId)) surfaces as a clean 409, not a raw 500', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:edit']);
-      mockCategoryLookup({ [CATEGORY_ID]: serviceCategoryFixture });
-      prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([serviceGrantFixture]);
-      const { Prisma } = await import('../generated/prisma-client');
-      prismaMock.branchCategoryAccess.create
-        .mockResolvedValueOnce({})
-        .mockRejectedValueOnce(new Prisma.PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: 'test' }));
-
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [{ categoryId: CATEGORY_ID, subcategoryIds: [] }, { categoryId: CATEGORY_ID, subcategoryIds: [] }] });
-
-      expect(res.status).toBe(409);
-    });
-
-    it('a duplicate subcategoryId within one mapping (DB @@unique(branchCategoryAccessId, subcategoryId)) surfaces as a clean 409', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:edit']);
-      mockCategoryLookup({ [CATEGORY_ID]: serviceCategoryFixture, [SUB_MASSAGE_ID]: subMassageFixture });
-      prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([serviceGrantFixture]);
-      const { Prisma } = await import('../generated/prisma-client');
-      prismaMock.branchCategoryAccess.create.mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: 'test' }),
-      );
-
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [{ categoryId: CATEGORY_ID, subcategoryIds: [SUB_MASSAGE_ID, SUB_MASSAGE_ID] }] });
-
-      expect(res.status).toBe(409);
-    });
-
-    it('auto-grants a category the vendor has not been granted at all (no VendorCategoryAccess row) instead of rejecting — the standalone "Business Modules + Category Access" screen was removed, so this is now the only place Service/Therapy grants come from', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:edit']);
-      mockCategoryLookup({ [CATEGORY_ID]: serviceCategoryFixture });
-      prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([]); // vendor never granted this category yet
-      prismaMock.member.update.mockResolvedValue(vendorAFixture);
-      prismaMock.branchCategoryAccess.create.mockResolvedValue({});
-      prismaMock.branchCategoryAccess.findMany.mockResolvedValue([
-        { id: 'bca-1', branchId: BRANCH_A_ID, categoryId: CATEGORY_ID, category: serviceCategoryFixture, subcategories: [] },
-      ]);
-
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [{ categoryId: CATEGORY_ID, subcategoryIds: [] }] });
-
-      expect(res.status).toBe(200);
-      expect(prismaMock.vendorCategoryAccess.createMany).toHaveBeenCalledWith({
-        data: [{ vendorId: VENDOR_A_ID, categoryId: CATEGORY_ID }],
-        skipDuplicates: true,
-      });
-      expect(prismaMock.member.update).toHaveBeenCalledWith({ where: { id: VENDOR_A_ID }, data: { offersService: true } });
-      expect(prismaMock.branchCategoryAccess.deleteMany).toHaveBeenCalledWith({ where: { branchId: BRANCH_A_ID } });
-      expect(prismaMock.branchCategoryAccess.create).toHaveBeenCalledWith({
-        data: { branchId: BRANCH_A_ID, categoryId: CATEGORY_ID, subcategories: { create: [] } },
-      });
-    });
-
-    it('does NOT re-grant or touch the offers* flag for a category the vendor already holds', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:edit']);
-      mockCategoryLookup({ [CATEGORY_ID]: serviceCategoryFixture });
-      prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([serviceGrantFixture]); // already granted
-      prismaMock.branchCategoryAccess.create.mockResolvedValue({});
-      prismaMock.branchCategoryAccess.findMany.mockResolvedValue([
-        { id: 'bca-1', branchId: BRANCH_A_ID, categoryId: CATEGORY_ID, category: serviceCategoryFixture, subcategories: [] },
-      ]);
-
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [{ categoryId: CATEGORY_ID, subcategoryIds: [] }] });
-
-      expect(res.status).toBe(200);
-      expect(prismaMock.vendorCategoryAccess.createMany).not.toHaveBeenCalled();
-      expect(prismaMock.member.update).not.toHaveBeenCalled();
-    });
-
-    it('rejects a category whose type is PRODUCT — Product never flows through branch-level access (it stays on the standalone Product Categories grant)', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:edit']);
-      mockCategoryLookup({ [PRODUCT_CATEGORY_ID]: productCategoryFixture });
-
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [{ categoryId: PRODUCT_CATEGORY_ID, subcategoryIds: [] }] });
-
-      expect(res.status).toBe(422);
-      expect(prismaMock.branchCategoryAccess.deleteMany).not.toHaveBeenCalled();
-    });
-
-    it('rejects a subcategory that does not actually belong to the given categoryId', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:edit']);
-      // SUB_FACIAL_ID is a real category row, but its parent is SECOND_CATEGORY_ID, not CATEGORY_ID.
-      mockCategoryLookup({
-        [CATEGORY_ID]: serviceCategoryFixture,
-        [SUB_FACIAL_ID]: { ...subFacialFixture, parentId: SECOND_CATEGORY_ID },
-      });
-      prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([serviceGrantFixture]);
-
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [{ categoryId: CATEGORY_ID, subcategoryIds: [SUB_FACIAL_ID] }] });
-
-      expect(res.status).toBe(422);
-      expect(prismaMock.branchCategoryAccess.deleteMany).not.toHaveBeenCalled();
-    });
-
-    it('rejects a subcategory row directly (not a top-level category) passed as the mapping\'s own categoryId', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:edit']);
-      mockCategoryLookup({ [SUB_MASSAGE_ID]: subMassageFixture }); // parentId set -> not top-level
-
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [{ categoryId: SUB_MASSAGE_ID, subcategoryIds: [] }] });
-
-      expect(res.status).toBe(422);
-    });
-
-    it("403s (not 404) saving when the branch exists but belongs to a different vendor than the URL claims", async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:edit']);
-      prismaMock.branch.findUnique.mockResolvedValue(branchBFixture);
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [] });
-      expect(res.status).toBe(403);
-      expect(prismaMock.branchCategoryAccess.deleteMany).not.toHaveBeenCalled();
-    });
-
-    it('403s without members:edit', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:view']);
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [] });
-      expect(res.status).toBe(403);
-    });
-
-    it('an empty mappings array wipes the branch\'s entire mapping (deleteMany, no create)', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:edit']);
-      prismaMock.branchCategoryAccess.findMany.mockResolvedValue([]);
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [] });
-      expect(res.status).toBe(200);
-      expect(prismaMock.branchCategoryAccess.deleteMany).toHaveBeenCalledWith({ where: { branchId: BRANCH_A_ID } });
-      expect(prismaMock.branchCategoryAccess.create).not.toHaveBeenCalled();
-    });
-
-    // "Removing a category mapping cascades its subcategory mappings": this is the replace-the-
-    // full-set pattern — the branch previously had CATEGORY_ID + SECOND_CATEGORY_ID mapped; a PUT
-    // that now only lists SECOND_CATEGORY_ID wipes everything (relying on the DB's own
-    // `onDelete: Cascade` from BranchCategoryAccess -> BranchSubcategoryAccess to take
-    // CATEGORY_ID's subcategory rows with it) and recreates only what's still listed.
-    it("dropping a previously-mapped category from the new mappings array cascades away its subcategories (replace-the-full-set)", async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:edit']);
-      mockCategoryLookup({ [SECOND_CATEGORY_ID]: secondCategoryFixture });
-      prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([secondCategoryGrantFixture]);
-      prismaMock.branchCategoryAccess.create.mockResolvedValue({}); // reset — a prior test in this file left this rejecting
-      prismaMock.branchCategoryAccess.findMany.mockResolvedValue([
-        { id: 'bca-2', branchId: BRANCH_A_ID, categoryId: SECOND_CATEGORY_ID, category: secondCategoryFixture, subcategories: [] },
-      ]);
-
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [{ categoryId: SECOND_CATEGORY_ID, subcategoryIds: [] }] });
-
-      expect(res.status).toBe(200);
-      // Full wipe first (this is what actually cascades CATEGORY_ID's now-dropped subcategory rows away).
-      expect(prismaMock.branchCategoryAccess.deleteMany).toHaveBeenCalledWith({ where: { branchId: BRANCH_A_ID } });
-      // Only the still-listed category is recreated — CATEGORY_ID is gone entirely.
-      expect(prismaMock.branchCategoryAccess.create).toHaveBeenCalledOnce();
-      expect(prismaMock.branchCategoryAccess.create).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ categoryId: SECOND_CATEGORY_ID }) }),
-      );
-      expect(prismaMock.branchCategoryAccess.create).not.toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ categoryId: CATEGORY_ID }) }),
-      );
-    });
-
-    // "Removing just one subcategory mapping leaves the rest intact": the category itself stays
-    // mapped, only one of its two previously-enabled subcategories is dropped from this save.
-    it('dropping one subcategory from an otherwise-unchanged category mapping leaves the other subcategory intact', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:edit']);
-      mockCategoryLookup({ [CATEGORY_ID]: serviceCategoryFixture, [SUB_MASSAGE_ID]: subMassageFixture });
-      prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([serviceGrantFixture]);
-      prismaMock.branchCategoryAccess.create.mockResolvedValue({}); // reset — a prior test in this file left this rejecting
-      prismaMock.branchCategoryAccess.findMany.mockResolvedValue([
-        {
-          id: 'bca-1',
-          branchId: BRANCH_A_ID,
-          categoryId: CATEGORY_ID,
-          category: serviceCategoryFixture,
-          subcategories: [{ id: 'bsa-1', subcategoryId: SUB_MASSAGE_ID, subcategory: subMassageFixture }],
-        },
-      ]);
-
-      // Previously both SUB_MASSAGE_ID and SUB_FACIAL_ID were enabled; this save only re-submits
-      // SUB_MASSAGE_ID, dropping SUB_FACIAL_ID.
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [{ categoryId: CATEGORY_ID, subcategoryIds: [SUB_MASSAGE_ID] }] });
-
-      expect(res.status).toBe(200);
-      expect(prismaMock.branchCategoryAccess.create).toHaveBeenCalledWith({
-        data: { branchId: BRANCH_A_ID, categoryId: CATEGORY_ID, subcategories: { create: [{ subcategoryId: SUB_MASSAGE_ID }] } },
-      });
-      expect(res.body.data[0].subcategories).toHaveLength(1);
-      expect(res.body.data[0].subcategories[0].subcategoryId).toBe(SUB_MASSAGE_ID);
-    });
-  });
-
-  describe('GET /me/branches/:branchId/category-access (self-service mirror)', () => {
-    it("returns the caller's own branch mapping", async () => {
-      resolveMock.mockResolvedValue(['members:custom']);
-      prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
-      prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-      prismaMock.branchCategoryAccess.findMany.mockResolvedValue([
-        { id: 'bca-1', branchId: BRANCH_A_ID, categoryId: CATEGORY_ID, category: serviceCategoryFixture, subcategories: [] },
-      ]);
-      const res = await request(app)
-        .get(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
-      expect(res.status).toBe(200);
-      expect(res.body.data).toHaveLength(1);
-    });
-
-    // The spec draft expected 404 here too ("never confirm existence"); verified against the
-    // actual implementation instead of assumed — same `getBranchScopedOrThrow` contract as the
-    // admin route above, so this is 403 (branch exists, wrong vendor), not 404.
-    it("403s (not 404) when a vendor tries to read another vendor's branch via this route", async () => {
-      resolveMock.mockResolvedValue(['members:custom']);
-      prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
-      prismaMock.branch.findUnique.mockResolvedValue(branchBFixture); // belongs to VENDOR_B
-      const res = await request(app)
-        .get(`/api/v1/vendors/me/branches/${BRANCH_B_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
-      expect(res.status).toBe(403);
-    });
-
-    it('404s when the branch does not exist at all', async () => {
-      resolveMock.mockResolvedValue(['members:custom']);
-      prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
-      prismaMock.branch.findUnique.mockResolvedValue(null);
-      const res = await request(app)
-        .get(`/api/v1/vendors/me/branches/${BRANCH_B_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
-      expect(res.status).toBe(404);
-    });
-
-    it('returns 403 with no members:custom permission', async () => {
-      resolveMock.mockResolvedValue([]);
-      const res = await request(app)
-        .get(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
-      expect(res.status).toBe(403);
-    });
+      .get(`/api/v1/vendors/${VENDOR_A_ID}/branches`)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['admin'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data[0]).not.toHaveProperty('categoryTypes');
+    expect(prismaMock.branch.findMany).toHaveBeenCalledWith(expect.objectContaining({ include: { _count: { select: { deals: true } } } }));
   });
 });
 

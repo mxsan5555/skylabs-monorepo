@@ -6,13 +6,10 @@ import {
   createBranch,
   createMyBranch,
   deleteDeal,
-  getBranchCategoryAccess,
   listBranches,
-  listCategories,
   listDeals,
   listMyBranches,
   listMyDeals,
-  setBranchCategoryAccess,
   setBranchStatus,
   setDealStatus,
   setMyBranchStatus,
@@ -21,7 +18,6 @@ import {
   updateMyBranch,
   type Branch,
   type BranchInput,
-  type Category,
   type Deal,
   type OpeningHours,
   type WeekdayKey,
@@ -40,21 +36,11 @@ interface VendorBranchesProps {
   /** Superadmin-only hard delete — no self-service equivalent exists (vendors can only
    *  Activate/Deactivate their own deals), so this is always `false` on the `isSelf` surface. */
   canDeleteDeal?: boolean;
-  /**
-   * Forwarded straight to `BranchDialog`'s own `onCategoryAccessSaved` — see that prop's doc
-   * comment. This admin-only "Branches & Deals" tab previously had NO way at all to tell its
-   * caller that a branch's category save may have just flipped `Vendor.offersService`/
-   * `offersTherapy` server-side, so the vendor object rendered elsewhere (e.g. the Overview tab's
-   * Therapy/Product wizard steps) could go stale indefinitely until a full page reload. Omitted
-   * on the `isSelf` surface's call site below since `BranchDialog` never fires it there anyway.
-   */
-  onVendorRefresh?: () => void;
 }
 
 /** Groups branches by their `state` field for a "N branches across M states" summary — states
- *  are not a stored entity anywhere in the backend (see the direct-category-access plan's
- *  architecture notes), so this is pure client-side grouping, same approach as elsewhere in this
- *  app. Branches with no state set are grouped under "Unspecified" so they're never silently
+ *  are not a stored entity anywhere in the backend (they come from the India location list), so
+ *  this is pure client-side grouping. Branches with no state set are grouped under "Unspecified" so they're never silently
  *  dropped from the count. */
 export function groupBranchesByState(branches: Branch[]): { state: string; branches: Branch[] }[] {
   const groups = new Map<string, Branch[]>();
@@ -69,7 +55,7 @@ export function groupBranchesByState(branches: Branch[]): { state: string; branc
 
 /** Branch list + nested Deal list for a single vendor — reused for both the admin
  *  (`/vendors/:vendorId/branches...`) and self-service (`/vendors/me/branches...`) surfaces. */
-export function VendorBranches({ token, vendorId, isSelf, canEdit, canDeleteDeal = false, onVendorRefresh }: VendorBranchesProps) {
+export function VendorBranches({ token, vendorId, isSelf, canEdit, canDeleteDeal = false }: VendorBranchesProps) {
   const navigate = useNavigate();
   // Deals are added and edited on the shared deal form (PLANNING §2.7).
   const dealFormPath = (dealId?: string) =>
@@ -219,13 +205,7 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canDeleteDeal
         <div className="page-head">
           <h2>Branches</h2>
           {canEdit && (
-            <BranchDialog
-              token={token}
-              vendorId={vendorId}
-              isSelf={isSelf}
-              onSave={(input) => saveBranch(input).then((data) => { setError(''); return data; })}
-              onCategoryAccessSaved={onVendorRefresh}
-            />
+            <BranchDialog onSave={(input) => saveBranch(input).then((data) => { setError(''); return data; })} />
           )}
         </div>
         {error && <p className="error-state" role="alert">{error}</p>}
@@ -257,7 +237,7 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canDeleteDeal
                 </button>
                 {canEdit && (
                   <div className="page-head__actions">
-                    <BranchDialog branch={branch} token={token} vendorId={vendorId} isSelf={isSelf} onSave={(input) => saveBranch(input, branch)} onCategoryAccessSaved={onVendorRefresh} />
+                    <BranchDialog branch={branch} onSave={(input) => saveBranch(input, branch)} />
                     <OutlinedButton onClick={() => toggleBranchStatus(branch)}>
                       {branch.isActive ? 'Deactivate' : 'Activate'}
                     </OutlinedButton>
@@ -449,60 +429,18 @@ export function OpeningHoursEditor({ value, onChange }: { value: OpeningHours; o
 }
 
 /**
- * Branch create/edit dialog — exported so it can be reused verbatim by the onboarding wizard's
- * Step 2 (`vendor-wizard-branches.tsx`) as well as this file's own two-pane `VendorBranches`.
- *
- * Also owns the branch's Service/Therapy "Categories & Subcategories" mapping (folded in from the
- * now-deleted `branch-category-access-dialog.tsx` — see that file's own former doc comment for the
- * original design). Service/Therapy category access is per-branch only now: there's no more
- * vendor-wide grant screen for those two types (see `VendorProductCategoryAccess` in
- * `vendor-wizard-modules.tsx`, which keeps that grant screen for Product alone), so the category
- * picker here fetches every active top-level SERVICE + THERAPY category unfiltered by vendor
- * (`listCategories({ type })`, no `vendorId`) — this dialog IS the granting surface for those two
- * types now. The backend (`setBranchCategoryAccess`) auto-creates the vendor's `VendorCategoryAccess`
- * grant the first time any branch maps a category, so no separate "grant it first" step exists any
- * more either.
- *
- * Admin-only (`!isSelf`): there is no self-service `PUT` route for a branch's category mapping
- * (see msd-api's `GET /vendors/me/branches/:branchId/category-access` route doc comment — reading
- * your own branch's mapping is self-service, editing it stays an admin/Data-Entry action), so the
- * whole Categories & Subcategories section is omitted entirely on the `isSelf` surface rather than
- * rendering controls that would silently fail to save.
+ * Branch create/edit dialog for this file's two-pane `VendorBranches`. No category step:
+ * categories are open to every member (D10).
  */
 export function BranchDialog({
   branch,
   onSave,
-  onCategoryAccessSaved,
-  token,
-  vendorId,
-  isSelf = false,
   dialogRef: externalDialogRef,
   hideTrigger,
 }: {
   branch?: Branch;
-  /** Resolves to the created/updated `Branch` (never just `void`) — for a brand-new branch this
-   *  is the only place its real `id` becomes available, needed to save this dialog's own category
-   *  mapping against the right branch right after creation. */
+  /** Resolves to the created/updated `Branch`. */
   onSave: (input: BranchInput) => Promise<Branch>;
-  /**
-   * Fired right after `setBranchCategoryAccess` succeeds below — NOT after `onSave` (the branch
-   * fields save). That call can auto-grant a vendor-level `VendorCategoryAccess` row and flip
-   * `offersService`/`offersTherapy` server-side (see `setBranchCategoryAccess`'s own doc comment
-   * in msd-api's vendor.service.ts), so any caller that gates a screen on those flags (e.g. the
-   * Therapy/Product wizard steps' "module not enabled" message) must refetch the vendor AFTER
-   * this fires, never right after `onSave` alone — refetching too early is a real race that can
-   * silently capture the pre-grant `offersTherapy: false`, which is exactly the "granted category
-   * access but the module still shows as disabled" bug this callback exists to prevent. Omitted
-   * (not called) on the `isSelf` surface, where the whole Categories & Subcategories section
-   * doesn't render at all.
-   */
-  onCategoryAccessSaved?: () => void;
-  token: string | null;
-  vendorId: string;
-  /** True on the self-service "Branches & Deals" surface — see this component's own doc comment
-   *  on why the category section is entirely omitted rather than attempting a save that has no
-   *  backend route to land on. Defaults to `false` since most call sites are admin-scoped. */
-  isSelf?: boolean;
   /** Lets a caller drive this dialog open from a trigger it renders itself (e.g.
    *  `vendor-wizard-branches.tsx`'s `BranchRow`, which owns a per-branch "Edit" button so opening
    *  one branch's dialog can never affect another's) instead of using this component's own
@@ -527,82 +465,6 @@ export function BranchDialog({
   const [submitting, setSubmitting] = useState(false);
   // Same double-submit guard convention used elsewhere in this file (DealDialog's submittingRef).
   const submittingRef = useRef(false);
-
-  // ─── Categories & Subcategories (admin-only — see this component's own doc comment) ─────────
-  const [serviceCategories, setServiceCategories] = useState<Category[]>([]);
-  const [therapyCategories, setTherapyCategories] = useState<Category[]>([]);
-  const [categoryMap, setCategoryMap] = useState<Map<string, Set<string>>>(new Map());
-  const [categoriesLoading, setCategoriesLoading] = useState(false);
-  const [categoriesError, setCategoriesError] = useState('');
-
-  // Flat set of every active top-level SERVICE/THERAPY category (top level + children) — fetched
-  // once on mount (same "fetch alongside the dialog it belongs to" pattern as this file's own
-  // `DealDialog`'s branch-category-access effect), unfiltered by vendor (see this component's own
-  // doc comment).
-  const flatCategories = [...serviceCategories, ...therapyCategories];
-  const topLevelCategories = flatCategories.filter((c) => !c.parentId);
-  const branchId = branch?.id;
-
-  useEffect(() => {
-    if (isSelf) return; // no self-service category editing — see this component's own doc comment
-    let cancelled = false;
-    setCategoriesLoading(true);
-    setCategoriesError('');
-    (async () => {
-      try {
-        // All three calls are independent (`getBranchCategoryAccess` needs only `vendorId`/
-        // `branchId`, already known before this effect runs — it doesn't need `svc`/`thr` first),
-        // so they're fired together instead of awaiting the category lists before even starting
-        // the access fetch. That serial chain was measured as a real, avoidable extra round trip
-        // on every branch Edit dialog open (see Phase D's performance investigation report).
-        const [{ data: svc }, { data: thr }, access] = await Promise.all([
-          listCategories(token, { type: 'SERVICE' }),
-          listCategories(token, { type: 'THERAPY' }),
-          branchId ? getBranchCategoryAccess(token, vendorId, branchId).then((r) => r.data) : Promise.resolve(null),
-        ]);
-        if (cancelled) return;
-        setServiceCategories(svc);
-        setTherapyCategories(thr);
-        if (access) {
-          const next = new Map<string, Set<string>>();
-          access.forEach((row) => next.set(row.categoryId, new Set(row.subcategories.map((s) => s.subcategoryId))));
-          setCategoryMap(next);
-        } else {
-          setCategoryMap(new Map());
-        }
-      } catch (err) {
-        if (cancelled) return;
-        setCategoriesError(err instanceof ApiRequestError ? err.message : 'Could not load categories.');
-      } finally {
-        if (!cancelled) setCategoriesLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [token, vendorId, branchId, isSelf]);
-
-  const toggleCategory = (categoryId: string) =>
-    setCategoryMap((prev) => {
-      const next = new Map(prev);
-      if (next.has(categoryId)) next.delete(categoryId);
-      else next.set(categoryId, new Set());
-      return next;
-    });
-
-  const toggleSubcategory = (categoryId: string, subcategoryId: string) =>
-    setCategoryMap((prev) => {
-      const next = new Map(prev);
-      // A subcategory can't be enabled without its parent — auto-check the parent category too
-      // if the user reaches for a subcategory checkbox first (mirrors BranchDialog's own
-      // State-clears-City idiom: related fields reset/adjust in the same state update).
-      const current = next.get(categoryId) ?? new Set<string>();
-      const subs = new Set(current);
-      if (subs.has(subcategoryId)) subs.delete(subcategoryId);
-      else subs.add(subcategoryId);
-      next.set(categoryId, subs);
-      return next;
-    });
 
   const set = (key: keyof typeof form, value: string) => {
     setForm((f) => ({ ...f, [key]: value, ...(key === 'state' ? { city: '' } : {}) }));
@@ -638,23 +500,7 @@ export function BranchDialog({
         mapLocationUrl: form.mapLocationUrl.trim() || undefined,
         openingHours: Object.keys(openingHours).length > 0 ? openingHours : undefined,
       };
-      const savedBranch = await onSave(input);
-
-      if (!isSelf) {
-        try {
-          const mappings = [...categoryMap.entries()].map(([categoryId, subcategoryIds]) => ({ categoryId, subcategoryIds: [...subcategoryIds] }));
-          await setBranchCategoryAccess(token, vendorId, savedBranch.id, { mappings });
-          onCategoryAccessSaved?.();
-        } catch (categoryErr) {
-          // The branch itself already saved successfully above — never leave the admin unsure
-          // whether that part worked, and never silently drop the category data either.
-          const message = categoryErr instanceof ApiRequestError ? categoryErr.message : 'Could not save categories.';
-          const combined = `Branch saved, but categories could not be saved: ${message}`;
-          setError(combined);
-          showSnackbar(combined, { variant: 'error' });
-          return; // keep the dialog open so the admin can retry the category save
-        }
-      }
+      await onSave(input);
 
       showSnackbar(branch ? 'Branch updated successfully.' : 'Branch created successfully.', { variant: 'success' });
       dialogRef.current?.close();
@@ -766,53 +612,11 @@ export function BranchDialog({
 
           <OpeningHoursEditor value={openingHours} onChange={setOpeningHours} />
 
-          {!isSelf && (
-            <>
-              <h3 className="section-title">Categories &amp; Subcategories</h3>
-              {categoriesLoading ? (
-                <p className="loading-state">Loading categories…</p>
-              ) : categoriesError ? (
-                <p className="error-state" role="alert">{categoriesError}</p>
-              ) : topLevelCategories.length === 0 ? (
-                <p className="empty-state">No active Service or Therapy categories exist in Category Master yet.</p>
-              ) : (
-                <div className="category-grant-grid">
-                  {topLevelCategories.map((category) => {
-                    const subcategoryOptions = flatCategories.filter((c) => c.parentId === category.id);
-                    const checked = categoryMap.has(category.id);
-                    return (
-                      <div className="category-grant-grid__group" key={category.id}>
-                        <label className="category-grant-grid__option">
-                          <input type="checkbox" checked={checked} onChange={() => toggleCategory(category.id)} />
-                          {category.name}
-                        </label>
-                        {checked && subcategoryOptions.length > 0 && (
-                          <div className="category-grant-grid__subgroup">
-                            {subcategoryOptions.map((sub) => (
-                              <label key={sub.id} className="category-grant-grid__option category-grant-grid__option--indented">
-                                <input
-                                  type="checkbox"
-                                  checked={categoryMap.get(category.id)?.has(sub.id) ?? false}
-                                  onChange={() => toggleSubcategory(category.id, sub.id)}
-                                />
-                                {sub.name}
-                              </label>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </>
-          )}
-
           {error && <p className="error-state" role="alert">{error}</p>}
         </div>
         <div slot="actions">
           <TextButton onClick={() => dialogRef.current?.close()}>Cancel</TextButton>
-          <FilledButton onClick={submit} disabled={submitting || categoriesLoading}>{submitting ? 'Saving…' : 'Save'}</FilledButton>
+          <FilledButton onClick={submit} disabled={submitting}>{submitting ? 'Saving…' : 'Save'}</FilledButton>
         </div>
       </Dialog>
     </>

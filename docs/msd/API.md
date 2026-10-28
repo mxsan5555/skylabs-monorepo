@@ -164,8 +164,6 @@ Planned: `GET /rbac/bootstrap` adds `scopes`; role create, clone and delete retu
 | GET | `/api/v1/vendors/:vendorId/branches` | `vendors.branches:view` |
 | POST | `/api/v1/vendors/:vendorId/branches` | `vendors.branches:create` |
 | PATCH | `/api/v1/vendors/:vendorId/branches/:branchId` | `vendors.branches:edit` |
-| GET | `/api/v1/vendors/:vendorId/branches/:branchId/category-access` | `vendors.branches:view` |
-| PUT | `/api/v1/vendors/:vendorId/branches/:branchId/category-access` | `vendors.branches:edit` |
 | GET | `/api/v1/vendors/:vendorId/branches/:branchId/deals` | `vendors.deals:view` |
 | POST | `/api/v1/vendors/:vendorId/branches/:branchId/deals` | `vendors.deals:create` |
 | GET | `/api/v1/vendors/:vendorId/branches/:branchId/deals/:dealId` | `vendors.deals:view` |
@@ -177,8 +175,6 @@ Planned: `GET /rbac/bootstrap` adds `scopes`; role create, clone and delete retu
 | PATCH | `/api/v1/vendors/:vendorId/branches/:branchId/deals/:dealId/status` | `vendors.deals:status_change` |
 | PATCH | `/api/v1/vendors/:vendorId/branches/:branchId/status` | `vendors.branches:status_change` |
 | POST | `/api/v1/vendors/:vendorId/branches/:branchId/therapists` | `vendors.therapists:create` |
-| GET | `/api/v1/vendors/:vendorId/category-access` | `members:view` |
-| PUT | `/api/v1/vendors/:vendorId/category-access` | `members:edit` |
 | GET | `/api/v1/vendors/:vendorId/customers` | `members:view` |
 | GET | `/api/v1/vendors/:vendorId/deals` | `vendors.deals:view` |
 | GET | `/api/v1/vendors/:vendorId/products` | `vendors.products:view` |
@@ -210,7 +206,6 @@ Planned: `GET /rbac/bootstrap` adds `scopes`; role create, clone and delete retu
 | GET | `/api/v1/vendors/me/branches` | `members:custom` |
 | POST | `/api/v1/vendors/me/branches` | `members:custom` |
 | PATCH | `/api/v1/vendors/me/branches/:branchId` | `members:custom` |
-| GET | `/api/v1/vendors/me/branches/:branchId/category-access` | `members:custom` |
 | GET | `/api/v1/vendors/me/deals` | `members:custom` |
 | GET | `/api/v1/vendors/me/branches/:branchId/deals` | `members:custom` |
 | GET | `/api/v1/vendors/me/branches/:branchId/deals/:dealId` | `members:custom` |
@@ -229,8 +224,6 @@ Planned: `GET /rbac/bootstrap` adds `scopes`; role create, clone and delete retu
 | PATCH | `/api/v1/vendors/me/branches/:branchId/status` | `members:custom` |
 | GET | `/api/v1/vendors/me/branches/:branchId/therapists` | `members:custom` |
 | POST | `/api/v1/vendors/me/branches/:branchId/therapists` | `members:custom` |
-| GET | `/api/v1/vendors/me/category-access` | `members:custom` |
-| PUT | `/api/v1/vendors/me/category-access` | `members:custom` |
 | GET | `/api/v1/vendors/me/customers` | `members:custom` |
 | POST | `/api/v1/vendors/me/images` | `members:custom` |
 | DELETE | `/api/v1/vendors/me/images/:imageId` | `members:custom` |
@@ -269,14 +262,20 @@ Planned: `GET /rbac/bootstrap` adds `scopes`; role create, clone and delete retu
 | GET | `/api/v1/vendors/users/lookup` | `members:create|edit` |
 | GET | `/api/v1/vendors/users/search` | `members:create|edit` |
 
+Category grants are retired (D10, C-12, P4-15, 2026-10-27): the seven `.../category-access` routes
+(`/me`, `/me/branches/:branchId`, `/:vendorId`, `/:vendorId/branches/:branchId`, read and write)
+return 404; the branch list no longer carries `categoryTypes`; `GET /vendors/categories` returns the
+same active categories for every member and ignores `vendorId`. Member dashboard `categories` and
+`subCategories` count the categories the member uses on its deals, products and therapists.
+
 `/vendors/...` paths that mirror `/members/...` are deprecated aliases (`Deprecation` and `Link`
 headers) kept for one release (R7, D16). `/vendors/me/*` is member self-service and
 `/vendors/:vendorId/*` is staff working on a member's catalog until the flat routes exist.
 
 ### 2.1 Request fields (catalog objects)
 
-Branch (`BranchCreate`): `name` 1 to 150 required; `address`, `city`, `country`; `state` (to become
-required with an allowlist, C-03); `pincode`; `mapLocationUrl` (resolved to latitude and longitude
+Branch (`BranchCreate`): `name` 1 to 150 required; `address`, `country`; `state` and `city` required
+from the India location list (C-03, columns `NOT NULL` since S22); `pincode`; `mapLocationUrl` (resolved to latitude and longitude
 on the server); `phone`, `email`; `openingHours` per weekday `{open, start, end}`; status via
 `PATCH .../status {isActive}`.
 

@@ -899,18 +899,11 @@ a.dashboard-stat:focus-visible {
   color: var(--md-sys-color-on-primary);
 }
 
-/* Category Access grant grid (vendor-wizard-modules.tsx) — one checkbox list per enabled
-   business module. */
+/* Checkbox grid for the console forms (e.g. the deal form's therapist picker). */
 .category-grant-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
-}
-
-.category-grant-grid__group {
-  border-radius: 12px;
-  background-color: var(--md-sys-color-surface-container, #eef1f6);
-  padding: 12px 16px;
 }
 
 .category-grant-grid__option {
@@ -918,18 +911,6 @@ a.dashboard-stat:focus-visible {
   align-items: center;
   gap: 8px;
   min-height: 44px;
-}
-
-/* Branch-level Category → Subcategory tree (branch-category-access-dialog.tsx) — subcategories
-   nest under their parent category's checkbox, indented rather than in their own grid group. */
-.category-grant-grid__subgroup {
-  display: flex;
-  flex-direction: column;
-  margin-left: 24px;
-}
-
-.category-grant-grid__option--indented {
-  min-height: 40px;
 }
 
 /* Deal form (pages/account/members/deal-form-page.tsx, PLANNING §2.7): short text lists,

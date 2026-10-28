@@ -45,7 +45,7 @@ Known failures at 2026-10-18 (msd recounted 2026-10-27: `india-locations` moved 
 | Project | Failing | Where |
 |---|---|---|
 | msd | 19 tests in 11 files | `permission-matrix` 9, `contact-us` 2, and 1 each in `app.spec`, `widget-registry`, `deal-card`, `media-uploader`, `site-footer`, `wishlist`, `roles`, `settings`; `entry-server.test.tsx` fails to load (`sky-product-card-wc` fixed 2026-10-24). Regressions since commit e756759 (NewOfferCard), not yet fixed: `home` 4 (FAQ section no longer rendered, deal favourite), `category` 1 (product wishlist heart) |
-| msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; the other 1,163 pass) |
+| msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; recounted 2026-10-27: 1,245 pass) |
 | shared-menu | 5 | `index.test.ts` |
 
 Lint and type drift: 30 msd lint errors (`import/first` and `no-empty-function` in older tests), an ESLint ignore error in the shared packages, and
@@ -116,6 +116,21 @@ mapPopularTag" (both pass alone).
     404 on another member's deal, package, image or FAQ.
   - Copy to branch: copy is Draft at the target branch with the same packages and FAQs, no
     media, no therapists; a target branch of another member returns 404.
+- Categories open to every member (D10, P4-15; `vendors.routes.test.ts` "Category grant routes are
+  retired", `category.service.test.ts`, `categories.routes.test.ts`, `branch-form-page.test.tsx`,
+  `vendor-branches.test.tsx`, `therapist-form-page.test.tsx`):
+  - Each of the seven `.../category-access` routes returns 404 and writes nothing, even with every
+    permission.
+  - `GET /vendors/categories` returns the same list for every member, ignores `vendorId`, and
+    reads no grant; the branch list has no `categoryTypes`.
+  - Deleting a category no deal or product uses succeeds even when old grant rows point at it.
+  - Branch forms (page and dialog) have no category section and save the branch fields only.
+  - The therapist form offers every branch of the member and every active top-level Therapy
+    category.
+- Branch location columns (DL-02, S22): `npm run msd-api:prisma:report-branch-locations` lists
+  branches whose state or city isn't in the India list and exits 1 when any exist; the
+  `20261027100000_branch_location_required` migration stops with a clear message when a branch
+  has no state or city, and otherwise sets both `NOT NULL`.
 
 ### 4.3 Customers and orders
 

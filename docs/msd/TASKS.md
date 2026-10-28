@@ -38,7 +38,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | # | Module | Done | Total | % |
 |---|---|---|---|---|
 | 1 | Admin and staff | 2 | 31 | 6 |
-| 2 | Members | 45 | 101 | 45 |
+| 2 | Members | 47 | 101 | 47 |
 | 3 | Customers and orders | 2 | 12 | 17 |
 | 4 | Storefront | 16 | 42 | 38 |
 | 5 | Static content | 0 | 5 | 0 |
@@ -49,7 +49,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
 | 12 | Platform, security and release | 7 | 69 | 10 |
-| | **Total** | **83** | **289** | **29** |
+| | **Total** | **85** | **289** | **29** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -134,7 +134,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | P4-11 | BE | Cross-resource ownership validators (branch to member, therapist to branch, category access) in one shared service | M | P4-02 | Unit tests |
 | [ ] | P4-13 | BE | Grant `members:view` and `members:edit` with own scope to role `member`, then retire `members:custom` | M | P4-01 | Member reads and edits only their own record; `members:custom` gone from the seed |
 | [x] | P4-14 | BE | Product category without per-member grants (D10, C-07, C-12 for products): `createProduct` and `updateProduct` check only active `PRODUCT` type and subcategory parentage | S | - | Member with no `VendorCategoryAccess` row creates a product; a `SERVICE` category is rejected; tests |
-| [ ] | P4-15 | BE | Finish C-12 for deals and therapists: drop vendor and branch category grant checks, retire the `PUT .../category-access` routes and the onboarding grant step | M | P4-14 | Deal and therapist create work with no grants; grant routes return 404; tests; partly 2026-10-27: deal and therapist create/update check only the category type; grant routes and onboarding step not retired |
+| [x] | P4-15 | BE | Finish C-12 for deals and therapists: drop vendor and branch category grant checks, retire the `PUT .../category-access` routes and the onboarding grant step | M | P4-14 | Deal and therapist create work with no grants; grant routes return 404; tests; done 2026-10-27: no grant checks or grant routes (404), branch and therapist forms have no grant step, dashboard counts used categories; grant tables and `offers*` flags dropped in the contract step |
 | [ ] | P4-16 | BE | Member customers view (C-16, D9, D19): `GET /customers` own scope, customers with an order item from the member, name, city, order count, last order date | S | P4-01 | Member sees only own customers; no phone or email unless an order is open |
 | [ ] | P5-01 | DB | `MemberDocument` migration: status, masked number, hash, reviewer, expiry, uploader fields | M | P3-01 | Up and down tested; partly: columns in the migration; up and down rehearsal open (P10-45) |
 | [ ] | P5-02 | DB | Copy legacy GST, PAN and `kycDocuments` into `MemberDocument`; verify counts | M | P5-01 | Count and checksum report; partly: existing `VendorDocument` rows become SUBMITTED; legacy GST, PAN and `kycDocuments` columns not copied yet |
@@ -188,7 +188,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | P10-49 | FE | Member detail page shows total customers and total orders (counts linking to the filtered lists) | S | P4-16 | Counts match the lists; support sees counts only |
 | [ ] | P5-16 | SEC | Switch `STORE_FULL_DOCUMENT_NUMBER` (default true in development): when false, write only the masked number and hash; production boot warns while it is true (D3) | S | P2-13 | Both modes tested; no full number stored when false |
 | [ ] | DL-01 | DB | Deal schema S18 to S21 and backfill S23 (PLANNING §2.7, DATABASE §2) with `down.sql` | M | owner approval of §2.7 | Migration up and down on a Neon copy; counts of backfilled rows recorded; partly 2026-10-27: migration `20261026100000_deal_page_fields` + `down.sql` written, client generated, applied locally 2026-10-27 (empty `migrate diff`, 38 deals backfilled); Neon rehearsal open |
-| [ ] | DL-02 | SH | India location list to `packages/shared-utils`; branch `state` and `city` required from it, `addressLine2` (C-03, S22) | M | - | Unknown state or city returns 422; msd form and API use the one list; report of existing bad rows; partly 2026-10-27: list in `@skylabs-monorepo/shared-utils`, API and both branch forms require state + city, `addressLine2` added; bad-row report open |
+| [x] | DL-02 | SH | India location list to `packages/shared-utils`; branch `state` and `city` required from it, `addressLine2` (C-03, S22) | M | - | Unknown state or city returns 422; msd form and API use the one list; report of existing bad rows; partly 2026-10-27: list in `@skylabs-monorepo/shared-utils`, API and both branch forms require state + city, `addressLine2` added; done 2026-10-27: report script `npm run msd-api:prisma:report-branch-locations` (0 bad rows locally), `state`/`city` `NOT NULL` migration; Neon run with DL-01 |
 | [x] | DL-03 | BE | Deal create/update `.strict()` schemas, slug rule, server-derived prices (C-04, C-05), single-deal GET, Active readiness check, Super Admin-only delete, seed grants per §2.7 matrix (C-18) | L | DL-01, P3-15 | TESTING §4.2 deal cases green; done 2026-10-27 |
 | [x] | DL-04 | BE | Package routes: add, edit, delete, reorder (staff and `/me`) | M | DL-03 | 409 rules tested; done 2026-10-27 |
 | [x] | DL-05 | BE | Staff deal media routes and image alt text | S | DL-01 | Staff upload, reorder, alt text; member route unchanged; done 2026-10-27 |

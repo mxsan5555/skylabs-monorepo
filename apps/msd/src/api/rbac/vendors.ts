@@ -1,4 +1,4 @@
-import { apiGet, apiPatch, apiPost, apiPut, apiDelete, apiPostForm } from './client';
+import { apiGet, apiPatch, apiPost, apiDelete, apiPostForm } from './client';
 import type { MediaImage, MediaVideo } from '../media';
 
 export type VendorStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'ARCHIVED';
@@ -111,8 +111,8 @@ export interface Vendor extends Omit<VendorFields, 'businessName'> {
   createdByUserId: string | null;
   createdAt: string;
   updatedAt: string;
-  /** Business modules — bound to the onboarding wizard's Step 2 checkboxes; each `true` module
-   *  must be backed by at least one `VendorCategoryAccess` grant of the matching `type`. */
+  /** Dormant business-module flags (D10: categories are open to every member); nothing reads
+   *  them. Dropped with the grant tables in the contract phase. */
   offersService: boolean;
   offersProduct: boolean;
   offersTherapy: boolean;
@@ -218,11 +218,6 @@ export interface Branch {
   createdAt: string;
   updatedAt: string;
   _count?: { deals: number };
-  /** The distinct `CategoryType`s this branch currently has ANY `BranchCategoryAccess` grant
-   *  for (e.g. `['THERAPY']`) — lets the Add Therapist/Deal branch pickers filter to branches
-   *  currently eligible for a module, computed server-side in the same query as the rest of this
-   *  list (see msd-api's `vendor.service.ts#listBranches`), never a separate per-branch fetch. */
-  categoryTypes: CategoryType[];
   /** Only present on the cross-vendor `GET /vendors/branches` sidebar listing. */
   vendor?: { id: string; businessName: string | null };
 }
@@ -255,24 +250,6 @@ export interface Category {
   /** Only ever set on a top-level row (`parentId: null`) — a subcategory inherits its parent's
    *  type by join, never duplicated here (see msd-api's `category.service.ts`). */
   type?: CategoryType | null;
-}
-
-/** A vendor's direct grant of access to one top-level Category — see msd-api's
- *  `VendorCategoryAccess` model doc comment. Granting a top-level category implicitly grants
- *  every one of its active subcategories, so only top-level rows ever appear here. */
-export interface VendorCategoryAccessRow {
-  id: string;
-  vendorId: string;
-  categoryId: string;
-  createdAt: string;
-  category: Category;
-}
-
-export interface VendorModulesAndCategoryAccessInput {
-  offersService: boolean;
-  offersProduct: boolean;
-  offersTherapy: boolean;
-  categoryIds: string[];
 }
 
 export type DealCancellationPolicy = 'FREE_24H' | 'FREE_48H' | 'NON_REFUNDABLE';
@@ -529,41 +506,6 @@ export function setBranchStatus(token: string | null, vendorId: string, branchId
   return apiPatch<Branch>(`/vendors/${vendorId}/branches/${branchId}/status`, token, { isActive });
 }
 
-/** A branch's own category/subcategory access map — narrows the vendor-level
- *  `VendorCategoryAccess` grants (see that interface's own doc comment): each `categoryId` here
- *  must be a top-level category the vendor already holds, and each `subcategories` entry a real
- *  child of that category explicitly enabled for this branch. Mirrors msd-api's
- *  `BranchCategoryAccess`/`BranchSubcategoryAccess` include shape exactly (`getBranchCategoryAccess`
- *  in `vendor.service.ts`). */
-export interface BranchCategoryAccessRow {
-  id: string;
-  branchId: string;
-  categoryId: string;
-  createdAt: string;
-  category: Category;
-  subcategories: { id: string; subcategoryId: string; subcategory: Category }[];
-}
-
-export interface BranchCategoryAccessInput {
-  mappings: { categoryId: string; subcategoryIds: string[] }[];
-}
-
-export function getBranchCategoryAccess(token: string | null, vendorId: string, branchId: string) {
-  return apiGet<BranchCategoryAccessRow[]>(`/vendors/${vendorId}/branches/${branchId}/category-access`, token);
-}
-
-export function setBranchCategoryAccess(token: string | null, vendorId: string, branchId: string, input: BranchCategoryAccessInput) {
-  return apiPut<BranchCategoryAccessRow[]>(`/vendors/${vendorId}/branches/${branchId}/category-access`, token, input);
-}
-
-/** Self-service read mirror of `getBranchCategoryAccess` — a vendor owner has no `vendors:view`,
- *  only `vendors:custom`, so `DealDialog`'s branch-scoped Category/Subcategory pickers must call
- *  this on the `isSelf` surface instead of the admin-scoped function above. Read-only: branch
- *  category mapping is only ever edited by an admin in Step 2 of the onboarding wizard. */
-export function getMyBranchCategoryAccess(token: string | null, branchId: string) {
-  return apiGet<BranchCategoryAccessRow[]>(`/vendors/me/branches/${branchId}/category-access`, token);
-}
-
 export function listDeals(token: string | null, vendorId: string, branchId: string) {
   return apiGet<Deal[]>(`/vendors/${vendorId}/branches/${branchId}/deals`, token);
 }
@@ -805,34 +747,10 @@ export function deleteTherapistPackage(token: string | null, therapistId: string
 
 // ─── Reference lookups ────────────────────────────────────────────────────────
 
-/**
- * The lean, active-only category lookup every vendor-facing category dropdown uses (Deal/
- * Product/Therapist create, the onboarding wizard's category-grant step). `type` alone (no
- * `vendorId`) is the "grant categories" screen — every active category of that module,
- * regardless of what's granted yet. `vendorId` additionally scopes to only categories this
- * vendor currently holds a `VendorCategoryAccess` grant for (plus their active children) — use
- * this everywhere a vendor picks a category to create against, once grants already exist.
- */
-export function listCategories(token: string | null, opts: { type?: CategoryType; vendorId?: string } = {}) {
+/** Active categories for the vendor-facing dropdowns (deal, product, therapist). `type` filters
+ *  by module; every member sees the same list (D10: no category grants). */
+export function listCategories(token: string | null, opts: { type?: CategoryType } = {}) {
   return apiGet<Category[]>(`/vendors/categories${toQuery(opts)}`, token);
-}
-
-// ─── Business modules + Category access (onboarding wizard Step 2) ──────────
-
-export function getMyVendorCategoryAccess(token: string | null) {
-  return apiGet<VendorCategoryAccessRow[]>('/vendors/me/category-access', token);
-}
-
-export function setMyVendorModulesAndCategoryAccess(token: string | null, input: VendorModulesAndCategoryAccessInput) {
-  return apiPut<VendorCategoryAccessRow[]>('/vendors/me/category-access', token, input);
-}
-
-export function getVendorCategoryAccess(token: string | null, vendorId: string) {
-  return apiGet<VendorCategoryAccessRow[]>(`/vendors/${vendorId}/category-access`, token);
-}
-
-export function setVendorModulesAndCategoryAccess(token: string | null, vendorId: string, input: VendorModulesAndCategoryAccessInput) {
-  return apiPut<VendorCategoryAccessRow[]>(`/vendors/${vendorId}/category-access`, token, input);
 }
 
 // ─── Product (vendor-owned catalog — self-service + admin-on-behalf, mirrors Branch/Deal) ───

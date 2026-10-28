@@ -242,23 +242,6 @@ export const MemberDocumentReviewSchema = z
   .strict()
   .openapi('MemberDocumentReview');
 
-/**
- * Onboarding wizard Step 2's "Business Modules + Category Access" save — replace-the-full-set
- * semantics (same shape as rbac.schema.ts's RolePermissionsUpdateSchema). Each `categoryIds`
- * entry must be a top-level category whose `type` matches one of the *true* module flags below
- * (validated server-side in vendor.service.ts#setVendorModulesAndCategoryAccess — a module
- * checked with zero granted categories is a valid intermediate state, e.g. mid-wizard, but the
- * Step 6 submission gate requires >=1 category per enabled module).
- */
-export const VendorModulesAndCategoryAccessSchema = z
-  .object({
-    offersService: z.boolean(),
-    offersProduct: z.boolean(),
-    offersTherapy: z.boolean(),
-    categoryIds: z.array(z.string().uuid()).default([]),
-  })
-  .openapi('VendorModulesAndCategoryAccess');
-
 // ─── Branch ──────────────────────────────────────────────────────────────────
 
 /** Route param for the admin-scoped `/:vendorId/branches/:branchId/...` sub-resources — same
@@ -333,27 +316,6 @@ export const BranchUpdateSchema = BranchFieldsSchema.partial()
   .refine((b) => b.state === undefined || b.city === undefined || isIndiaLocation(b.state, b.city), { message: LOCATION_MESSAGE, path: ['city'] })
   .openapi('BranchUpdate');
 export const BranchStatusUpdateSchema = z.object({ isActive: z.boolean() }).openapi('BranchStatusUpdate');
-
-/**
- * A branch's own category/subcategory access map — replace-the-full-set semantics (same shape as
- * `VendorModulesAndCategoryAccessSchema` above). Each `categoryId` must be a top-level category
- * the VENDOR already holds via `VendorCategoryAccess` (a branch can only narrow the vendor's
- * grants, never exceed them); each `subcategoryIds` entry must be a real child of that
- * `categoryId` (validated server-side in vendor.service.ts#setBranchCategoryAccess). An empty
- * `subcategoryIds` array means the branch offers the category's top level with none of its
- * subcategories explicitly enabled yet — see BranchSubcategoryAccess's own schema doc comment for
- * why subcategory access is always explicit, never implied.
- */
-export const BranchCategoryAccessInputSchema = z
-  .object({
-    mappings: z.array(
-      z.object({
-        categoryId: z.string().uuid(),
-        subcategoryIds: z.array(z.string().uuid()).default([]),
-      }),
-    ),
-  })
-  .openapi('BranchCategoryAccessInput');
 
 // ─── Therapist ───────────────────────────────────────────────────────────────
 

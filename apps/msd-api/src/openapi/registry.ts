@@ -46,8 +46,6 @@ import {
   TherapistStatusUpdateSchema,
   TherapistPackageCreateSchema,
   TherapistPackageUpdateSchema,
-  VendorModulesAndCategoryAccessSchema,
-  BranchCategoryAccessInputSchema,
 } from '../schemas/vendor.schema';
 import { CategoryCreateSchema, CategoryUpdateSchema, CategoryStatusUpdateSchema } from '../schemas/category.schema';
 import {
@@ -1404,83 +1402,6 @@ export function buildOpenApiDocument() {
       responses: { 200: { description: 'Deleted' }, 403: errorResponse, 404: errorResponse },
     });
   }
-
-  // ─── Vendor business modules + Category access (onboarding wizard Step 2) ───────────────────
-
-  registry.registerPath({
-    method: 'get',
-    path: '/vendors/me/category-access',
-    summary: "The caller's own vendor's granted top-level categories",
-    tags: ['Vendors - Self-service'],
-    security: bearer,
-    responses: { 200: { description: 'Grants' } },
-  });
-
-  registry.registerPath({
-    method: 'put',
-    path: '/vendors/me/category-access',
-    summary: "Replace the caller's own vendor's business modules + granted top-level categories",
-    tags: ['Vendors - Self-service'],
-    security: bearer,
-    request: { body: { content: { 'application/json': { schema: VendorModulesAndCategoryAccessSchema } } } },
-    responses: { 200: { description: 'Updated' }, 422: errorResponse },
-  });
-
-  registry.registerPath({
-    method: 'get',
-    path: '/vendors/me/branches/{branchId}/category-access',
-    summary: "A branch's own category/subcategory access map, for the caller's own vendor (read-only)",
-    tags: ['Vendors - Self-service'],
-    security: bearer,
-    request: { params: z.object({ branchId: z.string().uuid() }) },
-    responses: { 200: { description: 'Branch category access' }, 404: errorResponse },
-  });
-
-  registry.registerPath({
-    method: 'get',
-    path: '/vendors/{vendorId}/category-access',
-    summary: "A vendor's granted top-level categories (admin)",
-    tags: ['Vendors - Admin'],
-    security: bearer,
-    request: { params: z.object({ vendorId: z.string().uuid() }) },
-    responses: { 200: { description: 'Grants' } },
-  });
-
-  registry.registerPath({
-    method: 'put',
-    path: '/vendors/{vendorId}/category-access',
-    summary: "Replace a vendor's business modules + granted top-level categories (admin)",
-    tags: ['Vendors - Admin'],
-    security: bearer,
-    request: {
-      params: z.object({ vendorId: z.string().uuid() }),
-      body: { content: { 'application/json': { schema: VendorModulesAndCategoryAccessSchema } } },
-    },
-    responses: { 200: { description: 'Updated' }, 422: errorResponse },
-  });
-
-  registry.registerPath({
-    method: 'get',
-    path: '/vendors/{vendorId}/branches/{branchId}/category-access',
-    summary: "A branch's own category/subcategory access map (narrows the vendor's grants)",
-    tags: ['Vendors - Admin'],
-    security: bearer,
-    request: { params: z.object({ vendorId: z.string().uuid(), branchId: z.string().uuid() }) },
-    responses: { 200: { description: 'Grants' } },
-  });
-
-  registry.registerPath({
-    method: 'put',
-    path: '/vendors/{vendorId}/branches/{branchId}/category-access',
-    summary: "Replace a branch's category/subcategory access map",
-    tags: ['Vendors - Admin'],
-    security: bearer,
-    request: {
-      params: z.object({ vendorId: z.string().uuid(), branchId: z.string().uuid() }),
-      body: { content: { 'application/json': { schema: BranchCategoryAccessInputSchema } } },
-    },
-    responses: { 200: { description: 'Updated' }, 422: errorResponse },
-  });
 
   // ─── Public customer catalogue (no auth) ──────────────────────────────────────
 

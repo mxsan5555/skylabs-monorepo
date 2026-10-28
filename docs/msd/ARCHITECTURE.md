@@ -103,7 +103,7 @@ list and form pages. Status labels, tones and the review flag copy live once in 
 |---|---|---|---|
 | C-01 | Member can delete own product | Remove `DELETE /vendors/me/products/:id` | open |
 | C-02 | Deal approval gate | Create deals `approvalStatus=APPROVED`, member publishes with status ACTIVE, stop `DEAL_PENDING_APPROVAL`, remove approval from visibility, home hero and promotions; migrate PENDING rows | done 2026-10-27 (P3-15); column dropped in the contract step |
-| C-03 | Branch `state` optional free text | `state` and `city` required on create, from one India location list moved from `apps/msd/src/data/india-locations.ts` to `packages/shared-utils` (`india-locations`) so the form and the API allowlist can't drift | done 2026-10-27 (DL-02; bad-row report open) |
+| C-03 | Branch `state` optional free text | `state` and `city` required on create, from one India location list moved from `apps/msd/src/data/india-locations.ts` to `packages/shared-utils` (`india-locations`) so the form and the API allowlist can't drift | done 2026-10-27 (DL-02: report script, columns `NOT NULL`) |
 | C-04 | `slug` required from the client | Optional; generate `{title}-{member}-{city}` with a numeric suffix on conflict; fixed once Active, old slugs kept (PLANNING §2.7) | done 2026-10-27 (DL-03) |
 | C-05 | Discount accepted from the client | Compute from the cheapest active package; prices, discount and duration refused as input | done 2026-10-27 (DL-03) |
 | C-06 | `vendors:custom` and `vendors.*` keys | `<resource>:<action>` plus scope | open (P1-05, P4) |
@@ -111,7 +111,7 @@ list and form pages. Status labels, tones and the review flag copy live once in 
 | C-08 | No branch delete | `DELETE /branches/:id`, Super Admin only, 409 on FK conflict | open |
 | C-09 | Flat catalog routes | `/branches`, `/deals`, `/therapists`, `/products` over the existing services; nested routes become aliases | open |
 | C-11 | Member self-registration and `/me/submit` | Removed; members are created Active with `documentsDueAt` | done (P3-21) |
-| C-12 | Category grants for deals and therapists | Stop the vendor and branch grant checks, retire `PUT .../category-access` | partly 2026-10-27: deals and therapists check only the category type; `PUT .../category-access` routes still live (P4-15) |
+| C-12 | Category grants for deals and therapists | Stop the vendor and branch grant checks, retire `PUT .../category-access` | done 2026-10-27 (P4-15): no grant checks anywhere, the seven `category-access` routes return 404, branch and therapist forms have no grant step; grant tables dropped in the contract step |
 | C-13 | Member edits while inactive | `blockWhenReadOnly` | done (P2-04) |
 | C-14 | Branch phone format | Reuse the member phone rule | open |
 | C-15 | Rich text storage | Sanitize HTML on write (`lib/sanitize-html.ts` allowlist), plain-text copy for search, meta and JSON-LD, length measured on plain text | open |

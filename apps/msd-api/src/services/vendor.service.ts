@@ -5,7 +5,7 @@ import { ApiError } from '../lib/http';
 import { ensureUniqueSlug } from '../lib/slug';
 import { resolveGoogleMapsLocation } from '../providers/maps/googleMapsUrlResolver.provider';
 import { assignRole, serializeUser } from './user.service';
-import { listActiveCategories, assertCategoryChildOf, assertCategoryOfType } from './category.service';
+import { listActiveCategories, assertCategoryOfType } from './category.service';
 import { getProductScopedOrThrow } from './product.service';
 import * as mediaService from './media.service';
 import type { MediaFile } from './media.service';
@@ -15,7 +15,6 @@ import { sendMemberNotice } from './member-notice.service';
 import { ROLE_KEYS } from '../lib/role-keys';
 import {
   Prisma,
-  type CategoryType,
   type MemberStatus,
   type MemberDocumentStatus,
   type KycStatus,
@@ -27,7 +26,6 @@ import type {
   VendorSelfUpdateSchema,
   BranchCreateSchema,
   BranchUpdateSchema,
-  BranchCategoryAccessInputSchema,
   TherapistCreateSchema,
   TherapistUpdateSchema,
   TherapistPackageCreateSchema,
@@ -40,7 +38,6 @@ type MemberCreateInput = z.infer<typeof MemberCreateSchema>;
 type VendorSelfUpdateInput = z.infer<typeof VendorSelfUpdateSchema>;
 type BranchCreateInput = z.infer<typeof BranchCreateSchema>;
 type BranchUpdateInput = z.infer<typeof BranchUpdateSchema>;
-type BranchCategoryAccessInput = z.infer<typeof BranchCategoryAccessInputSchema>;
 type TherapistCreateInput = z.infer<typeof TherapistCreateSchema>;
 type TherapistUpdateInput = z.infer<typeof TherapistUpdateSchema>;
 type TherapistPackageCreateInput = z.infer<typeof TherapistPackageCreateSchema>;
@@ -687,27 +684,14 @@ export async function listAllTherapists(opts: { page: number; pageSize: number; 
 
 // ─── Branch (shared by admin `:vendorId` path and self-derived vendorId) ─────
 
-/**
- * `categoryTypes` — the distinct `CategoryType`s this branch currently has ANY `BranchCategoryAccess`
- * grant for (e.g. `['THERAPY']`) — lets a caller (the Add Therapist/Deal forms' branch picker)
- * know which branches are currently eligible for a given module WITHOUT a separate
- * `getBranchCategoryAccess` round-trip per branch. Computed from the same single query as the
- * rest of this response (`include`, not a follow-up call), so listing N branches is still exactly
- * one query — never N+1 — regardless of how many categories each branch has mapped.
- */
+/** Every branch of a member, newest first, with its deal count. Any branch can hold deals and
+ *  therapists of any active category (D10: no category grants). */
 export async function listBranches(vendorId: string) {
-  const branches = await prisma.branch.findMany({
+  return prisma.branch.findMany({
     where: { vendorId },
     orderBy: { createdAt: 'desc' },
-    include: {
-      _count: { select: { deals: true } },
-      categoryAccess: { select: { category: { select: { type: true } } } },
-    },
+    include: { _count: { select: { deals: true } } },
   });
-  return branches.map(({ categoryAccess, ...branch }) => ({
-    ...branch,
-    categoryTypes: [...new Set(categoryAccess.map((a) => a.category.type).filter((t): t is CategoryType => t !== null))],
-  }));
 }
 
 /** 404 if the branch doesn't exist at all; 403 if it exists but belongs to a different vendor. */
@@ -736,93 +720,6 @@ export async function updateBranch(vendorId: string, branchId: string, input: Br
 export async function setBranchStatus(vendorId: string, branchId: string, isActive: boolean) {
   await getBranchScopedOrThrow(vendorId, branchId);
   return prisma.branch.update({ where: { id: branchId }, data: { isActive } });
-}
-
-// ─── Branch category access (narrows the vendor's own VendorCategoryAccess grants — see
-// BranchCategoryAccess/BranchSubcategoryAccess's own schema doc comments) ────────────────────
-
-export async function getBranchCategoryAccess(vendorId: string, branchId: string) {
-  await getBranchScopedOrThrow(vendorId, branchId);
-  return prisma.branchCategoryAccess.findMany({
-    where: { branchId },
-    include: { category: true, subcategories: { include: { subcategory: true } } },
-  });
-}
-
-/**
- * Replace-the-full-set pattern (same shape as `setVendorModulesAndCategoryAccess` above) — each
- * `categoryId` must be a top-level SERVICE/THERAPY category, and each `subcategoryIds` entry must
- * be a real child of that `categoryId` (`assertCategoryChildOf`).
- *
- * Unlike the original design, this no longer requires the vendor to already hold a
- * `VendorCategoryAccess` grant for the category — Step 2's separate "Business Modules + Category
- * Access" screen for Service/Therapy was removed (category/subcategory access for those two
- * modules is now managed entirely from the branch), so this is the only place left that grants
- * them. A category with no existing vendor-level grant gets one created here automatically
- * (`offersService`/`offersTherapy` flipped to `true` as needed) in the same transaction, rather
- * than rejecting the save — see `category.type` below. Never auto-*revokes* on removal: unmapping
- * a category from one branch must never invalidate an existing Deal/Therapist at a different
- * branch still relying on that same vendor-level grant (`assertVendorHasCategoryAccess`) or flip a
- * module flag back off under a vendor's feet. Product is unaffected — it still only ever goes
- * through the explicit `setVendorModulesAndCategoryAccess` grant, since Product has no branch
- * scoping and never flows through this function.
- */
-export async function setBranchCategoryAccess(vendorId: string, branchId: string, input: BranchCategoryAccessInput) {
-  await getBranchScopedOrThrow(vendorId, branchId);
-
-  const categoriesById = new Map<string, { id: string; name: string; type: CategoryType | null }>();
-  for (const mapping of input.mappings) {
-    const category = await prisma.category.findUnique({ where: { id: mapping.categoryId } });
-    if (!category) throw new ApiError('VALIDATION_ERROR', 'categoryId does not exist');
-    if (category.parentId !== null) {
-      throw new ApiError('VALIDATION_ERROR', `Category "${category.name}" is a subcategory — map its top-level category instead`);
-    }
-    if (category.type !== 'SERVICE' && category.type !== 'THERAPY') {
-      throw new ApiError('VALIDATION_ERROR', `Category "${category.name}" is not a Service or Therapy category`);
-    }
-    categoriesById.set(category.id, category);
-    for (const subcategoryId of mapping.subcategoryIds) {
-      await assertCategoryChildOf(mapping.categoryId, subcategoryId);
-    }
-  }
-
-  const existingGrants = await prisma.vendorCategoryAccess.findMany({
-    where: { vendorId, categoryId: { in: [...categoriesById.keys()] } },
-    select: { categoryId: true },
-  });
-  const grantedIds = new Set(existingGrants.map((g) => g.categoryId));
-  const toGrant = [...categoriesById.values()].filter((c) => !grantedIds.has(c.id));
-
-  await prisma.$transaction(async (tx) => {
-    if (toGrant.length > 0) {
-      await tx.vendorCategoryAccess.createMany({
-        data: toGrant.map((c) => ({ vendorId, categoryId: c.id })),
-        skipDuplicates: true,
-      });
-      const flags: Prisma.MemberUpdateInput = {};
-      if (toGrant.some((c) => c.type === 'SERVICE')) flags.offersService = true;
-      if (toGrant.some((c) => c.type === 'THERAPY')) flags.offersTherapy = true;
-      if (Object.keys(flags).length > 0) {
-        await tx.member.update({ where: { id: vendorId }, data: flags });
-      }
-    }
-
-    // Cascades to BranchSubcategoryAccess automatically (onDelete: Cascade).
-    await tx.branchCategoryAccess.deleteMany({ where: { branchId } });
-    for (const mapping of input.mappings) {
-      await tx.branchCategoryAccess.create({
-        data: {
-          branchId,
-          categoryId: mapping.categoryId,
-          subcategories: {
-            create: mapping.subcategoryIds.map((subcategoryId) => ({ subcategoryId })),
-          },
-        },
-      });
-    }
-  });
-
-  return getBranchCategoryAccess(vendorId, branchId);
 }
 
 // ─── Therapist (shared by self-derived vendorId, mirrors Branch's scoping pattern) ───────────
@@ -1113,65 +1010,6 @@ export async function listMyCustomers(vendorId: string, opts: { page: number; pa
   });
 
   return { items, total };
-}
-
-// ─── Category access (member modules) ────────────────────────────────────────
-
-/**
- * Replace-the-full-set pattern (same shape as role.service.ts#setRolePermissions) — a vendor's
- * enabled business modules + the top-level categories it's granted for them, saved together in
- * one call from the onboarding wizard's Step 2. Each `categoryId` must be a top-level category
- * (`parentId === null`) whose `type` matches one of the *enabled* modules — you can't grant a
- * Product category while `offersProduct` is false.
- */
-export async function setVendorModulesAndCategoryAccess(
-  vendorId: string,
-  input: { offersService: boolean; offersProduct: boolean; offersTherapy: boolean; categoryIds: string[] },
-) {
-  await getVendorOrThrow(vendorId);
-
-  const enabledTypes = new Set<CategoryType>([
-    ...(input.offersService ? (['SERVICE'] as const) : []),
-    ...(input.offersProduct ? (['PRODUCT'] as const) : []),
-    ...(input.offersTherapy ? (['THERAPY'] as const) : []),
-  ]);
-
-  if (input.categoryIds.length > 0) {
-    const categories = await prisma.category.findMany({ where: { id: { in: input.categoryIds } } });
-    if (categories.length !== input.categoryIds.length) {
-      throw new ApiError('VALIDATION_ERROR', 'One or more categoryIds do not exist');
-    }
-    for (const category of categories) {
-      if (category.parentId !== null) {
-        throw new ApiError('VALIDATION_ERROR', `Category "${category.name}" is a subcategory — grant its top-level category instead`);
-      }
-      if (!category.type || !enabledTypes.has(category.type)) {
-        throw new ApiError('VALIDATION_ERROR', `Category "${category.name}" does not belong to an enabled business module`);
-      }
-    }
-  }
-
-  await prisma.$transaction([
-    prisma.member.update({
-      where: { id: vendorId },
-      data: { offersService: input.offersService, offersProduct: input.offersProduct, offersTherapy: input.offersTherapy },
-    }),
-    prisma.vendorCategoryAccess.deleteMany({ where: { vendorId } }),
-    ...(input.categoryIds.length > 0
-      ? [
-          prisma.vendorCategoryAccess.createMany({
-            data: input.categoryIds.map((categoryId) => ({ vendorId, categoryId })),
-          }),
-        ]
-      : []),
-  ]);
-
-  return prisma.vendorCategoryAccess.findMany({ where: { vendorId }, include: { category: true } });
-}
-
-export async function getVendorCategoryAccess(vendorId: string) {
-  await getVendorOrThrow(vendorId);
-  return prisma.vendorCategoryAccess.findMany({ where: { vendorId }, include: { category: true } });
 }
 
 // ─── Vendor media (shared upload system — see media.service.ts's doc comment; ownership here
