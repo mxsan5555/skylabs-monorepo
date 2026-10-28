@@ -167,7 +167,7 @@ export function MemberDocumentsTab({ token, memberId, canEdit, canApprove, canRe
                 <h3>{label}</h3>
                 <sky-badge status={STATUS_TONE[state]}>{STATUS_LABEL[state]}</sky-badge>
                 {row?.numberMasked && <p>{row.numberMasked}</p>}
-                {row?.uploadedOnBehalf && <p className="field-hint">Uploaded by staff for the member</p>}
+                {row?.uploadedOnBehalf && <p className="field-hint">{`Uploaded by ${row.uploadedByName || 'staff'} for the member`}</p>}
                 {row?.status === 'REJECTED' && row.rejectionReason && <p className="error-state">Rejected: {row.rejectionReason}</p>}
                 {row?.originalFilename && <p className="field-hint">{row.originalFilename}</p>}
               </div>

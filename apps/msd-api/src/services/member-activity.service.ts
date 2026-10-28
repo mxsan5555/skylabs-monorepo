@@ -3,6 +3,7 @@ import { documentTypeList } from '../lib/document-number';
 import type { MemberStatus, ReminderDelivery, VendorDocumentType } from '../generated/prisma-client';
 import { REMINDER_COUNT } from './member-reminder-policy';
 import { REVIEW_FLAG_SUMMARY } from '../lib/member-messages';
+import { userNamesById } from './user-names';
 
 export async function getStatusHistory(memberId: string) {
   const rows = await prisma.memberStatusHistory.findMany({
@@ -10,12 +11,7 @@ export async function getStatusHistory(memberId: string) {
     orderBy: { createdAt: 'desc' },
     take: 200,
   });
-  const actorIds = [...new Set(rows.map((r) => r.actorUserId).filter((id): id is string => Boolean(id)))];
-  const actors =
-    actorIds.length > 0
-      ? await prisma.user.findMany({ where: { id: { in: actorIds } }, select: { id: true, name: true } })
-      : [];
-  const nameById = new Map(actors.map((a) => [a.id, a.name]));
+  const nameById = await userNamesById(rows.map((r) => r.actorUserId));
   return rows.map((r) => ({
     id: r.id,
     fromStatus: r.fromStatus,
@@ -83,10 +79,7 @@ export async function getMemberActivity(memberId: string): Promise<ActivityItem[
     prisma.memberDocumentReminder.findMany({ where: { memberId }, orderBy: { createdAt: 'desc' }, take: 200 }),
     prisma.member.findUnique({ where: { id: memberId }, select: { reviewFlaggedAt: true } }),
   ]);
-  const senderIds = [...new Set(reminders.map((r) => r.sentByUserId).filter((id): id is string => Boolean(id)))];
-  const senders =
-    senderIds.length > 0 ? await prisma.user.findMany({ where: { id: { in: senderIds } }, select: { id: true, name: true } }) : [];
-  const senderName = new Map(senders.map((u) => [u.id, u.name]));
+  const senderName = await userNamesById(reminders.map((r) => r.sentByUserId));
 
   const items: ActivityItem[] = history.map((h) => ({
     kind: 'status',

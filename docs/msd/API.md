@@ -268,6 +268,11 @@ return 404; the branch list no longer carries `categoryTypes`; `GET /vendors/cat
 same active categories for every member and ignores `vendorId`. Member dashboard `categories` and
 `subCategories` count the categories the member uses on its deals, products and therapists.
 
+Member documents (P5-15): each row of `GET /members/:id/documents` (and the `/vendors` and
+`/vendors/me` variants) carries `uploadedByName`: the staff member's name when
+`uploadedOnBehalf` is true, `null` for the member's own upload or when that account is gone.
+Visible to every viewer of the list; one name lookup per list.
+
 Member detail counts (P10-49): `GET /members/:id` (and `/vendors/:id`) also returns
 `customerCount` and `orderCount`: distinct customers and distinct orders with at least one order
 line from the member (any status), the same rows as the Customers list. List routes do not carry

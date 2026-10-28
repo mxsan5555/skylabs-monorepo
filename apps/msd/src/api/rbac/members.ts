@@ -32,6 +32,8 @@ export interface MemberDocumentRow {
   reviewedAt: string | null;
   uploadedOnBehalf: boolean;
   uploadedByUserId: string | null;
+  /** Staff member who uploaded it for the member (P5-15); null for the member's own upload. */
+  uploadedByName?: string | null;
   createdAt: string;
   updatedAt: string;
   /** Present only for roles that may open files: a signed link that expires after 5 minutes. */

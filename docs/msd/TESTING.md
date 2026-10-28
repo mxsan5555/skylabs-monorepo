@@ -45,7 +45,7 @@ Known failures at 2026-10-18 (msd recounted 2026-10-27: `india-locations` moved 
 | Project | Failing | Where |
 |---|---|---|
 | msd | 19 tests in 11 files | `permission-matrix` 9, `contact-us` 2, and 1 each in `app.spec`, `widget-registry`, `deal-card`, `media-uploader`, `site-footer`, `wishlist`, `roles`, `settings`; `entry-server.test.tsx` fails to load (`sky-product-card-wc` fixed 2026-10-24). Regressions since commit e756759 (NewOfferCard), not yet fixed: `home` 4 (FAQ section no longer rendered, deal favourite), `category` 1 (product wishlist heart) |
-| msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; recounted 2026-10-28: 1,258 pass) |
+| msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; recounted 2026-10-28: 1,262 pass) |
 | shared-menu | 5 | `index.test.ts` |
 
 Lint and type drift: 30 msd lint errors (`import/first` and `no-empty-function` in older tests), an ESLint ignore error in the shared packages, and
@@ -90,7 +90,10 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
   every media file removed after commit: the member's documents, images and video plus the
   images and videos of its deals, products and therapists (P3-25); archive keeps every file.
 - Documents: Support sees type and status only (no file key); masked numbers only; duplicate
-  number 409; approve, reject with reason; deleting an Approved document 409.
+  number 409; approve, reject with reason; deleting an Approved document 409. Uploader (P5-15;
+  `member-document.service.test.ts`, `member-documents-tab.test.tsx`): an on-behalf upload names the
+  staff member ("Uploaded by Priya for the member"), a missing account reads "staff", the member's
+  own upload has no name, and the list makes one name lookup (none without on-behalf rows).
 - Counts (P10-49; `vendors.routes.test.ts` "customer and order counts", `member-detail-page.test.tsx`,
   `vendor-customers.test.tsx`, `orders.test.tsx`): the detail response counts distinct orders and
   distinct customers (two lines of one order count once; two orders of one customer, one

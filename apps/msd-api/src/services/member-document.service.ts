@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { userNamesById } from './user-names';
 import { deleteMediaFile, signedFileUrl, writeMediaFile } from '../lib/media-storage';
 import { bucketForKey, storageFolder } from '../lib/storage-layout';
 import { validateMediaFile } from './media-validation.service';
@@ -47,7 +48,7 @@ type DocumentRow = Partial<Prisma.MemberDocumentGetPayload<Record<string, never>
  * `includeFiles` is true (viewers with members:edit or members:approve, or the member itself),
  * and so is the masked number. Support and Marketing see the type and the status only.
  */
-export async function toDocumentView(row: DocumentRow, opts: { includeFiles: boolean }) {
+export async function toDocumentView(row: DocumentRow, opts: { includeFiles: boolean; uploadedByName?: string | null }) {
   return {
     id: row.id,
     documentType: row.documentType,
@@ -56,6 +57,8 @@ export async function toDocumentView(row: DocumentRow, opts: { includeFiles: boo
     reviewedAt: row.reviewedAt,
     uploadedOnBehalf: row.uploadedOnBehalf,
     uploadedByUserId: row.uploadedByUserId,
+    /** The staff member who uploaded it for the member (P5-15); null for the member's own upload. */
+    uploadedByName: row.uploadedOnBehalf ? (opts.uploadedByName ?? null) : null,
     expiresAt: row.expiresAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -73,7 +76,11 @@ export async function toDocumentView(row: DocumentRow, opts: { includeFiles: boo
 
 export async function listMemberDocuments(memberId: string, opts: { includeFiles: boolean }) {
   const rows = await prisma.memberDocument.findMany({ where: { vendorId: memberId }, orderBy: { documentType: 'asc' } });
-  return Promise.all(rows.map((row) => toDocumentView(row, opts)));
+  // One lookup for the staff names behind on-behalf uploads (P5-15).
+  const nameById = await userNamesById(rows.filter((r) => r.uploadedOnBehalf).map((r) => r.uploadedByUserId));
+  return Promise.all(
+    rows.map((row) => toDocumentView(row, { ...opts, uploadedByName: row.uploadedByUserId ? (nameById.get(row.uploadedByUserId) ?? null) : null })),
+  );
 }
 
 export interface UploadInput {

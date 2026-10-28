@@ -15,7 +15,7 @@ vi.mock('../../../../api/rbac/members', () => ({
 }));
 
 const ROWS = [
-  { id: 'd1', documentType: 'PAN', status: 'SUBMITTED', numberMasked: 'ABXXXXX34F', rejectionReason: null, uploadedOnBehalf: true, originalFilename: 'pan.pdf' },
+  { id: 'd1', documentType: 'PAN', status: 'SUBMITTED', numberMasked: 'ABXXXXX34F', rejectionReason: null, uploadedOnBehalf: true, uploadedByName: 'Priya', originalFilename: 'pan.pdf' },
   { id: 'd2', documentType: 'GST', status: 'REJECTED', numberMasked: '27ABCDE1234F1Z5', rejectionReason: 'Scan is blurry', uploadedOnBehalf: false },
 ];
 
@@ -77,13 +77,20 @@ describe('MemberDocumentsTab', () => {
     expect(screen.getByText(/loading documents/i)).toBeTruthy();
   });
 
+  it('says "staff" when the uploader name is not known (P5-15)', async () => {
+    listMock.mockResolvedValue({ data: [{ ...ROWS[0], uploadedByName: null }] });
+    renderTab();
+    expect(await screen.findByText('Uploaded by staff for the member')).toBeTruthy();
+  });
+
   it('shows a row per required document with status, masked number and who uploaded', async () => {
     renderTab();
     await waitFor(() => expect(screen.getByText('PAN card')).toBeTruthy());
     expect(screen.getByText('Aadhaar card')).toBeTruthy();
     expect(screen.getByText('GST registration')).toBeTruthy();
     expect(screen.getByText('ABXXXXX34F')).toBeTruthy();
-    expect(screen.getByText(/uploaded by staff for the member/i)).toBeTruthy();
+    // P5-15: the staff member's name when the API has it.
+    expect(screen.getByText('Uploaded by Priya for the member')).toBeTruthy();
     expect(screen.getByText(/scan is blurry/i)).toBeTruthy();
     expect(screen.getByText('pan.pdf')).toBeTruthy();
     const badges = Array.from(document.querySelectorAll('sky-badge')).map((b) => b.textContent);
