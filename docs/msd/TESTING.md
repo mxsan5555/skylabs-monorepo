@@ -45,7 +45,7 @@ Known failures at 2026-10-18 (msd recounted 2026-10-27: `india-locations` moved 
 | Project | Failing | Where |
 |---|---|---|
 | msd | 19 tests in 11 files | `permission-matrix` 9, `contact-us` 2, and 1 each in `app.spec`, `widget-registry`, `deal-card`, `media-uploader`, `site-footer`, `wishlist`, `roles`, `settings`; `entry-server.test.tsx` fails to load (`sky-product-card-wc` fixed 2026-10-24). Regressions since commit e756759 (NewOfferCard), not yet fixed: `home` 4 (FAQ section no longer rendered, deal favourite), `category` 1 (product wishlist heart) |
-| msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; recounted 2026-10-28: 1,253 pass) |
+| msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; recounted 2026-10-28: 1,256 pass) |
 | shared-menu | 5 | `index.test.ts` |
 
 Lint and type drift: 30 msd lint errors (`import/first` and `no-empty-function` in older tests), an ESLint ignore error in the shared packages, and
@@ -67,6 +67,15 @@ mapPopularTag" (both pass alone).
   (403); the last active Super Admin cannot lose the role, be blocked or be deleted (409).
 - Permission revoked while a token is active: the API refuses on the next request after the cache
   clears.
+- Session hygiene (P10-38; `packages/shared-auth/src/react/auth-context.test.tsx`,
+  `apps/msd/src/auth/role-routing.test.ts`): sign-out calls `POST /auth/logout` with the refresh
+  token and clears the access token, refresh token, any preview and the bootstrap, even when the
+  call fails; a "Login As" preview token is kept in `sessionStorage` only (localStorage keeps the
+  real token), so a new tab or a closed tab never carries it; Return to Super Admin restores the
+  real token (renewing it if it lapsed); an expired or refused preview falls back to the real
+  session instead of signing out; a preview left in localStorage by an older build is cleared on
+  load. The sign-in return path accepts only same-site paths: `//host`, `/\host`, tab or newline
+  tricks, encoded `%2F%2F` / `%5C` and absolute URLs are refused.
 
 ### 4.2 Members
 
@@ -81,6 +90,11 @@ mapPopularTag" (both pass alone).
   images and videos of its deals, products and therapists (P3-25); archive keeps every file.
 - Documents: Support sees type and status only (no file key); masked numbers only; duplicate
   number 409; approve, reject with reason; deleting an Approved document 409.
+- Activity (P3-24; `member-activity.service.test.ts`, `member-activity-tab.test.tsx`): status items
+  carry from, to and the actor; document items the type, the event and `byStaff`; reminder items
+  the sequence (null when manual), the delivered channels and the sender; the console writes
+  "Status changed from Active to Suspended by Priya" and "Aadhaar card uploaded by staff for the
+  member" from those fields and falls back to `summary` for unknown values or rows without fields.
 - Reminders (all covered by unit tests): nothing before day 14; reminder 1 on the due date; 7-day
   spacing; after missed runs only the next reminder; final reminder carries the suspension
   sentence; documents asked for = missing + rejected; a second run sends nothing; a run that loses

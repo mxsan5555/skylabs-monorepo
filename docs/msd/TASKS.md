@@ -37,8 +37,8 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 
 | # | Module | Done | Total | % |
 |---|---|---|---|---|
-| 1 | Admin and staff | 2 | 31 | 6 |
-| 2 | Members | 49 | 101 | 49 |
+| 1 | Admin and staff | 3 | 31 | 10 |
+| 2 | Members | 50 | 101 | 50 |
 | 3 | Customers and orders | 2 | 12 | 17 |
 | 4 | Storefront | 17 | 42 | 40 |
 | 5 | Static content | 0 | 5 | 0 |
@@ -49,7 +49,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
 | 12 | Platform, security and release | 7 | 69 | 10 |
-| | **Total** | **88** | **289** | **30** |
+| | **Total** | **90** | **289** | **31** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -94,7 +94,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | P10-10 | FE | Staff users page: create, edit, status, delete rules; role dropdown limited; last super admin message | M | P8-01 | `users/` tests updated |
 | [ ] | P10-29 | FE | System settings page (super admin edit, admin view) | M | P8-03 | Tests |
 | [ ] | P10-30 | FE | Logs page: login history (all or own) and audit filters | M | P8-04, P8-05 | Tests |
-| [ ] | P10-38 | SEC | Logout clears tokens and bootstrap; preview token never persisted past tab; no open redirects after sign-in | S | - | Tests |
+| [x] | P10-38 | SEC | Logout clears tokens and bootstrap; preview token never persisted past tab; no open redirects after sign-in | S | - | Tests; done 2026-10-28: `shared-auth` sign-out revokes the refresh token and clears everything, preview token in `sessionStorage` only (older localStorage previews migrated), `sanitizeReturnUrl` refuses backslash, control-character and encoded `//` paths. mera-driver's Angular `AuthService` still keeps previews in localStorage (its own task) |
 
 ## 2. Members
 
@@ -124,7 +124,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [x] | P3-21 | BE | Remove `POST /vendors/me` and `POST /vendors/me/submit` and the vendor approve and reject routes (ARCHITECTURE.md C-11) | M | P3-12 | Routes return 404, OpenAPI updated |
 | [ ] | P3-22 | BE | Rename `vendor.service.ts`, `vendors.routes.ts` and the `Vendor*` Zod schemas to member names | S | P3-12 | No `vendor` in those file or schema names; existing tests green |
 | [ ] | P3-23 | FE | Move the member detail page and self-service calls in msd from `/vendors/:id` and `/vendors/me` to `/members/*` before the alias is removed | S | P3-12 | No `/vendors` request left in `apps/msd/src/api` (grep) |
-| [ ] | P3-24 | BE | Return structured fields (from status, to status, document type, actor id) from the member activity API so the client stops parsing summary sentences | S | P3-13 | Activity items carry the fields; `readableActivitySummary` removed from `apps/msd`; tests |
+| [x] | P3-24 | BE | Return structured fields (from status, to status, document type, actor id) from the member activity API so the client stops parsing summary sentences | S | P3-13 | Activity items carry the fields; `readableActivitySummary` removed from `apps/msd`; tests; done 2026-10-28: typed fields per kind (status, document, reminder) next to `summary`; console `activityText` builds the sentence, `readableActivitySummary` removed |
 | [x] | P3-25 | BE | Hard delete of a member also removes the media files of its deals, products and therapists from R2, not only its own documents, images and video | S | P3-09 | Test: every storage key of the cascaded rows is deleted after commit; archive keeps all files; done 2026-10-27: `memberStorageKeys` also reads deal, product and therapist images and videos before the delete |
 | [ ] | P4-01 | BE | Members list, get, update through `scopedWhere` | M | P2-02, P3-05 | Member A cannot read B (404) |
 | [ ] | P4-02 | BE | Branches: flat routes plus scope plus status endpoint | M | P4-01 | IDOR test |

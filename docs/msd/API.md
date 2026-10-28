@@ -268,6 +268,13 @@ return 404; the branch list no longer carries `categoryTypes`; `GET /vendors/cat
 same active categories for every member and ignores `vendorId`. Member dashboard `categories` and
 `subCategories` count the categories the member uses on its deals, products and therapists.
 
+Member activity (P3-24): `GET /members/:id/activity` (and the `/vendors/:id/activity` alias,
+`members:view`) returns items newest first with `kind`, `at`, `summary` (plain sentence, kept for
+older clients) and `detail`, plus typed fields per kind: `status` → `fromStatus`, `toStatus`,
+`actorId`, `actorName`; `document` → `documentType`, `event` (`uploaded | approved | rejected`),
+`byStaff`; `reminder` → `sequence` (null for a manual reminder), `channels` (`email`, `sms` that
+delivered), `actorId`, `actorName`; `review` → none. Clients build their text from these fields.
+
 Member customers (D19, P4-16): `GET /vendors/me/customers` (`members:custom`) returns per
 customer `id`, `name`, `city`, `orderCount`, `lastActivityAt` (latest order date), `hasOpenOrder`,
 and `phone` / `email` only when `hasOpenOrder` is true (else `null`). The staff route

@@ -15,31 +15,25 @@ export const MEMBER_DOCUMENT_LABEL: Record<VendorDocumentType, string> = {
   GST: 'GST number',
 };
 
-const STATUS_SUMMARY = /^Status changed from ([A-Z_]+) to ([A-Z_]+)(.*)$/;
-const DOCUMENT_SUMMARY = /^([A-Z_]+) document (.*)$/;
-
-const isStatus = (value: string): value is MemberStatus => value in MEMBER_STATUS_LABEL;
-const isDocumentType = (value: string): value is VendorDocumentType => value in MEMBER_DOCUMENT_LABEL;
+const isStatus = (value: string | undefined): value is MemberStatus => !!value && value in MEMBER_STATUS_LABEL;
+const isDocumentType = (value: string | undefined): value is VendorDocumentType => !!value && value in MEMBER_DOCUMENT_LABEL;
 
 /**
- * Makes an activity summary readable. msd-api (`member-activity.service.ts`) writes two fixed
- * templates with raw enums: "Status changed from ACTIVE to SUSPENDED[ by Name]" and
- * "AADHAAR document uploaded[ by staff for the member]" / "... approved" / "... rejected". Only a
- * known enum at the start of one of those templates is swapped for its label; anything else,
- * including the rest of the sentence, stays exactly as the server sent it.
+ * The sentence for one activity row, built from its structured fields (P3-24) with the console's
+ * own labels: "Status changed from Active to Suspended by Priya", "Aadhaar card uploaded by staff
+ * for the member", "PAN card approved". Reminder and review rows, rows without fields and any
+ * value this map does not know use the server's `summary` as sent.
  */
-export function readableActivitySummary(summary: string): string {
-  const status = STATUS_SUMMARY.exec(summary);
-  if (status) {
-    const [, from, to, rest] = status;
-    return isStatus(from) && isStatus(to) ? `Status changed from ${MEMBER_STATUS_LABEL[from]} to ${MEMBER_STATUS_LABEL[to]}${rest}` : summary;
+export function activityText(item: ActivityItem): string {
+  if (item.kind === 'status' && isStatus(item.fromStatus) && isStatus(item.toStatus)) {
+    const by = item.actorName ? ` by ${item.actorName}` : '';
+    return `Status changed from ${MEMBER_STATUS_LABEL[item.fromStatus]} to ${MEMBER_STATUS_LABEL[item.toStatus]}${by}`;
   }
-  const document = DOCUMENT_SUMMARY.exec(summary);
-  if (document) {
-    const [, type, rest] = document;
-    return isDocumentType(type) ? `${MEMBER_DOCUMENT_LABEL[type]} ${rest}` : summary;
+  if (item.kind === 'document' && isDocumentType(item.documentType) && item.event) {
+    const byStaff = item.event === 'uploaded' && item.byStaff ? ' by staff for the member' : '';
+    return `${MEMBER_DOCUMENT_LABEL[item.documentType]} ${item.event}${byStaff}`;
   }
-  return summary;
+  return item.summary;
 }
 
 /** Colour meaning of each lifecycle state (`sky-badge status`): live, paused, blocked, gone. */

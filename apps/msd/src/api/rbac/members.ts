@@ -39,12 +39,27 @@ export interface MemberDocumentRow {
   originalFilename?: string | null;
 }
 
+/** One row of `GET /members/:id/activity`. `detail` is the reason for status and document items,
+ *  the documents asked for on reminders. The structured fields (P3-24) are what the console
+ *  reads; `summary` is the server's plain sentence, kept as the fallback. */
 export interface ActivityItem {
-  /** `detail` is the reason for status and document items, the documents asked for on reminders. */
   kind: 'status' | 'document' | 'reminder' | 'review';
   at: string;
   summary: string;
   detail: string | null;
+  /** status */
+  fromStatus?: string;
+  toStatus?: string;
+  /** status and reminder: who acted (null for the system). */
+  actorId?: string | null;
+  actorName?: string | null;
+  /** document */
+  documentType?: string;
+  event?: 'uploaded' | 'approved' | 'rejected';
+  byStaff?: boolean;
+  /** reminder: 1..n, null for a manual reminder; the channels that delivered. */
+  sequence?: number | null;
+  channels?: ('email' | 'sms')[];
 }
 
 function toQuery(params: Record<string, string | number | undefined>): string {

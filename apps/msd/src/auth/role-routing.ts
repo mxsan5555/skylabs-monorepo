@@ -101,8 +101,32 @@ export function extractReturnUrl(location: { search?: string; state?: unknown })
  *  Exported so `otp.tsx` can re-validate a `returnUrl` it received via `location.state` right
  *  before actually navigating to it — defense in depth on top of `extractReturnUrl` already
  *  sanitizing it once, on the way in. */
+/** ASCII control characters: everything below space (tab, newline, ...) plus DEL. */
+const FIRST_PRINTABLE_CODE = 0x20;
+const DELETE_CODE = 0x7f;
+
+/** A backslash or an ASCII control character. */
+function hasUnsafeChar(value: string): boolean {
+  for (const char of value) {
+    const code = char.charCodeAt(0);
+    if (char === '\\' || code < FIRST_PRINTABLE_CODE || code === DELETE_CODE) return true;
+  }
+  return false;
+}
+
 export function sanitizeReturnUrl(url: string): string | null {
   if (!url || !url.startsWith('/') || url.startsWith('//')) return null;
+  // Browsers read `/\host`, `/<tab>/host` and their encoded forms as `//host` (P10-38): refuse any
+  // backslash or control character, and any path whose decoded start leaves this origin.
+  if (hasUnsafeChar(url)) return null;
+  let decoded = url;
+  try {
+    decoded = decodeURIComponent(url);
+  } catch {
+    return null;
+  }
+  if (decoded.startsWith('//') || hasUnsafeChar(decoded)) return null;
+  if (typeof window !== 'undefined' && new URL(url, window.location.origin).origin !== window.location.origin) return null;
   if (url === '/sign-in' || url.startsWith('/sign-in?') || url.startsWith('/sign-in/')) return null;
   if (url === '/otp' || url.startsWith('/otp?') || url.startsWith('/otp/')) return null;
   return url;
