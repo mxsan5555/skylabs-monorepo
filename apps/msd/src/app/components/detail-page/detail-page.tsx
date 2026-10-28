@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FilledButton, Icon, OutlinedButton, OutlinedIconButton } from '@skylabs-monorepo/shared-ui/react';
 import { getCatalogVendor, type CatalogVendorBranch } from '../../../api/catalog';
 import { fillTemplate, formatINR, formatTime12h } from '../../../utils/format';
 import content from '../../../content.json';
+import { useHydrated } from '../../../hooks/use-hydrated';
+import { DealMap, type DealMapPoint } from '../deal-map/deal-map';
 import './detail-page.css';
 
 const t = content.detailPage;
@@ -304,7 +306,24 @@ function directionsUrl(branch: DetailBranch): string | undefined {
 
 /** Location (address, Get directions, call) and the branch's weekly hours: given by the page, or
  *  read from the member's public page (`GET /catalog/vendors/:slug`). */
-export function BranchPanels({ branch, vendorSlug }: { branch: DetailBranch; vendorSlug?: string | null }) {
+export function BranchPanels({
+  branch,
+  vendorSlug,
+  showMap = false,
+}: {
+  branch: DetailBranch;
+  vendorSlug?: string | null;
+  /** A compact map of the branch under the address (deal page, ST-26). Client-only: the map
+   *  engine loads after hydration, so prerendered HTML never contains it. */
+  showMap?: boolean;
+}) {
+  const hydrated = useHydrated();
+  const mapPoint = useMemo<DealMapPoint | null>(() => {
+    const lat = Number(branch.latitude);
+    const lng = Number(branch.longitude);
+    if (branch.latitude == null || branch.longitude == null || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { id: branch.id, lat, lng, label: branch.name, title: branch.name };
+  }, [branch.id, branch.name, branch.latitude, branch.longitude]);
   const given = branch.openingHours !== undefined;
   const [hours, setHours] = useState<CatalogVendorBranch['openingHours'] | null>(branch.openingHours ?? null);
   const [hoursLoaded, setHoursLoaded] = useState(given);
@@ -343,6 +362,9 @@ export function BranchPanels({ branch, vendorSlug }: { branch: DetailBranch; ven
           <Icon aria-hidden="true">location_on</Icon>
           <span>{address}</span>
         </p>
+        {showMap && hydrated && mapPoint && (
+          <DealMap compact points={[mapPoint]} ariaLabel={fillTemplate(t.map.label, { name: branch.name })} loadingLabel={t.map.loading} />
+        )}
         <div className="detail-page__panel-actions">
           {directions && (
             <OutlinedButton href={directions} target="_blank" rel="noopener noreferrer" className="detail-page__directions">

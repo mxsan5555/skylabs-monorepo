@@ -20,6 +20,13 @@ vi.mock('../../../api/catalog', () => ({
   getCatalogVendor: vi.fn(),
   listCatalogBanners: () => Promise.resolve({ data: [] }),
 }));
+vi.mock('../../components/deal-map/deal-map', () => ({
+  DealMap: ({ points, ariaLabel, compact }: { points: { label: string; href?: string }[]; ariaLabel: string; compact?: boolean }) => (
+    <div role="region" aria-label={ariaLabel} data-compact={String(Boolean(compact))}>
+      {points.map((p) => `${p.label}|${p.href ?? 'no-link'}`).join(',')}
+    </div>
+  ),
+}));
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({ useAuth: () => ({ isAuthenticated: false, token: null }) }));
 vi.mock('../../../wishlist/wishlist-context', () => ({
   useWishlist: () => ({ has: () => false, toggle: vi.fn(), isPending: () => false }),
@@ -167,6 +174,20 @@ describe('DealDetail', () => {
     m.deal.mockResolvedValue({ data: { ...DEAL, branch: { ...DEAL.branch, address: 'Karve Road, Pune', addressLine2: null } } });
     renderAt('/deal/swedish-massage-zen-spa-pune');
     expect(await screen.findByText('Kothrud — Karve Road, Pune')).toBeTruthy();
+  });
+
+  it('shows a compact map of the branch with one plain marker (ST-26)', async () => {
+    renderAt('/deal/swedish-massage-zen-spa-pune');
+    const map = await screen.findByRole('region', { name: d.map.label.replace('{name}', 'Kothrud') });
+    expect(map.getAttribute('data-compact')).toBe('true');
+    expect(map.textContent).toBe('Kothrud|no-link');
+  });
+
+  it('shows no map when the branch has no coordinates', async () => {
+    m.deal.mockResolvedValue({ data: { ...DEAL, branch: { ...DEAL.branch, latitude: null, longitude: null } } });
+    renderAt('/deal/swedish-massage-zen-spa-pune');
+    await screen.findByRole('heading', { level: 1, name: 'Swedish massage' });
+    expect(screen.queryByRole('region', { name: d.map.label.replace('{name}', 'Kothrud') })).toBeNull();
   });
 
   it('sold out replaces Add to cart', async () => {

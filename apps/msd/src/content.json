@@ -658,6 +658,10 @@
     "locationAndHours": "Location and hours",
     "hours": "Hours",
     "getDirections": "Get directions",
+    "map": {
+      "label": "Map of {name}",
+      "loading": "Loading map"
+    },
     "quantity": "Quantity",
     "decrease": "Decrease quantity",
     "increase": "Increase quantity",

@@ -666,14 +666,15 @@ export async function getPublicDealFacets(
 export async function listPublicLocations() {
   const rows = await prisma.branch.groupBy({
     by: ['state', 'city'],
-    where: { isActive: true, vendor: { status: 'ACTIVE' }, state: { not: null }, city: { not: null } },
+    // State and city are required columns (S22), so every active branch has both.
+    where: { isActive: true, vendor: { status: 'ACTIVE' } },
     _avg: { latitude: true, longitude: true },
     orderBy: [{ state: 'asc' }, { city: 'asc' }],
   });
   const toNumber = (v: unknown) => (v == null ? null : Number(v));
   return rows.map((r) => ({
-    state: r.state as string,
-    city: r.city as string,
+    state: r.state,
+    city: r.city,
     latitude: toNumber(r._avg.latitude),
     longitude: toNumber(r._avg.longitude),
   }));

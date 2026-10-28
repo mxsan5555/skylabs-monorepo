@@ -45,7 +45,7 @@ Known failures at 2026-10-18 (msd recounted 2026-10-27: `india-locations` moved 
 | Project | Failing | Where |
 |---|---|---|
 | msd | 19 tests in 11 files | `permission-matrix` 9, `contact-us` 2, and 1 each in `app.spec`, `widget-registry`, `deal-card`, `media-uploader`, `site-footer`, `wishlist`, `roles`, `settings`; `entry-server.test.tsx` fails to load (`sky-product-card-wc` fixed 2026-10-24). Regressions since commit e756759 (NewOfferCard), not yet fixed: `home` 4 (FAQ section no longer rendered, deal favourite), `category` 1 (product wishlist heart) |
-| msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; recounted 2026-10-27: 1,245 pass) |
+| msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; recounted 2026-10-27: 1,246 pass) |
 | shared-menu | 5 | `index.test.ts` |
 
 Lint and type drift: 30 msd lint errors (`import/first` and `no-empty-function` in older tests), an ESLint ignore error in the shared packages, and
@@ -182,6 +182,10 @@ mapPopularTag" (both pass alone).
     `validThrough`), BreadcrumbList, FAQPage only with FAQs, no rating; passes the Rich Results
     test.
   - Search: a query with the member name returns that member's deals; title matches rank first.
+  - Branch map (ST-26, `deal-detail.test.tsx`, `deal-map.test.tsx`, `marker-html.test.ts`): the
+    Location panel shows a compact map labelled "Map of {branch}" with one marker (the branch
+    name, not a link) when the branch has coordinates; no map without coordinates; the prerendered
+    HTML has no map (it appears after hydration); the therapist page has no map.
   - Prerendered deal page hydrates without warnings; `sitemap.xml` lists Active deal slugs only.
 - Therapist detail (`therapist-detail.test.tsx`): type as h1, person and experience, Details and
   the location aside, the rail leaves out the current therapist; the price follows the chosen

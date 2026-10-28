@@ -423,7 +423,7 @@ export function DealDetail() {
               </sky-accordion-item>
             </sky-accordion>
           </div>
-          {deal.branch && <BranchPanels branch={deal.branch} vendorSlug={deal.vendor?.slug} />}
+          {deal.branch && <BranchPanels branch={deal.branch} vendorSlug={deal.vendor?.slug} showMap />}
         </div>
       </PageSection>
 
