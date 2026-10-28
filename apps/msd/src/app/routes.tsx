@@ -118,6 +118,11 @@ function DealFormPageRoute() {
   return <DealFormPage token={token} />;
 }
 
+function MemberDealFormPageRoute() {
+  const { token } = useAuth();
+  return <DealFormPage token={token} surface="member" />;
+}
+
 function TherapistFormPageRoute() {
   const { token } = useAuth();
   return <TherapistFormPage token={token} />;
@@ -145,7 +150,7 @@ export function AppRoutes() {
           <Route path="/categories" element={<CategoriesIndex />} />
           <Route path="/category/:slug" element={<Category />} />
           <Route path="/category/:slug/:city" element={<Category />} />
-          <Route path="/deal/:id" element={<DealDetail />} />
+          <Route path="/deal/:slug" element={<DealDetail />} />
           <Route path="/deals" element={<ListingPage key="deals" kind="deals" />} />
           <Route path="/deals/:city" element={<ListingPage key="deals" kind="deals" />} />
           <Route path="/products" element={<ListingPage key="products" kind="products" />} />
@@ -479,6 +484,23 @@ export function AppRoutes() {
             element={
               <RequirePermission menuKey="vendor-portal.deals">
                 <VendorDeals />
+              </RequirePermission>
+            }
+          />
+          {/* The member's own deal form: the same page staff use (PLANNING §2.7). */}
+          <Route
+            path="/account/vendor-deals/new"
+            element={
+              <RequirePermission menuKey="vendor-portal.deals" action="create">
+                <MemberDealFormPageRoute />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/vendor-deals/:dealId"
+            element={
+              <RequirePermission menuKey="vendor-portal.deals" action="edit">
+                <MemberDealFormPageRoute />
               </RequirePermission>
             }
           />

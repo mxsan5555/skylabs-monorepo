@@ -145,8 +145,13 @@ export function createPrismaMock() {
       create: vi.fn(),
       createMany: vi.fn(),
       update: vi.fn(),
+      delete: vi.fn(),
       deleteMany: vi.fn(),
       count: vi.fn(),
+    },
+    dealFaq: {
+      createMany: vi.fn(),
+      deleteMany: vi.fn(),
     },
     dealImage: {
       findUnique: vi.fn(),
@@ -357,6 +362,8 @@ export function createPrismaMock() {
     cartItem: {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
+      count: vi.fn(),
+      aggregate: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),

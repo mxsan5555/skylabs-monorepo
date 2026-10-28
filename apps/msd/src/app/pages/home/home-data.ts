@@ -33,6 +33,7 @@ export function toDealCardDeal(deal: CatalogDeal): DealCardDeal {
   const media = resolveDealMedia(deal);
   return {
     id: deal.id,
+    slug: deal.slug,
     title: deal.title,
     image: media.images[0] ?? '',
     imageAlt: deal.title,

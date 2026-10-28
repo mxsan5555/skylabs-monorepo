@@ -15,18 +15,12 @@ import {
   BranchCreateSchema,
   BranchUpdateSchema,
   BranchStatusUpdateSchema,
-  BranchCategoryAccessInputSchema,
   VendorBranchIdParamSchema,
-  DealCreateSchema,
-  DealUpdateSchema,
-  DealStatusUpdateSchema,
-  DealRejectSchema,
   TherapistCreateSchema,
   TherapistUpdateSchema,
   TherapistStatusUpdateSchema,
   TherapistPackageCreateSchema,
   TherapistPackageUpdateSchema,
-  VendorModulesAndCategoryAccessSchema,
   VendorIdParamSchema,
   VendorDocumentTypeParamSchema,
   VendorImageIdParamSchema,
@@ -37,6 +31,7 @@ import { MediaReorderSchema } from '../schemas/media.schema';
 import { imageUpload, videoUpload, documentUpload } from '../lib/media-upload.middleware';
 import type { VendorDocumentType } from '../generated/prisma-client';
 import * as vendorService from '../services/vendor.service';
+import { registerDealRoutes, memberDealSurface, staffDealSurface } from './vendor-deals.routes';
 import * as memberDocumentService from '../services/member-document.service';
 import * as productService from '../services/product.service';
 import { writeAuditLog } from '../services/audit.service';
@@ -62,13 +57,12 @@ function withCompletion<T extends Record<string, unknown>>(vendor: T) {
 
 const VendorCategoriesQuerySchema = z.object({
   type: z.enum(['SERVICE', 'PRODUCT', 'THERAPY']).optional(),
-  vendorId: z.string().uuid().optional(),
 });
 
 router.get('/categories', validateQuery(VendorCategoriesQuerySchema), async (req, res, next) => {
   try {
-    const { type, vendorId } = req.validatedQuery as ReturnType<typeof VendorCategoriesQuerySchema.parse>;
-    sendData(res, await vendorService.listCategories({ type, vendorId }));
+    const { type } = req.validatedQuery as ReturnType<typeof VendorCategoriesQuerySchema.parse>;
+    sendData(res, await vendorService.listCategories({ type }));
   } catch (err) {
     next(err);
   }
@@ -371,59 +365,6 @@ router.get('/me/branches', requirePermission('members', 'custom'), async (req, r
   }
 });
 
-// ─── Business modules + Category access (onboarding wizard Step 2) ──────────────────────────
-// Replace-the-full-set pattern, same shape as rbac.routes.ts's PUT /roles/:id/permissions.
-
-router.get('/me/category-access', requirePermission('members', 'custom'), async (req, res, next) => {
-  try {
-    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
-    sendData(res, await vendorService.getVendorCategoryAccess(vendor.id));
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.put(
-  '/me/category-access',
-  requirePermission('members', 'custom'),
-  validateBody(VendorModulesAndCategoryAccessSchema),
-  async (req, res, next) => {
-    try {
-      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
-      const result = await vendorService.setVendorModulesAndCategoryAccess(vendor.id, req.body);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'vendor.category_access.update',
-        targetType: 'Vendor',
-        targetId: vendor.id,
-        after: req.body,
-        ...requestMeta(req),
-      });
-      sendData(res, result);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-/**
- * Self-service read mirror of `/:vendorId/branches/:branchId/category-access` (see that route's
- * doc comment further down) — needed because `DealDialog`'s Category/Subcategory pickers are
- * branch-scoped now and that component is shared between the admin wizard and this self-service
- * surface. Read-only: a vendor owner views but never edits their own branch's category mapping
- * (that stays an admin/Data-Entry action via Step 2 of the onboarding wizard) — no `PUT` mirror.
- * `getBranchCategoryAccess` already calls `getBranchScopedOrThrow`, so a vendor can't reach
- * another vendor's branch here even by guessing a `branchId`.
- */
-router.get('/me/branches/:branchId/category-access', requirePermission('members', 'custom'), async (req, res, next) => {
-  try {
-    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
-    sendData(res, await vendorService.getBranchCategoryAccess(vendor.id, req.params.branchId));
-  } catch (err) {
-    next(err);
-  }
-});
-
 /**
  * Distinct customers who have ordered from the caller's own vendor — for the vendor-facing
  * "Customers" screen. Derived entirely from existing Order rows (no new table); paginates the
@@ -512,208 +453,8 @@ router.patch(
   },
 );
 
-router.get('/me/branches/:branchId/deals', requirePermission('members', 'custom'), async (req, res, next) => {
-  try {
-    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
-    sendData(res, await vendorService.listDeals(vendor.id, req.params.branchId));
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.post(
-  '/me/branches/:branchId/deals',
-  requirePermission('members', 'custom'),
-  validateBody(DealCreateSchema),
-  async (req, res, next) => {
-    try {
-      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
-      const deal = await vendorService.createDeal(vendor.id, req.params.branchId, req.body, false);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'deal.create',
-        targetType: 'Deal',
-        targetId: deal.id,
-        after: deal,
-        ...requestMeta(req),
-      });
-      sendData(res, deal, { status: 201 });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-router.patch(
-  '/me/branches/:branchId/deals/:dealId',
-  requirePermission('members', 'custom'),
-  validateBody(DealUpdateSchema),
-  async (req, res, next) => {
-    try {
-      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
-      const deal = await vendorService.updateDeal(vendor.id, req.params.branchId, req.params.dealId, req.body);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'deal.update',
-        targetType: 'Deal',
-        targetId: deal.id,
-        after: deal,
-        ...requestMeta(req),
-      });
-      sendData(res, deal);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-router.patch(
-  '/me/branches/:branchId/deals/:dealId/status',
-  requirePermission('members', 'custom'),
-  validateBody(DealStatusUpdateSchema),
-  async (req, res, next) => {
-    try {
-      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
-      const deal = await vendorService.setDealStatus(vendor.id, req.params.branchId, req.params.dealId, req.body.status, false);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'deal.status_change',
-        targetType: 'Deal',
-        targetId: deal.id,
-        after: { status: deal.status },
-        ...requestMeta(req),
-      });
-      sendData(res, deal);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-// ─── Deal media (shared upload system — see media.service.ts's doc comment) ─────────────────
-
-router.post(
-  '/me/branches/:branchId/deals/:dealId/images',
-  requirePermission('members', 'custom'),
-  imageUpload.single('file'),
-  async (req, res, next) => {
-    try {
-      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
-      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
-      const image = await vendorService.addDealImage(vendor.id, req.params.branchId, req.params.dealId, {
-        buffer: req.file.buffer,
-        originalname: req.file.originalname,
-      });
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'deal_image.create',
-        targetType: 'DealImage',
-        targetId: image.id,
-        ...requestMeta(req),
-      });
-      sendData(res, image, { status: 201 });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-router.delete(
-  '/me/branches/:branchId/deals/:dealId/images/:imageId',
-  requirePermission('members', 'custom'),
-  async (req, res, next) => {
-    try {
-      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
-      await vendorService.deleteDealImage(vendor.id, req.params.branchId, req.params.dealId, req.params.imageId);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'deal_image.delete',
-        targetType: 'DealImage',
-        targetId: req.params.imageId,
-        ...requestMeta(req),
-      });
-      sendData(res, { deleted: true });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-router.patch(
-  '/me/branches/:branchId/deals/:dealId/images/reorder',
-  requirePermission('members', 'custom'),
-  validateBody(MediaReorderSchema),
-  async (req, res, next) => {
-    try {
-      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
-      await vendorService.reorderDealImages(vendor.id, req.params.branchId, req.params.dealId, req.body.imageIds);
-      sendData(res, { reordered: true });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-router.patch(
-  '/me/branches/:branchId/deals/:dealId/images/:imageId/primary',
-  requirePermission('members', 'custom'),
-  async (req, res, next) => {
-    try {
-      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
-      await vendorService.setDealPrimaryImage(vendor.id, req.params.branchId, req.params.dealId, req.params.imageId);
-      sendData(res, { primary: true });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-router.post(
-  '/me/branches/:branchId/deals/:dealId/video',
-  requirePermission('members', 'custom'),
-  videoUpload.single('file'),
-  async (req, res, next) => {
-    try {
-      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
-      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
-      const video = await vendorService.replaceDealVideo(vendor.id, req.params.branchId, req.params.dealId, {
-        buffer: req.file.buffer,
-        originalname: req.file.originalname,
-      });
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'deal_video.upsert',
-        targetType: 'DealVideo',
-        targetId: video.id,
-        ...requestMeta(req),
-      });
-      sendData(res, video, { status: 201 });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-router.delete(
-  '/me/branches/:branchId/deals/:dealId/video',
-  requirePermission('members', 'custom'),
-  async (req, res, next) => {
-    try {
-      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
-      await vendorService.deleteDealVideo(vendor.id, req.params.branchId, req.params.dealId);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'deal_video.delete',
-        targetType: 'DealVideo',
-        targetId: req.params.dealId,
-        ...requestMeta(req),
-      });
-      sendData(res, { deleted: true });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
+// Member's own deals, packages and media (vendor-deals.routes.ts).
+registerDealRoutes(router, memberDealSurface);
 
 // ─── Therapist (self-service — mirrors Branch's exact pattern) ──────────────
 
@@ -1354,83 +1095,6 @@ router.get('/:vendorId/branches', requirePermission('vendors.branches', 'view'),
   }
 });
 
-router.get(
-  '/:vendorId/category-access',
-  requirePermission('members', 'view'),
-  validateParams(VendorIdParamSchema),
-  async (req, res, next) => {
-    try {
-      sendData(res, await vendorService.getVendorCategoryAccess(req.params.vendorId));
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-router.put(
-  '/:vendorId/category-access',
-  requirePermission('members', 'edit'),
-  validateParams(VendorIdParamSchema),
-  validateBody(VendorModulesAndCategoryAccessSchema),
-  async (req, res, next) => {
-    try {
-      const result = await vendorService.setVendorModulesAndCategoryAccess(req.params.vendorId, req.body);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'vendor.category_access.update',
-        targetType: 'Vendor',
-        targetId: req.params.vendorId,
-        after: req.body,
-        ...requestMeta(req),
-      });
-      sendData(res, result);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-/**
- * A branch's own category/subcategory access map — narrows the vendor-level grants above (see
- * BranchCategoryAccess's own schema doc comment). Gated on `vendors.branches`, same as every
- * other branch-scoped route in this file.
- */
-router.get(
-  '/:vendorId/branches/:branchId/category-access',
-  requirePermission('vendors.branches', 'view'),
-  validateParams(VendorBranchIdParamSchema),
-  async (req, res, next) => {
-    try {
-      sendData(res, await vendorService.getBranchCategoryAccess(req.params.vendorId, req.params.branchId));
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-router.put(
-  '/:vendorId/branches/:branchId/category-access',
-  requirePermission('vendors.branches', 'edit'),
-  validateParams(VendorBranchIdParamSchema),
-  validateBody(BranchCategoryAccessInputSchema),
-  async (req, res, next) => {
-    try {
-      const result = await vendorService.setBranchCategoryAccess(req.params.vendorId, req.params.branchId, req.body);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'branch_category_access.update',
-        targetType: 'Branch',
-        targetId: req.params.branchId,
-        after: req.body,
-        ...requestMeta(req),
-      });
-      sendData(res, result);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
 /**
  * All of a vendor's therapists (active AND inactive, across every branch) for the admin's
  * vendor detail page. Read-only — the admin-on-behalf create/update/status-change variants live
@@ -1452,25 +1116,6 @@ router.get(
   },
 );
 
-/**
- * All of a vendor's deals (every status, across every branch) for the admin's vendor detail
- * page — same "vendor-wide, not branch-scoped" shape as `/:vendorId/therapists` above. Read-only;
- * admin-on-behalf create/update/status-change stay branch-scoped under
- * `/:vendorId/branches/:branchId/deals[/:dealId]` further down. Gated on `vendors.deals`, same
- * permission key the branch-scoped deal routes already use.
- */
-router.get(
-  '/:vendorId/deals',
-  requirePermission('vendors.deals', 'view'),
-  validateParams(VendorIdParamSchema),
-  async (req, res, next) => {
-    try {
-      sendData(res, await vendorService.listVendorDealsForAdmin(req.params.vendorId));
-    } catch (err) {
-      next(err);
-    }
-  },
-);
 
 /**
  * Distinct customers who have ordered/booked from a vendor, for the admin's vendor detail page.
@@ -1562,158 +1207,16 @@ router.patch(
   },
 );
 
-router.get('/:vendorId/branches/:branchId/deals', requirePermission('vendors.deals', 'view'), async (req, res, next) => {
-  try {
-    sendData(res, await vendorService.listDeals(req.params.vendorId, req.params.branchId));
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.post(
-  '/:vendorId/branches/:branchId/deals',
-  requirePermission('vendors.deals', 'create'),
-  validateBody(DealCreateSchema),
-  async (req, res, next) => {
-    try {
-      const deal = await vendorService.createDeal(req.params.vendorId, req.params.branchId, req.body, true);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'deal.create',
-        targetType: 'Deal',
-        targetId: deal.id,
-        after: deal,
-        ...requestMeta(req),
-      });
-      sendData(res, deal, { status: 201 });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-router.patch(
-  '/:vendorId/branches/:branchId/deals/:dealId',
-  requirePermission('vendors.deals', 'edit'),
-  validateBody(DealUpdateSchema),
-  async (req, res, next) => {
-    try {
-      const deal = await vendorService.updateDeal(req.params.vendorId, req.params.branchId, req.params.dealId, req.body);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'deal.update',
-        targetType: 'Deal',
-        targetId: deal.id,
-        after: deal,
-        ...requestMeta(req),
-      });
-      sendData(res, deal);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-router.patch(
-  '/:vendorId/branches/:branchId/deals/:dealId/status',
-  requirePermission('vendors.deals', 'status_change'),
-  validateBody(DealStatusUpdateSchema),
-  async (req, res, next) => {
-    try {
-      const deal = await vendorService.setDealStatus(
-        req.params.vendorId,
-        req.params.branchId,
-        req.params.dealId,
-        req.body.status,
-        true,
-      );
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'deal.status_change',
-        targetType: 'Deal',
-        targetId: deal.id,
-        after: { status: deal.status },
-        ...requestMeta(req),
-      });
-      sendData(res, deal);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-router.patch(
-  '/:vendorId/branches/:branchId/deals/:dealId/approve',
-  requirePermission('vendors.deals', 'approve'),
-  async (req, res, next) => {
-    try {
-      const deal = await vendorService.approveDeal(req.params.vendorId, req.params.branchId, req.params.dealId);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'deal.approve',
-        targetType: 'Deal',
-        targetId: deal.id,
-        after: { approvalStatus: deal.approvalStatus, status: deal.status },
-        ...requestMeta(req),
-      });
-      sendData(res, deal);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-router.patch(
-  '/:vendorId/branches/:branchId/deals/:dealId/reject',
-  requirePermission('vendors.deals', 'reject'),
-  validateBody(DealRejectSchema),
-  async (req, res, next) => {
-    try {
-      const deal = await vendorService.rejectDeal(req.params.vendorId, req.params.branchId, req.params.dealId, req.body.rejectionReason);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'deal.reject',
-        targetType: 'Deal',
-        targetId: deal.id,
-        after: { approvalStatus: deal.approvalStatus, rejectionReason: req.body.rejectionReason },
-        ...requestMeta(req),
-      });
-      sendData(res, deal);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-router.delete(
-  '/:vendorId/branches/:branchId/deals/:dealId',
-  requirePermission('vendors.deals', 'delete'),
-  async (req, res, next) => {
-    try {
-      const before = await vendorService.getDealScopedOrThrow(req.params.vendorId, req.params.branchId, req.params.dealId);
-      await vendorService.deleteDeal(req.params.vendorId, req.params.branchId, req.params.dealId);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'deal.delete',
-        targetType: 'Deal',
-        targetId: req.params.dealId,
-        before,
-        ...requestMeta(req),
-      });
-      sendData(res, null);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
+// Staff working on a member's deals (vendor-deals.routes.ts).
+registerDealRoutes(router, staffDealSurface);
 
 // ─── Therapist (admin-on-behalf — mirrors Branch/Deal's exact admin split) ──────────────────
 // vendorId comes from the URL (not a JWT-derived `getMyVendorOrThrow`), so an admin/salesperson
 // can create/edit a Therapist before the vendor has ever logged in (onboarding wizard Step 4).
 // Reuses the exact same createTherapist/updateTherapist/setTherapistStatus service functions the
 // self-service `/me/*` routes call — those already take vendorId as a plain parameter and do no
-// ownership resolution internally, so the `specializationCategoryId` -> assertVendorHasCategoryAccess
-// (THERAPY) check inside them runs unchanged for this path too; no bypass.
+// ownership resolution internally, so the `specializationCategoryId` -> active THERAPY category
+// check inside them runs unchanged for this path too; no bypass.
 
 router.post(
   '/:vendorId/branches/:branchId/therapists',

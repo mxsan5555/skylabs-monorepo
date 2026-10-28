@@ -7,6 +7,7 @@ extendZodWithOpenApi(z);
 const TAG = '(expire_soon|hot|new|deal)';
 /** Comma list of card tags (PLANNING §4 D30): items whose shown tag is any of them. */
 const tagsParam = z.string().regex(new RegExp(`^${TAG}(,${TAG}){0,3}$`)).optional();
+/** Comma-separated UUIDs, max 50. */
 const idsParam = z.string().regex(/^[0-9a-f-]{36}(,[0-9a-f-]{36}){0,49}$/i).optional();
 
 export const CatalogDealQuerySchema = PaginationQuerySchema.extend({
@@ -28,10 +29,10 @@ export const CatalogDealQuerySchema = PaginationQuerySchema.extend({
   sort: z.enum(['relevance', 'price_asc', 'price_desc', 'distance', 'newest', 'discount']).optional().default('relevance'),
   /** Comma-separated vendor UUIDs (max 50) → `vendorId in [...]`; wins over the single `vendorId`
    *  above when both are given. */
-  vendorIds: z.string().regex(/^[0-9a-f-]{36}(,[0-9a-f-]{36}){0,49}$/i).optional(),
+  vendorIds: idsParam,
   /** Comma-separated branch UUIDs (max 50) → `branchId in [...]`; wins over the single `branchId`
    *  above when both are given. */
-  branchIds: z.string().regex(/^[0-9a-f-]{36}(,[0-9a-f-]{36}){0,49}$/i).optional(),
+  branchIds: idsParam,
   /** Radius in km around `latitude`/`longitude`; ignored without coordinates. */
   radiusKm: z.coerce.number().gt(0).max(500).optional(),
   minPrice: z.coerce.number().min(0).optional(),

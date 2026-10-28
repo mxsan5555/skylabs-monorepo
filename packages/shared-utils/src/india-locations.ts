@@ -1,12 +1,8 @@
 /**
- * Static Indian States/UTs → major cities dataset. Used anywhere a vendor or customer needs a
- * cascading State → City picker (e.g. Branch creation, the public Explore location filter) —
- * there is no `State`/`City` entity in the backend (a vendor's/branch's "state" is just the
- * distinct `Branch.state` string value grouped client-side, see the direct-category-access
- * plan's architecture notes), so this is intentionally a plain static list, not an API call.
- *
- * Not exhaustive down to every town — covers all states/UTs plus their most-searched cities,
- * enough to drive a real dropdown without fabricating precision the backend can't back up.
+ * Indian states and union territories with their most-searched cities. The one location list for
+ * msd: the branch form's State -> City picker, the storefront location filters and the msd-api
+ * allowlist that keeps `Branch.state` / `Branch.city` in step with them (docs/msd/PLANNING.md
+ * §2.7, C-03). Not every town: enough to drive a real dropdown.
  */
 export interface IndiaState {
   state: string;
@@ -56,4 +52,9 @@ export const STATES: string[] = INDIA_LOCATIONS.map((s) => s.state);
 
 export function citiesForState(state: string): string[] {
   return INDIA_LOCATIONS.find((s) => s.state === state)?.cities ?? [];
+}
+
+/** True when `city` is one of `state`'s cities (exact, case-sensitive match). */
+export function isIndiaLocation(state: string, city: string): boolean {
+  return citiesForState(state).includes(city);
 }

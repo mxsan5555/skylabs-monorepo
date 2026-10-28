@@ -163,6 +163,47 @@ describe('POST /api/v1/cart/items — Service-Deal line (dealId + dealPackageId)
       }),
     );
   });
+
+  /** PLANNING §2.7: stock and the per-customer limit count the whole cart for the deal, plus
+   *  paid orders; both answer 409 with their own code. */
+  const addDeal = (quantity: number) =>
+    request(app)
+      .post('/api/v1/cart/items')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ dealId: SERVICE_DEAL_ID, dealPackageId: DEAL_PACKAGE_ID, quantity });
+
+  it('409 DEAL_LIMIT_REACHED when cart + paid units would pass the per-customer limit', async () => {
+    prismaMock.deal.findFirst.mockResolvedValue({ ...serviceDealFixture, maxBookings: null, limitPerCustomer: 2 });
+    prismaMock.dealPackage.findUnique.mockResolvedValue(dealPackageFixture);
+    prismaMock.cart.upsert.mockResolvedValue(emptyCart);
+    prismaMock.cartItem.aggregate.mockResolvedValue({ _sum: { quantity: 1 } } as never); // 1 already in the cart
+    prismaMock.orderItem.aggregate.mockResolvedValue({ _sum: { quantity: 0 } } as never);
+    const res = await addDeal(2);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('DEAL_LIMIT_REACHED');
+    expect(prismaMock.cartItem.create).not.toHaveBeenCalled();
+  });
+
+  it('409 DEAL_SOLD_OUT when the deal has no stock left', async () => {
+    prismaMock.deal.findFirst.mockResolvedValue({ ...serviceDealFixture, maxBookings: 5, limitPerCustomer: null });
+    prismaMock.dealPackage.findUnique.mockResolvedValue(dealPackageFixture);
+    prismaMock.cart.upsert.mockResolvedValue(emptyCart);
+    prismaMock.cartItem.aggregate.mockResolvedValue({ _sum: { quantity: 0 } } as never);
+    prismaMock.orderItem.aggregate.mockResolvedValue({ _sum: { quantity: 5 } } as never);
+    const res = await addDeal(1);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('DEAL_SOLD_OUT');
+  });
+
+  it('within the limit and stock the line is added', async () => {
+    prismaMock.deal.findFirst.mockResolvedValue({ ...serviceDealFixture, maxBookings: 5, limitPerCustomer: 3 });
+    prismaMock.dealPackage.findUnique.mockResolvedValue(dealPackageFixture);
+    prismaMock.cart.upsert.mockResolvedValue(emptyCart);
+    prismaMock.cartItem.findFirst.mockResolvedValue(null);
+    prismaMock.cartItem.aggregate.mockResolvedValue({ _sum: { quantity: 1 } } as never); // 1 in the cart + 2 = 3 = the limit
+    prismaMock.orderItem.aggregate.mockResolvedValue({ _sum: { quantity: 0 } } as never);
+    expect((await addDeal(2)).status).toBe(201);
+  });
 });
 
 describe('POST /api/v1/cart/items — Therapist line (therapistId + therapistPackageId)', () => {

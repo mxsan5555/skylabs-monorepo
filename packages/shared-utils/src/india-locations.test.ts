@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { INDIA_LOCATIONS, STATES, citiesForState } from './india-locations';
+import { INDIA_LOCATIONS, STATES, citiesForState, isIndiaLocation } from './india-locations';
 
 /**
  * Feature: Static India States/Cities dataset
@@ -18,20 +18,15 @@ import { INDIA_LOCATIONS, STATES, citiesForState } from './india-locations';
  */
 describe('citiesForState', () => {
   it('returns the correct subset of cities for a known state (happy path)', () => {
-    expect(citiesForState('Maharashtra')).toEqual([
-      'Mumbai',
-      'Pune',
-      'Nagpur',
-      'Nashik',
-      'Thane',
-      'Aurangabad',
-    ]);
+    const maharashtra = citiesForState('Maharashtra');
+    expect(maharashtra.slice(0, 3)).toEqual(['Mumbai', 'Pune', 'Nagpur']);
+    expect(maharashtra).toContain('Kolhapur');
   });
 
   it('returns a different, non-overlapping subset for another known state', () => {
     const kerala = citiesForState('Kerala');
     const maharashtra = citiesForState('Maharashtra');
-    expect(kerala).toEqual(['Kochi', 'Thiruvananthapuram', 'Kozhikode', 'Thrissur']);
+    expect(kerala.slice(0, 4)).toEqual(['Kochi', 'Thiruvananthapuram', 'Kozhikode', 'Thrissur']);
     // No cross-contamination between two different states' city lists.
     expect(kerala.some((city) => maharashtra.includes(city))).toBe(false);
   });
@@ -59,7 +54,16 @@ describe('citiesForState', () => {
     expect(citiesForState('MAHARASHTRA')).toEqual([]);
   });
 
-  it('returns a small union-territory state with exactly one city (boundary: minimal list)', () => {
-    expect(citiesForState('Sikkim')).toEqual(['Gangtok']);
+  it('returns a union territory with exactly one city (boundary: minimal list)', () => {
+    expect(citiesForState('Chandigarh')).toEqual(['Chandigarh']);
+  });
+});
+
+describe('isIndiaLocation', () => {
+  it('accepts a city of its own state only', () => {
+    expect(isIndiaLocation('Maharashtra', 'Pune')).toBe(true);
+    expect(isIndiaLocation('Karnataka', 'Pune')).toBe(false);
+    expect(isIndiaLocation('Maharashtra', 'pune')).toBe(false);
+    expect(isIndiaLocation('Atlantis', 'Pune')).toBe(false);
   });
 });

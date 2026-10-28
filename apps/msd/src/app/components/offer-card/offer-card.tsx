@@ -12,6 +12,7 @@ import { ProductCardGallery } from '../product-card-gallery';
 import { formatDistance } from '../therapist-card/therapist-card';
 import { ListingToolbar } from '../listing-toolbar/listing-toolbar';
 import content from '../../../content.json';
+import { dealHref } from '../../../catalog/catalog-shell';
 
 const t = content.offerCard;
 
@@ -102,7 +103,7 @@ export function OfferCard({ item, tag, color, variant = 'plain', layout = 'verti
       {...(card.originalPrice ? { 'original-price': formatINR(card.originalPrice) } : {})}
       {...(card.discount ? { discount: fillTemplate(t.discount, { percent: String(card.discount) }) } : {})}
       {...(rating ? { rating: rating.rating, reviews: rating.reviews } : {})}
-      href={isDeal ? `/deal/${id}` : `/products/${id}`}
+      href={isDeal ? dealHref(item.deal) : `/products/${id}`}
     >
       {gallery && <ProductCardGallery slot="media" images={gallery} alt={card.imageAlt} layout={layout} fill />}
       <ListingToolbar

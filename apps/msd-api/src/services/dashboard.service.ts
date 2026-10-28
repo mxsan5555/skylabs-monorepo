@@ -261,36 +261,27 @@ async function getVendorDashboardStats(
   ).toString();
 
   /*
-   * Vendor category access is queried separately because the
-   * category counts are based on VendorCategoryAccess.
+   * Categories and subcategories this member actually uses across its deals, products and
+   * therapists (D10: categories are open to every member, so there are no grants to count).
    */
-  const categories = await prisma.vendorCategoryAccess.count({
-    where: {
-      vendorId,
-      category: {
-        parentId: null,
-      },
-    },
-  });
-
-  /*
-   * Subcategories are inherited from the vendor's granted
-   * top-level categories.
-   */
-  const subCategories = await prisma.category.count({
-    where: {
-      parentId: {
-        not: null,
-      },
-      parent: {
-        vendorAccess: {
-          some: {
-            vendorId,
-          },
-        },
-      },
-    },
-  });
+  const [dealCats, productCats, therapistCats] = await Promise.all([
+    prisma.deal.findMany({ where: { vendorId }, select: { categoryId: true, subcategoryId: true }, distinct: ['categoryId', 'subcategoryId'] }),
+    prisma.product.findMany({ where: { vendorId }, select: { categoryId: true, subcategoryId: true }, distinct: ['categoryId', 'subcategoryId'] }),
+    prisma.therapist.findMany({ where: { vendorId, specializationCategoryId: { not: null } }, select: { specializationCategoryId: true }, distinct: ['specializationCategoryId'] }),
+  ]);
+  const usedCategoryIds = [
+    ...new Set(
+      [
+        ...dealCats.flatMap((d) => [d.categoryId, d.subcategoryId]),
+        ...productCats.flatMap((p) => [p.categoryId, p.subcategoryId]),
+        ...therapistCats.map((t) => t.specializationCategoryId),
+      ].filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const [categories, subCategories] = await Promise.all([
+    prisma.category.count({ where: { id: { in: usedCategoryIds }, parentId: null } }),
+    prisma.category.count({ where: { id: { in: usedCategoryIds }, parentId: { not: null } } }),
+  ]);
 
   return {
     /*
@@ -311,13 +302,12 @@ async function getVendorDashboardStats(
     branches,
 
     /*
-     * Number of top-level categories granted to this vendor.
+     * Number of top-level categories this member uses.
      */
     categories,
 
     /*
-     * Number of subcategories belonging to the vendor's
-     * granted top-level categories.
+     * Number of subcategories this member uses.
      */
     subCategories,
 

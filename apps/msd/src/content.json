@@ -440,9 +440,8 @@
       "home": "Home",
       "explore": "Explore"
     },
-    "errors": {
-      "loadDeals": "Could not load deals."
-    }
+    "loading": "Loading results…",
+    "loadError": "Could not load results."
   },
   "category": {
     "sortOptions": [
@@ -607,7 +606,6 @@
     },
     "dealsAriaLabelSuffix": "deals",
     "loading": "Loading category…",
-    "loadingDeals": "Loading deals…",
     "durationSuffix": "min",
     "offeringLabels": {
       "service": "Deal",
@@ -624,8 +622,7 @@
     },
     "errors": {
       "loadCategory": "Could not load category.",
-      "addToCart": "Could not add to cart.",
-      "loadDeals": "Could not load deals."
+      "addToCart": "Could not add to cart."
     },
     "notFound": {
       "metaTitle": "Category Not Found | MSD",
@@ -654,8 +651,6 @@
     "off": "{percent}% off",
     "originalPrice": "Original price {price}",
     "details": "Details",
-    "notes": "Notes",
-    "policy": "Policy",
     "terms": "Terms & Conditions",
     "cancellationPolicy": "Cancellation policy",
     "cancellationText": "Cancel up to 24 hours before your appointment for a full refund. Same-day cancellations are non-refundable.",
@@ -663,6 +658,10 @@
     "locationAndHours": "Location and hours",
     "hours": "Hours",
     "getDirections": "Get directions",
+    "map": {
+      "label": "Map of {name}",
+      "loading": "Loading map"
+    },
     "quantity": "Quantity",
     "decrease": "Decrease quantity",
     "increase": "Increase quantity",
@@ -676,7 +675,17 @@
     "copied": "Link copied",
     "thumbnails": "Gallery thumbnails",
     "viewImage": "View image {n} of {count}",
-    "related": "You May Also Like"
+    "related": "You May Also Like",
+    "gallery": {
+      "open": "Open image {n} of {count} full screen",
+      "dialog": "{title} photos",
+      "close": "Close full-screen view",
+      "previous": "Previous image",
+      "next": "Next image",
+      "counter": "{n} of {count}"
+    },
+    "soldOut": "Sold out",
+    "call": "Call {phone}"
   },
   "dealDetail": {
     "loading": "Loading deal…",
@@ -700,7 +709,9 @@
     "meta": {
       "titleSuffix": " | MSD",
       "defaultDescription": "Book {name} at MSD.",
-      "locationPrefix": "in"
+      "locationPrefix": "in",
+      "titleTemplate": "{title} at {member}, {city}",
+      "titleTemplateNoCity": "{title} at {member}"
     },
     "labels": {
       "service": "Deal",
@@ -741,7 +752,49 @@
       "5:00 PM",
       "6:00 PM"
     ],
-    "description": "Description"
+    "description": "Description",
+    "sections": {
+      "whatYouGet": "What you get",
+      "howToRedeem": "How to redeem",
+      "cancellation": "Cancellation",
+      "finePrint": "Fine print",
+      "eligibility": "Who can use it",
+      "therapists": "Therapists for this deal",
+      "about": "About {name}",
+      "faqs": "Questions and answers",
+      "related": "More {category} deals"
+    },
+    "highlights": "Highlights",
+    "redeem": {
+      "bookingRequired": "Book a time with the branch before you visit.",
+      "walkIn": "No booking needed: show your voucher at the branch.",
+      "validFor": "Use within {days} days of purchase.",
+      "validForOne": "Use within 1 day of purchase."
+    },
+    "cancellation": {
+      "FREE_24H": "Free cancellation up to 24 hours before your appointment.",
+      "FREE_48H": "Free cancellation up to 48 hours before your appointment.",
+      "NON_REFUNDABLE": "This deal is non-refundable."
+    },
+    "termsLink": "Read the MSD Terms of Service",
+    "availability": {
+      "soldOut": "Sold out",
+      "bought": "{count} bought",
+      "endsInDays": "Ends in {days}d {hours}h",
+      "endsInHours": "Ends in {hours}h",
+      "stockLeft": "Only {count} left",
+      "limit": "Up to {limit} per customer"
+    },
+    "package": {
+      "forPeople": "For {count} people",
+      "includes": "Includes"
+    },
+    "about": {
+      "website": "Visit website",
+      "allDeals": "See all deals from {name}",
+      "call": "Call {phone}"
+    },
+    "breadcrumbCity": "Deals in {city}"
   },
   "therapistDetail": {
     "loading": "Loading therapist…",
@@ -1834,7 +1887,9 @@
       "breadcrumb": "Deals",
       "chipsLabel": "Deal categories",
       "all": "All deals",
-      "ariaLabel": "Deal results"
+      "ariaLabel": "Deal results",
+      "loading": "Loading deals…",
+      "loadError": "Could not load deals."
     },
     "products": {
       "title": "Wellness products",
@@ -1846,7 +1901,9 @@
       "empty": {
         "heading": "No products found",
         "subheading": "Try another category or clear the filters."
-      }
+      },
+      "loading": "Loading products…",
+      "loadError": "Could not load products."
     },
     "therapists": {
       "title": "Therapists",
@@ -1856,7 +1913,9 @@
       "breadcrumb": "Therapists",
       "chipsLabel": "Therapy categories",
       "all": "All therapists",
-      "ariaLabel": "Therapist results"
+      "ariaLabel": "Therapist results",
+      "loading": "Loading therapists…",
+      "loadError": "Could not load therapists."
     }
   },
   "customerDashboard": {

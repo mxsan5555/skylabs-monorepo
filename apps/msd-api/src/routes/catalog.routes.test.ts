@@ -118,7 +118,7 @@ describe('GET /api/v1/catalog/deals', () => {
     expect(res.body.data[0].product).toBeUndefined();
   });
 
-  it('5/6/7/8/9. always filters to ACTIVE + APPROVED + active vendor + active branch (inactive/rejected/unapproved/inactive-vendor/inactive-branch all excluded by construction)', async () => {
+  it('5/6/7/8/9. always filters to ACTIVE + active vendor + active branch, with no approval step (D6)', async () => {
     prismaMock.deal.findMany.mockResolvedValue([]);
     prismaMock.deal.count.mockResolvedValue(0);
     await request(app).get('/api/v1/catalog/deals');
@@ -126,12 +126,12 @@ describe('GET /api/v1/catalog/deals', () => {
       expect.objectContaining({
         where: expect.objectContaining({
           status: 'ACTIVE',
-          approvalStatus: 'APPROVED',
           vendor: { status: 'ACTIVE' },
           branch: { isActive: true },
         }),
       }),
     );
+    expect(prismaMock.deal.findMany.mock.calls[0][0]!.where).not.toHaveProperty('approvalStatus');
   });
 
   it('never filters by productId — Deal has no Product concept (fully independent catalog entities)', async () => {
@@ -549,6 +549,26 @@ describe('GET /api/v1/catalog/products/:id', () => {
   });
 });
 
+describe('GET /api/v1/catalog/deals?search= (PLANNING §2.7)', () => {
+  const row = (id: string, title: string, member: string) => ({ ...serviceDealFixture, id, title, vendor: { ...serviceDealFixture.vendor, businessName: member } });
+
+  it('matches title, member, category, subcategory and city, and ranks title first, then member', async () => {
+    prismaMock.deal.findMany.mockResolvedValue([
+      row('a', 'Hair spa', 'Glow Salon'),
+      row('b', 'Head massage', 'Massage Hub'),
+      row('c', 'Massage for two', 'Zen'),
+      row('d', 'Swedish massage', 'Zen'),
+    ]);
+    prismaMock.deal.count.mockResolvedValue(4);
+    const res = await request(app).get('/api/v1/catalog/deals?search=massage');
+    expect(res.status).toBe(200);
+    expect(res.body.data.map((d: { id: string }) => d.id)).toEqual(['c', 'b', 'd', 'a']);
+    const where = prismaMock.deal.findMany.mock.calls[0][0]!.where as { OR: Record<string, unknown>[] };
+    expect(where.OR.map((clause) => Object.keys(clause)[0])).toEqual(['title', 'vendor', 'category', 'subcategory', 'branch']);
+    expect(prismaMock.deal.findMany.mock.calls[0][0]).toMatchObject({ take: 500 });
+  });
+});
+
 describe('GET /api/v1/catalog/deals/:id', () => {
   it('returns 404 for a deal that fails the visibility filter (inactive/rejected/unapproved/hidden vendor or branch)', async () => {
     prismaMock.deal.findFirst.mockResolvedValue(null); // simulates the where-clause excluding it
@@ -556,15 +576,67 @@ describe('GET /api/v1/catalog/deals/:id', () => {
     expect(res.status).toBe(404);
   });
 
+  const detailFixture = {
+    ...serviceDealFixture,
+    discountPercent: 25,
+    shortDescription: 'Sharp cut in 30 minutes',
+    maxBookings: 20,
+    packages: [
+      { id: 'pkg-1', durationMinutes: 30, persons: 1, name: null, inclusions: [], sellingPrice: '299.00', originalPrice: '399.00' },
+      { id: 'pkg-2', durationMinutes: 60, persons: 2, name: 'Couple', inclusions: ['Hair wash'], sellingPrice: '500.00', originalPrice: null },
+    ],
+    faqs: [{ id: 'faq-1', question: 'Walk-ins?', answer: 'Book first.' }],
+    therapistLinks: [{ therapist: { id: 'th-1', personName: 'Asha' } }],
+  };
+
   it('returns a visible deal by id, applying the same visibility where-clause as the list', async () => {
-    prismaMock.deal.findFirst.mockResolvedValue(serviceDealFixture);
+    prismaMock.deal.findFirst.mockResolvedValue(detailFixture);
+    prismaMock.orderItem.aggregate.mockResolvedValue({ _sum: { quantity: 3 } } as never);
     const res = await request(app).get(`/api/v1/catalog/deals/${DEAL_ID}`);
     expect(res.status).toBe(200);
-    expect(prismaMock.deal.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ id: DEAL_ID, status: 'ACTIVE', approvalStatus: 'APPROVED' }),
-      }),
-    );
+    const where = prismaMock.deal.findFirst.mock.calls[0][0]!.where;
+    expect(where).toMatchObject({ id: DEAL_ID, status: 'ACTIVE', vendor: { status: 'ACTIVE' }, branch: { isActive: true } });
+    expect(where).not.toHaveProperty('approvalStatus');
+  });
+
+  it('carries the deal page fields: tagline, currency, per-package discount, stock, therapists (PLANNING §2.7)', async () => {
+    prismaMock.deal.findFirst.mockResolvedValue(detailFixture);
+    prismaMock.orderItem.aggregate.mockResolvedValue({ _sum: { quantity: 3 } } as never);
+    const res = await request(app).get(`/api/v1/catalog/deals/${DEAL_ID}`);
+    const deal = res.body.data;
+    expect(deal.tagline).toBe('Sharp cut in 30 minutes');
+    expect(deal.currency).toBe('INR');
+    expect(deal.packages.map((p: { discountPercent: number | null }) => p.discountPercent)).toEqual([25, null]);
+    expect(deal.stockLeft).toBe(17);
+    expect(deal.isSoldOut).toBe(false);
+    expect(deal.boughtCount).toBeNull(); // under 10 paid units
+    expect(deal.therapists).toEqual([{ id: 'th-1', personName: 'Asha' }]);
+    expect(deal).not.toHaveProperty('therapistLinks');
+    expect(deal).not.toHaveProperty('maxBookings');
+  });
+
+  it('shows the bought count from 10 paid units and sold out at 0 stock', async () => {
+    prismaMock.deal.findFirst.mockResolvedValue(detailFixture);
+    prismaMock.orderItem.aggregate.mockResolvedValue({ _sum: { quantity: 20 } } as never);
+    const res = await request(app).get(`/api/v1/catalog/deals/${DEAL_ID}`);
+    expect(res.body.data.boughtCount).toBe(20);
+    expect(res.body.data.isSoldOut).toBe(true);
+  });
+
+  it('opens a deal by its current or an old slug (PLANNING §2.7 URLs)', async () => {
+    prismaMock.deal.findFirst.mockResolvedValue(detailFixture);
+    prismaMock.orderItem.aggregate.mockResolvedValue({ _sum: { quantity: 0 } } as never);
+    const res = await request(app).get('/api/v1/catalog/deals/old-haircut-slug');
+    expect(res.status).toBe(200);
+    expect(res.body.data.slug).toBe('haircut-deal');
+    expect(prismaMock.deal.findFirst.mock.calls[0][0]!.where).toMatchObject({
+      OR: [{ slug: 'old-haircut-slug' }, { previousSlugs: { has: 'old-haircut-slug' } }],
+    });
+  });
+
+  it('422s for a malformed id or slug', async () => {
+    const res = await request(app).get('/api/v1/catalog/deals/bad%20slug!');
+    expect(res.status).toBe(422);
   });
 });
 

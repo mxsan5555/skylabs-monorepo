@@ -1,12 +1,9 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { FilledButton } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import {
   getCatalogCategory,
-  getCatalogDealFacets,
-  getCatalogProductFacets,
-  getCatalogTherapistFacets,
   listCatalogDeals,
   listCatalogProducts,
   listCatalogTherapists,
@@ -26,13 +23,10 @@ import { PageHeadLogo } from '../../components/section-head/page-head-logo';
 import { ChipNav } from '../../components/chip-nav/chip-nav';
 import { ClampText } from '../../components/clamp-text/clamp-text';
 import { ListingBody } from '../../components/listing/listing-body';
-import { countText, pickSort, sortOptionsFor, sortValuesFor, useListingParams, type ListingKind } from '../../components/listing/listing-params';
-import { useListingFacets } from '../../components/listing/use-listing-facets';
-import { listingCards, listingNoun } from '../../components/listing/listing-cards';
-import type { DealMapPoint } from '../../components/deal-map/deal-map';
-import type { ListingFacets } from '../../components/filter-panel/filter-panel';
+import { countText, kindOfCategoryType, pickSort, sortOptionsFor, sortValuesFor, useListingParams } from '../../components/listing/listing-params';
+import { LISTING_FACETS, useListingFacets } from '../../components/listing/use-listing-facets';
+import { dealMapPoints, listingCards, listingLoadError, listingNoun } from '../../components/listing/listing-cards';
 import { usePagedList } from '../../../hooks/use-paged-list';
-import { formatINR } from '../../../utils/format';
 import { useVisitorLocation } from '../../../location/location-context';
 import { citySlug, cityHref, categoryHref, useCatalogShell } from '../../../catalog/catalog-shell';
 import { categoryDataKey, usePrerenderedData } from '../../../prerender-data/prerender-data';
@@ -47,14 +41,6 @@ const t = content.category;
 /** SERVICE (or untyped, legacy) categories list deals; PRODUCT/THERAPY list their own entities. */
 function isDealCategory(category: CatalogCategoryWithChildren): boolean {
   return category.type !== 'PRODUCT' && category.type !== 'THERAPY';
-}
-const FACETS: Record<ListingKind, (opts: object) => Promise<{ data: ListingFacets | null | undefined }>> = {
-  deals: getCatalogDealFacets,
-  products: getCatalogProductFacets,
-  therapists: getCatalogTherapistFacets,
-};
-function kindOf(category: CatalogCategoryWithChildren | null): ListingKind {
-  return category?.type === 'PRODUCT' ? 'products' : category?.type === 'THERAPY' ? 'therapists' : 'deals';
 }
 
 /**
@@ -113,7 +99,7 @@ export function Category() {
     return () => { cancelled = true; };
   }, [slug, initial]);
 
-  const kind = kindOf(category);
+  const kind = kindOfCategoryType(category?.type);
   const subSlug = searchParams.get('sub');
   const subcategoryIdx = (category?.children.findIndex((c) => c.slug === subSlug) ?? -1) + 1;
   const activeSubcategory = subcategoryIdx === 0 ? undefined : category?.children[subcategoryIdx - 1];
@@ -123,7 +109,8 @@ export function Category() {
   const lng = coords?.longitude ?? undefined;
   const ready = !!category && !cityPending && !cityMissing;
   const located = kind !== 'products';
-  const city = located ? cityLocation : undefined;
+  // City pages exist for deal categories only; therapists here follow the visitor's location.
+  const city = kind === 'deals' ? cityLocation : undefined;
 
   // One filter set per kind, shared by the list and its facets (facets drop paging and sort).
   const base = {
@@ -147,7 +134,7 @@ export function Category() {
   const listKey = JSON.stringify([kind, base, sort]);
   const isDefaultView = !activeSubcategory && !sort && minPrice == null && maxPrice == null && lat == null && lng == null &&
     radius == null && vendorIds.length === 0 && branchIds.length === 0 && tags.length === 0;
-  const loadError = (err: unknown) => (err instanceof ApiRequestError ? err.message : t.errors.loadDeals);
+  const loadError = listingLoadError(kind);
 
   const dealList = usePagedList<CatalogDeal>(
     (page) => listCatalogDeals({ ...base, page, pageSize: CATEGORY_PAGE_SIZE, sort: sort as CatalogDealSort | undefined }),
@@ -170,26 +157,15 @@ export function Category() {
   );
   const list = kind === 'therapists' ? therapistList : kind === 'products' ? productList : dealList;
 
-  const facets = useListingFacets<typeof base>(ready ? FACETS[kind] : null, base, category?.id);
+  const facets = useListingFacets<typeof base>(ready ? LISTING_FACETS[kind] : null, base, category?.id);
 
   const deals = dealList.items;
-  const mapPoints = useMemo<DealMapPoint[]>(
-    () =>
-      kind !== 'deals'
-        ? []
-        : deals.flatMap((d) =>
-            d.branch?.latitude != null && d.branch?.longitude != null
-              ? [{ id: d.id, lat: Number(d.branch.latitude), lng: Number(d.branch.longitude), label: formatINR(Number(d.salePrice)), title: d.title, href: `/deal/${d.id}` }]
-              : [],
-          ),
-    [deals, kind],
-  );
-
   if (categoryLoading || cityPending) { return <p className="loading-state"> {t.loading}</p>; }
   if (categoryError || !category || cityMissing) {
     return (
       <PageSection stack aria-label={t.notFound.heading}>
         <Seo title={t.notFound.metaTitle} description={t.notFound.subheading} path={categoryHref(slug)} noindex />
+        <h1 className="sr-only">{t.notFound.heading}</h1>
         <sky-info-card icon="search_off" heading={t.notFound.heading} subheading={categoryError || t.notFound.subheading} />
         <div>
           <FilledButton onClick={() => navigate('/categories')}>{t.notFound.cta}</FilledButton>
@@ -260,8 +236,7 @@ export function Category() {
         sort={sort}
         list={list}
         cards={cards}
-        empty={kind === 'therapists' ? t.emptyTherapists : t.emptyDeals}
-        mapPoints={mapPoints}
+        mapPoints={kind === 'deals' ? dealMapPoints(deals) : undefined}
       />
     </>
   );

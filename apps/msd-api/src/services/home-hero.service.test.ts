@@ -86,7 +86,7 @@ describe('getPublicHomeHero — publish gate + fallback', () => {
     expect(call.where.isActive).toBe(true);
     const [dealBranch, productBranch] = call.where.OR;
     expect(dealBranch.deal.is.status).toBe('ACTIVE');
-    expect(dealBranch.deal.is.approvalStatus).toBe('APPROVED');
+    expect(dealBranch.deal.is).not.toHaveProperty('approvalStatus'); // no approval step (D6)
     expect(productBranch.product.is.isActive).toBe(true);
   });
 
@@ -205,8 +205,8 @@ describe('reorderSlides', () => {
 
 describe('admin slide rows', () => {
   it('say why an item is hidden from customers', () => {
-    expect(ineligibleReason({ deal: { status: 'ACTIVE', approvalStatus: 'APPROVED', vendor: { status: 'ACTIVE' }, branch: { isActive: false } }, product: null })).toBe('Branch paused');
-    expect(ineligibleReason({ deal: { status: 'DRAFT', approvalStatus: 'APPROVED', vendor: { status: 'ACTIVE' }, branch: { isActive: true } }, product: null })).toBe('Deal is draft');
+    expect(ineligibleReason({ deal: { status: 'ACTIVE', vendor: { status: 'ACTIVE' }, branch: { isActive: false } }, product: null })).toBe('Branch paused');
+    expect(ineligibleReason({ deal: { status: 'DRAFT', vendor: { status: 'ACTIVE' }, branch: { isActive: true } }, product: null })).toBe('Deal is draft');
     expect(ineligibleReason({ deal: null, product: { isActive: true, vendor: { status: 'SUSPENDED' } } })).toBe('Member is suspended');
     expect(ineligibleReason({ deal: null, product: { isActive: false, vendor: { status: 'ACTIVE' } } })).toBe('Product is paused');
     expect(ineligibleReason({ deal: null, product: { isActive: true, vendor: { status: 'ACTIVE' } } })).toBeNull();

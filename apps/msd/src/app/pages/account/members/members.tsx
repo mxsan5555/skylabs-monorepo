@@ -4,9 +4,7 @@ import { FilledButton, Icon } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import {
   getMyVendor,
-  listCategories,
   updateMyVendor,
-  type Category,
   type Vendor,
   type VendorFields,
 } from '../../../../api/rbac/vendors';
@@ -201,15 +199,6 @@ function SelfVendorManagement({ token }: { token: string | null }) {
   const { vendor, notFound, loading, saving, message, error, fieldErrors, save } = useMyVendor(token);
   // An inactive member may look but not change anything; admin-layout shows the view-only banner.
   const canEdit = bootstrap?.member?.status !== 'INACTIVE';
-  const [categories, setCategories] = useState<Category[]>([]);
-
-  useEffect(() => {
-    if (!vendor) {
-      setCategories([]);
-      return;
-    }
-    listCategories(token, { type: 'SERVICE', vendorId: vendor.id }).then(({ data }) => setCategories(data)).catch(() => setCategories([]));
-  }, [token, vendor?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- keyed on id, not object identity
 
   if (loading) {
     return (
@@ -256,7 +245,7 @@ function SelfVendorManagement({ token }: { token: string | null }) {
       {vendor && vendor.status === 'ACTIVE' && (
         <>
           <h2 className="section-title">My Branches &amp; Deals</h2>
-          <VendorBranches token={token} vendorId={vendor.id} isSelf canEdit canApproveDeal={false} categories={categories} />
+          <VendorBranches token={token} vendorId={vendor.id} isSelf canEdit />
         </>
       )}
     </div>

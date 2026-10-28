@@ -20,6 +20,8 @@ export interface MediaImage {
   sizeBytes: number;
   sortOrder: number;
   isPrimary: boolean;
+  /** Deal images only (PLANNING §2.7); the page falls back to the deal title. */
+  altText?: string | null;
 }
 
 export interface MediaVideo {
@@ -49,7 +51,10 @@ interface EntityRef {
 function basePath(ref: EntityRef): string {
   switch (ref.entityType) {
     case 'deal':
-      return `/vendors/me/branches/${ref.branchId}/deals/${ref.entityId}`;
+      // Member: own deal; staff: `vendorId` is the member the deal belongs to (API.md §2.2).
+      return ref.selfService === false && ref.vendorId
+        ? `/vendors/${ref.vendorId}/branches/${ref.branchId}/deals/${ref.entityId}`
+        : `/vendors/me/branches/${ref.branchId}/deals/${ref.entityId}`;
     case 'therapist':
       return ref.selfService ? `/vendors/me/therapists/${ref.entityId}` : `/vendors/${ref.vendorId}/therapists/${ref.entityId}`;
     case 'product':

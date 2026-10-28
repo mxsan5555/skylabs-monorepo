@@ -1,5 +1,6 @@
 import {
   getCatalogCategory,
+  getCatalogDeal,
   listCatalogCategories,
   listCatalogDeals,
   listCatalogFaqs,
@@ -10,6 +11,7 @@ import {
   listCatalogTherapists,
   type CatalogCategoryWithChildren,
   type CatalogDeal,
+  type CatalogDealDetail,
   type CatalogFaq,
   type CatalogLocation,
   type CatalogPopularTreatmentGroup,
@@ -164,4 +166,35 @@ export async function loadListingData(kind: 'deals' | 'products' | 'therapists',
   }
   const { data, meta } = await listCatalogDeals(where);
   return { items: (data ?? []).map(trimDeal), total: meta?.total ?? (data ?? []).length };
+}
+
+/** Payload for key `dealDataKey(slug)` (read by the deal page). `deal: null` means not found. */
+export interface DealData {
+  deal: CatalogDealDetail | null;
+}
+
+/** Most deal pages one build prerenders (100 per API page). */
+export const DEAL_PRERENDER_LIMIT = 2000;
+
+/** Slugs of every visible deal, for `/deal/<slug>` pages and the sitemap (PLANNING §2.7). */
+export async function loadDealSlugs(limit = DEAL_PRERENDER_LIMIT): Promise<string[]> {
+  const slugs: string[] = [];
+  for (let page = 1; slugs.length < limit; page += 1) {
+    const { data, meta } = await listCatalogDeals({ page, pageSize: 100 });
+    const rows = data ?? [];
+    slugs.push(...rows.map((d) => d.slug).filter(Boolean));
+    if (rows.length < 100 || slugs.length >= (meta?.total ?? 0)) break;
+  }
+  return [...new Set(slugs)].slice(0, limit);
+}
+
+/** One deal page's data; a 404 is `{ deal: null }`, other errors reject. */
+export async function loadDealData(slug: string): Promise<DealData> {
+  try {
+    const { data } = await getCatalogDeal(slug);
+    return { deal: data };
+  } catch (err) {
+    if (err instanceof ApiRequestError && err.status === 404) return { deal: null };
+    throw err;
+  }
 }

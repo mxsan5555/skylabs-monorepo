@@ -30,3 +30,6 @@ export const categoryDataKey = (slug: string, city?: string) => (city ? `categor
 /** Key for a listing page's first page (`/deals`, `/products`, `/therapists`, optionally a city). */
 export const listingDataKey = (kind: 'deals' | 'products' | 'therapists', city?: string) =>
   city ? `listing:${kind}:${city}` : `listing:${kind}`;
+
+/** Key for a deal page (`/deal/:slug`, PLANNING §2.7): `{ deal }`, null when the slug is unknown. */
+export const dealDataKey = (slug: string) => `deal:${slug}`;

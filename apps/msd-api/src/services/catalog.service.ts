@@ -9,6 +9,8 @@ import { VISIBLE_DEAL_WHERE, VISIBLE_PRODUCT_WHERE, VISIBLE_THERAPIST_WHERE } fr
 import { listActiveCategories, getActiveCategoryBySlugOrThrow } from './category.service';
 import { getActiveTagNamesFor } from './popular-tag.service';
 import { getPublicTreatmentDirectory } from './popular-treatment.service';
+import { paidUnits, stockLeft } from './deal-limits';
+import { discountOf } from './deal-pricing';
 // Home Hero's public read is NOT wrapped here — home-hero.service.ts imports
 // `VISIBLE_DEAL_WHERE`/`PUBLIC_DEAL_SELECT` FROM this file, so importing it back here would be a
 // circular module dependency. `catalog.routes.ts` calls `homeHeroService.getPublicHomeHero`
@@ -311,8 +313,6 @@ export const PUBLIC_DEAL_SELECT = {
   shortDescription: true,
   description: true,
   termsAndConditions: true,
-  notes: true,
-  policy: true,
   originalPrice: true,
   salePrice: true,
   discountPercent: true,
@@ -332,6 +332,57 @@ export const PUBLIC_DEAL_SELECT = {
   mediaImages: { orderBy: PUBLIC_MEDIA_IMAGE_ORDER_BY, select: PUBLIC_MEDIA_IMAGE_SELECT },
   mediaVideo: { select: PUBLIC_MEDIA_VIDEO_SELECT },
 } as const;
+
+const PUBLIC_DEAL_FAQ_ORDER_BY: Prisma.DealFaqOrderByWithRelationInput[] = [{ sortOrder: 'asc' }];
+
+/** Deal page (`GET /catalog/deals/:idOrSlug`, PLANNING §2.7): the card fields plus everything the
+ *  page shows, so the page needs no second call. Still an allow-list: no stock counts, owner,
+ *  KYC or bank fields. */
+const PUBLIC_DEAL_DETAIL_SELECT = {
+  ...PUBLIC_DEAL_SELECT,
+  highlights: true,
+  eligibility: true,
+  bookingRequired: true,
+  bookingInstructions: true,
+  validityDays: true,
+  limitPerCustomer: true,
+  maxBookings: true,
+  cancellationPolicy: true,
+  cancellationNote: true,
+  startDate: true,
+  updatedAt: true,
+  vendor: { select: { ...PUBLIC_VENDOR_SELECT, businessDescription: true, website: true } },
+  branch: {
+    select: {
+      ...PUBLIC_BRANCH_SELECT,
+      addressLine2: true,
+      state: true,
+      pincode: true,
+      phone: true,
+      mapLocationUrl: true,
+      openingHours: true,
+    },
+  },
+  packages: {
+    where: { isActive: true },
+    orderBy: PUBLIC_DEAL_PACKAGE_ORDER_BY,
+    select: { ...PUBLIC_DEAL_PACKAGE_SELECT, name: true, persons: true, inclusions: true },
+  },
+  mediaImages: { orderBy: PUBLIC_MEDIA_IMAGE_ORDER_BY, select: { ...PUBLIC_MEDIA_IMAGE_SELECT, altText: true } },
+  faqs: { orderBy: PUBLIC_DEAL_FAQ_ORDER_BY, select: { id: true, question: true, answer: true } },
+  therapistLinks: {
+    where: { therapist: VISIBLE_THERAPIST_WHERE },
+    select: { therapist: { select: PUBLIC_THERAPIST_LISTING_SELECT } },
+  },
+} as const;
+
+/** Most rows a ranked search loads (short queries match a lot; ranking happens in memory). */
+const SEARCH_RANK_LIMIT = 500;
+
+/** "{n} bought" only from this many paid units (PLANNING §2.7). */
+const BOUGHT_COUNT_MIN = 10;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 
 /** The visibility bars live in catalog-visibility.ts (no service imports, so no cycles). */
 export { VISIBLE_DEAL_WHERE, VISIBLE_PRODUCT_WHERE, VISIBLE_THERAPIST_WHERE } from './catalog-visibility';
@@ -464,10 +515,24 @@ export function buildDealWhere(opts: DealWhereOpts) {
           OR: [
             { title: { contains: opts.search, mode: 'insensitive' as const } },
             { vendor: { is: { businessName: { contains: opts.search, mode: 'insensitive' as const } } } },
+            { category: { is: { name: { contains: opts.search, mode: 'insensitive' as const } } } },
+            { subcategory: { is: { name: { contains: opts.search, mode: 'insensitive' as const } } } },
+            { branch: { is: { city: { contains: opts.search, mode: 'insensitive' as const } } } },
           ],
         }
       : {}),
   };
+}
+
+/** Search rank (PLANNING §2.7): title starts with the query, title contains it, member name,
+ *  then category, subcategory or city. Lower is better; stable for ties. */
+export function searchRank(row: { title: string; vendor?: { businessName: string | null } | null }, query: string): number {
+  const q = query.trim().toLowerCase();
+  const title = row.title.toLowerCase();
+  if (title.startsWith(q)) return 0;
+  if (title.includes(q)) return 1;
+  if ((row.vendor?.businessName ?? '').toLowerCase().includes(q)) return 2;
+  return 3;
 }
 
 export async function listPublicDeals(
@@ -525,6 +590,20 @@ export async function listPublicDeals(
     const page = ranked.slice((opts.page - 1) * opts.pageSize, (opts.page - 1) * opts.pageSize + opts.pageSize);
     const items = await withDealPopularTags(tagged(page));
     return { items, total };
+  }
+
+  if (opts.search?.trim() && sort === 'relevance') {
+    const [allRows, matched] = await Promise.all([
+      prisma.deal.findMany({ where, orderBy, take: SEARCH_RANK_LIMIT, select: PUBLIC_DEAL_SELECT }),
+      prisma.deal.count({ where }),
+    ]);
+    const query = opts.search;
+    const ranked = allRows
+      .map((row, index) => ({ row, index, rank: searchRank(row, query) }))
+      .sort((a, b) => a.rank - b.rank || a.index - b.index)
+      .map((r) => r.row);
+    const page = ranked.slice((opts.page - 1) * opts.pageSize, opts.page * opts.pageSize);
+    return { items: await withDealPopularTags(tagged(page)), total: Math.min(matched, SEARCH_RANK_LIMIT) };
   }
 
   const [rows, total] = await Promise.all([
@@ -587,24 +666,46 @@ export async function getPublicDealFacets(
 export async function listPublicLocations() {
   const rows = await prisma.branch.groupBy({
     by: ['state', 'city'],
-    where: { isActive: true, vendor: { status: 'ACTIVE' }, state: { not: null }, city: { not: null } },
+    // State and city are required columns (S22), so every active branch has both.
+    where: { isActive: true, vendor: { status: 'ACTIVE' } },
     _avg: { latitude: true, longitude: true },
     orderBy: [{ state: 'asc' }, { city: 'asc' }],
   });
   const toNumber = (v: unknown) => (v == null ? null : Number(v));
   return rows.map((r) => ({
-    state: r.state as string,
-    city: r.city as string,
+    state: r.state,
+    city: r.city,
     latitude: toNumber(r._avg.latitude),
     longitude: toNumber(r._avg.longitude),
   }));
 }
 
-export async function getPublicDealOrThrow(id: string) {
-  const deal = await prisma.deal.findFirst({ where: { id, ...VISIBLE_DEAL_WHERE }, select: PUBLIC_DEAL_SELECT });
+/**
+ * The deal page (`GET /catalog/deals/:idOrSlug`, API.md §4): a UUID, the current slug or an old
+ * slug; the response always carries the current `slug` so the page can replace its URL. Hidden
+ * deals are a 404.
+ */
+export async function getPublicDealOrThrow(idOrSlug: string) {
+  const match = UUID_RE.test(idOrSlug) ? { id: idOrSlug } : { OR: [{ slug: idOrSlug }, { previousSlugs: { has: idOrSlug } }] };
+  const deal = await prisma.deal.findFirst({ where: { ...match, ...VISIBLE_DEAL_WHERE }, select: PUBLIC_DEAL_DETAIL_SELECT });
   if (!deal) throw new ApiError('NOT_FOUND', 'Deal not found');
-  const [withTags] = await withDealPopularTags([deal]);
-  return withTags;
+
+  const now = new Date();
+  const [hot, sold] = await Promise.all([getHotIds('deal', now), paidUnits(deal.id)]);
+  const [withTags] = await withDealPopularTags(withOfferTags([deal], (d) => d.discountPercent, hot, now));
+  const { therapistLinks, maxBookings, shortDescription, packages, ...rest } = withTags;
+  const left = stockLeft(maxBookings, sold);
+  return {
+    ...rest,
+    shortDescription,
+    tagline: shortDescription,
+    currency: 'INR' as const,
+    boughtCount: sold >= BOUGHT_COUNT_MIN ? sold : null,
+    isSoldOut: left === 0,
+    stockLeft: left,
+    packages: packages.map((p) => ({ ...p, discountPercent: discountOf(p.sellingPrice, p.originalPrice) })),
+    therapists: therapistLinks.map((link) => link.therapist),
+  };
 }
 
 export interface ProductWhereOpts {

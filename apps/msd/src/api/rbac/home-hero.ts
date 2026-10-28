@@ -26,7 +26,6 @@ export interface HomeHeroSlide {
     title: string;
     slug: string;
     status: string;
-    approvalStatus: string;
     vendor: { id: string; businessName: string; status: string };
     branch: { id: string; name: string; state: string | null; isActive: boolean };
   } | null;

@@ -343,25 +343,11 @@ describe('DELETE /api/v1/categories/:id', () => {
     expect(prismaMock.category.delete).not.toHaveBeenCalled();
   });
 
-  it('returns 409 when the category is still granted to a vendor', async () => {
+  it('deletes when no deal or product uses it; old grant rows go with it (cascade, D10)', async () => {
     resolveMock.mockResolvedValue(['masters.categories:delete']);
     prismaMock.category.findUnique.mockResolvedValue(childFixture);
     prismaMock.deal.count.mockResolvedValue(0);
     prismaMock.product.count.mockResolvedValue(0);
-    prismaMock.vendorCategoryAccess.count.mockResolvedValue(1);
-    const res = await request(app)
-      .delete(`/api/v1/categories/${CHILD_ID}`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
-    expect(res.status).toBe(409);
-    expect(prismaMock.category.delete).not.toHaveBeenCalled();
-  });
-
-  it('deletes successfully when unreferenced', async () => {
-    resolveMock.mockResolvedValue(['masters.categories:delete']);
-    prismaMock.category.findUnique.mockResolvedValue(childFixture);
-    prismaMock.deal.count.mockResolvedValue(0);
-    prismaMock.product.count.mockResolvedValue(0);
-    prismaMock.vendorCategoryAccess.count.mockResolvedValue(0);
     prismaMock.category.delete.mockResolvedValue(childFixture);
     const res = await request(app)
       .delete(`/api/v1/categories/${CHILD_ID}`)
