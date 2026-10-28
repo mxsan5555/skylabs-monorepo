@@ -16,6 +16,8 @@ const dealRow = {
   salePrice: '1299.00',
   status: 'ACTIVE',
   approvalStatus: 'APPROVED',
+  discountPercent: 20,
+  endDate: null,
   vendor: { businessName: 'Urban Spa', status: 'ACTIVE' },
   branch: { name: 'Hazratganj', isActive: true },
   mediaImages: [{ storageKey: 'members/m1/deals/deal-1/a.jpg' }],
@@ -52,6 +54,9 @@ describe('searchStateItems (D23)', () => {
         price: '1299.00',
         image: 'members/m1/deals/deal-1/a.jpg',
         eligible: true,
+        status: 'ACTIVE',
+        discountPercent: 20,
+        endDate: null,
       },
     ]);
   });

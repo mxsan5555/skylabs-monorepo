@@ -43,13 +43,13 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 4 | Storefront | 2 | 32 | 6 |
 | 5 | Static content | 0 | 5 | 0 |
 | 6 | CTA banners | 4 | 5 | 80 |
-| 7 | Home slider | 7 | 8 | 88 |
+| 7 | Home slider | 13 | 14 | 93 |
 | 8 | Masters | 0 | 1 | 0 |
 | 9 | Payments, payouts and reports | 0 | 11 | 0 |
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
 | 12 | Platform, security and release | 7 | 69 | 10 |
-| | **Total** | **60** | **266** | **23** |
+| | **Total** | **66** | **272** | **24** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -280,6 +280,12 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [x] | SL-07 | FE | Home hero console revamp (D28): overview table of every slider, then a two-pane builder (ordered slide cards with drag and move buttons, Undo on remove, inline browse-and-add panel); `GET /home-hero/overview`, `PUT /home-hero/slides/order`, `eligibleOnly` search | L | SL-05 | Merged: `home-hero.tsx`, `home-hero-builder.tsx`, `state-item-picker.tsx` with tests; service tests for overview and reorder |
 | [x] | SL-08 | FE | Hero slider: two outlined feature cards at a time, no fill (container query, one and a peek on phones), action in the card slot (Book now / Add to cart), autoplay off for reduced motion; shared-ui `sky-product-card` media fills its frame and shows a placeholder for a broken image, `sky-feature-card` too (one shared `media-placeholder`), and the feature card tints slotted action buttons to its accent; one `useAddProductToCart` hook and `cartToast` copy for the hero and category cards; `fillTemplate` for content placeholders; Service / Product badge (`sky-feature-card` `badge`) and a wishlist toggle in each hero card's actions, equal-height slides with aligned buttons (`headline-lines`/`text-lines` clamp) (existing wishlist context through one `useWishlistToggle` hook, shared with the home cards) | S | SL-06 | Merged: `home.test.tsx` hero tests, `use-wishlist-toggle.test.tsx`, `sky-feature-card.test.ts` badge tests, `sky-product-card.test.ts` media tests; checked at 1440 and 390 px |
 | [ ] | SL-01 | BIZ | Write the home slider rules in PLANNING.md §7 (slide count, schedule, image sizes, alt text) and review the existing Home Hero screen against them | S | - | Rules approved; gaps added here as tasks; partly: built behaviour written in PLANNING.md §7 (state picker, deal slides, 5-slide rule, Global fallback); own banner image, schedule and image rules open |
+| [x] | HT-01 | DB | Home Tag Sections: `HomeTagSection` (state x tag, `isEnabled`) + `HomeTagSectionItem` (ordered deals) + `HomeTagSectionTag` enum; partial unique indexes for the Postgres NULL-distinctness gap | S | SL-03 | Merged: migration `20261028100000_home_tag_sections` + `down.sql`, rehearsed this session (rolled back once to add the Prisma-ergonomics unique index, re-applied) |
+| [x] | HT-02 | BE | `home-tag-section.service.ts`: eligibility (hero's checks + Expire-soon-only future-`endDate` rule, no end date = ineligible), overview, always-4-rows-per-state, item add/remove/reorder (duplicate 409, out-of-state 422), public per-tag fallback (a configured state row never falls back to Global) | L | HT-01 | Merged: 25 tests in `home-tag-section.service.test.ts` |
+| [x] | HT-03 | SH | `state-catalog.service.ts`/`StateItem` gains optional `status`/`discountPercent`/`endDate` on deal results (Home Hero/Promotions unaffected, fields just unused there) | S | HT-02 | Merged: `state-catalog.service.test.ts` updated, 8/8 green |
+| [x] | HT-04 | BE | `/home-tag-sections/*` admin routes + `GET /catalog/home-tag-sections` public route; menu node `masters.home-tag-sections`; seed grants (`MASTERS_SUB_KEYS`/`EXTRA_ACTIONS_BY_MENU_KEY`); audit logging | M | HT-02 | Merged: `home-tag-sections.routes.ts`, `app.ts`/`catalog.routes.ts` mounts, `msd-menu.json`, `seed.ts`; reseeded locally (255 Permission rows, was 251) |
+| [x] | HT-05 | FE | Three admin screens: overview (states + Global), state page (always 4 tag rows + Enabled switch), builder (Home Hero builder's layout, `dealsOnly` picker mode showing status/discount/expiry) | L | HT-04 | Merged: `masters/home-tag-sections{,-state,-builder}.tsx`, `api/rbac/home-tag-sections.ts`, routes in `routes.tsx`; `state-item-picker.tsx` gained the `dealsOnly` prop (Home Hero/Promotions rendering unchanged, 6/6 picker tests still green); 16 component tests |
+| [x] | HT-06 | FE | Storefront: 4 rails (New, Hot Deal, Deal, Expire soon fixed order) after Hero + Deals Near You, before How It Works; `PageSection`/`CardRail`/`OfferCard`, only rendered deals the server resolved | M | HT-04 | Merged: `pages/home/home-tag-sections.tsx` wired into `home.tsx`; `content.json` copy; 6 component tests |
 
 ## 8. Masters
 

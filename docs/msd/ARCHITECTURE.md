@@ -262,6 +262,41 @@ category page, explore, deal detail and product detail.
 - **Storefront** (`pages/home/home-hero.tsx`): h1 and search left; right side a Swiper carousel of
   `HeroItemCard` (deal or product) for the visitor's state.
 
+### 7.1 Home tag sections (built 2026-10-28, PLANNING.md §7.1)
+
+`HomeTagSection` (state x tag, `isEnabled`) + `HomeTagSectionItem` (ordered deals, manually picked
+by the admin — never computed); service `home-tag-section.service.ts`; console
+`pages/account/masters/home-tag-sections{,-state,-builder}.tsx`; public
+`GET /catalog/home-tag-sections`.
+
+- **Three admin screens**, deliberately one level deeper than the hero's two: overview (states +
+  Global, `GET /home-tag-sections/overview`) → state page (always all 4 fixed tag rows — New,
+  Deal, Hot Deal, Expire soon — each an Enabled switch upserting `PUT /home-tag-sections/sections`
+  on toggle) → one tag's builder (`home-tag-sections-builder.tsx`, the Home Hero builder's exact
+  ordered-list-plus-`StateItemPicker` layout and CSS, `dealsOnly` so the picker hides the
+  All/Deals/Products filter and shows each candidate's status/discount/`endDate` instead — the tag
+  is the admin's own judgement call, the picker never computes it). Opening a tag that was never
+  enabled lazily creates its (disabled) `HomeTagSection` row so deals can be curated before
+  switching it on.
+- **Eligibility** (`ineligibleReason`) mirrors the hero's deal checks exactly (member active,
+  branch active, deal `ACTIVE`, `approvalStatus APPROVED`), plus one Expire-soon-only rule: the
+  deal needs a future `endDate` — no end date at all is ineligible there too (2026-10-28 decision,
+  no arbitrary day-window). `MIN_ELIGIBLE_ITEMS_PER_TAG_SECTION = 1`, not the hero's 5 — each tag
+  rail is useful with a single deal, and the admin's manual curation is already the quality gate.
+- **Public resolution is per-tag, not per-state** (the hero's one all-or-nothing swap does not
+  apply here): each of the 4 tags is decided on its own — the visitor's state's own row for that
+  tag if one is configured at all (enabled or not, eligible or not — a configured state row never
+  falls back to Global for that tag); otherwise Global/Default's row for the same tag. A tag with
+  nothing eligible anywhere is simply absent.
+- **Storefront** (`pages/home/home-tag-sections.tsx`, placed right after Deals Near You): up to 4
+  independent `PageSection` + `CardRail` rails of `OfferCard`s (no hero-style carousel, every item
+  is a deal), in a fixed order — New, Hot Deal, Deal, Expire soon — deliberately different from the
+  admin screen's row order (New, Deal, Hot Deal, Expire soon).
+- **Shared, additive-only changes**: `state-catalog.service.ts`'s `StateItem`/`searchStateItems`
+  gained optional `status`/`discountPercent`/`endDate` on deal results (Home Hero and Promotions
+  ignore the extra fields, unchanged); `state-item-picker.tsx` gained the `dealsOnly` prop (unset
+  for Home Hero/Promotions, so their rendering is byte-for-byte unchanged).
+
 ## 8. Masters
 
 Categories (`Category`, `CategoryImage`, types `SERVICE | PRODUCT | THERAPY`), popular tags and

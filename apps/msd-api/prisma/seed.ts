@@ -97,6 +97,7 @@ const EXTRA_ACTIONS_BY_MENU_KEY: Record<string, PermissionAction[]> = {
   'masters.popular-treatments': ['create', 'edit', 'delete'],
   'masters.promotions': ['create', 'edit', 'delete'],
   'masters.home-hero': ['create', 'edit', 'delete'],
+  'masters.home-tag-sections': ['create', 'edit', 'delete'],
   'rbac.roles': ['create', 'edit', 'delete', 'status_change'],
   'rbac.users': ['create', 'edit', 'delete', 'assign', 'status_change', 'custom'],
   'rbac.audit-logs': [],
@@ -271,7 +272,7 @@ export const MEMBER_GRANTS: Record<'admin' | 'sales' | 'marketing' | 'support' |
  * `resetGrant`, not `applyPermissionMatrix` — kept here as a flat, directly testable data
  * constant (same reasoning as `MEMBER_GRANTS` above) rather than inline in that function.
  */
-const MASTERS_SUB_KEYS = ['categories', 'sub-categories', 'tags', 'popular-treatments', 'promotions', 'home-hero'];
+const MASTERS_SUB_KEYS = ['categories', 'sub-categories', 'tags', 'popular-treatments', 'promotions', 'home-hero', 'home-tag-sections'];
 export const MASTERS_GRANTS: Record<'admin' | 'marketing', string[]> = {
   admin: [
     'masters:view',

@@ -512,6 +512,51 @@ Planned: every content route moves from the `cms.*` keys to `content:<action>` (
 - `GET /catalog/home-hero?state=`: `{ state, slides: [{ id, type, deal?, product? }] }`; a state's
   slider with 5 or more eligible slides, else the Global one, else an empty list.
 
+### 7.1 Home tag sections (built 2026-10-28, PLANNING.md §7.1)
+
+| Method | Path | Guard |
+|---|---|---|
+| GET | `/api/v1/catalog/home-tag-sections` | public |
+| GET | `/api/v1/home-tag-sections/overview` | `masters.home-tag-sections:view` |
+| GET | `/api/v1/home-tag-sections/states` | `masters.home-tag-sections:view` |
+| GET | `/api/v1/home-tag-sections/sections` | `masters.home-tag-sections:view` |
+| PUT | `/api/v1/home-tag-sections/sections` | `masters.home-tag-sections:edit` |
+| GET | `/api/v1/home-tag-sections/sections/:id/items` | `masters.home-tag-sections:view` |
+| POST | `/api/v1/home-tag-sections/sections/:id/items` | `masters.home-tag-sections:create` |
+| PUT | `/api/v1/home-tag-sections/sections/:id/items/order` | `masters.home-tag-sections:edit` |
+| DELETE | `/api/v1/home-tag-sections/items/:id` | `masters.home-tag-sections:delete` |
+| GET | `/api/v1/home-tag-sections/search-items` | `masters.home-tag-sections:view` |
+
+- Deals only (no product/type toggle) — a section's tag (`NEW | DEAL | HOT_DEAL | EXPIRE_SOON`)
+  is always the admin's own manual choice, never computed from creation date, discount or
+  `endDate`.
+- `GET /home-tag-sections/sections?state=`: always all 4 fixed tag rows for that state (or
+  Global/Default), even ones never configured (`id: null`, `isEnabled: false` defaults). Each row:
+  `id`, `state`, `tag`, `title`, `isEnabled`, `itemCount`, `eligibleCount`, `minimumRequired` (1),
+  `status` (`LIVE | DRAFT | DISABLED`), `updatedAt`.
+- `PUT /home-tag-sections/sections` `{ state, tag, isEnabled }`: upserts the one (state, tag) row
+  the Enabled switch controls (creates it on first use). Audited as `home_tag_section.status_change`.
+- `POST /home-tag-sections/sections/:id/items` `{ dealId }`: the deal must belong to that section's
+  state (422 otherwise, same rule as Home Hero's slides); already in the section is 409. Audited as
+  `home_tag_section_item.create`.
+- `PUT /home-tag-sections/sections/:id/items/order` `{ itemIds }`: saves the whole order of one
+  section at once; `itemIds` must be exactly that section's items (422 otherwise). Audited as
+  `home_tag_section_item.reorder`.
+- `GET /home-tag-sections/search-items`: same shape as `/home-hero/search-items` (`type` is always
+  `deal`), plus `status`, `discountPercent`, `endDate` on every row so the admin can judge a
+  candidate for Expire soon themselves — the tag is never computed.
+- Admin item rows also carry `image`, `price` and `ineligibleReason` — mirrors Home Hero's deal
+  checks (member active, branch active, deal `ACTIVE`, `approvalStatus APPROVED`) plus one rule
+  only for Expire soon: a deal with no `endDate`, or one already in the past, is ineligible there
+  specifically (no arbitrary day-window).
+- `GET /catalog/home-tag-sections?state=`: `[{ tag, title, state, deals: [...] }]`, one entry per
+  tag that resolves to a publishable section — resolved independently per tag: the visitor's own
+  state's row for that tag if one is configured at all (enabled or not, eligible or not — a
+  configured state row never falls back to Global for that tag); otherwise Global/Default's row
+  for the same tag. A tag with nothing eligible anywhere is simply absent from the array; `deals`
+  needs >=1 eligible deal to appear (no 5-slide-style minimum like the hero —
+  `MIN_ELIGIBLE_ITEMS_PER_TAG_SECTION = 1`).
+
 ## 8. Masters
 
 | Method | Path | Guard |

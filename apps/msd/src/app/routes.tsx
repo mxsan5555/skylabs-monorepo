@@ -47,6 +47,9 @@ import { PopularTreatmentManagement } from './pages/account/masters/popular-trea
 import { PromotionManagement } from './pages/account/masters/promotions';
 import { HomeHeroManagement } from './pages/account/masters/home-hero';
 import { HomeHeroBuilder } from './pages/account/masters/home-hero-builder';
+import { HomeTagSectionsManagement } from './pages/account/masters/home-tag-sections';
+import { HomeTagSectionsStatePage } from './pages/account/masters/home-tag-sections-state';
+import { HomeTagSectionsBuilder } from './pages/account/masters/home-tag-sections-builder';
 import { BlogList } from './pages/account/cms/blog-list';
 import { BlogDetailAdmin } from './pages/account/cms/blog-detail-admin';
 import { BlogCategoriesList } from './pages/account/cms/blog-categories-list';
@@ -827,6 +830,30 @@ export function AppRoutes() {
             element={
               <RequirePermission menuKey="masters.home-hero">
                 <HomeHeroBuilder />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/masters/home-tag-sections"
+            element={
+              <RequirePermission menuKey="masters.home-tag-sections">
+                <HomeTagSectionsManagement />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/masters/home-tag-sections/:state"
+            element={
+              <RequirePermission menuKey="masters.home-tag-sections">
+                <HomeTagSectionsStatePage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/masters/home-tag-sections/:state/:tag"
+            element={
+              <RequirePermission menuKey="masters.home-tag-sections">
+                <HomeTagSectionsBuilder />
               </RequirePermission>
             }
           />

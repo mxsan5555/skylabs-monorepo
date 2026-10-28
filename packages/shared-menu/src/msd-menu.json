@@ -444,6 +444,14 @@
         "permissionKey": "masters.home-hero",
         "parent": "masters",
         "order": 5
+      },
+      {
+        "id": "masters-home-tag-sections",
+        "title": "Home Tag Sections",
+        "route": "/account/masters/home-tag-sections",
+        "permissionKey": "masters.home-tag-sections",
+        "parent": "masters",
+        "order": 6
       }
     ]
   },

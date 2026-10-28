@@ -10,6 +10,7 @@ describe('seed: Masters grants (PLANNING.md §1.2 — regression for a 2026-10-2
     expect(MASTERS_GRANTS.admin).toContain('masters.tags:edit');
     expect(MASTERS_GRANTS.admin).toContain('masters.promotions:create');
     expect(MASTERS_GRANTS.admin).toContain('masters.home-hero:edit');
+    expect(MASTERS_GRANTS.admin).toContain('masters.home-tag-sections:edit');
   });
 
   it('Marketing: view only on every sub-resource — never create, edit or delete', () => {
@@ -22,8 +23,8 @@ describe('seed: Masters grants (PLANNING.md §1.2 — regression for a 2026-10-2
     expect(MASTERS_GRANTS.marketing).not.toContain('masters.promotions:edit');
   });
 
-  it('both roles cover the same six sub-resources (categories, sub-categories, tags, popular-treatments, promotions, home-hero)', () => {
-    const subResources = ['categories', 'sub-categories', 'tags', 'popular-treatments', 'promotions', 'home-hero'];
+  it('both roles cover the same seven sub-resources (categories, sub-categories, tags, popular-treatments, promotions, home-hero, home-tag-sections)', () => {
+    const subResources = ['categories', 'sub-categories', 'tags', 'popular-treatments', 'promotions', 'home-hero', 'home-tag-sections'];
     for (const sub of subResources) {
       expect(MASTERS_GRANTS.admin.some((k) => k.startsWith(`masters.${sub}:`))).toBe(true);
       expect(MASTERS_GRANTS.marketing.some((k) => k.startsWith(`masters.${sub}:`))).toBe(true);

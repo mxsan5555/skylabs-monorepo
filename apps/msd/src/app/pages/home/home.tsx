@@ -12,6 +12,7 @@ import { SITE_URL } from '../../seo/site-url';
 import { dealPath, productPath, therapistPath } from '../../seo/public-urls';
 import { CategoryTiles } from './category-tiles';
 import { DealsNearYou } from './deals-near-you';
+import { HomeTagSections } from './home-tag-sections';
 import { HomeHero } from './home-hero';
 import { BannerSlot } from '../../components/banner-slot/banner-slot';
 import { HowItWorks } from './how-it-works';
@@ -73,6 +74,7 @@ export function Home() {
         categories={categories}
         renderDeal={renderDeal}
       />
+      <HomeTagSections renderDeal={renderDeal} />
       <HowItWorks />
       {ready && catalog.therapists.length > 0 && (
         <PageSection tone="tint" aria-labelledby="therapists-heading">

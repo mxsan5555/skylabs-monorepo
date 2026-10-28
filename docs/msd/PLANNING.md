@@ -321,6 +321,48 @@ Home hero slider, managed under Masters → Home hero (`/account/masters/home-he
 
 Still open (SL-01): slide schedule (start and end dates) and image size and alt text rules.
 
+### 7.1 Home tag sections (built 2026-10-28)
+
+Four more home-page rails — New, Deal, Hot Deal, Expire soon — one state-first admin screen per
+tag, managed under Masters → Home Tag Sections (`/account/masters/home-tag-sections`). Shares the
+hero's state-first/overview/builder mechanics end to end (§7 points 1–4: overview table, no-dialog
+builder, "Only visible to customers" picker filter, live-vs-draft via an eligible-item count); only
+what's different from the hero is written below. See ARCHITECTURE.md §7.1 and DATABASE.md §7.1 for
+the implementation and schema.
+
+1. **Tag assignment is manual, never computed.** The admin puts a deal into the New / Deal / Hot
+   Deal / Expire soon section themselves — no automatic classification by creation date, discount
+   size, or days to `endDate`. The deal picker (the hero's existing state-item search, filtered to
+   deals only) shows each candidate's title, status, discount and expiry date so the admin can
+   judge it themselves.
+2. **One section per state × tag, an ordered list of deals inside each.** A state's page always
+   shows all 4 tag rows (New, Deal, Hot Deal, Expire soon) with an Enabled switch each; enabling one
+   opens its own builder (the hero's ordered-list-plus-Add-panel layout, deals only, no type
+   toggle). Removing a deal removes it from that one section only — the same deal can sit in
+   several sections (e.g. both Deal and Hot Deal) at once, each with its own order.
+3. **Eligibility mirrors the hero's `ineligibleReason` exactly** (member active, branch active,
+   deal `ACTIVE`, `approvalStatus APPROVED`) **plus one Expire-soon-only rule:** the deal needs a
+   future `endDate` — a deal with **no end date at all is ineligible there too** (it cannot be
+   judged "approaching expiry" without one; decided 2026-10-28, no arbitrary day-window; every
+   other tag ignores `endDate` completely). A section publishes once it is enabled and has at
+   least 1 currently-eligible deal — no slide-count minimum like the hero's 5, since each tag rail
+   is useful even with a single deal and the admin's own manual curation is already the quality
+   gate. Not configurable (no `SystemSetting` table yet, D22) — a plain constant
+   (`MIN_ELIGIBLE_ITEMS_PER_TAG_SECTION = 1`), same pattern as the hero's `MIN_ELIGIBLE_SLIDES`.
+4. **Per-tag fallback, not whole-state — and a configured state row never falls back.** Each of the
+   4 tags is resolved independently. If the visitor's state has its OWN row for that tag — enabled
+   or not, eligible or not, it doesn't matter — that row and only that row decides whether the rail
+   shows; a disabled or currently-empty state row is a deliberate state, never silently replaced by
+   Global. Only a tag the state has genuinely never configured at all falls back to the
+   Global/Default row for that SAME tag. A tag with nothing eligible anywhere (state or Global) is
+   simply absent; `Deals Near You` is unaffected either way.
+5. **Storefront layout:** each resolved, eligible rail is its own `PageSection` + `SectionHead` +
+   `CardRail` of `OfferCard`s, laid out like `Deals Near You` (no hero-style carousel, no type tag
+   since every item here is a deal), placed immediately after the Hero and Deals Near You sections
+   and before How It Works. Fixed rail order **New → Hot Deal → Deal → Expire soon** — deliberately
+   different from the admin screen's row order (New, Deal, Hot Deal, Expire soon) — every time,
+   regardless of which rails happen to render.
+
 ## 8. Masters
 
 Categories and subcategories (types `SERVICE`, `PRODUCT`, `THERAPY`), popular tags and popular

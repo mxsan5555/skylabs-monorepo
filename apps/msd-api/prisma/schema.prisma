@@ -1169,6 +1169,58 @@ model HomeHeroSlide {
   @@index([sortOrder])
 }
 
+enum HomeTagSectionTag {
+  NEW
+  DEAL
+  HOT_DEAL
+  EXPIRE_SOON
+}
+
+/// One row per state x tag (docs/msd/PLANNING.md §7.1); `state: null` is the Global/Default
+/// section, same convention as `HomeHeroSlide`. Unlike the hero (one flat row per slide), a
+/// section's deals live in `HomeTagSectionItem` (join-table shape, like `RoleDashboardWidget`/
+/// `PromotionPlacement`) because a section holds several independently-ordered deals behind one
+/// `isEnabled` switch.
+///
+/// `@@unique([state, tag])` below exists for Prisma Client's own typed `upsert`/`findUnique`
+/// ergonomics (`setSectionEnabled` upserts by this key) — but it is NOT the real NULL-safety
+/// constraint: Postgres treats every NULL as distinct, so this plain index alone would silently
+/// allow several Global (`state: null`) rows for the same tag. The migration additionally hand-
+/// writes two partial unique indexes (`home_tag_section_global_tag_unique` WHERE state IS NULL,
+/// `home_tag_section_state_tag_unique` WHERE state IS NOT NULL) that are what Postgres actually
+/// enforces for the `state: null` case — same "Prisma's declarative DSL can't express this"
+/// pattern as `HomeHeroSlide`'s own `home_hero_slide_one_item` CHECK.
+model HomeTagSection {
+  id        String            @id @default(uuid())
+  state     String?
+  tag       HomeTagSectionTag
+  isEnabled Boolean           @default(false)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  items     HomeTagSectionItem[]
+
+  @@unique([state, tag])
+  @@index([state])
+  @@index([tag])
+}
+
+/// A deal assigned into one `HomeTagSection`, manually picked and ordered by the admin (never
+/// computed) — see `home-tag-section.service.ts`'s own doc comment for the eligibility rules.
+model HomeTagSectionItem {
+  id               String         @id @default(uuid())
+  homeTagSectionId String
+  dealId           String
+  sortOrder        Int            @default(0)
+  createdAt        DateTime       @default(now())
+  section          HomeTagSection @relation(fields: [homeTagSectionId], references: [id], onDelete: Cascade)
+  deal             Deal           @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@unique([homeTagSectionId, dealId])
+  @@index([homeTagSectionId])
+  @@index([dealId])
+  @@index([sortOrder])
+}
+
 /// A Superadmin-managed marketing label ("Trending", "Best Seller", ...) mappable onto any mix
 /// of Category/Deal/Product/Therapist rows. `isActive` is the ONLY thing a deactivate/reactivate
 /// toggle touches — mapping rows are never deleted or recreated by a status change, so
@@ -1289,6 +1341,7 @@ model Deal {
   popularTagLinks         PopularTagDeal[]
   promotionLinks          Promotion[]
   heroSlides              HomeHeroSlide[]
+  homeTagSectionItems     HomeTagSectionItem[]
   wishlistItems           WishlistItem[]
   therapistLinks          DealTherapist[]
 

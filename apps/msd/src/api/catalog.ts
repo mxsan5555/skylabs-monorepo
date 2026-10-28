@@ -246,6 +246,22 @@ export function getCatalogHomeHero(state?: string) {
   return apiGet<CatalogHomeHero>(`/catalog/home-hero${state ? `?state=${encodeURIComponent(state)}` : ''}`, null);
 }
 
+/** Public Home Tag Section rails — New / Deal / Hot Deal / Expire soon (docs/msd/PLANNING.md
+ *  §7.1). Each tag resolves independently to the visitor's state or Global/Default; a tag with
+ *  no eligible section anywhere is simply absent from the array. */
+export type CatalogHomeTagSectionTag = 'NEW' | 'DEAL' | 'HOT_DEAL' | 'EXPIRE_SOON';
+
+export interface CatalogHomeTagSection {
+  tag: CatalogHomeTagSectionTag;
+  title: string;
+  state: string | null;
+  deals: CatalogDeal[];
+}
+
+export function getCatalogHomeTagSections(state?: string) {
+  return apiGet<CatalogHomeTagSection[]>(`/catalog/home-tag-sections${state ? `?state=${encodeURIComponent(state)}` : ''}`, null);
+}
+
 export interface CatalogDealListOptions {
   page?: number;
   pageSize?: number;

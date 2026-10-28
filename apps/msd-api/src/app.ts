@@ -28,6 +28,7 @@ import popularTagsRoutes from './routes/popular-tags.routes';
 import popularTreatmentsRoutes from './routes/popular-treatments.routes';
 import promotionsRoutes from './routes/promotions.routes';
 import homeHeroRoutes from './routes/home-hero.routes';
+import homeTagSectionsRoutes from './routes/home-tag-sections.routes';
 import catalogRoutes from './routes/catalog.routes';
 import cartRoutes from './routes/cart.routes';
 import wishlistRoutes from './routes/wishlist.routes';
@@ -117,6 +118,7 @@ export function createApp(): express.Express {
   api.use('/popular-treatments', popularTreatmentsRoutes);
   api.use('/promotions', promotionsRoutes);
   api.use('/home-hero', homeHeroRoutes);
+  api.use('/home-tag-sections', homeTagSectionsRoutes);
   api.use('/catalog', catalogRoutes);
   api.use('/cart', cartRoutes);
   api.use('/wishlist', wishlistRoutes);

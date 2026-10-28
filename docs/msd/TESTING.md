@@ -234,6 +234,22 @@ transform doesn't type-check, which is why these don't block `msd-api:test`.
   named after the item; Add to cart and the heart work for a signed-in visitor and send others to
   sign in; every slide has the same height (checked at 1440 and 390 px); dots on the left and
   Previous / Next on the right move the slider (each dot a labelled button with a 24px target).
+- Home Tag Sections console (PLANNING §7.1, built 2026-10-28): the overview lists Global first
+  with how many of a state's 4 tags are enabled and live; a row opens the state page, which always
+  shows all 4 rows (New, Deal, Hot Deal, Expire soon) even for a state never touched before; the
+  Enabled switch upserts immediately and reverts on failure; "Open builder" goes to that one tag's
+  ordered deal list (`home-tag-sections.test.tsx`, `home-tag-sections-state.test.tsx`,
+  `home-tag-sections-builder.test.tsx` — 16 tests total).
+- Home Tag Sections: a deal is manually picked per tag, never computed; the picker (`dealsOnly`
+  mode of the shared `StateItemPicker`) shows status, discount and end date, hides the
+  All/Deals/Products filter; an out-of-state deal is 422, a duplicate within one section is 409;
+  Expire soon rejects a deal with no `endDate` or one already past as ineligible (not just
+  unflagged); a section needs only 1 eligible deal to go live; a state's own configured row for a
+  tag (enabled or not) never falls back to Global — only a tag the state never configured at all
+  does (`home-tag-section.service.test.ts` — 25 tests). Storefront: up to 4 rails (New, Hot Deal,
+  Deal, Expire soon — a different order from the admin screen) render right after Deals Near You,
+  each only once the server resolves >=1 eligible deal for it (`home-tag-sections.test.tsx` in
+  `pages/home` — 6 tests).
 - CTA banners: a banner saves state, colour roles, image (one only) and slots; each slot shows the
   visitor's state's active in-date banners, else Global, else nothing; contrast holds for every
   colour role (axe); `<BannerSlot>` hydrates without warnings.

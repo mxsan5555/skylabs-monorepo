@@ -220,6 +220,32 @@ Same migration: `dealId` becomes nullable; `productId` text null FK -> Product (
 `home_hero_slide_one_item`: exactly one of `dealId`, `productId` is set. Duplicate items in one
 slider are refused by the service (409), not a unique index, because `state` is nullable.
 
+### 7.1 Home tag sections (migration `20261028100000_home_tag_sections`, built)
+
+| Model (table) | Columns | Relations | Unique / indexes |
+|---|---|---|---|
+| HomeTagSection | 6 | items -> HomeTagSectionItem[] | `@@unique([state, tag])`; index(state); index(tag) |
+| HomeTagSectionItem | 5 | section -> HomeTagSection (cascade); deal -> Deal (cascade) | `@@unique([homeTagSectionId, dealId])`; index(homeTagSectionId); index(dealId); index(sortOrder) |
+
+`HomeTagSectionTag` enum: `NEW`, `DEAL`, `HOT_DEAL`, `EXPIRE_SOON`. `Deal` gained a sibling
+`homeTagSectionItems -> HomeTagSectionItem[]` relation (same migration, no new column on `Deal`
+itself — only the join table's `dealId` FK).
+
+Postgres treats every NULL as distinct, so `@@unique([state, tag])` alone would silently allow
+several Global (`state: null`) rows for the same tag. The migration additionally hand-writes two
+partial unique indexes that are the real NULL-safe constraint (the plain index above is kept only
+for Prisma Client's own typed `upsert`/`findUnique` ergonomics):
+
+```sql
+CREATE UNIQUE INDEX "home_tag_section_global_tag_unique" ON "HomeTagSection"("tag") WHERE "state" IS NULL;
+CREATE UNIQUE INDEX "home_tag_section_state_tag_unique" ON "HomeTagSection"("state", "tag") WHERE "state" IS NOT NULL;
+```
+
+`down.sql` provided and rehearsed this session (ran once, re-applied the corrected migration —
+see TASKS.md). Seed (`masters.home-tag-sections` added to `MASTERS_SUB_KEYS`/
+`EXTRA_ACTIONS_BY_MENU_KEY`) re-run locally; idempotent, additive only (255 Permission rows, was
+251).
+
 ## 8. Masters
 
 | Model (table) | Columns | Relations | Unique / indexes |
