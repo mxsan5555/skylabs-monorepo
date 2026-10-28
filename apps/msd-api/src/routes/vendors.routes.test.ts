@@ -1159,6 +1159,20 @@ describe('PATCH /api/v1/vendors/:id/status (member status alias)', () => {
 describe('DELETE /api/v1/vendors/:id (member delete alias)', () => {
   const REASON = { reason: 'Closed the business for good' };
 
+  // The hard delete also reads the media of the member's deals, products and therapists (P3-25).
+  beforeEach(() => {
+    for (const model of [
+      prismaMock.dealImage,
+      prismaMock.dealVideo,
+      prismaMock.productImage,
+      prismaMock.productVideo,
+      prismaMock.therapistImage,
+      prismaMock.therapistVideo,
+    ]) {
+      model.findMany.mockResolvedValue([]);
+    }
+  });
+
   it('hard deletes a SUSPENDED member with no order lines', async () => {
     resolveMock.mockResolvedValue(['members:delete']);
     prismaMock.member.findUnique.mockResolvedValue({ ...vendorAFixture, status: 'SUSPENDED', owner: null });

@@ -45,7 +45,7 @@ Known failures at 2026-10-18 (msd recounted 2026-10-27: `india-locations` moved 
 | Project | Failing | Where |
 |---|---|---|
 | msd | 19 tests in 11 files | `permission-matrix` 9, `contact-us` 2, and 1 each in `app.spec`, `widget-registry`, `deal-card`, `media-uploader`, `site-footer`, `wishlist`, `roles`, `settings`; `entry-server.test.tsx` fails to load (`sky-product-card-wc` fixed 2026-10-24). Regressions since commit e756759 (NewOfferCard), not yet fixed: `home` 4 (FAQ section no longer rendered, deal favourite), `category` 1 (product wishlist heart) |
-| msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; recounted 2026-10-27: 1,246 pass) |
+| msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; recounted 2026-10-27: 1,247 pass) |
 | shared-menu | 5 | `index.test.ts` |
 
 Lint and type drift: 30 msd lint errors (`import/first` and `no-empty-function` in older tests), an ESLint ignore error in the shared packages, and
@@ -77,7 +77,8 @@ mapPopularTag" (both pass alone).
 - Inactive: any non-GET returns 403 `MEMBER_INACTIVE_READ_ONLY` (logout and refresh excepted);
   GET orders, customers and catalog return 200; banner on every console screen.
 - Delete: only from Suspended and only for Super Admin; zero orders deletes, otherwise archives;
-  media files removed after commit (P3-25 for cascaded rows).
+  every media file removed after commit: the member's documents, images and video plus the
+  images and videos of its deals, products and therapists (P3-25); archive keeps every file.
 - Documents: Support sees type and status only (no file key); masked numbers only; duplicate
   number 409; approve, reject with reason; deleting an Approved document 409.
 - Reminders (all covered by unit tests): nothing before day 14; reminder 1 on the due date; 7-day

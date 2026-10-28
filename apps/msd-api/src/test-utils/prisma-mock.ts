@@ -164,6 +164,7 @@ export function createPrismaMock() {
     },
     dealVideo: {
       findUnique: vi.fn(),
+      findMany: vi.fn(),
       upsert: vi.fn(),
       delete: vi.fn(),
     },
@@ -183,6 +184,7 @@ export function createPrismaMock() {
     },
     productVideo: {
       findUnique: vi.fn(),
+      findMany: vi.fn(),
       upsert: vi.fn(),
       delete: vi.fn(),
     },
@@ -197,6 +199,7 @@ export function createPrismaMock() {
     },
     therapistVideo: {
       findUnique: vi.fn(),
+      findMany: vi.fn(),
       upsert: vi.fn(),
       delete: vi.fn(),
     },
