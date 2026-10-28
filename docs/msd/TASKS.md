@@ -48,8 +48,8 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 9 | Payments, payouts and reports | 0 | 11 | 0 |
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
-| 12 | Platform, security and release | 7 | 69 | 10 |
-| | **Total** | **92** | **289** | **32** |
+| 12 | Platform, security and release | 8 | 69 | 12 |
+| | **Total** | **93** | **289** | **32** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -409,4 +409,4 @@ Removed 2026-10-24: ST-17 (therapist city filter is in ST-40; products are not l
 | [ ] | X-02 | OPS | Add the CI check as a required status check in branch protection | S | - | PR cannot merge red |
 | [ ] | X-03 | SEC | Rotate the secrets that were once committed (Gmail app password, ConnectExpress SMS key, Razorpay keys, `JWT_SECRET`); they remain in git history | S | - | All rotated at the provider |
 | [ ] | X-04 | OPS | Verify the msd-api production deploy end to end with the DEPLOYMENT.md checklist (health, /docs, sign-in, R2 upload survives a redeploy) | S | - | Checklist ticked |
-| [ ] | X-05 | BE | Remove the leftover `console.log` in `apps/msd-api/src/middleware/requirePermission.ts` (prints every permission when routes load) | S | - | No log line at boot |
+| [x] | X-05 | BE | Remove the leftover `console.log` in `apps/msd-api/src/middleware/requirePermission.ts` (prints every permission when routes load) | S | - | No log line at boot; done 2026-10-28 (`requirePermission.test.ts` "at boot") |
