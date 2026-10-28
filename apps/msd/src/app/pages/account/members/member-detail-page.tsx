@@ -67,6 +67,20 @@ export function MemberDetailPage() {
   const canStatusChange = can('members', 'status_change');
   const canDelete = can('members', 'delete');
 
+  // Each catalog sub-resource is independently gated by its own matrix key (PLANNING.md §1.2
+  // grants Branches/Deals/Therapists/Products separately from the Member profile itself) — never
+  // the blanket `members:edit`/`members:delete` above, which only governs the Profile and
+  // Documents tabs. A role could hold VCE on Branches without holding `members:edit` at all (or
+  // vice versa), and the Role Permission Matrix UI's own per-resource checkboxes must actually
+  // change what's visible here.
+  const canEditBranches = can('vendors.branches', 'edit');
+  const canEditDeals = can('vendors.deals', 'edit');
+  const canDeleteDeals = can('vendors.deals', 'delete');
+  const canEditTherapists = can('vendors.therapists', 'edit');
+  const canDeleteTherapists = can('vendors.therapists', 'delete');
+  const canEditProducts = can('vendors.products', 'edit');
+  const canDeleteProducts = can('vendors.products', 'delete');
+
   const tab: Tab = TABS.find((t) => t.value === section)?.value ?? 'profile';
 
   const [member, setMember] = useState<Vendor | null>(null);
@@ -267,10 +281,10 @@ export function MemberDetailPage() {
           />
         )}
 
-        {tab === 'branches' && <BranchesListPage token={token} vendorId={member.id} canEdit={canEdit} />}
-        {tab === 'deals' && <DealsListPage token={token} vendorId={member.id} canEdit={canEdit} canDelete={canDelete} />}
-        {tab === 'therapists' && <TherapistsListPage token={token} vendorId={member.id} canEdit={canEdit} canDelete={canDelete} />}
-        {tab === 'products' && <ProductsListPage token={token} vendorId={member.id} canEdit={canEdit} canDelete={canDelete} />}
+        {tab === 'branches' && <BranchesListPage token={token} vendorId={member.id} canEdit={canEditBranches} />}
+        {tab === 'deals' && <DealsListPage token={token} vendorId={member.id} canEdit={canEditDeals} canDelete={canDeleteDeals} />}
+        {tab === 'therapists' && <TherapistsListPage token={token} vendorId={member.id} canEdit={canEditTherapists} canDelete={canDeleteTherapists} />}
+        {tab === 'products' && <ProductsListPage token={token} vendorId={member.id} canEdit={canEditProducts} canDelete={canDeleteProducts} />}
 
         {tab === 'activity' && <MemberActivityTab token={token} memberId={member.id} refreshKey={activityKey} />}
       </section>

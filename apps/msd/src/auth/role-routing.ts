@@ -12,6 +12,11 @@ import type { BootstrapResponse } from '@skylabs-monorepo/shared-types';
 
 const STAFF_ROLE_KEYS = ['super_admin', 'admin', 'marketing', 'sales'] as const;
 
+/** Role keys that mean "this account owns a member business" — mirrors msd-api's
+ *  `lib/role-keys.ts#MEMBER_ROLE_KEYS` ('member' is canonical; 'vendor' tolerated during the
+ *  in-progress rename so a bootstrap carrying either key still routes correctly). */
+const MEMBER_ROLE_KEYS = ['member', 'vendor'] as const;
+
 export function getRoleKeys(bootstrap: BootstrapResponse): string[] {
   return bootstrap.roles.map((r) => r.key);
 }
@@ -26,7 +31,8 @@ export function isCustomerUser(bootstrap: BootstrapResponse): boolean {
 }
 
 export function isVendorUser(bootstrap: BootstrapResponse): boolean {
-  return getRoleKeys(bootstrap).includes('vendor');
+  const roleKeys = getRoleKeys(bootstrap);
+  return (MEMBER_ROLE_KEYS as readonly string[]).some((k) => roleKeys.includes(k));
 }
 
 /** Who gets the storefront "My Account" area (`/my-dashboard`, `/my-account/*`, `/orders`):

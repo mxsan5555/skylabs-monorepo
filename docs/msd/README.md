@@ -28,7 +28,7 @@ find the module below, then use its section number in every file. Example: custo
 
 | # | Module | Built | Next | Tasks done |
 |---|---|---|---|---|
-| 1 | Admin and staff | OTP and Google sign-in, dynamic RBAC, role, user and audit screens, Login As | Enforce own scope, 14-key permission matrix, staff users, settings | 1 of 30 |
+| 1 | Admin and staff | OTP and Google sign-in, dynamic RBAC, role, user and audit screens, Login As, `RolePermission.scope` resolved end to end (own-scope live for audit logs), role create/clone locked | Enforce own scope on the rest of the matrix, 14-key permission matrix, staff users, settings | 5 of 30 |
 | 2 | Members | Lifecycle (active, inactive, suspended, archived), documents with review, reminders and review flag, Remind now, member list and detail tabs, catalog CRUD | Own-scope routes, flat catalog routes, deal approval removal, signed document links | 30 of 87 |
 | 3 | Customers and orders | Cart, wishlist, checkout with Razorpay and COD, order history, support requests | Cancel, refund requests, customer block | 0 of 10 |
 | 4 | Storefront | Header, footer, tab bar, home, category page with filters, sorts and map, prerender and SEO files | Follow-ups ST-01 to ST-28 | 0 of 29 |

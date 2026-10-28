@@ -35,7 +35,8 @@ import { getBootstrap } from '../services/bootstrap.service';
 import { writeAuditLog } from '../services/audit.service';
 import { prisma } from '../lib/prisma';
 import { sendData, ApiError } from '../lib/http';
-import { invalidatePermissionCache, isSuperAdminRoleSet } from '../services/permission-resolver.service';
+import { invalidatePermissionCache, isSuperAdminRoleSet, resolveGrantedPermissions } from '../services/permission-resolver.service';
+import { scopeFor } from '@skylabs-monorepo/shared-permissions';
 
 const UserRoleParamsSchema = z.object({ id: z.string().uuid(), roleId: z.string().uuid() });
 
@@ -71,18 +72,11 @@ router.post(
   '/roles',
   requirePermission('rbac.roles', 'create'),
   validateBody(RoleCreateSchema),
-  async (req, res, next) => {
+  async (_req, _res, next) => {
+    // `createRole` always throws `ROLE_MANAGEMENT_LOCKED` (PLANNING.md §1.1/R1) — no role is
+    // ever actually created, so there is nothing left here to audit-log or respond with.
     try {
-      const role = await roleService.createRole(req.body);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'role.create',
-        targetType: 'Role',
-        targetId: role.id,
-        after: role,
-        ...requestMeta(req),
-      });
-      sendData(res, role, { status: 201 });
+      await roleService.createRole(_req.body);
     } catch (err) {
       next(err);
     }
@@ -147,19 +141,11 @@ router.post(
   requirePermission('rbac.roles', 'create'),
   validateParams(UuidParamSchema),
   validateBody(RoleCloneSchema),
-  async (req, res, next) => {
+  async (req, _res, next) => {
+    // `cloneRole` always throws `ROLE_MANAGEMENT_LOCKED` (PLANNING.md §1.1/R1) — no role is
+    // ever actually cloned, so there is nothing left here to audit-log or respond with.
     try {
-      const clone = await roleService.cloneRole(req.params.id, req.body.key, req.body.name);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'role.clone',
-        targetType: 'Role',
-        targetId: clone.id,
-        before: { sourceRoleId: req.params.id },
-        after: clone,
-        ...requestMeta(req),
-      });
-      sendData(res, clone, { status: 201 });
+      await roleService.cloneRole(req.params.id, req.body.key, req.body.name);
     } catch (err) {
       next(err);
     }
@@ -239,6 +225,11 @@ router.put(
         after: { permissions },
         ...requestMeta(req),
       });
+      // Same reasoning as DELETE /roles/:id and PATCH /roles/:id/status just above — without
+      // this, every already-signed-in holder of this role (or anyone who signs in within the
+      // next CACHE_TTL_MS) keeps resolving the pre-save grant set from the resolver's cache,
+      // even though the Role Permission Matrix UI already shows the saved result as current.
+      invalidatePermissionCache();
       sendData(res, result);
     } catch (error) {
       next(error);
@@ -640,11 +631,22 @@ router.get(
 
 // ─── Audit logs ──────────────────────────────────────────────────────────────
 
+/**
+ * PLANNING.md §1.2's Logs row: `V A` for Super Admin, `V O` (own actions only) for everyone
+ * else. `rbac.audit-logs:view`'s scope is resolved per-caller (see `SCOPE_ENFORCED_PERMISSION_
+ * KEYS` in role.service.ts — this is the one key it's real for today) rather than hardcoded to
+ * a role-name check.
+ */
 router.get('/audit-logs', requirePermission('rbac.audit-logs', 'view'), validateQuery(PaginationQuerySchema), async (req, res, next) => {
   try {
     const targetUserId = typeof req.query.targetUserId === 'string' ? req.query.targetUserId : undefined;
     const { page, pageSize } = req.validatedQuery as ReturnType<typeof PaginationQuerySchema.parse>;
-    const where = targetUserId ? { targetType: 'User', targetId: targetUserId } : {};
+    const { scopes } = await resolveGrantedPermissions(req.user!.roles);
+    const ownScopeOnly = scopeFor(scopes, 'rbac.audit-logs', 'view') === 'OWN';
+    const where = {
+      ...(targetUserId ? { targetType: 'User', targetId: targetUserId } : {}),
+      ...(ownScopeOnly ? { actorUserId: req.user!.sub } : {}),
+    };
     const [items, total] = await Promise.all([
       prisma.auditLog.findMany({
         where,

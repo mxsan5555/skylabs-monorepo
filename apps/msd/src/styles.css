@@ -679,6 +679,19 @@ a.dashboard-stat:focus-visible {
   white-space: nowrap;
 }
 
+/* Role Permission Matrix (roles/permission-matrix.tsx): a cell whose checkbox/scope differs
+   from the role's last-persisted grant, so an edit is visible before Save is clicked. */
+.perm-matrix__cell--dirty {
+  background-color: var(--md-sys-color-tertiary-container, #ffd8c2);
+  border-radius: 8px;
+}
+
+/* An action this resource does not define at all (e.g. Orders has no Create) — distinct from
+   an unchecked but grantable action. */
+.perm-matrix__cell--na {
+  color: var(--md-sys-color-outline, #767a7c);
+}
+
 .widget-assign-row {
   display: flex;
   align-items: center;

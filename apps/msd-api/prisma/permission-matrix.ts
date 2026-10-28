@@ -3,7 +3,7 @@
  * Orders/Customers/Content/Payments & Payouts/Reports/Staff Users/System Settings/My Profile),
  * encoded as exact per-role grant lists keyed by real `Permission.key` (`${menuKey}:${action}`).
  *
- * Governs exactly five roles — `admin`, `marketing`, `sales`, `support`, `vendor` (the matrix's
+ * Governs exactly five roles — `admin`, `marketing`, `sales`, `support`, `member` (the matrix's
  * "Member" row). `super_admin` is governed separately (its own hard runtime bypass in
  * `permission-resolver.service.ts`, capped for the few resources the matrix restricts even for
  * Super Admin — see that file's `SUPER_ADMIN_VIEW_ONLY_MENU_KEYS`); `customer` isn't a row in
@@ -70,7 +70,13 @@ const CONTENT_CRUD_KEYS = CONTENT_GROUP.filter((k) => !CONTENT_SINGLETON_KEYS.in
 
 export const PERMISSION_MATRIX_GRANTS: Record<string, string[]> = {
   // Members=VCE, Branches/Deals/Therapists=VCE, Products=VCE(no delete), Orders=V, Customers=V,
-  // Content=VCE, Payments=-, Reports=V(overall), Staff Users=V, System Settings=VE, My Profile=VE.
+  // Content=VCE, Payments=-, Reports=V(overall), Staff Users=V, System Settings=V (PLANNING.md
+  // §1.2's "System settings" row is Admin=`V A`, not VE — Edit is Super-Admin-only per §1.3 rule
+  // 3's own explicit list — this used to also grant `system-settings:edit`, fixed 2026-10-26),
+  // My Profile=VE. Extra actions per §1.2's table: Order cancel (`orders:status_change`),
+  // Customer block/unblock (`customers:status_change`) and Report export (`reports:export`) are
+  // all explicitly "Super Admin, Admin" — added 2026-10-26 (previously missing, so Admin could
+  // not cancel an order, block a customer, or export a report after a reseed).
   admin: [
     'vendors:view', 'vendors:create', 'vendors:edit', 'vendors:approve', 'vendors:reject', 'vendors:status_change',
     'vendors.branches:view', 'vendors.branches:create', 'vendors.branches:edit', 'vendors.branches:status_change',
@@ -78,13 +84,13 @@ export const PERMISSION_MATRIX_GRANTS: Record<string, string[]> = {
     'vendors.therapists:view', 'vendors.therapists:create', 'vendors.therapists:edit', 'vendors.therapists:status_change',
     'vendors.products:view', 'vendors.products:create', 'vendors.products:edit',
     'products:view',
-    'orders:view',
-    'customers:view',
+    'orders:view', 'orders:status_change',
+    'customers:view', 'customers:status_change',
     ...keysFor(CONTENT_CRUD_KEYS, ['view', 'create', 'edit']),
     ...keysFor(CONTENT_SINGLETON_KEYS, ['view', 'edit']),
-    'reports:view',
+    'reports:view', 'reports:export',
     'rbac.users:view',
-    'system-settings:view', 'system-settings:edit',
+    'system-settings:view',
     'settings:view', 'settings:edit',
     // Accounts — view-only across the board, and deliberately NO `accounts.member-settlements:
     // approve` (payout release stays Super-Admin-only, enforced server-side by requireSuperAdmin
@@ -137,15 +143,19 @@ export const PERMISSION_MATRIX_GRANTS: Record<string, string[]> = {
   ],
   // The matrix's "Member" row — own-business-only, via the `vendor-portal.*` surface, never the
   // admin-wide `vendors`/`orders`/`customers`/`cms`/`products` keys (those would leak the
-  // admin-wide sidebar nodes AND their unscoped backing endpoints to a vendor owner). Products is
-  // capped to own:VCE (no delete, unlike its previous full-CRUD grant); Customers is denied
-  // entirely per the matrix's bare "-" (no "own:" qualifier, unlike every other Member cell).
-  vendor: [
+  // admin-wide sidebar nodes AND their unscoped backing endpoints to a member owner). Products is
+  // capped to own:VCE (no delete, unlike its previous full-CRUD grant). Customers is `view`-only
+  // per PLANNING.md §1.2's actual cell — `V O (customers who ordered from them)`, i.e. D19's
+  // "member's own customers" — not the bare "-" an earlier revision of this file assumed; the
+  // `/vendors/me/customers` route (D19) already enforces the own-scope filtering, this grant only
+  // controls whether its sidebar node is visible.
+  member: [
     'vendor-portal.profile:view', 'vendor-portal.profile:edit',
     'vendor-portal.branches:view', 'vendor-portal.branches:create', 'vendor-portal.branches:edit', 'vendor-portal.branches:status_change',
     'vendor-portal.deals:view', 'vendor-portal.deals:create', 'vendor-portal.deals:edit', 'vendor-portal.deals:status_change',
     'vendor-portal.therapists:view', 'vendor-portal.therapists:create', 'vendor-portal.therapists:edit', 'vendor-portal.therapists:status_change',
     'vendor-portal.products:view', 'vendor-portal.products:create', 'vendor-portal.products:edit',
+    'vendor-portal.customers:view',
     'vendor-portal.orders:view',
     // Purchase Verification plumbing gate (voucher verify/start/OTP/complete/ship/evidence) —
     // see seed.ts's EXTRA_ACTIONS_BY_MENU_KEY doc comment on this exact key. Excluded from the

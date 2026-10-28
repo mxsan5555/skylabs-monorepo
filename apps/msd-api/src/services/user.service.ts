@@ -2,6 +2,7 @@ import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
 import { revokeAllRefreshTokens } from './token.service';
 import { Prisma, type UserStatus } from '../generated/prisma-client';
+import { MEMBER_ROLE_KEYS } from '../lib/role-keys';
 
 /**
  * Every staff User now holds EXACTLY one role (enforced by `setStaffUserRole`/`replaceUserRole`
@@ -26,6 +27,10 @@ import { Prisma, type UserStatus } from '../generated/prisma-client';
  * agree). The User row itself is untouched either way; this only narrows what this one listing
  * surfaces. Applied identically to `listUsers` and `countStaffUsers` below so the sidebar
  * count/badge (if any) never disagrees with what the list itself shows.
+ *
+ * The Member role key is mid-rename (`vendor` -> `member`, see `lib/role-keys.ts`'s
+ * `MEMBER_ROLE_KEYS` doc comment) — this excludes BOTH so the exclusion holds regardless of
+ * which key a given row still carries during the transition.
  */
 const STAFF_ONLY_WHERE: Prisma.UserWhereInput = {
   deletedAt: null,
@@ -33,15 +38,16 @@ const STAFF_ONLY_WHERE: Prisma.UserWhereInput = {
   roles: { some: { role: { key: { not: 'customer' } } } },
   AND: [
     { roles: { none: { role: { isSuperAdmin: true } } } },
-    { roles: { none: { role: { key: 'vendor' } } } },
+    { roles: { none: { role: { key: { in: [...MEMBER_ROLE_KEYS] } } } } },
     { vendorProfile: null },
   ],
 };
 
 /** Roles that can never be assigned through staff-user management — Customer and Member
- *  ("vendor") each have their own dedicated account-creation flow and own role assignment, never
- *  this one. Shared by `createUser` and `setStaffUserRole` so both enforce the same rule. */
-const INELIGIBLE_STAFF_ROLE_KEYS = ['customer', 'vendor'];
+ *  (`member`, transitionally also `vendor`) each have their own dedicated account-creation flow
+ *  and own role assignment, never this one. Shared by `createUser` and `setStaffUserRole` so both
+ *  enforce the same rule. */
+const INELIGIBLE_STAFF_ROLE_KEYS = ['customer', ...MEMBER_ROLE_KEYS];
 
 async function assertEligibleStaffRole(roleId: string) {
   const role = await prisma.role.findUnique({ where: { id: roleId } });

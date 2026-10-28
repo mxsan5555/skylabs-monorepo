@@ -7,6 +7,16 @@ vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
     token: 'test-token',
     can: () => true,
   }),
+  // `api/rbac/roles`'s `importActual` below drags in `api/rbac/client.ts`, which calls this at
+  // module scope to build its 401-retry token store — stubbed minimally so that import doesn't
+  // throw; nothing in this file exercises token refresh/logout.
+  getTokenStore: () => ({
+    getToken: () => 'test-token',
+    setToken: vi.fn(),
+    subscribe: vi.fn().mockReturnValue(vi.fn()),
+    refresh: vi.fn().mockResolvedValue(null),
+    logout: vi.fn().mockResolvedValue(undefined),
+  }),
 }));
 
 const listRolesMock = vi.fn();
@@ -64,7 +74,7 @@ const CATALOG: PermissionCatalogRow[] = [
     menuKey: 'dashboard',
     title: 'Dashboard',
     actions: [
-      { action: 'view', key: 'dashboard:view', permissionId: DASHBOARD_PERMISSION_ID, label: 'Dashboard — view' },
+      { action: 'view', key: 'dashboard:view', permissionIds: [DASHBOARD_PERMISSION_ID], label: 'Dashboard — view' },
     ],
   },
 ];
@@ -102,8 +112,8 @@ function widgetCheckbox(title: string): HTMLInputElement {
   return label.querySelector('input[type="checkbox"]') as HTMLInputElement;
 }
 
-function permissionSelect(title: string): HTMLSelectElement {
-  return screen.getByRole('combobox', { name: title }) as HTMLSelectElement;
+function permissionCheckbox(title: string): HTMLInputElement {
+  return screen.getByRole('checkbox', { name: title }) as HTMLInputElement;
 }
 
 function findButton(text: string): HTMLElement {
@@ -188,16 +198,16 @@ describe('RoleManagement — widget and permission selection stay independent', 
     renderRoles();
     await waitForFullySettled();
 
-    const dashboardViewSelect = permissionSelect('Dashboard — view');
-    expect(dashboardViewSelect.value).toBe('');
+    const dashboardViewCheckbox = permissionCheckbox('Vendor: Dashboard: View');
+    expect(dashboardViewCheckbox.checked).toBe(false);
 
     const totalOrdersCheckbox = widgetCheckbox('Total Orders');
     fireEvent.click(totalOrdersCheckbox);
     expect(totalOrdersCheckbox.checked).toBe(true);
-    expect(dashboardViewSelect.value).toBe('');
+    expect(dashboardViewCheckbox.checked).toBe(false);
 
-    fireEvent.change(dashboardViewSelect, { target: { value: 'ALL' } });
-    expect(dashboardViewSelect.value).toBe('ALL');
+    fireEvent.click(dashboardViewCheckbox);
+    expect(dashboardViewCheckbox.checked).toBe(true);
     expect(totalOrdersCheckbox.checked).toBe(true);
     expect(widgetCheckbox('My Business').checked).toBe(false);
   });

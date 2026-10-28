@@ -3,7 +3,7 @@ import { filterMenuByPermissions } from '@skylabs-monorepo/shared-permissions';
 import { getMenuForApp } from '@skylabs-monorepo/shared-menu';
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
-import { resolveGrantedPermissionKeys } from './permission-resolver.service';
+import { resolveGrantedPermissions } from './permission-resolver.service';
 import type { AccessTokenPayload } from '../lib/jwt';
 
 export async function getBootstrap(tokenPayload: AccessTokenPayload): Promise<BootstrapResponse> {
@@ -27,7 +27,7 @@ export async function getBootstrap(tokenPayload: AccessTokenPayload): Promise<Bo
   }
 
   const roles = await prisma.role.findMany({ where: { key: { in: tokenPayload.roles } } });
-  const permissions = await resolveGrantedPermissionKeys(tokenPayload.roles);
+  const { keys: permissions, scopes } = await resolveGrantedPermissions(tokenPayload.roles);
   const menu = filterMenuByPermissions(getMenuForApp('msd'), permissions);
 
   const roleIds = roles.map((r) => r.id);
@@ -58,6 +58,7 @@ export async function getBootstrap(tokenPayload: AccessTokenPayload): Promise<Bo
     user: { id: user.id, name: user.name, email: user.email ?? undefined, phone: user.phone ?? undefined, status: user.status },
     roles: roles.map((r) => ({ id: r.id, key: r.key, name: r.name, isSuperAdmin: r.isSuperAdmin })),
     permissions,
+    scopes,
     menu,
     dashboardWidgets,
     member: ownedMember ?? null,

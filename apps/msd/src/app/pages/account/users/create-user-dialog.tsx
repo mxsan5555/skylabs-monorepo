@@ -10,11 +10,17 @@ import content from '../../../../content.json';
 import { validateEmail, validatePhone } from '../../../../utils/validation';
 type CreateUserFieldKey = 'name' | 'email' | 'phone' | 'roleId';
 
-/** Eligible internal staff roles — Member ("vendor") is excluded here even though `roles` (from
+/** Role keys that mean "this account owns a member business" — mirrors msd-api's
+ *  `lib/role-keys.ts#MEMBER_ROLE_KEYS` ('member' is canonical; 'vendor' tolerated during the
+ *  in-progress rename so this stays correct regardless of which key a given environment's Role
+ *  row still carries). */
+const MEMBER_ROLE_KEYS = ['member', 'vendor'];
+
+/** Eligible internal staff roles — Member is excluded here even though `roles` (from
  *  `GET /rbac/roles`) already excludes Customer server-side, since Member must never be an
  *  option in staff Add/Edit even though it's still shown in Role Management itself. */
 export function eligibleStaffRoles(roles: Role[]): Role[] {
-  return roles.filter((r) => r.key !== 'vendor');
+  return roles.filter((r) => !MEMBER_ROLE_KEYS.includes(r.key));
 }
 
 export function CreateUserDialog({ roles, onCreated }: { roles: Role[]; onCreated: (user: UserRecord) => void }) {

@@ -12,16 +12,23 @@ vi.mock('../lib/prisma', async () => {
 
 vi.mock('../services/permission-resolver.service', () => ({
   resolveGrantedPermissionKeys: vi.fn(),
+  resolveGrantedPermissions: vi.fn(),
   invalidatePermissionCache: vi.fn(),
   isSuperAdminRoleSet: vi.fn().mockResolvedValue(false),
 }));
 
 import app from '../app';
 import { prisma } from '../lib/prisma';
-import { resolveGrantedPermissionKeys } from '../services/permission-resolver.service';
+import {
+  resolveGrantedPermissionKeys,
+  resolveGrantedPermissions,
+  invalidatePermissionCache,
+} from '../services/permission-resolver.service';
 import { bearerFor } from '../test-utils/auth-test-utils';
 
 const resolveMock = vi.mocked(resolveGrantedPermissionKeys);
+const resolveScopesMock = vi.mocked(resolveGrantedPermissions);
+const invalidateCacheMock = vi.mocked(invalidatePermissionCache);
 const prismaMock = vi.mocked(prisma, true);
 
 const ROLE_ID = '746d394b-7760-461a-8d4b-28d0e1c532f9';
@@ -44,6 +51,7 @@ const roleFixture = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resolveScopesMock.mockResolvedValue({ keys: [], scopes: {} });
 });
 
 describe('GET /api/v1/rbac/roles', () => {
@@ -90,29 +98,32 @@ describe('POST /api/v1/rbac/roles', () => {
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
   });
 
-  it('returns 201 with the created role for a valid body + permission', async () => {
+  /**
+   * PLANNING.md §1.1/R1: role create, clone and delete are locked — custom roles are not
+   * needed, unconditionally, regardless of who holds `rbac.roles:create`.
+   */
+  it('returns 403 ROLE_MANAGEMENT_LOCKED even for a valid body + permission', async () => {
     resolveMock.mockResolvedValue(['rbac.roles:create']);
-    prismaMock.role.findUnique.mockResolvedValue(null);
-    prismaMock.role.create.mockResolvedValue({ ...roleFixture, ...validBody });
-    prismaMock.auditLog.create.mockResolvedValue({});
     const res = await request(app)
       .post('/api/v1/rbac/roles')
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
       .send(validBody);
-    expect(res.status).toBe(201);
-    expect(res.body.data.key).toBe('marketing_lead');
-    expect(prismaMock.auditLog.create).toHaveBeenCalledOnce();
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('ROLE_MANAGEMENT_LOCKED');
+    expect(prismaMock.role.create).not.toHaveBeenCalled();
   });
+});
 
-  it('returns 409 when the role key already exists', async () => {
+describe('POST /api/v1/rbac/roles/:id/clone', () => {
+  it('returns 403 ROLE_MANAGEMENT_LOCKED even for a valid body + permission (PLANNING.md §1.1/R1)', async () => {
     resolveMock.mockResolvedValue(['rbac.roles:create']);
-    prismaMock.role.findUnique.mockResolvedValue(roleFixture);
     const res = await request(app)
-      .post('/api/v1/rbac/roles')
+      .post(`/api/v1/rbac/roles/${ROLE_ID}/clone`)
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
-      .send(validBody);
-    expect(res.status).toBe(409);
-    expect(res.body.error.code).toBe('CONFLICT');
+      .send({ key: 'cloned_role', name: 'Cloned Role' });
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('ROLE_MANAGEMENT_LOCKED');
+    expect(prismaMock.role.create).not.toHaveBeenCalled();
   });
 });
 
@@ -722,7 +733,10 @@ describe('GET /api/v1/rbac/permissions/catalog', () => {
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }));
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.data)).toBe(true);
-    expect(res.body.data.find((m: { menuKey: string }) => m.menuKey === 'rbac.roles')).toBeDefined();
+    // `vendors.branches` is the real key `requirePermission()`/the sidebar read for this row
+    // (PLANNING.md §1.2's "Branches") — not a parallel, UI-only key (see role.service.ts
+    // `getPermissionCatalog`'s own doc comment).
+    expect(res.body.data.find((m: { menuKey: string }) => m.menuKey === 'vendors.branches')).toBeDefined();
   });
 });
 
@@ -765,16 +779,16 @@ describe('PUT /api/v1/rbac/roles/:id/permissions', () => {
   it('returns 401 with no token', async () => {
     const res = await request(app)
       .put(`/api/v1/rbac/roles/${ROLE_ID}/permissions`)
-      .send({ permissionIds: [PERMISSION_ID] });
+      .send({ permissions: [{ permissionId: PERMISSION_ID, scope: 'ALL' }] });
     expect(res.status).toBe(401);
   });
 
-  it('returns 422 when permissionIds contains a non-uuid entry', async () => {
+  it('returns 422 when a permission entry has a non-uuid permissionId', async () => {
     resolveMock.mockResolvedValue(['rbac.roles:edit']);
     const res = await request(app)
       .put(`/api/v1/rbac/roles/${ROLE_ID}/permissions`)
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
-      .send({ permissionIds: ['not-a-uuid'] });
+      .send({ permissions: [{ permissionId: 'not-a-uuid', scope: 'ALL' }] });
     expect(res.status).toBe(422);
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
   });
@@ -782,7 +796,7 @@ describe('PUT /api/v1/rbac/roles/:id/permissions', () => {
   it('returns 200 with the updated rolePermission rows on success', async () => {
     resolveMock.mockResolvedValue(['rbac.roles:edit']);
     prismaMock.role.findUnique.mockResolvedValue(roleFixture);
-    prismaMock.permission.count.mockResolvedValue(1);
+    prismaMock.permission.findMany.mockResolvedValue([{ id: PERMISSION_ID, key: 'rbac.roles:view' }]);
     prismaMock.rolePermission.deleteMany.mockResolvedValue({});
     prismaMock.rolePermission.createMany.mockResolvedValue({});
     prismaMock.rolePermission.findMany.mockResolvedValue([
@@ -792,21 +806,96 @@ describe('PUT /api/v1/rbac/roles/:id/permissions', () => {
     const res = await request(app)
       .put(`/api/v1/rbac/roles/${ROLE_ID}/permissions`)
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
-      .send({ permissionIds: [PERMISSION_ID] });
+      .send({ permissions: [{ permissionId: PERMISSION_ID, scope: 'ALL' }] });
     expect(res.status).toBe(200);
     expect(res.body.data[0].permissionId).toBe(PERMISSION_ID);
+    // Without this, every already-signed-in holder of this role keeps resolving the pre-save
+    // grant set from the resolver's cache for up to CACHE_TTL_MS after a successful save.
+    expect(invalidateCacheMock).toHaveBeenCalled();
+  });
+
+  it('does NOT invalidate the cache when the save itself fails validation', async () => {
+    resolveMock.mockResolvedValue(['rbac.roles:edit']);
+    prismaMock.role.findUnique.mockResolvedValue(roleFixture);
+    prismaMock.permission.findMany.mockResolvedValue([]); // none of the submitted ids matched
+    const res = await request(app)
+      .put(`/api/v1/rbac/roles/${ROLE_ID}/permissions`)
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
+      .send({ permissions: [{ permissionId: PERMISSION_ID, scope: 'ALL' }] });
+    expect(res.status).toBe(422);
+    expect(invalidateCacheMock).not.toHaveBeenCalled();
   });
 
   it('returns 422 when a permissionId does not exist in the catalog (service-level validation)', async () => {
     resolveMock.mockResolvedValue(['rbac.roles:edit']);
     prismaMock.role.findUnique.mockResolvedValue(roleFixture);
-    prismaMock.permission.count.mockResolvedValue(0); // none of the submitted ids matched
+    prismaMock.permission.findMany.mockResolvedValue([]); // none of the submitted ids matched
     const res = await request(app)
       .put(`/api/v1/rbac/roles/${ROLE_ID}/permissions`)
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
-      .send({ permissionIds: [PERMISSION_ID] });
+      .send({ permissions: [{ permissionId: PERMISSION_ID, scope: 'ALL' }] });
     expect(res.status).toBe(422);
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('returns 422 when OWN scope is requested for a key with no real OWN-enforcement code yet', async () => {
+    resolveMock.mockResolvedValue(['rbac.roles:edit']);
+    prismaMock.role.findUnique.mockResolvedValue(roleFixture);
+    prismaMock.permission.findMany.mockResolvedValue([{ id: PERMISSION_ID, key: 'customers:view' }]);
+    const res = await request(app)
+      .put(`/api/v1/rbac/roles/${ROLE_ID}/permissions`)
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
+      .send({ permissions: [{ permissionId: PERMISSION_ID, scope: 'OWN' }] });
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(prismaMock.rolePermission.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('accepts OWN scope for a key on the enforced allowlist (rbac.audit-logs:view)', async () => {
+    resolveMock.mockResolvedValue(['rbac.roles:edit']);
+    prismaMock.role.findUnique.mockResolvedValue(roleFixture);
+    prismaMock.permission.findMany.mockResolvedValue([{ id: PERMISSION_ID, key: 'rbac.audit-logs:view' }]);
+    prismaMock.rolePermission.deleteMany.mockResolvedValue({});
+    prismaMock.rolePermission.createMany.mockResolvedValue({});
+    prismaMock.rolePermission.findMany.mockResolvedValue([
+      { roleId: ROLE_ID, permissionId: PERMISSION_ID, permission: { id: PERMISSION_ID, key: 'rbac.audit-logs:view' } },
+    ]);
+    prismaMock.auditLog.create.mockResolvedValue({});
+    const res = await request(app)
+      .put(`/api/v1/rbac/roles/${ROLE_ID}/permissions`)
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
+      .send({ permissions: [{ permissionId: PERMISSION_ID, scope: 'OWN' }] });
+    expect(res.status).toBe(200);
+  });
+});
+
+describe('GET /api/v1/rbac/audit-logs — own-scope (PLANNING.md §1.2 Logs: V A SuperAdmin, V O everyone else)', () => {
+  it('returns every row (no actorUserId filter) when the caller holds ALL scope', async () => {
+    resolveMock.mockResolvedValue(['rbac.audit-logs:view']);
+    resolveScopesMock.mockResolvedValue({ keys: ['rbac.audit-logs:view'], scopes: { 'rbac.audit-logs:view': 'ALL' } });
+    prismaMock.auditLog.findMany.mockResolvedValue([]);
+    prismaMock.auditLog.count.mockResolvedValue(0);
+    const res = await request(app)
+      .get('/api/v1/rbac/audit-logs')
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['super_admin'] }));
+    expect(res.status).toBe(200);
+    expect(prismaMock.auditLog.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: {} }),
+    );
+  });
+
+  it('filters to the caller\'s own actorUserId when scope is OWN', async () => {
+    resolveMock.mockResolvedValue(['rbac.audit-logs:view']);
+    resolveScopesMock.mockResolvedValue({ keys: ['rbac.audit-logs:view'], scopes: { 'rbac.audit-logs:view': 'OWN' } });
+    prismaMock.auditLog.findMany.mockResolvedValue([]);
+    prismaMock.auditLog.count.mockResolvedValue(0);
+    const res = await request(app)
+      .get('/api/v1/rbac/audit-logs')
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['support'] }));
+    expect(res.status).toBe(200);
+    expect(prismaMock.auditLog.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { actorUserId: USER_ID } }),
+    );
   });
 });
 
@@ -864,8 +953,8 @@ describe('GET /api/v1/rbac/bootstrap', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns 200 with user/roles/permissions/menu/dashboardWidgets for any authenticated user', async () => {
-    resolveMock.mockResolvedValue(['dashboard:view']);
+  it('returns 200 with user/roles/permissions/scopes/menu/dashboardWidgets for any authenticated user', async () => {
+    resolveScopesMock.mockResolvedValue({ keys: ['dashboard:view'], scopes: {} });
     prismaMock.user.findFirst.mockResolvedValue({
       id: USER_ID,
       name: 'Admin User',
@@ -883,6 +972,7 @@ describe('GET /api/v1/rbac/bootstrap', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.user.id).toBe(USER_ID);
     expect(res.body.data.permissions).toEqual(['dashboard:view']);
+    expect(res.body.data.scopes).toEqual({});
     // filterMenuByPermissions is the *real* implementation here — only "dashboard" is granted view.
     expect(res.body.data.menu.map((n: { id: string }) => n.id)).toEqual(['dashboard']);
   });

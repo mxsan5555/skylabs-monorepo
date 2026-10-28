@@ -5,7 +5,7 @@ vi.mock('../lib/prisma', async () => {
   return { prisma: createPrismaMock() };
 });
 vi.mock('./permission-resolver.service', () => ({
-  resolveGrantedPermissionKeys: vi.fn().mockResolvedValue([]),
+  resolveGrantedPermissions: vi.fn().mockResolvedValue({ keys: [], scopes: {} }),
 }));
 
 import { prisma } from '../lib/prisma';
@@ -33,5 +33,18 @@ describe('getBootstrap member info', () => {
     prismaMock.member.findUnique.mockResolvedValue(null as never);
     const res = await getBootstrap(payload);
     expect(res.member).toBeNull();
+  });
+});
+
+describe('getBootstrap scopes', () => {
+  it('passes through the resolver\'s scope map', async () => {
+    const { resolveGrantedPermissions } = await import('./permission-resolver.service');
+    vi.mocked(resolveGrantedPermissions).mockResolvedValueOnce({
+      keys: ['rbac.audit-logs:view'],
+      scopes: { 'rbac.audit-logs:view': 'OWN' },
+    });
+    prismaMock.member.findUnique.mockResolvedValue(null as never);
+    const res = await getBootstrap(payload);
+    expect(res.scopes).toEqual({ 'rbac.audit-logs:view': 'OWN' });
   });
 });

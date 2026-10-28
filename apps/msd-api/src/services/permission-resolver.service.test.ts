@@ -6,7 +6,7 @@ vi.mock('../lib/prisma', async () => {
 });
 
 import { prisma } from '../lib/prisma';
-import { resolveGrantedPermissionKeys, invalidatePermissionCache } from './permission-resolver.service';
+import { resolveGrantedPermissionKeys, resolveGrantedPermissions, invalidatePermissionCache } from './permission-resolver.service';
 
 const prismaMock = vi.mocked(prisma, true);
 
@@ -99,5 +99,41 @@ describe('resolveGrantedPermissionKeys', () => {
     // Unaffected resources keep full VCED.
     expect(result).toContain('vendors:delete');
     expect(result).toContain('rbac.users:delete');
+  });
+});
+
+describe('resolveGrantedPermissions (scope)', () => {
+  it('reports the scope of a single-role grant', async () => {
+    prismaMock.role.findMany.mockResolvedValue([{ isSuperAdmin: false }]);
+    prismaMock.rolePermission.findMany.mockResolvedValue([
+      { scope: 'OWN', permission: { key: 'rbac.audit-logs:view' } },
+    ]);
+
+    const result = await resolveGrantedPermissions(['support']);
+
+    expect(result.keys).toEqual(['rbac.audit-logs:view']);
+    expect(result.scopes).toEqual({ 'rbac.audit-logs:view': 'OWN' });
+  });
+
+  it('highest-scope-wins: ALL beats OWN across two roles granting the same key', async () => {
+    prismaMock.role.findMany.mockResolvedValue([{ isSuperAdmin: false }, { isSuperAdmin: false }]);
+    prismaMock.rolePermission.findMany.mockResolvedValue([
+      { scope: 'OWN', permission: { key: 'rbac.audit-logs:view' } },
+      { scope: 'ALL', permission: { key: 'rbac.audit-logs:view' } },
+    ]);
+
+    const result = await resolveGrantedPermissions(['support', 'admin']);
+
+    expect(result.scopes['rbac.audit-logs:view']).toBe('ALL');
+  });
+
+  it('SuperAdmin resolves with an empty scope map (scopeFor defaults absent keys to ALL)', async () => {
+    prismaMock.role.findMany.mockResolvedValue([{ isSuperAdmin: true }]);
+    prismaMock.rolePermission.findMany.mockResolvedValue([]);
+
+    const result = await resolveGrantedPermissions(['super_admin']);
+
+    expect(result.scopes).toEqual({});
+    expect(prismaMock.rolePermission.findMany).not.toHaveBeenCalled();
   });
 });

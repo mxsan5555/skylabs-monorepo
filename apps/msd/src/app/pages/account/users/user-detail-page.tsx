@@ -408,7 +408,7 @@ export function UserDetailPage() {
             user.roles.map((role) => {
               const granted = grantedByRoleId[role.id] ?? new Set<string>();
               const rows = catalog
-                .map((row) => ({ ...row, actions: row.actions.filter((a) => a.permissionId && granted.has(a.permissionId)) }))
+                .map((row) => ({ ...row, actions: row.actions.filter((a) => a.permissionIds.some((id) => granted.has(id))) }))
                 .filter((row) => row.actions.length > 0);
               return (
                 <sky-card key={role.id} aria-label={`${role.name} effective access`}>

@@ -112,8 +112,23 @@ Closing the gap and a CI coverage check are P9-05 and P9-06.
 | GET | `/api/v1/rbac/users/me` | signed in (own records, or checked in the handler) |
 | PATCH | `/api/v1/rbac/users/me` | signed in (own records, or checked in the handler) |
 
-Planned: `GET /rbac/bootstrap` adds `scopes`; role create, clone and delete return 403
-`ROLE_MANAGEMENT_LOCKED`; grant edits refuse super-admin-only actions (`ROLE_GRANT_FORBIDDEN`);
+Done since 2026-10-23 (not yet reflected in the generated table above, which is otherwise
+unchanged — no route path added, removed or moved):
+
+- `GET /rbac/bootstrap` now returns `scopes` (`Record<permissionKey, 'ALL'|'OWN'>`,
+  highest-scope-wins across the caller's roles).
+- `POST /rbac/roles` and `POST /rbac/roles/:id/clone` now return 403 `ROLE_MANAGEMENT_LOCKED`
+  unconditionally (PLANNING.md §1.1/R1) — `DELETE /rbac/roles/:id` already returned 403
+  `FORBIDDEN` for every system role, which today is every role (custom roles can't be created).
+- `PUT /rbac/roles/:id/permissions` returns 422 `VALIDATION_ERROR` if any entry requests
+  `scope: "OWN"` for a permission key outside `role.service.ts#SCOPE_ENFORCED_PERMISSION_KEYS`
+  (today: only `rbac.audit-logs:view`) — saving `OWN` for an unsupported key would otherwise look
+  restricted in the Role Permission Matrix UI while silently still behaving like `ALL`.
+- `GET /rbac/audit-logs` filters to the caller's own `actorUserId` when their resolved scope for
+  `rbac.audit-logs:view` is `OWN` (Super Admin keeps `ALL` via its existing bypass) —
+  PLANNING.md §1.2's Logs row (`V A` Super Admin, `V O` everyone else).
+
+Still planned: grant edits refuse super-admin-only actions (`ROLE_GRANT_FORBIDDEN`);
 `/staff-users*` replaces `/rbac/users*` with a role allowlist and last-Super-Admin guard;
 `GET /settings`, `PATCH /settings/:key`; `GET /logs/login-history`, `GET /logs/audit`;
 `GET`/`PATCH /me` (P8).

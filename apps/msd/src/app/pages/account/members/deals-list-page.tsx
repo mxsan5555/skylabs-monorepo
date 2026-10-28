@@ -8,11 +8,11 @@ import { useConfirmDialog } from '../../../components/confirm-dialog';
 interface DealsListPageProps {
   token: string | null;
   vendorId: string;
-  /** Gates "Add deal" and each row's Edit/Toggle-status action — same coarse `vendors:edit`
-   *  prop `BranchesListPage`/`TherapistsTab` already take (the backend's nested
-   *  `vendors.deals:*` permissions are the real enforcement either way). */
+  /** Gates "Add deal" and each row's Edit/Toggle-status action — computed by the caller from
+   *  `vendors.deals:edit` (never the blanket `members:edit`; the backend's `vendors.deals:*`
+   *  permissions are the real enforcement either way). */
   canEdit: boolean;
-  /** Gates the Delete row action — mirrors `member-detail-page.tsx`'s own `canDelete`. */
+  /** Gates the Delete row action — computed by the caller from `vendors.deals:delete`. */
   canDelete: boolean;
 }
 

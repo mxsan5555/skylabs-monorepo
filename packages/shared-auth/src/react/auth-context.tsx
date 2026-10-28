@@ -70,8 +70,14 @@ export function AuthProvider({
   );
 
   const loadBootstrap = useCallback(
-    async (nextToken: string) => {
-      setLoading(true);
+    async (nextToken: string, opts: { silent?: boolean } = {}) => {
+      // `silent` skips the `loading` flip — `RequireAuth` renders a full-page placeholder
+      // instead of `children` for as long as `loading` is true (see its own doc comment), which
+      // is correct for the *initial* session restore but would otherwise replace whatever the
+      // user is looking at with a spinner on every background refresh too (see the proactive
+      // token-refresh effect below, which calls this silently every ~15 minutes so an active
+      // session's permissions don't go stale for its entire duration).
+      if (!opts.silent) setLoading(true);
       try {
         const data = await fetchBootstrap(apiBaseUrl, nextToken);
         setBootstrap(data);
@@ -88,7 +94,7 @@ export function AuthProvider({
           setToken(null);
         }
       } finally {
-        setLoading(false);
+        if (!opts.silent) setLoading(false);
       }
     },
     [apiBaseUrl, setToken],
@@ -170,6 +176,14 @@ export function AuthProvider({
   // so a session outlives the 15-minute access-token TTL instead of the app silently going
   // "logged in but broken" (or getting force-logged-out) once it lapses. Never armed for a
   // preview ("Login As") token — see the mount effect's own note on why.
+  //
+  // Also the one place a long-lived, already-open session picks up a role-permission change:
+  // without the silent `loadBootstrap` below, `bootstrap` (and therefore the sidebar and every
+  // `can()` check) stayed frozen at whatever it was at the last sign-in for as long as the tab
+  // stayed open — a Role Permission Matrix save could never reach an already-signed-in holder of
+  // that role until they manually signed out and back in. `silent: true` so this doesn't flip
+  // the shared `loading` flag `RequireAuth` uses to show a full-page placeholder (see
+  // `loadBootstrap`'s own doc comment) — this is a background refresh, never the initial restore.
   useEffect(() => {
     if (!token || isPreviewToken(token)) return;
 
@@ -179,6 +193,7 @@ export function AuthProvider({
         const refreshed = await tokenStore.refresh();
         if (refreshed) {
           setTokenState(refreshed);
+          await loadBootstrap(refreshed, { silent: true });
         } else {
           // The refresh cookie itself is invalid/expired/revoked — nothing left to recover,
           // this is a genuine end of session.
@@ -193,7 +208,7 @@ export function AuthProvider({
     }, delay);
 
     return () => clearTimeout(timer);
-  }, [token, tokenStore]);
+  }, [token, tokenStore, loadBootstrap]);
 
   const loginAsUser = useCallback(
     async (targetUserId: string) => {

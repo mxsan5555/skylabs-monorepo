@@ -3,18 +3,14 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react';
-import type { MdDialog } from '@material/web/dialog/dialog.js';
 
 import {
   FilledButton,
   OutlinedButton,
-  TextButton,
   OutlinedTextField,
   Switch,
-  Dialog,
   Icon,
 } from '@skylabs-monorepo/shared-ui/react';
 
@@ -22,8 +18,6 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { useConfirmDialog } from '../../../components/confirm-dialog';
 
 import {
-  cloneRole,
-  createRole,
   deleteRole,
   getPermissionCatalog,
   getRolePermissions,
@@ -71,6 +65,13 @@ export function RoleManagement() {
     Map<string, Map<string, PermissionScope>>
   >(new Map());
 
+  // The last-persisted grant set per role, so the matrix can tell an edited-but-unsaved
+  // checkbox apart from one that already matches the database. Only ever replaced wholesale
+  // (initial load, or a role's own successful save) — never mutated by `toggleRolePermission`.
+  const [savedPermissionsByRole, setSavedPermissionsByRole] = useState<
+    Map<string, Map<string, PermissionScope>>
+  >(new Map());
+
   const [dirtyRoleIds, setDirtyRoleIds] = useState<Set<string>>(new Set());
 
   const [selectedWidgets, setSelectedWidgets] = useState<
@@ -92,7 +93,6 @@ export function RoleManagement() {
   const [actionError, setActionError] = useState('');
 
   const canEdit = can('rbac.roles', 'edit');
-  const canCreate = can('rbac.roles', 'create');
   const canDelete = can('rbac.roles', 'delete');
   const canChangeStatus = can('rbac.roles', 'status_change');
 
@@ -104,18 +104,12 @@ export function RoleManagement() {
   // Keep every role available in the matrix, including custom roles.
   const matrixRoles = roles;
 
-  console.log("Can Edit Roles:", can('rbac.roles', 'edit'));
-console.log("Can Create Roles:", can('rbac.roles', 'create'));
-console.log("Can Delete Roles:", can('rbac.roles', 'delete'));
-console.log("Can Change Status:", can('rbac.roles', 'status_change'));
-
   const loadRoles = useCallback(async () => {
     setRolesLoading(true);
     setRolesError('');
 
     try {
       const { data } = await listRoles(token);
-      console.log("Fetched roles:", data);
       setRoles(data);
 
       setSelectedRoleId((current) => {
@@ -149,7 +143,6 @@ console.log("Can Change Status:", can('rbac.roles', 'status_change'));
 
     getPermissionCatalog(token)
       .then(({ data }) => {
-        console.log("Permission Catalog Data:", data);
         if (!cancelled) {
           setCatalog(data);
         }
@@ -183,7 +176,6 @@ console.log("Can Change Status:", can('rbac.roles', 'status_change'));
 
     listDashboardWidgetsCatalog(token)
       .then(({ data }) => {
-        console.log("the dashboard widget catalog data:", data);
         if (!cancelled) {
           setWidgetsCatalog(data);
         }
@@ -225,7 +217,6 @@ console.log("Can Change Status:", can('rbac.roles', 'status_change'));
     Promise.all(
       matrixRoles.map(async (role) => {
         const { data } = await getRolePermissions(token, role.id);
-        console.log("the role permissions data:", data);
 
         const permissions = new Map<string, PermissionScope>();
 
@@ -240,6 +231,7 @@ console.log("Can Change Status:", can('rbac.roles', 'status_change'));
         if (cancelled) return;
 
         setPermissionsByRole(new Map(entries));
+        setSavedPermissionsByRole(new Map(entries.map(([roleId, perms]) => [roleId, new Map(perms)])));
         setDirtyRoleIds(new Set());
       })
       .catch((error) => {
@@ -284,7 +276,6 @@ console.log("Can Change Status:", can('rbac.roles', 'status_change'));
 
     getRoleWidgets(token, selectedRole.id)
       .then(({ data }) => {
-        console.log("Fetched roles widget:", data);
         if (!cancelled) {
           setSelectedWidgets(
             new Map(data.map((item) => [item.widgetId, item.order])),
@@ -521,6 +512,12 @@ console.log("Can Change Status:", can('rbac.roles', 'status_change'));
             return next;
           });
 
+          setSavedPermissionsByRole((previous) => {
+            const next = new Map(previous);
+            next.set(role.id, new Map(savedPermissions));
+            return next;
+          });
+
           setDirtyRoleIds((previous) => {
             const next = new Set(previous);
             next.delete(role.id);
@@ -600,16 +597,6 @@ console.log("Can Change Status:", can('rbac.roles', 'status_change'));
           </p>
         </div>
 
-        <div className="page-head__actions">
-          {canCreate && (
-            <CreateRoleButton
-              onCreated={(role) => {
-                setRoles((previous) => [...previous, role]);
-                setSelectedRoleId(role.id);
-              }}
-            />
-          )}
-        </div>
       </header>
 
       {actionMessage && (
@@ -659,16 +646,6 @@ console.log("Can Change Status:", can('rbac.roles', 'status_change'));
                 </div>
 
                 <div className="page-head__actions">
-                  {canCreate && (
-                    <CloneRoleButton
-                      role={selectedRole}
-                      onCloned={(role) => {
-                        setRoles((previous) => [...previous, role]);
-                        setSelectedRoleId(role.id);
-                      }}
-                    />
-                  )}
-
                   {canChangeStatus && (
                     <label className="widget-assign-row__label">
                       <Switch
@@ -764,6 +741,7 @@ console.log("Can Change Status:", can('rbac.roles', 'status_change'));
                   ? permissionsByRole.get(selectedRoleId) ?? new Map<string, PermissionScope>()
                   : new Map<string, PermissionScope>()
               }
+              savedPermissions={selectedRoleId ? savedPermissionsByRole.get(selectedRoleId) : undefined}
               onPermissionToggle={toggleRolePermission}
               disabled={!canEdit || savingPermissions}
             />
@@ -829,240 +807,6 @@ console.log("Can Change Status:", can('rbac.roles', 'status_change'));
 
       {ConfirmDialog}
     </div>
-  );
-}
-
-function CreateRoleButton({
-  onCreated,
-}: {
-  onCreated: (role: Role) => void;
-}) {
-  const { token } = useAuth();
-  const dialogRef = useRef<MdDialog>(null);
-
-  const [form, setForm] = useState({
-    key: '',
-    name: '',
-    description: '',
-  });
-
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
-
-  const submit = async () => {
-    setError('');
-
-    if (!/^[a-z][a-z0-9_]*$/.test(form.key)) {
-      setError('Key must be lower_snake_case, e.g. "regional_manager".');
-      return;
-    }
-
-    if (!form.name.trim()) {
-      setError('Name is required.');
-      return;
-    }
-
-    setSubmitting(true);
-
-    try {
-      const { data } = await createRole(token, {
-        ...form,
-        isActive: true,
-      });
-
-      onCreated(data);
-      setForm({ key: '', name: '', description: '' });
-      dialogRef.current?.close();
-    } catch (error) {
-      setError(
-        error instanceof ApiRequestError
-          ? error.message
-          : 'Could not create role.',
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <>
-      <FilledButton onClick={() => dialogRef.current?.show()}>
-        <Icon slot="icon" aria-hidden="true">
-          add
-        </Icon>
-        New role
-      </FilledButton>
-
-      <Dialog ref={dialogRef}>
-        <div slot="headline">Create role</div>
-
-        <div slot="content" className="form-grid">
-          <OutlinedTextField
-            label="Key (lower_snake_case)"
-            value={form.key}
-            onInput={(event: Event) =>
-              setForm((current) => ({
-                ...current,
-                key: (event.target as HTMLInputElement).value,
-              }))
-            }
-          />
-
-          <OutlinedTextField
-            label="Name"
-            value={form.name}
-            onInput={(event: Event) =>
-              setForm((current) => ({
-                ...current,
-                name: (event.target as HTMLInputElement).value,
-              }))
-            }
-          />
-
-          <OutlinedTextField
-            label="Description"
-            value={form.description}
-            onInput={(event: Event) =>
-              setForm((current) => ({
-                ...current,
-                description: (event.target as HTMLInputElement).value,
-              }))
-            }
-          />
-
-          {error && (
-            <p className="error-state" role="alert">
-              {error}
-            </p>
-          )}
-        </div>
-
-        <div slot="actions">
-          <TextButton onClick={() => dialogRef.current?.close()}>
-            Cancel
-          </TextButton>
-
-          <FilledButton onClick={submit} disabled={submitting}>
-            {submitting ? 'Creating…' : 'Create'}
-          </FilledButton>
-        </div>
-      </Dialog>
-    </>
-  );
-}
-
-function CloneRoleButton({
-  role,
-  onCloned,
-}: {
-  role: Role;
-  onCloned: (role: Role) => void;
-}) {
-  const { token } = useAuth();
-  const dialogRef = useRef<MdDialog>(null);
-
-  const [form, setForm] = useState({
-    key: '',
-    name: `${role.name} copy`,
-  });
-
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
-
-  const submit = async () => {
-    setError('');
-
-    if (!/^[a-z][a-z0-9_]*$/.test(form.key)) {
-      setError('Key must be lower_snake_case, e.g. "regional_manager".');
-      return;
-    }
-
-    if (!form.name.trim()) {
-      setError('Name is required.');
-      return;
-    }
-
-    setSubmitting(true);
-
-    try {
-      const { data } = await cloneRole(
-        token,
-        role.id,
-        form.key,
-        form.name,
-      );
-
-      onCloned(data);
-      dialogRef.current?.close();
-    } catch (error) {
-      setError(
-        error instanceof ApiRequestError
-          ? error.message
-          : 'Could not clone role.',
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <>
-      <OutlinedButton onClick={() => dialogRef.current?.show()}>
-        <Icon slot="icon" aria-hidden="true">
-          content_copy
-        </Icon>
-        Clone
-      </OutlinedButton>
-
-      <Dialog ref={dialogRef}>
-        <div slot="headline">Clone "{role.name}"</div>
-
-        <div slot="content" className="form-grid">
-          <p className="field-hint">
-            Copies this role's permissions and dashboard widgets onto a new
-            role.
-          </p>
-
-          <OutlinedTextField
-            label="New key (lower_snake_case)"
-            value={form.key}
-            onInput={(event: Event) =>
-              setForm((current) => ({
-                ...current,
-                key: (event.target as HTMLInputElement).value,
-              }))
-            }
-          />
-
-          <OutlinedTextField
-            label="New name"
-            value={form.name}
-            onInput={(event: Event) =>
-              setForm((current) => ({
-                ...current,
-                name: (event.target as HTMLInputElement).value,
-              }))
-            }
-          />
-
-          {error && (
-            <p className="error-state" role="alert">
-              {error}
-            </p>
-          )}
-        </div>
-
-        <div slot="actions">
-          <TextButton onClick={() => dialogRef.current?.close()}>
-            Cancel
-          </TextButton>
-
-          <FilledButton onClick={submit} disabled={submitting}>
-            {submitting ? 'Cloning…' : 'Clone'}
-          </FilledButton>
-        </div>
-      </Dialog>
-    </>
   );
 }
 

@@ -1,4 +1,9 @@
-import { PERMISSION_ACTIONS, type MenuNode, type PermissionAction } from '@skylabs-monorepo/shared-types';
+import {
+  PERMISSION_ACTIONS,
+  type MenuNode,
+  type PermissionAction,
+  type PermissionScope,
+} from '@skylabs-monorepo/shared-types';
 
 /** Canonical permission key format shared by both APIs' `Permission.key` column and the frontends. */
 export function permissionKeyFor(menuKey: string, action: PermissionAction): string {
@@ -12,6 +17,20 @@ export function can(
   action: PermissionAction = 'view',
 ): boolean {
   return grantedPermissions.includes(permissionKeyFor(menuKey, action));
+}
+
+/**
+ * The scope (`ALL`/`OWN`) the caller holds for a permission key, from `BootstrapResponse.scopes`.
+ * Defaults to `ALL` when the key is absent — matching `requirePermission()`'s own behavior of
+ * never restricting by scope unless a route explicitly reads it, so a missing entry never reads
+ * as "more restricted" than what the backend actually enforces.
+ */
+export function scopeFor(
+  scopes: Readonly<Record<string, PermissionScope>> | undefined,
+  menuKey: string,
+  action: PermissionAction = 'view',
+): PermissionScope {
+  return scopes?.[permissionKeyFor(menuKey, action)] ?? 'ALL';
 }
 
 /**

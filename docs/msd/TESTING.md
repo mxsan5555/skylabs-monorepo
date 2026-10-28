@@ -40,8 +40,8 @@ Known failures at 2026-10-18; they must not grow. Anything else failing is a reg
 
 | Project | Failing | Where |
 |---|---|---|
-| msd | 23 tests in 13 files | `permission-matrix` 9, `india-locations` 3, `contact-us` 2, and 1 each in `app.spec`, `widget-registry`, `deal-card`, `media-uploader`, `sky-product-card-wc`, `site-footer`, `wishlist`, `roles`, `settings`; `entry-server.test.tsx` fails to load. Regressions since commit e756759 (NewOfferCard), not yet fixed: `home` 4 (FAQ section no longer rendered, deal favourite), `category` 1 (product wishlist heart) |
-| msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; the other 1,163 pass) |
+| msd | 16 tests in 54 files, found 2026-10-27 (was 27 tests in 58 files on 2026-10-23, itself documented as 23 tests in 13 files on 2026-10-18 — massively understated even before the 2026-10-23 permission-engine change, root-caused below; none of the extra scope traces to that change) | **Dominant cause, ~53 of the 54 files**: every one crashes at import with `[vitest] No "getTokenStore" export is defined on the "@skylabs-monorepo/shared-auth/react" mock` — `api/rbac/client.ts` calls `getTokenStore()` at module scope (added after 2026-10-18), and dozens of page/component test files mock `shared-auth/react` minimally (just `useAuth`) without it, so merely importing the page under test throws before any test body runs. Confirmed pre-existing and unrelated to RBAC: reproduces identically for files never touched this session (`category.test.tsx`, `settings.test.tsx`, every `account/cms/*`, `account/masters/*`, `account/vendor-portal/*`, `account/orders/*`, etc.) — not attempted here, a one-line-per-file fix (add a `getTokenStore` stub to each file's mock factory, same shape used in `roles.test.tsx`) but far outside this pass's scope. The remaining, individually-named failures: `india-locations` 3, `contact-us` 2, and 1 each in `app.spec`, `widget-registry`, `deal-card`, `media-uploader`, `sky-product-card-wc`, `site-footer`, `wishlist`; regressions since commit e756759 (NewOfferCard), not yet fixed: `home` 4 (FAQ section no longer rendered, deal favourite), `category` 1 (product wishlist heart — on top of that file's `getTokenStore` crash above). **Fixed 2026-10-27**: `permission-matrix.test.tsx`'s 9 failures (targeted a per-cell-select Permission Matrix redesign — one `<select>` per action, `onScopeChange(permissionId, scope)` — that was never built) and `roles.test.tsx`'s 7th case (same unbuilt design) are gone; both files rewritten against the real checkbox-plus-one-scope-control component, now 10/10 and 7/7 (see §4.1 and ARCHITECTURE.md §1) |
+| msd-api | 39 tests in 10 files, found 2026-10-27 (was 40 in 10 files on 2026-10-23, itself documented as 5 on 2026-10-18 — the baseline was already stale before that date; none of the 40 was caused by the 2026-10-23 permission-engine change, and none was cross-test pollution from it either — every one reproduces identically running its file alone, confirmed file-by-file with `nx run msd-api:test -- <file>`, and the full-suite run is deterministic across repeats) | `rbac.routes` 15 (see below), `vendors.routes` 6, `order.service` 4, `promotion.service` 4, `auth.member` 2, `auth.routes` 2, `orders.routes` 2, `payment.routes` 2, `vendor.service` 2, `permission-resolver.service` 1 (asserts a SuperAdmin's resolved keys contain `vendors:delete`, a key the live menu no longer has — `msd-menu.json`'s top-level list node is already `members`, per the partly-done P1-05 rename). Of the 15 in `rbac.routes`: 4 use `POST`/`DELETE /rbac/users/:id/roles/:roleId`, a route pair that no longer exists (replaced by the atomic `PUT /rbac/users/:id/role`, which is itself also broken — see the build-failure note below); 2 assert the old suspended-member bootstrap message text against the current, longer one; 1 validates `PUT /rbac/users/:id/role` params that don't match the route's actual `:id`-only param shape; 1 is the matching "atomic replace" test hitting the same param mismatch; 1 is a stale role-conflicts fixture; 2 are `GET /roles/:id/permissions` asserting the old `{permissionIds}` response shape instead of `{permissionId, scope}`; the remaining 4 (bootstrap/impersonate "404" cases, 2 Super-Admin-role-grant cases) weren't traced past "fails the same alone" — not investigated further, out of scope for the permission-engine pass. The other ~9 files were not individually root-caused beyond "pre-existing, confirmed via isolation". **Fixed 2026-10-27**: `rbac.routes.test.ts`'s "/permissions/catalog" test (not in the above list — found 500ing when touching `getPermissionCatalog()` for P10-08; `test-utils/prisma-mock.ts`'s `permission` mock never had an `upsert`, so the route 500'd under test regardless of catalog content) — added the missing mock method and fixed the test's stale `menuKey === 'rbac.roles'` assertion (never a real catalog row, old or new) to a real one |
 | shared-menu | 5 | `index.test.ts` |
 
 Lint and type drift: 30 msd lint errors (`import/first` and `no-empty-function` in older tests), an ESLint ignore error in the shared packages, and
@@ -50,11 +50,23 @@ ignores every file under `apps/msd-api/src` today. Flaky under load: `deals-list
 "toggle-status flips a non-ACTIVE deal" and `popular-tags.test.tsx` "mapping a category calls
 mapPopularTag" (both pass alone).
 
+**`npx nx run msd-api:build` is already red**, found 2026-10-23: 15 pre-existing TypeScript
+errors, none in a file touched by that date's permission-engine change (confirmed file-by-file).
+Six are in `rbac.routes.ts`'s `POST`/`DELETE /users/:id/roles/:roleId` handlers — a route pair
+superseded by the atomic `PUT /users/:id/role` (see this file's own rbac.routes known-failure
+note above) that still calls `userService.assignRole`/`unassignRole`, neither of which exists,
+and references undefined `before`/`user` locals; the rest are scattered missing names/type
+mismatches in `dispute.service.ts`, `order.service.ts`, `product.service.ts`,
+`settlement.service.ts`, `vendor.service.ts`, `voucher.service.ts`. Vitest's transpile-only
+transform doesn't type-check, which is why these don't block `msd-api:test`.
+
 ## 4. Acceptance per module
 
 ### 4.1 Admin and staff
 
-- Matrix snapshot test: 7 roles × 14 resources × actions × scope equals `PLANNING.md` §1.2 (P1-08).
+- Matrix snapshot test: 7 roles × 14 resources × actions × scope equals `PLANNING.md` §1.2 (P1-08,
+  still open for the full 14-resource spec — `prisma/permission-matrix.test.ts` covers the
+  governed-role set and the Member row's grants, including `vendor-portal.customers:view`).
 - Every route has `requirePermission` or is on a documented public allowlist (P4-12).
 - Preview token refused on payout, delete, status, refund, staff and role-grant routes; a Super
   Admin cannot be impersonated.
@@ -63,6 +75,83 @@ mapPopularTag" (both pass alone).
   (403); the last active Super Admin cannot lose the role, be blocked or be deleted (409).
 - Permission revoked while a token is active: the API refuses on the next request after the cache
   clears.
+- Role create and clone return 403 `ROLE_MANAGEMENT_LOCKED` unconditionally (R1); the Role
+  Management screen never renders New role/Clone (P2-15, verified 2026-10-23:
+  `rbac.routes.test.ts`'s "POST /api/v1/rbac/roles" and "POST /api/v1/rbac/roles/:id/clone"
+  blocks).
+- Saving `scope: "OWN"` via `PUT /rbac/roles/:id/permissions` for a key outside
+  `role.service.ts#SCOPE_ENFORCED_PERMISSION_KEYS` returns 422, never silently succeeds (verified
+  2026-10-23).
+- A non-Super-Admin's own audit-log view (`GET /rbac/audit-logs`) returns only rows where they are
+  the actor once their resolved scope for `rbac.audit-logs:view` is `OWN`; Super Admin still sees
+  every row (verified 2026-10-23, PLANNING.md §1.2 Logs row).
+- **Role Permission Matrix screen — layout and catalog-key mismatch both fixed** (2026-10-27):
+  the matrix table now uses the existing `.perm-matrix`/`.perm-matrix-wrap` classes (was a bare
+  unstyled `<table>`, which read as "compressed, left-aligned, no column separation") with one
+  column per View/Create/Edit/Delete/Scope and a dirty-cell highlight comparing the draft against
+  the last-persisted `GET .../permissions` response (`permission-matrix.test.tsx`, 13/13).
+  Separately, and the more load-bearing fix: this screen's catalog used to be a different key
+  space than what `requirePermission()`/the sidebar actually read — see ARCHITECTURE.md §1 and
+  TASKS.md P10-08 for the full root cause and the fix (`RBAC_RESOURCE_CATALOG` now declares real
+  `menuKeys`, `getPermissionCatalog()` returns `permissionIds[]` per action, `content` aggregates
+  its ~10 real `cms.*` leaves). Covered by `role.service.test.ts` (new, 6 tests: every row's real
+  key, Content's grouping and atomic toggle, the singleton-CMS create/delete exclusion, the
+  upsert set) and `permission-matrix.test.tsx`'s new "backed by several real keys" cases. Not
+  covered end-to-end against a live resolver/bootstrap (that would need a real Postgres, per
+  §1's "Needs Postgres" list) — the unit-level proof is that `getPermissionCatalog()`'s
+  `menuKeys`/`permissionIds` now literally are the same `Permission` rows
+  `permission-resolver.service.ts`/`requirePermission()` read, verified by key string equality,
+  not a mocked assumption.
+- **Sidebar node visibility is `:view`-gated only, by design** (investigated 2026-10-26):
+  Marketing's resolved menu excludes Customers/Orders (the matrix denies both outright); Sales and
+  Support correctly resolve to the SAME navigable nodes — both hold `view` on every shared
+  resource, differing only in create/edit/delete, which never changes sidebar structure. This is
+  not a resolver/bootstrap/sidebar bug; `prisma/permission-matrix.test.ts`'s "Marketing vs Sales
+  vs Support" describe block locks this in so a future change doesn't get mistaken for a
+  regression (or silently become one). `AuthProvider`'s own bootstrap-per-login behavior (never a
+  stale/previous user's menu, cleared on sign-out) is covered in
+  `packages/shared-auth/src/react/auth-context.test.tsx` (new 2026-10-26 — no prior test existed
+  for `AuthProvider` at all).
+- **Admin's grants now match every cell PLANNING.md §1.2 specifies** (audited and fixed
+  2026-10-26 — needs a reseed to reach an already-provisioned database, see DATABASE.md §1):
+  holds `orders:status_change`, `customers:status_change` and `reports:export` (Extra Actions
+  table — each has a real backing route, so these were a genuine capability gap, not just a
+  matrix-display mismatch); no longer holds `system-settings:edit` (§1.3 rule 3 — Edit is
+  Super-Admin-only, Admin's row is `V A`); Masters is `VCE` (no delete) on every sub-resource, not
+  the full CRUD-with-delete it had drifted to. Marketing's Masters grant is `V` (view only) on
+  every sub-resource, not the mixed create/edit/full-CRUD it had drifted to. All covered in
+  `prisma/permission-matrix.test.ts` and the new `prisma/seed-starter-permissions.test.ts`.
+- Admin/Marketing/Sales/Support now actually hold `rbac.audit-logs:view` with `scope: 'OWN'`
+  (fixed 2026-10-26 — see DATABASE.md §1 for the reseed step); before this, the own-scope
+  enforcement code added 2026-10-23 had no effect for anyone but Super Admin because nobody else
+  had ever been granted the key at all.
+- Found, reported, not fixed (out of scope for a permission-grant change — see TASKS.md): the
+  refund workflow (`disputes.routes.ts`/`refunds.routes.ts`) doesn't implement PLANNING.md §3's
+  D11 "Support raises a refund request; Admin or Super Admin approves or rejects" — there is no
+  staff-side "raise" step and no `orders:custom`/`orders:approve` keys anywhere in it, only a
+  customer-initiated dispute and a single-step Admin-only `accounts.refunds-disputes:approve`
+  refund-create. Tracked as the already-open P7-01 through P7-05/P10-25. Also found: Admin's and
+  Sales's `vendors.deals:approve`/`reject` grants are vestigial from the pre-D6 deal-approval
+  gate (already tracked as the open P3-15).
+- **Traced the full Role Permission Matrix → Save → cache → bootstrap → sidebar/action/backend
+  flow end to end (2026-10-26)**, per the Matrix-vs-sidebar mismatch investigation: found and
+  fixed the one broken link — `PUT /rbac/roles/:id/permissions` never called
+  `invalidatePermissionCache()`, unlike `DELETE /roles/:id` and `PATCH /roles/:id/status`, so a
+  saved Matrix change could lag up to `CACHE_TTL_MS` (30s) behind what the Matrix UI already
+  showed as current for anyone resolving that role's permissions. `rbac.routes.test.ts` now
+  asserts the cache is invalidated on a successful save and NOT invalidated when the save fails
+  validation. Every other link in the chain (Matrix UI's save payload, `setRolePermissions`,
+  `GET /rbac/bootstrap`, `filterMenuByPermissions`, `requirePermission`) was re-verified against
+  the current code this session and found already correct — the apparent "mismatch" otherwise
+  traces entirely to the live database still predating the 2026-10-23 matrix fixes (see
+  DATABASE.md §1's 2026-10-26 re-verification), not a code bug.
+- **An already-open session now receives a saved Role Permission Matrix change** (fixed
+  2026-10-26, closes the other half of TASKS.md P10-01): `AuthProvider`'s proactive token-refresh
+  timer now silently reloads `bootstrap` on every renewal (≤ ~15 min), instead of a signed-in
+  tab's sidebar/`can()` staying frozen at whatever it was at last sign-in until the user manually
+  signs out and back in. Covered by a new test in `auth-context.test.tsx` asserting (a) the menu
+  updates to the post-refresh bootstrap's menu and (b) `loading` never flips to `true` for this
+  background refresh (which would otherwise trigger `RequireAuth`'s full-page placeholder).
 
 ### 4.2 Members
 
@@ -89,6 +178,11 @@ mapPopularTag" (both pass alone).
 - Members list: the Filter menu sends exactly one filter per option; status and documents columns
   use their tonal colours.
 - Own scope (after P4): member A reading member B's branch, deal, therapist or product gets 404.
+- Console action gating per catalog resource (P4-19, fixed 2026-10-26): the Branches/Deals/
+  Therapists/Products tabs on the Member detail page show Add/Edit/Delete from that resource's
+  own `vendors.branches`/`vendors.deals`/`vendors.therapists`/`vendors.products` key, never the
+  Profile tab's blanket `members:edit`/`members:delete` — verified with a grant combination where
+  the two disagree (`member-detail-page.test.tsx`).
 
 ### 4.3 Customers and orders
 

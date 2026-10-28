@@ -1,6 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import type { BootstrapResponse } from '@skylabs-monorepo/shared-types';
-import { extractReturnUrl, isCustomerAccountUser, sanitizeReturnUrl, signInPathWithNext, signInPathWithReturnTo } from './role-routing';
+import {
+  extractReturnUrl,
+  isCustomerAccountUser,
+  isDualRoleUser,
+  isVendorUser,
+  resolvePostLoginPath,
+  sanitizeReturnUrl,
+  signInPathWithNext,
+  signInPathWithReturnTo,
+} from './role-routing';
+
+const withRoles = (...keys: string[]) => ({ roles: keys.map((key) => ({ key })) }) as unknown as BootstrapResponse;
 
 describe('extractReturnUrl', () => {
   it('reads a plain ?next= path', () => {
@@ -117,8 +128,6 @@ describe('signInPathWithReturnTo', () => {
 });
 
 describe('isCustomerAccountUser', () => {
-  const withRoles = (...keys: string[]) => ({ roles: keys.map((key) => ({ key })) }) as unknown as BootstrapResponse;
-
   it('is true for a customer', () => {
     expect(isCustomerAccountUser(withRoles('customer'))).toBe(true);
   });
@@ -133,5 +142,42 @@ describe('isCustomerAccountUser', () => {
 
   it('is false for a member without the customer role', () => {
     expect(isCustomerAccountUser(withRoles('member'))).toBe(false);
+  });
+});
+
+/**
+ * Regression coverage for the msd-api `vendor` -> `member` role-key rename (see
+ * `lib/role-keys.ts#MEMBER_ROLE_KEYS` server-side): a real Member account's bootstrap carries
+ * whichever key its Role row currently has, so this must recognize both during the transition —
+ * never only the pre-rename `'vendor'` key.
+ */
+describe('isVendorUser', () => {
+  it('is true for the canonical `member` key', () => {
+    expect(isVendorUser(withRoles('member'))).toBe(true);
+  });
+
+  it('is true for the pre-rename `vendor` key (transitional)', () => {
+    expect(isVendorUser(withRoles('vendor'))).toBe(true);
+  });
+
+  it('is false for a plain customer', () => {
+    expect(isVendorUser(withRoles('customer'))).toBe(false);
+  });
+});
+
+describe('isDualRoleUser / resolvePostLoginPath', () => {
+  it('sends a customer+member user to the chooser regardless of which member key is present', () => {
+    expect(isDualRoleUser(withRoles('customer', 'member'))).toBe(true);
+    expect(resolvePostLoginPath(withRoles('customer', 'member'))).toBe('/choose-experience');
+    expect(isDualRoleUser(withRoles('customer', 'vendor'))).toBe(true);
+    expect(resolvePostLoginPath(withRoles('customer', 'vendor'))).toBe('/choose-experience');
+  });
+
+  it('sends a member-only user straight to the admin console', () => {
+    expect(resolvePostLoginPath(withRoles('member'))).toBe('/account/dashboard');
+  });
+
+  it('sends staff to the admin console even if also flagged member (should not happen, but staff wins)', () => {
+    expect(resolvePostLoginPath(withRoles('admin', 'member'))).toBe('/account/dashboard');
   });
 });

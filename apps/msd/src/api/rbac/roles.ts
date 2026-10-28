@@ -30,8 +30,12 @@ export interface RoleUpdateInput {
 
 export interface PermissionCatalogAction {
   action: PermissionAction;
+  /** Every real `${menuKey}:${action}` key this action represents, comma-joined (usually one;
+   *  more than one only for a resource that aggregates several real keys, e.g. Content). */
   key: string;
-  permissionId: string | null;
+  /** The real `Permission.id`s this one UI action controls — toggling it grants/revokes all of
+   *  them together. Empty when the backend hasn't created the row(s) yet (needs a reseed). */
+  permissionIds: string[];
   label: string | null;
 }
 

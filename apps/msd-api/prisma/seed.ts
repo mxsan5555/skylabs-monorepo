@@ -44,13 +44,6 @@ export const ROLES: RoleSeed[] = [
   { key: 'member', name: 'Member', description: 'Deal company that manages its own profile and catalog.', isSystem: true, isSuperAdmin: false },
   { key: 'support', name: 'Support', description: 'Contacts customers and members. View only.', isSystem: true, isSuperAdmin: false },
   { key: 'customer', name: 'Customer', description: 'Consumer-facing base role.', isSystem: true, isSuperAdmin: false },
-  // Key stays 'vendor' (reused everywhere as a string key — permission keys, UserRole rows,
-  // route checks) but the DISPLAYED name is 'Member', per the external account rename — same
-  // role id/row, no duplicate role created. `role.upsert`'s `update: { name: ... }` means a seed
-  // rerun actually renames an already-seeded "Vendor" row the first time this runs.
-  { key: 'vendor', name: 'Member', description: 'External business owner/manager account.', isSystem: true, isSuperAdmin: false },
-  { key: 'marketing', name: 'Marketing', description: 'Content, promotions, categories.', isSystem: true, isSuperAdmin: false },
-  { key: 'sales', name: 'Sales', description: 'Vendor accounts and reporting.', isSystem: true, isSuperAdmin: false },
 ];
 
 /**
@@ -270,6 +263,31 @@ export const MEMBER_GRANTS: Record<'admin' | 'sales' | 'marketing' | 'support' |
   member: ['members:custom'],
 };
 
+/**
+ * PLANNING.md §1.2's Masters row: `VCE / dashboard` for Admin (never delete — matches
+ * Branches/Deals/Therapists/Products' own no-delete-for-Admin discipline), `V / dashboard` for
+ * Marketing (view only, never create/edit/delete). `masters` is NOT in
+ * `MATRIX_GOVERNED_MENU_KEYS`, so this is read by `grantStarterPermissions`'s exact-state
+ * `resetGrant`, not `applyPermissionMatrix` — kept here as a flat, directly testable data
+ * constant (same reasoning as `MEMBER_GRANTS` above) rather than inline in that function.
+ */
+const MASTERS_SUB_KEYS = ['categories', 'sub-categories', 'tags', 'popular-treatments', 'promotions', 'home-hero'];
+export const MASTERS_GRANTS: Record<'admin' | 'marketing', string[]> = {
+  admin: [
+    'masters:view',
+    ...MASTERS_SUB_KEYS.flatMap((k) => [`masters.${k}:view`, `masters.${k}:create`, `masters.${k}:edit`]),
+  ],
+  marketing: ['masters:view', ...MASTERS_SUB_KEYS.map((k) => `masters.${k}:view`)],
+};
+
+/**
+ * PLANNING.md §1.2's Logs row: `V O` for every non-SuperAdmin staff role (SuperAdmin gets `V A`
+ * via its blanket bypass). `rbac.audit-logs` is ungoverned, so this is only ever read by
+ * `grantStarterPermissions`'s `grantOwnScope` loop. Member excluded — see that loop's own doc
+ * comment for why.
+ */
+export const LOGS_OWN_SCOPE_ROLES: string[] = ['admin', 'marketing', 'sales', 'support'];
+
 /** A reasonable starter grant for the non-super-admin staff roles, so the app isn't empty on first login. */
 async function grantStarterPermissions(
   roles: Map<string, { id: string; isSuperAdmin: boolean }>,
@@ -286,13 +304,13 @@ async function grantStarterPermissions(
   };
 
   /**
-   * Authoritative (delete-then-recreate) variant of `grant` above — used only for `vendor`.
+   * Authoritative (delete-then-recreate) variant of `grant` above — used only for `member`.
    * `grant`'s additive `createMany`/`skipDuplicates` can only ever ADD permissions on a re-run;
    * it can never retract a grant that was added by an older seed revision or hand-edited via the
-   * Role Permission Matrix UI. That matters specifically for `vendor`: it must never hold
+   * Role Permission Matrix UI. That matters specifically for `member`: it must never hold
    * `members:view`/`customers:view`/`products:view`/`orders:view` etc. (those would leak the
    * admin-wide Vendor List/Customers/Products/Orders sidebar nodes and their backing endpoints to
-   * every vendor owner — see CLAUDE.md's vendor-isolation rules), so its RolePermission set is
+   * every member owner — see CLAUDE.md's vendor-isolation rules), so its RolePermission set is
    * reset to exactly this list on every seed run rather than only ever growing.
    */
   const resetGrant = async (roleKey: string, keys: string[]) => {
@@ -306,73 +324,80 @@ async function grantStarterPermissions(
     });
   };
 
-  // Every `admin`/`marketing`/`sales` key that is also a row in the User Management permission
-  // matrix (`prisma/permission-matrix.ts`) is deliberately NOT listed here anymore — it would
-  // otherwise be re-added by this additive `grant()` on every seed run, silently undoing the
-  // matrix's caps (e.g. Admin/Sales losing `orders:edit`/`customers:delete`, Marketing losing its
-  // `reports:view`). Only genuinely ungoverned menuKeys (Dashboard, Masters, Services, Inventory)
-  // stay here; `applyPermissionMatrix` (called below, after this function) owns every matrix row
-  // for `admin`/`marketing`/`sales`/`support`/`vendor` with exact-state (delete-then-recreate)
-  // semantics on exactly those governed keys.
-  await grant('admin', [
+  /**
+   * Sets exactly one permission to `scope: 'OWN'` for a role, independent of whatever
+   * `grant()`/`resetGrant()` already wrote for that key (`upsert` so it works whether the bare
+   * grant ran first or not). Used for `rbac.audit-logs:view` below — PLANNING.md §1.2's Logs row
+   * is `V O` (own actions only) for every non-SuperAdmin role; `RolePermission.scope` defaults to
+   * `ALL`, so this is the one place that default needs overriding.
+   */
+  const grantOwnScope = async (roleKey: string, key: string) => {
+    const role = roles.get(roleKey);
+    const permissionId = permissionIdByKey.get(key);
+    if (!role || !permissionId) return;
+    await prisma.rolePermission.upsert({
+      where: { roleId_permissionId: { roleId: role.id, permissionId } },
+      update: { scope: 'OWN' },
+      create: { roleId: role.id, permissionId, scope: 'OWN' },
+    });
+  };
+
+  // Every `admin`/`marketing`/`sales`/`support` key that is also a row in the User Management
+  // permission matrix (`prisma/permission-matrix.ts`) is deliberately NOT listed here — it would
+  // otherwise be re-added by an additive `grant()` on every seed run, silently undoing the
+  // matrix's caps (that bug — `orders`/`customers`/`products` literals left over here from before
+  // this function used `resetGrant` — is exactly what let Admin lose `orders:status_change`/
+  // `customers:status_change` and Marketing/Admin gain stray Masters create/edit/delete rights
+  // the matrix never granted; fixed 2026-10-26, see permission-matrix.ts for Admin's corrected
+  // Orders/Customers/Reports/System-settings cells). Only genuinely ungoverned menuKeys
+  // (Dashboard, Masters, Services, Inventory) stay here, and now via the same exact-state
+  // `resetGrant` as `member` already used — additive `grant()` can only ever grow a role's access,
+  // never retract a stray grant from an earlier seed revision.
+  await resetGrant('admin', [
     'dashboard:view',
-    'customers:view', 'customers:create', 'customers:edit', 'customers:delete', 'customers:status_change',
     ...MEMBER_GRANTS.admin,
-    'orders:view', 'orders:edit', 'orders:status_change',
-    'products:view', 'products:create', 'products:edit', 'products:delete',
     'services:view', 'services:create', 'services:edit', 'services:delete',
     'inventory:view', 'inventory:create', 'inventory:edit', 'inventory:delete',
-    'masters:view', 'masters.categories:view', 'masters.categories:create', 'masters.categories:edit', 'masters.categories:delete',
-    'masters.sub-categories:view', 'masters.sub-categories:create', 'masters.sub-categories:edit', 'masters.sub-categories:delete',
-    'masters.tags:view', 'masters.tags:create', 'masters.tags:edit', 'masters.tags:delete',
-    'masters.popular-treatments:view', 'masters.popular-treatments:create', 'masters.popular-treatments:edit', 'masters.popular-treatments:delete',
-    'masters.promotions:view', 'masters.promotions:create', 'masters.promotions:edit', 'masters.promotions:delete',
-    'masters.home-hero:view', 'masters.home-hero:create', 'masters.home-hero:edit', 'masters.home-hero:delete',
+    ...MASTERS_GRANTS.admin,
   ]);
 
-  const adminRole = roles.get('admin');
-  const memberDelete = permissionIdByKey.get('members:delete');
-  if (adminRole && memberDelete) {
-    await prisma.rolePermission.deleteMany({ where: { roleId: adminRole.id, permissionId: memberDelete } });
-  }
-
-  await grant('marketing', [
+  await resetGrant('marketing', [
     'dashboard:view',
     ...MEMBER_GRANTS.marketing,
-    'masters:view', 'masters.categories:view', 'masters.categories:create', 'masters.categories:edit',
-    'masters.sub-categories:view', 'masters.sub-categories:create', 'masters.sub-categories:edit',
-    'masters.tags:view', 'masters.tags:create', 'masters.tags:edit', 'masters.tags:delete',
-    'masters.popular-treatments:view', 'masters.popular-treatments:create', 'masters.popular-treatments:edit', 'masters.popular-treatments:delete',
-    'masters.promotions:view', 'masters.promotions:create', 'masters.promotions:edit', 'masters.promotions:delete',
-    'masters.home-hero:view', 'masters.home-hero:create', 'masters.home-hero:edit', 'masters.home-hero:delete',
+    ...MASTERS_GRANTS.marketing,
   ]);
 
-  await grant('sales', [
+  await resetGrant('sales', [
     'dashboard:view',
     ...MEMBER_GRANTS.sales,
-    'orders:view', 'orders:export',
-    'reports:view', 'reports:export',
   ]);
 
-  await grant('support', [
+  await resetGrant('support', [
     'dashboard:view',
     ...MEMBER_GRANTS.support,
-    'customers:view',
-    'orders:view',
   ]);
+
+  // See `LOGS_OWN_SCOPE_ROLES`'s own doc comment (PLANNING.md §1.2's Logs row, and why Member is
+  // excluded) — `rbac.audit-logs` is ungoverned, so nothing else ever touches these roles' grant
+  // on this one key, making a plain `grantOwnScope` call safe without `resetGrant`'s blanket wipe.
+  for (const roleKey of LOGS_OWN_SCOPE_ROLES) {
+    await grantOwnScope(roleKey, 'rbac.audit-logs:view');
+  }
 
   await grant('customer', ['dashboard:view']);
   // Deliberately NOT 'members:view'/'customers:view'/'products:*'/'orders:*' — any of those would
   // also unlock the matching admin-wide sidebar node AND its backing endpoint (requirePermission
   // only checks the boolean grant, not who's asking): 'members:custom' is the one gate every
-  // vendor self-service route (`/vendors/me/*`, including its own Order/Product access via the
-  // `orders`/`vendors` OR-checks in orders.routes.ts and vendors.routes.ts) already runs on. The
-  // `vendor-portal.*` keys (the matrix's "Member" row) are now owned by `applyPermissionMatrix`
-  // below, not here — only the non-matrix `vendors:custom` plumbing gate and `dashboard:view`
-  // stay in this resetGrant.
-  await resetGrant('vendor', [
+  // member self-service route (`/vendors/me/*`, including its own Order/Product access via the
+  // `orders`/`vendors` OR-checks in orders.routes.ts and vendors.routes.ts) already runs on, so
+  // it's included directly here (there's no other call site that grants it — `MEMBER_GRANTS.
+  // member` documents the same list for reference but is never spread elsewhere). The
+  // `vendor-portal.*` keys (the matrix's "Member" row) are owned by `applyPermissionMatrix`
+  // below, not here — only the plumbing gates and `dashboard:view` stay in this resetGrant.
+  await resetGrant('member', [
     'dashboard:view',
     'vendors:custom',
+    ...MEMBER_GRANTS.member,
   ]);
 }
 
