@@ -39,6 +39,16 @@ beforeEach(() => {
   prismaMock.memberDocument.findMany.mockResolvedValue([] as never);
   prismaMock.vendorImage.findMany.mockResolvedValue([] as never);
   prismaMock.vendorVideo.findUnique.mockResolvedValue(null as never);
+  for (const model of [
+    prismaMock.dealImage,
+    prismaMock.dealVideo,
+    prismaMock.productImage,
+    prismaMock.productVideo,
+    prismaMock.therapistImage,
+    prismaMock.therapistVideo,
+  ]) {
+    model.findMany.mockResolvedValue([] as never);
+  }
   deleteMediaFile.mockResolvedValue(undefined);
   prismaMock.memberStatusHistory.create.mockResolvedValue({} as never);
   prismaMock.refreshSession.updateMany.mockResolvedValue({ count: 2 } as never);
@@ -222,11 +232,35 @@ describe('hard delete removes the member files from storage', () => {
       { storageKey: 'vendors/m1/2.jpg' },
     ] as never);
     prismaMock.vendorVideo.findUnique.mockResolvedValue({ storageKey: 'vendors/m1/v.mp4' } as never);
+    // P3-25: the member's deals, products and therapists cascade away with it, so their media too.
+    prismaMock.dealImage.findMany.mockResolvedValue([{ storageKey: 'deals/d1/1.jpg' }] as never);
+    prismaMock.dealVideo.findMany.mockResolvedValue([{ storageKey: 'deals/d1/v.mp4' }] as never);
+    prismaMock.productImage.findMany.mockResolvedValue([{ storageKey: 'products/p1/1.jpg' }] as never);
+    prismaMock.productVideo.findMany.mockResolvedValue([] as never);
+    prismaMock.therapistImage.findMany.mockResolvedValue([{ storageKey: 'therapists/t1/1.jpg' }] as never);
+    prismaMock.therapistVideo.findMany.mockResolvedValue([{ storageKey: 'therapists/t1/v.mp4' }] as never);
+  });
+
+  it('also deletes the media of the deals, products and therapists the member owns (P3-25)', async () => {
+    await deleteMember('m1', 'Cleanup after suspension', ACTOR);
+    for (const key of ['deals/d1/1.jpg', 'deals/d1/v.mp4', 'products/p1/1.jpg', 'therapists/t1/1.jpg', 'therapists/t1/v.mp4']) {
+      expect(deleteMediaFile).toHaveBeenCalledWith(key, 'public');
+    }
+    // Every lookup is scoped to this member's own rows.
+    for (const model of [prismaMock.dealImage, prismaMock.dealVideo]) {
+      expect(model.findMany).toHaveBeenCalledWith({ where: { deal: { vendorId: 'm1' } }, select: { storageKey: true } });
+    }
+    for (const model of [prismaMock.productImage, prismaMock.productVideo]) {
+      expect(model.findMany).toHaveBeenCalledWith({ where: { product: { vendorId: 'm1' } }, select: { storageKey: true } });
+    }
+    for (const model of [prismaMock.therapistImage, prismaMock.therapistVideo]) {
+      expect(model.findMany).toHaveBeenCalledWith({ where: { therapist: { vendorId: 'm1' } }, select: { storageKey: true } });
+    }
   });
 
   it('deletes every key once, after the transaction commits', async () => {
     await deleteMember('m1', 'Cleanup after suspension', ACTOR);
-    expect(deleteMediaFile).toHaveBeenCalledTimes(5);
+    expect(deleteMediaFile).toHaveBeenCalledTimes(10);
     for (const key of ['vendor-documents/m1/a.pdf', 'vendors/m1/1.jpg', 'vendors/m1/2.jpg', 'vendors/m1/v.mp4']) {
       expect(deleteMediaFile).toHaveBeenCalledWith(key, 'public');
     }
@@ -255,11 +289,12 @@ describe('hard delete removes the member files from storage', () => {
     deleteMediaFile.mockRejectedValue(new Error('r2 down'));
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(vi.fn());
     await expect(deleteMember('m1', 'Cleanup after suspension', ACTOR)).resolves.toEqual({ outcome: 'DELETED' });
-    expect(deleteMediaFile).toHaveBeenCalledTimes(5);
+    expect(deleteMediaFile).toHaveBeenCalledTimes(10);
     const logged = JSON.stringify(errorSpy.mock.calls.map((c) => c.map((a) => (a instanceof Error ? a.message : a))));
     expect(logged).not.toContain('vendors/m1');
     expect(logged).not.toContain('vendor-documents');
     expect(logged).not.toContain('members/m1');
+    expect(logged).not.toContain('deals/d1');
     errorSpy.mockRestore();
   });
 });

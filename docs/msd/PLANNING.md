@@ -329,8 +329,11 @@ A member who opens another member's deal, branch, package or therapist gets 404.
   must be `PAID` or `PARTIALLY_REFUNDED`.
 - **Support access (D12):** Support sees name, phone, email and order lines, never payment gateway
   ids.
-- **Member's own customers (D19):** name, city, order count, last order date; no phone or email
-  unless an order is open.
+- **Member's own customers (D19, decided 2026-10-28):** name, city, order count, last order date;
+  no phone or email unless an order is open. "Open" means the customer has a `CONFIRMED` order
+  with this member (paid, not yet completed); `PENDING_PAYMENT`, `COMPLETED` and `CANCELLED` are
+  not open. City is the shipping city of the customer's latest order with this member that has
+  one, else empty. Staff on the member's page keep full contact details (D12).
 
 ## 4. Storefront
 

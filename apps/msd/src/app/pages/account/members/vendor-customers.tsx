@@ -6,6 +6,7 @@ import { ApiRequestError } from '../../../../api/rbac/client';
 
 const CUSTOMER_COLUMNS = JSON.stringify([
   { key: 'Name', label: 'Name' },
+  { key: 'City', label: 'City' },
   { key: 'Phone', label: 'Phone' },
   { key: 'Email', label: 'Email' },
   { key: 'Orders', label: 'Orders' },
@@ -14,14 +15,19 @@ const CUSTOMER_COLUMNS = JSON.stringify([
 
 const CUSTOMER_ACTIONS = JSON.stringify([{ icon: 'visibility', label: 'View', event: '__view_detail__' }]);
 
+/** D19: the API withholds phone and email until the customer has an open order with you. */
+const CONTACT_HIDDEN = 'Hidden until an order is open';
+
 /** Flat row for <sky-data-table> — response is already flat with no nested objects, so the
  *  table's built-in `__view_detail__` action (Object.entries(row) drawer) is enough; no
  *  separate detail dialog needed. */
 function toCustomerRow(customer: CustomerRow): Record<string, string | number> {
+  const contact = (value: string | null) => (customer.hasOpenOrder ? value || '—' : CONTACT_HIDDEN);
   return {
     Name: customer.name || '—',
-    Phone: customer.phone || '—',
-    Email: customer.email || '—',
+    City: customer.city || '—',
+    Phone: contact(customer.phone),
+    Email: contact(customer.email),
     Orders: customer.orderCount,
     'Last Activity': new Date(customer.lastActivityAt).toLocaleDateString(),
   };
@@ -88,7 +94,7 @@ export function VendorCustomers() {
       <header className="page-head">
         <div>
           <h1>Customers</h1>
-          <p>Everyone who has ordered from or booked with your business.</p>
+          <p>Everyone who has ordered from or booked with your business. Phone and email show while a customer has an open order.</p>
         </div>
       </header>
 

@@ -948,64 +948,70 @@ export async function deleteTherapistVideo(vendorId: string, therapistId: string
 
 // ─── Customers (derived from Order — no dedicated table) ─────────────────────
 
+/** Order statuses that make a member's customer "open" (D19): paid and not yet completed. */
+const OPEN_ORDER_STATUSES: ReadonlySet<string> = new Set(['CONFIRMED']);
+
 /**
- * Distinct customers who have at least one Order with this vendor, for the vendor-facing
- * "Customers" screen. Deliberately NOT a new Prisma model/migration — grouped off the existing
- * Order rows and merged in application code, then the *distinct-customer* list (not the raw Order
- * rows) is paginated and hydrated with each User's display fields. Same minimal, non-sensitive
- * customer summary as ORDER_INCLUDE in order.service.ts (id/name/phone/email only).
+ * Distinct customers with at least one order line from this member, for the Customers screens.
+ * Grouped off the existing OrderItem rows (OrderItem.vendorId, so a multi-member order still
+ * counts for every member on it), then the distinct-customer list is sorted by latest order,
+ * paged and joined to each User's display fields.
  *
- * Orders are grouped via OrderItem.vendorId, not Order.vendorId (the "primary vendor" only) —
- * a multi-vendor order where this vendor holds a non-primary line item must still surface that
- * customer here. `orderCount` counts distinct Orders touching this vendor, not raw item rows
- * (a multi-item order for this same vendor still counts once) — every purchase kind (Deal,
- * Product, Therapist) is an OrderItem, so this one count already covers all of them; there is no
- * separate booking count anymore.
+ * Per customer: `orderCount` (distinct orders, not lines), `lastActivityAt` (latest order date),
+ * `city` (shipping city of the latest order that has one), `hasOpenOrder` (a CONFIRMED order).
+ * `contact: 'open-orders'` (the member's own view, D19) returns phone and email only while
+ * `hasOpenOrder`; `contact: 'full'` (staff, D12) always returns them.
  */
-export async function listMyCustomers(vendorId: string, opts: { page: number; pageSize: number }) {
+export async function listMyCustomers(
+  vendorId: string,
+  opts: { page: number; pageSize: number; contact: 'open-orders' | 'full' },
+) {
   const vendorOrderItems = await prisma.orderItem.findMany({
     where: { vendorId },
-    select: { orderId: true, order: { select: { customerId: true, createdAt: true } } },
+    select: { orderId: true, order: { select: { customerId: true, createdAt: true, status: true, shippingCity: true } } },
   });
 
-  const distinctOrders = new Map<string, { customerId: string; createdAt: Date }>();
+  const distinctOrders = new Map<string, (typeof vendorOrderItems)[number]['order']>();
   for (const item of vendorOrderItems) {
-    if (!distinctOrders.has(item.orderId)) {
-      distinctOrders.set(item.orderId, { customerId: item.order.customerId, createdAt: item.order.createdAt });
-    }
-  }
-  const orderGroups = new Map<string, { count: number; maxCreatedAt: Date }>();
-  for (const { customerId, createdAt } of distinctOrders.values()) {
-    const g = orderGroups.get(customerId);
-    if (g) {
-      g.count += 1;
-      if (createdAt > g.maxCreatedAt) g.maxCreatedAt = createdAt;
-    } else {
-      orderGroups.set(customerId, { count: 1, maxCreatedAt: createdAt });
-    }
+    if (!distinctOrders.has(item.orderId)) distinctOrders.set(item.orderId, item.order);
   }
 
-  const total = orderGroups.size;
-  const ranked = Array.from(orderGroups.entries())
-    .map(([customerId, stats]) => ({ customerId, orderCount: stats.count, lastActivityAt: stats.maxCreatedAt }))
-    .sort((a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime());
-  const page = ranked.slice((opts.page - 1) * opts.pageSize, (opts.page - 1) * opts.pageSize + opts.pageSize);
+  type Group = { count: number; lastActivityAt: Date; city: string | null; cityAt: Date | null; hasOpenOrder: boolean };
+  const groups = new Map<string, Group>();
+  for (const order of distinctOrders.values()) {
+    const g = groups.get(order.customerId) ?? { count: 0, lastActivityAt: order.createdAt, city: null, cityAt: null, hasOpenOrder: false };
+    g.count += 1;
+    if (order.createdAt > g.lastActivityAt) g.lastActivityAt = order.createdAt;
+    if (order.shippingCity && (!g.cityAt || order.createdAt > g.cityAt)) {
+      g.city = order.shippingCity;
+      g.cityAt = order.createdAt;
+    }
+    if (OPEN_ORDER_STATUSES.has(order.status)) g.hasOpenOrder = true;
+    groups.set(order.customerId, g);
+  }
+
+  const total = groups.size;
+  const ranked = Array.from(groups.entries()).sort(([, a], [, b]) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime());
+  const page = ranked.slice((opts.page - 1) * opts.pageSize, opts.page * opts.pageSize);
 
   const users = await prisma.user.findMany({
-    where: { id: { in: page.map((p) => p.customerId) } },
+    where: { id: { in: page.map(([customerId]) => customerId) } },
     select: { id: true, name: true, phone: true, email: true },
   });
   const userById = new Map(users.map((u) => [u.id, u]));
 
-  const items = page.map((p) => {
-    const user = userById.get(p.customerId);
+  const items = page.map(([customerId, g]) => {
+    const user = userById.get(customerId);
+    const showContact = opts.contact === 'full' || g.hasOpenOrder;
     return {
-      id: p.customerId,
+      id: customerId,
       name: user?.name ?? null,
-      phone: user?.phone ?? null,
-      email: user?.email ?? null,
-      orderCount: p.orderCount,
-      lastActivityAt: p.lastActivityAt,
+      city: g.city,
+      orderCount: g.count,
+      lastActivityAt: g.lastActivityAt,
+      hasOpenOrder: g.hasOpenOrder,
+      phone: showContact ? (user?.phone ?? null) : null,
+      email: showContact ? (user?.email ?? null) : null,
     };
   });
 

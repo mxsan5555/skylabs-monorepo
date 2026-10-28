@@ -46,14 +46,23 @@ function assertWritten(result: { count: number }): void {
   if (result.count === 0) throw new ApiError('CONFLICT', STATUS_CHANGED);
 }
 
-/** Every R2 key the member row owns directly. Read before the delete, because the rows cascade away. */
+/** Every R2 key the member owns: its own documents, images and video, plus the images and videos
+ *  of its deals, products and therapists (P3-25). Read before the delete, because all of these
+ *  rows cascade away with the member. */
 async function memberStorageKeys(memberId: string): Promise<string[]> {
-  const [documents, images, video] = await Promise.all([
-    prisma.memberDocument.findMany({ where: { vendorId: memberId }, select: { storageKey: true } }),
-    prisma.vendorImage.findMany({ where: { vendorId: memberId }, select: { storageKey: true } }),
-    prisma.vendorVideo.findUnique({ where: { vendorId: memberId }, select: { storageKey: true } }),
+  const key = { storageKey: true } as const;
+  const [documents, images, video, ...owned] = await Promise.all([
+    prisma.memberDocument.findMany({ where: { vendorId: memberId }, select: key }),
+    prisma.vendorImage.findMany({ where: { vendorId: memberId }, select: key }),
+    prisma.vendorVideo.findUnique({ where: { vendorId: memberId }, select: key }),
+    prisma.dealImage.findMany({ where: { deal: { vendorId: memberId } }, select: key }),
+    prisma.dealVideo.findMany({ where: { deal: { vendorId: memberId } }, select: key }),
+    prisma.productImage.findMany({ where: { product: { vendorId: memberId } }, select: key }),
+    prisma.productVideo.findMany({ where: { product: { vendorId: memberId } }, select: key }),
+    prisma.therapistImage.findMany({ where: { therapist: { vendorId: memberId } }, select: key }),
+    prisma.therapistVideo.findMany({ where: { therapist: { vendorId: memberId } }, select: key }),
   ]);
-  return [...documents, ...images, ...(video ? [video] : [])].map((row) => row.storageKey);
+  return [...documents, ...images, ...(video ? [video] : []), ...owned.flat()].map((row) => row.storageKey);
 }
 
 /** Best effort, after commit. Logs a count only, never a key. */
