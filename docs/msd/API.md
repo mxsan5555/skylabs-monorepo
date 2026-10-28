@@ -268,6 +268,12 @@ return 404; the branch list no longer carries `categoryTypes`; `GET /vendors/cat
 same active categories for every member and ignores `vendorId`. Member dashboard `categories` and
 `subCategories` count the categories the member uses on its deals, products and therapists.
 
+Member customers (D19, P4-16): `GET /vendors/me/customers` (`members:custom`) returns per
+customer `id`, `name`, `city`, `orderCount`, `lastActivityAt` (latest order date), `hasOpenOrder`,
+and `phone` / `email` only when `hasOpenOrder` is true (else `null`). The staff route
+`GET /vendors/:vendorId/customers` (`members:view`) returns the same rows with contact details
+always filled. The flat `GET /customers` with own scope (C-16) waits for P4-01.
+
 `/vendors/...` paths that mirror `/members/...` are deprecated aliases (`Deprecation` and `Link`
 headers) kept for one release (R7, D16). `/vendors/me/*` is member self-service and
 `/vendors/:vendorId/*` is staff working on a member's catalog until the flat routes exist.

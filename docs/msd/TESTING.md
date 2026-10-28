@@ -45,7 +45,7 @@ Known failures at 2026-10-18 (msd recounted 2026-10-27: `india-locations` moved 
 | Project | Failing | Where |
 |---|---|---|
 | msd | 19 tests in 11 files | `permission-matrix` 9, `contact-us` 2, and 1 each in `app.spec`, `widget-registry`, `deal-card`, `media-uploader`, `site-footer`, `wishlist`, `roles`, `settings`; `entry-server.test.tsx` fails to load (`sky-product-card-wc` fixed 2026-10-24). Regressions since commit e756759 (NewOfferCard), not yet fixed: `home` 4 (FAQ section no longer rendered, deal favourite), `category` 1 (product wishlist heart) |
-| msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; recounted 2026-10-27: 1,247 pass) |
+| msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; recounted 2026-10-28: 1,253 pass) |
 | shared-menu | 5 | `index.test.ts` |
 
 Lint and type drift: 30 msd lint errors (`import/first` and `no-empty-function` in older tests), an ESLint ignore error in the shared packages, and
@@ -91,6 +91,12 @@ mapPopularTag" (both pass alone).
   summary; not in `/docs`.
 - Remind now: 403 without `members:status_change`; 201 with per-channel result and audit row; 429
   within 24 hours; 409 for suspended, complete, or no contact; button hidden in those cases.
+- Member customers (D19, P4-16; `vendor.service.test.ts` "listMyCustomers", `vendors.routes.test.ts`,
+  `vendor-customers.test.tsx`): a member sees only customers with an order item from them; phone
+  and email are `null` unless the customer has a `CONFIRMED` order with this member
+  (`PENDING_PAYMENT`, `COMPLETED`, `CANCELLED` keep them hidden); city is the shipping city of the
+  latest order that has one; order count counts distinct orders; the staff route always returns
+  contact details; the console shows City and "Hidden until an order is open".
 - Members list: the Filter menu sends exactly one filter per option; status and documents columns
   use their tonal colours.
 - Own scope (after P4): member A reading member B's branch, deal, therapist or product gets 404.

@@ -578,10 +578,15 @@ export function setMyDealStatus(token: string | null, branchId: string, dealId: 
 export interface CustomerRow {
   id: string;
   name: string | null;
+  /** Shipping city of the customer's latest order with this member that has one. */
+  city: string | null;
+  /** On the member's own list, phone and email are null unless `hasOpenOrder` (D19). */
   phone: string | null;
   email: string | null;
   orderCount: number;
   lastActivityAt: string;
+  /** The customer has a CONFIRMED (paid, not completed) order with this member. */
+  hasOpenOrder: boolean;
 }
 
 /** The logged-in vendor's own customers, resolved server-side from the caller's JWT (never a

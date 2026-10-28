@@ -115,7 +115,7 @@ list and form pages. Status labels, tones and the review flag copy live once in 
 | C-13 | Member edits while inactive | `blockWhenReadOnly` | done (P2-04) |
 | C-14 | Branch phone format | Reuse the member phone rule | open |
 | C-15 | Rich text storage | Sanitize HTML on write (`lib/sanitize-html.ts` allowlist), plain-text copy for search, meta and JSON-LD, length measured on plain text | open |
-| C-16 | Member customers view | `GET /customers` own scope | open (P4-16) |
+| C-16 | Member customers view | `GET /customers` own scope | partly 2026-10-28 (P4-16): `GET /vendors/me/customers` follows D19 (city, contact only with a CONFIRMED order); the flat own-scope `GET /customers` waits for P4-01 |
 | C-17 | Two deal editors (`DealFormPage` without media, `DealDialog` in `vendor-branches.tsx` without therapists) | One `DealFormPage` for staff and member self-service, sections in PLANNING §2.7 order; `DealDialog` deleted | done 2026-10-27 (DL-10) |
 | C-18 | Seed gives Admin, Sales, Marketing, Support no `vendors.deals` grants; Deals tab gated by `members:edit` | Seed per PLANNING §2.7 matrix; console checks `vendors.deals:<action>` (staff) and `members:custom` (member) | done 2026-10-27 (DL-03) |
 | C-19 | Deal detail page reads `deal.discountPercent` before the selected package, hours from a second vendor call | Price and discount from the selected package; one detail response (API §4) | done 2026-10-27 (DL-12) |

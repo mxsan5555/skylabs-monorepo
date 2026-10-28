@@ -2535,6 +2535,35 @@ describe('GET /api/v1/vendors/me/customers — member with no business record', 
   });
 });
 
+describe('Member customers (D19, P4-16)', () => {
+  beforeEach(() => {
+    prismaMock.orderItem.findMany.mockResolvedValue([
+      { orderId: 'o1', order: { customerId: 'cust-1', createdAt: new Date('2026-10-01'), status: 'COMPLETED', shippingCity: 'Pune' } },
+    ]);
+    prismaMock.user.findMany.mockResolvedValue([{ id: 'cust-1', name: 'Asha', phone: '+919800000001', email: 'asha@example.com' }]);
+  });
+
+  it('the member sees name, city and counts but no phone or email without an open order', async () => {
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
+    const res = await request(app)
+      .get('/api/v1/vendors/me/customers')
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['member'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data[0]).toMatchObject({ name: 'Asha', city: 'Pune', orderCount: 1, hasOpenOrder: false, phone: null, email: null });
+    expect(prismaMock.orderItem.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { vendorId: VENDOR_A_ID } }));
+  });
+
+  it('staff on the member page always get phone and email (D12)', async () => {
+    resolveMock.mockResolvedValue(['members:view']);
+    const res = await request(app)
+      .get(`/api/v1/vendors/${VENDOR_A_ID}/customers`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['support'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data[0]).toMatchObject({ phone: '+919800000001', email: 'asha@example.com', hasOpenOrder: false, city: 'Pune' });
+  });
+});
+
 describe('vendors routes — malformed ids', () => {
   it('returns 422 for a non-uuid id instead of reaching the database', async () => {
     resolveMock.mockResolvedValue(['members:custom']);
