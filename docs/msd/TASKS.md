@@ -38,7 +38,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | # | Module | Done | Total | % |
 |---|---|---|---|---|
 | 1 | Admin and staff | 2 | 31 | 6 |
-| 2 | Members | 41 | 101 | 41 |
+| 2 | Members | 45 | 101 | 45 |
 | 3 | Customers and orders | 2 | 12 | 17 |
 | 4 | Storefront | 16 | 42 | 38 |
 | 5 | Static content | 0 | 5 | 0 |
@@ -49,7 +49,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
 | 12 | Platform, security and release | 7 | 69 | 10 |
-| | **Total** | **79** | **289** | **27** |
+| | **Total** | **83** | **289** | **29** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -187,7 +187,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [x] | P10-48 | FE | Product form (member detail Products and member self-service): Category (required), Subcategory and Type (optional) list all active `PRODUCT` categories, not per-member grants; "New" and "Featured" checkboxes stay on the form | S | P4-14 | Member with no grants sees the category list; both checkboxes save `isNew` and `isFeatured`; tests |
 | [ ] | P10-49 | FE | Member detail page shows total customers and total orders (counts linking to the filtered lists) | S | P4-16 | Counts match the lists; support sees counts only |
 | [ ] | P5-16 | SEC | Switch `STORE_FULL_DOCUMENT_NUMBER` (default true in development): when false, write only the masked number and hash; production boot warns while it is true (D3) | S | P2-13 | Both modes tested; no full number stored when false |
-| [ ] | DL-01 | DB | Deal schema S18 to S21 and backfill S23 (PLANNING §2.7, DATABASE §2) with `down.sql` | M | owner approval of §2.7 | Migration up and down on a Neon copy; counts of backfilled rows recorded; partly 2026-10-27: migration `20261026100000_deal_page_fields` + `down.sql` written, client generated; not applied locally (`prisma migrate deploy` needs the owner) or rehearsed on Neon |
+| [ ] | DL-01 | DB | Deal schema S18 to S21 and backfill S23 (PLANNING §2.7, DATABASE §2) with `down.sql` | M | owner approval of §2.7 | Migration up and down on a Neon copy; counts of backfilled rows recorded; partly 2026-10-27: migration `20261026100000_deal_page_fields` + `down.sql` written, client generated, applied locally 2026-10-27 (empty `migrate diff`, 38 deals backfilled); Neon rehearsal open |
 | [ ] | DL-02 | SH | India location list to `packages/shared-utils`; branch `state` and `city` required from it, `addressLine2` (C-03, S22) | M | - | Unknown state or city returns 422; msd form and API use the one list; report of existing bad rows; partly 2026-10-27: list in `@skylabs-monorepo/shared-utils`, API and both branch forms require state + city, `addressLine2` added; bad-row report open |
 | [x] | DL-03 | BE | Deal create/update `.strict()` schemas, slug rule, server-derived prices (C-04, C-05), single-deal GET, Active readiness check, Super Admin-only delete, seed grants per §2.7 matrix (C-18) | L | DL-01, P3-15 | TESTING §4.2 deal cases green; done 2026-10-27 |
 | [x] | DL-04 | BE | Package routes: add, edit, delete, reorder (staff and `/me`) | M | DL-03 | 409 rules tested; done 2026-10-27 |
@@ -195,11 +195,11 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [x] | DL-06 | BE | Copy deal to another branch of the same member as Draft | S | DL-03 | Copy test; done 2026-10-27 |
 | [x] | DL-07 | BE | `GET /catalog/deals/:idOrSlug` and the full detail response (API §4) | M | DL-03 | Route tests for UUID, slug, old slug, hidden deal; done 2026-10-27 |
 | [x] | DL-08 | BE | Cart and checkout: per-customer limit and stock (409 `DEAL_LIMIT_REACHED`, `DEAL_SOLD_OUT`) | S | DL-01 | Cart tests; done 2026-10-27 |
-| [ ] | DL-09 | BE | Deal search over title, member, category, subcategory and city with ranking; S24 trigram indexes | M | DL-01 | Search tests; EXPLAIN shows the GIN index; partly 2026-10-27: search over title, member, category, subcategory, city with title-first ranking and tests; EXPLAIN check open (needs the migrated DB) |
-| [ ] | DL-10 | FE | One deal form for staff and members (C-17): sections in §2.7 order, branch-first empty state, package cards, inline therapist, FAQs, readiness checklist; delete `DealDialog` | L | DL-03, DL-04, DL-05 | Form tests per role; checked at 1366 and 390 px; partly 2026-10-27: form, package cards, inline therapist, FAQs, checklist, Copy to branch, `DealDialog` deleted, `deal-form-page.test.tsx` 18 tests; 1366 / 390 px browser check open |
+| [x] | DL-09 | BE | Deal search over title, member, category, subcategory and city with ranking; S24 trigram indexes | M | DL-01 | Search tests; EXPLAIN shows the GIN index; done 2026-10-27: search over title, member, category, subcategory, city with title-first ranking and tests; EXPLAIN uses `Deal_title_trgm_idx` |
+| [x] | DL-10 | FE | One deal form for staff and members (C-17): sections in §2.7 order, branch-first empty state, package cards, inline therapist, FAQs, readiness checklist; delete `DealDialog` | L | DL-03, DL-04, DL-05 | Form tests per role; checked at 1366 and 390 px; partly 2026-10-27: form, package cards, inline therapist, FAQs, checklist, Copy to branch, `DealDialog` deleted, `deal-form-page.test.tsx` 18 tests; done 2026-10-27: console create, packages, images, Go live, copy, Sales edit and Admin no-delete checked by the owner |
 | [x] | DL-11 | FE | Branch form: State, then City from the shared list | S | DL-02 | Form test; done 2026-10-27 |
-| [ ] | DL-12 | FE | Deal page sections in §2.7 order (packages, buy box limits, accordions, therapists, about the business, FAQs) on existing `detail-page` blocks (C-19) | L | DL-07 | `deal-detail.test.tsx`; checked at 1366 and 390 px; partly 2026-10-27: all sections and `deal-detail.test.tsx`; browser check open, single-branch map stays ST-26 |
-| [ ] | DL-13 | FE | Deal gallery: thumbnails, phone swipe, full-screen view with keyboard and counter | M | DL-07 | Gallery tests; axe clean; partly 2026-10-27: thumbnails, arrows, swipe, dots, full-screen dialog with keys and counter, tested; axe run open |
+| [x] | DL-12 | FE | Deal page sections in §2.7 order (packages, buy box limits, accordions, therapists, about the business, FAQs) on existing `detail-page` blocks (C-19) | L | DL-07 | `deal-detail.test.tsx`; checked at 1366 and 390 px; done 2026-10-27: all sections and `deal-detail.test.tsx`, checked at 1366 and phone width; single-branch map stays ST-26 |
+| [x] | DL-13 | FE | Deal gallery: thumbnails, phone swipe, full-screen view with keyboard and counter | M | DL-07 | Gallery tests; axe clean; partly 2026-10-27: thumbnails, arrows, swipe, dots, full-screen dialog with keys and counter, tested; done 2026-10-27: Lighthouse accessibility 100 |
 | [ ] | DL-14 | FE | Deal SEO: `/deal/:slug` route with UUID and old-slug replace, canonical, title and meta rules, JSON-LD, prerender and sitemap of Active slugs | M | DL-07 | TESTING §4.4 deal page cases; Rich Results test passes; partly 2026-10-27: slug route with old-slug replace, canonical, title/meta rules, JSON-LD, deal prerender + sitemap; Rich Results test open (needs a public URL) |
 
 ## 3. Customers and orders
