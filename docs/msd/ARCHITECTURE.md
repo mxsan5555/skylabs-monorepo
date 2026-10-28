@@ -164,23 +164,28 @@ list and form pages. Status labels, tones and the review flag copy live once in 
 | # | Gap | Fix | Status |
 |---|---|---|---|
 | C-01 | Member can delete own product | Remove `DELETE /vendors/me/products/:id` | open |
-| C-02 | Deal approval gate | Create deals `approvalStatus=APPROVED`, member publishes with status ACTIVE, stop `DEAL_PENDING_APPROVAL`, remove approval from visibility, home hero and promotions; migrate PENDING rows | open (P3-15) |
-| C-03 | Branch `state` optional free text | Required on create, Indian states allowlist (`lib/india-states.ts`) | open |
-| C-04 | `slug` required from the client | Optional; generate from title with a numeric suffix on conflict | open |
-| C-05 | Discount accepted from the client | Compute from original and sale price | open |
+| C-02 | Deal approval gate | Create deals `approvalStatus=APPROVED`, member publishes with status ACTIVE, stop `DEAL_PENDING_APPROVAL`, remove approval from visibility, home hero and promotions; migrate PENDING rows | done 2026-10-27 (P3-15); column dropped in the contract step |
+| C-03 | Branch `state` optional free text | `state` and `city` required on create, from one India location list moved from `apps/msd/src/data/india-locations.ts` to `packages/shared-utils` (`india-locations`) so the form and the API allowlist can't drift | done 2026-10-27 (DL-02: report script, columns `NOT NULL`) |
+| C-04 | `slug` required from the client | Optional; generate `{title}-{member}-{city}` with a numeric suffix on conflict; fixed once Active, old slugs kept (PLANNING §2.7) | done 2026-10-27 (DL-03) |
+| C-05 | Discount accepted from the client | Compute from the cheapest active package; prices, discount and duration refused as input | done 2026-10-27 (DL-03) |
 | C-06 | `vendors:custom` and `vendors.*` keys | `<resource>:<action>` plus scope | open (P1-05, P4) |
 | C-07 | Product category grant check | Only active `PRODUCT` type and parent check | done 2026-10-16 (P4-14) |
 | C-08 | No branch delete | `DELETE /branches/:id`, Super Admin only, 409 on FK conflict | open |
 | C-09 | Flat catalog routes | `/branches`, `/deals`, `/therapists`, `/products` over the existing services; nested routes become aliases | open |
 | C-11 | Member self-registration and `/me/submit` | Removed; members are created Active with `documentsDueAt` | done (P3-21) |
-| C-12 | Category grants for deals and therapists | Stop the vendor and branch grant checks, retire `PUT .../category-access` | open (P4-15) |
+| C-12 | Category grants for deals and therapists | Stop the vendor and branch grant checks, retire `PUT .../category-access` | done 2026-10-27 (P4-15): no grant checks anywhere, the seven `category-access` routes return 404, branch and therapist forms have no grant step; grant tables dropped in the contract step |
 | C-13 | Member edits while inactive | `blockWhenReadOnly` | done (P2-04) |
 | C-14 | Branch phone format | Reuse the member phone rule | open |
 | C-15 | Rich text storage | Sanitize HTML on write (`lib/sanitize-html.ts` allowlist), plain-text copy for search, meta and JSON-LD, length measured on plain text | open |
 | C-16 | Member customers view | `GET /customers` own scope | open (P4-16) |
+| C-17 | Two deal editors (`DealFormPage` without media, `DealDialog` in `vendor-branches.tsx` without therapists) | One `DealFormPage` for staff and member self-service, sections in PLANNING §2.7 order; `DealDialog` deleted | done 2026-10-27 (DL-10) |
+| C-18 | Seed gives Admin, Sales, Marketing, Support no `vendors.deals` grants; Deals tab gated by `members:edit` | Seed per PLANNING §2.7 matrix; console checks `vendors.deals:<action>` (staff) and `members:custom` (member) | done 2026-10-27 (DL-03) |
+| C-19 | Deal detail page reads `deal.discountPercent` before the selected package, hours from a second vendor call | Price and discount from the selected package; one detail response (API §4) | done 2026-10-27 (DL-12) |
 
-Inline therapist creation inside a deal request is not planned: the UI creates the therapist
-first, then sends `therapistIds`.
+Inline therapist creation inside a deal request is not planned: the deal form's "Add a new
+therapist" calls the branch's therapist create route (the server sets branch and member), then
+ticks the new id in `therapistIds`. Packages on the edit screen use their own routes (API §2.2);
+on the create screen they travel with `DealCreate`.
 
 ## 3. Customers and orders
 
@@ -204,8 +209,29 @@ first, then sends `therapistIds`.
   `detail-page/` (`DetailGallery`, `DetailPrice`, `DetailPurchase`, `BranchPanels`,
   `DetailNotFound`, shared `detail-page.css`) and `duration-package-selector.tsx` (one picker for
   deal and therapist packages). Deal and therapist detail pages compose these; no page CSS.
+- **Listing shell** (ST-41 to ST-43), `components/listing/`: `listing-params.ts`
+  (`useListingParams` reads and writes `sort`, `view`, `min`, `max`, `radius`, `vendor`, `branch`,
+  `tag`, `cat` with defensive parsing; `pickSort`, `sortOptionsFor` per kind, `countText`),
+  `listing-body.tsx` (`ListingBody`: toolbar with Filters / List-Grid-Map / Sort, `SidebarLayout`
+  + `FilterPanel`, `CardGrid` or `DealMap`, `LoadMore`, city picker), `listing-cards.tsx`
+  (`listingCards`, `listingNoun`, `listingCopy` and `listingLoadError` per kind, `dealMapPoints`),
+  `kindOfCategoryType` in `listing-params.ts`, and `use-listing-facets.ts` (`LISTING_FACETS`).
+  City pages filter by city for deal categories only. Pages own their data, heading,
+  chip row (`ChipNav` with the count as `end`) and SEO: `pages/category/` (subcategory pills),
+  `pages/listing/listing-page.tsx` (one `ListingPage kind` for `/deals`, `/products`,
+  `/therapists` and the city routes; chips are links to `/category/:slug`) and `pages/search/`
+  (explore: kind chips with one-row count requests; "All" pages deals, products and therapists
+  together, a full page of each, relevance only, location / distance / price filters with merged
+  facets). `FilterPanel kind="deals|products|therapists|all"` picks its sections; Category and
+  Tags are `CheckboxFacet`s. `ChipNav` items with `href` render as a `<nav>` of real links. Card
+  tags come from the API's `tag` through `offerTagFor()` in `offer-card/` (label from
+  `content.offerCard.tags`, theme role in code); an explicit `tag` prop still overrides it (home
+  hero). The old `pages/products/` and `pages/therapists/` pages were removed. `Seo noindex="follow"`
+  writes `noindex, follow` (explore).
 - **Prerender:** `nx run msd:prerender` renders `/`, every `/category/:slug` and
-  `/category/:slug/:city` (deal categories × partner cities) with `react-dom/server`, embeds the
+  `/category/:slug/:city` (deal categories × partner cities), `/deals`, `/deals/:city`,
+  `/products`, `/therapists` and `/therapists/:city` (partner cities with results;
+  `loadListingData` + `listingDataKey`, seeding `ListingPage`'s default view) with `react-dom/server`, embeds the
   page data as `#__MSD_DATA__`, and writes `sitemap.xml`, `robots.txt`, `llms.txt` (needs
   `VITE_SITE_URL`). `main.tsx` hydrates when `#root[data-prerendered]` exists. Vercel rewrites
   every non-API path to `/spa.html` (the untouched client shell). If the API is unreachable at
@@ -222,6 +248,16 @@ first, then sends `therapistIds`.
   in `services/catalog.service.ts` (keep `id` as the last tiebreak); distance work stays in the
   pure `services/deal-ranking.ts`; register static paths (`/deals/facets`) before `/deals/:id`;
   add the OpenAPI entry; widen `apps/msd/src/api/catalog.ts`; deploy the API before the frontend.
+- **Card tags (API):** `services/offer-tag.ts` (pure) holds the D30 thresholds, `offerTag(item,
+  hotIds, now)`, `hotIdsFrom(lines)` and `tagWhere` / `tagsWhere` (a Prisma `where` per tag with
+  the higher-priority tags excluded, so filter, count and card always agree; `offer-tag.test.ts`
+  checks the two against each other). `getHotIds(kind)` in `catalog.service.ts` groups paid
+  `OrderItem` lines of the last 30 days by `dealId` / `productId`, cached in memory for 10 minutes
+  (`clearHotCache()` for tests). Product facets: `services/product-facets.ts`.
+- **Therapist listing (API):** Prisma narrows by category, city/state, member and branch;
+  `services/therapist-ranking.ts` (pure, like `deal-ranking.ts`) adds the lowest package price
+  and distance, then filters by price and radius, sorts and pages in memory. Before ST-40 the
+  category page sorted therapists in the browser one page at a time, so page 2 broke the order.
 
 ## 5. Static content
 

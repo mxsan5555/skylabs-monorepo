@@ -92,10 +92,9 @@ import DealDetail from './pages/deal-detail/deal-detail';
 import { Cart } from './pages/cart/cart';
 import Wishlist from './pages/wishlist/wishlist';
 import Checkout from './pages/checkout/checkout';
-import ProductListing from './pages/products/products';
+import { ListingPage } from './pages/listing/listing-page';
 import ProductDetail from './pages/product-detail/product-detail';
 import VendorPage from './pages/vendor/vendor';
-import { Therapists } from './pages/therapists/therapists';
 import TherapistDetail from './pages/therapist-detail/therapist-detail';
 import { MyAccountLayout } from './pages/my-account/my-account-layout';
 import { MyAccountProfile } from './pages/my-account/profile';
@@ -155,6 +154,11 @@ function DealFormPageRoute() {
   return <DealFormPage token={token} />;
 }
 
+function MemberDealFormPageRoute() {
+  const { token } = useAuth();
+  return <DealFormPage token={token} surface="member" />;
+}
+
 function TherapistFormPageRoute() {
   const { token } = useAuth();
   return <TherapistFormPage token={token} />;
@@ -182,17 +186,17 @@ export function AppRoutes() {
           <Route path="/categories" element={<CategoriesIndex />} />
           <Route path="/category/:slug" element={<Category />} />
           <Route path="/category/:slug/:city" element={<Category />} />
-          {/* `:slug` also accepts a legacy UUID (a bookmarked/shared pre-SEO link) — the backend
-            resolves either; the page itself client-navigates to the canonical slug path once
-            loaded (see DealDetail's own doc comment — this is NOT a server-issued redirect). */}
           <Route path="/deal/:slug" element={<DealDetail />} />
-          <Route path="/products" element={<ProductListing />} />
-          <Route path="/products/:slug" element={<ProductDetail />} />
+          <Route path="/deals" element={<ListingPage key="deals" kind="deals" />} />
+          <Route path="/deals/:city" element={<ListingPage key="deals" kind="deals" />} />
+          <Route path="/products" element={<ListingPage key="products" kind="products" />} />
+          <Route path="/products/:id" element={<ProductDetail />} />
           <Route path="/vendor/:slug" element={<VendorPage />} />
           {/* Therapist as an independent, directly browsable/purchasable entity — never reachable
             only via a Deal's page (see msd-api's Therapist schema doc comment). */}
-          <Route path="/therapists" element={<Therapists />} />
-          <Route path="/therapist/:slug" element={<TherapistDetail />} />
+          <Route path="/therapists" element={<ListingPage key="therapists" kind="therapists" />} />
+          <Route path="/therapists/:city" element={<ListingPage key="therapists" kind="therapists" />} />
+          <Route path="/therapist/:id" element={<TherapistDetail />} />
           {/* Cart / Wishlist / Checkout — plain PublicLayout children (Header+Footer, no sidebar),
             exactly as they worked before the Customer Sidebar fix. These are NOT part of the
             Customer Sidebar — they stay reachable from the existing Header cart/wishlist icons,
@@ -271,10 +275,15 @@ export function AppRoutes() {
             <Route path="/my-account/wishlist" element={<Wishlist />} />
           </Route>
 
-          {/* =====================================================
-              ORDER DETAIL — standalone storefront page
-              NO MyAccountLayout / NO account sidebar
-             ===================================================== */}
+          {/* Customer Orders — storefront layout, without account sidebar */}
+          {/* <Route
+            path="/orders"
+            element={
+              <RequireAuth>
+                <Orders />
+              </RequireAuth>
+            }
+          /> */}
           <Route
             path="/orders/:id"
             element={
@@ -551,6 +560,23 @@ export function AppRoutes() {
             element={
               <RequirePermission menuKey="vendor-portal.deals">
                 <VendorDeals />
+              </RequirePermission>
+            }
+          />
+          {/* The member's own deal form: the same page staff use (PLANNING §2.7). */}
+          <Route
+            path="/account/vendor-deals/new"
+            element={
+              <RequirePermission menuKey="vendor-portal.deals" action="create">
+                <MemberDealFormPageRoute />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/vendor-deals/:dealId"
+            element={
+              <RequirePermission menuKey="vendor-portal.deals" action="edit">
+                <MemberDealFormPageRoute />
               </RequirePermission>
             }
           />

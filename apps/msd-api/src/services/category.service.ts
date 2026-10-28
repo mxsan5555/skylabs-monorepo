@@ -67,53 +67,28 @@ export async function listCategories(opts: {
 
 /**
  * The lean, unpaginated "active only" lookup every vendor-facing category dropdown (Deal/
- * Product/Therapist create, the onboarding wizard's category-grant step) and the admin
- * category-tree screens use — kept separate from the paginated admin list above so neither has
+ * Product/Therapist create) and the admin category-tree screens use
+ * — kept separate from the paginated admin list above so neither has
  * to compromise shape.
  *
  * `type` alone filters the tree by business module (top-level rows only carry a type — a
  * subcategory or Type-tier row is included whenever its top-level ancestor matches, since
- * neither carries a type of its own — checked up to 2 hops up).
- * `vendorId` additionally scopes the result to only categories that vendor currently holds a
- * `VendorCategoryAccess` grant for (top-level rows the vendor was granted, plus their active
- * children AND grandchildren) — used everywhere a vendor picks a category to create against,
- * once they already have grants; omit it for the "grant categories" screen itself, which must
- * show every category of the enabled module regardless of what's granted yet.
+ * neither carries a type of its own — checked up to 2 hops up). Every member sees the same
+ * list (D10: no category grants).
  */
-export async function listActiveCategories(opts: { type?: CategoryType; vendorId?: string } = {}) {
-  if (!opts.vendorId) {
-    return prisma.category.findMany({
-      where: {
-        isActive: true,
-        ...(opts.type
-          ? {
-              OR: [
-                { type: opts.type },
-                { parent: { is: { type: opts.type } } },
-                { parent: { is: { parent: { is: { type: opts.type } } } } },
-              ],
-            }
-          : {}),
-      },
-      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-    });
-  }
-
-  const grants = await prisma.vendorCategoryAccess.findMany({
-    where: { vendorId: opts.vendorId, ...(opts.type ? { category: { is: { type: opts.type } } } : {}) },
-    select: { categoryId: true },
-  });
-  const grantedTopLevelIds = grants.map((g) => g.categoryId);
-  if (grantedTopLevelIds.length === 0) return [];
-
+export async function listActiveCategories(opts: { type?: CategoryType } = {}) {
   return prisma.category.findMany({
     where: {
       isActive: true,
-      OR: [
-        { id: { in: grantedTopLevelIds } },
-        { parentId: { in: grantedTopLevelIds } },
-        { parent: { is: { parentId: { in: grantedTopLevelIds } } } },
-      ],
+      ...(opts.type
+        ? {
+            OR: [
+              { type: opts.type },
+              { parent: { is: { type: opts.type } } },
+              { parent: { is: { parent: { is: { type: opts.type } } } } },
+            ],
+          }
+        : {}),
     },
     orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
   });
@@ -221,96 +196,14 @@ export async function resolveTopLevelCategory(categoryId: string): Promise<{ id:
 }
 
 /**
- * The actual backend enforcement of "a vendor can't create Salon deals without Salon access"
- * (frontend hiding is UX only, per this repo's established RBAC posture — see CLAUDE.md).
- * Throws VALIDATION_ERROR unless `vendorId` holds a `VendorCategoryAccess` grant for the
- * top-level category behind `categoryId` (resolving a subcategory to its parent first via
- * `resolveTopLevelCategory`) AND that top-level category's `type` matches `requiredType` — e.g.
- * a Service-granted category can never back a Product deal, even if the vendor happens to hold
- * *some* grant. Lives here (not vendor.service.ts) so both vendor.service.ts and
- * product.service.ts can import it without a circular dependency between the two.
- */
-export async function assertVendorHasCategoryAccess(vendorId: string, categoryId: string, requiredType: CategoryType) {
-  const topLevel = await resolveTopLevelCategory(categoryId);
-  if (topLevel.type !== requiredType) {
-    throw new ApiError('VALIDATION_ERROR', `This category is not a ${requiredType.toLowerCase()} category`);
-  }
-  const grant = await prisma.vendorCategoryAccess.findUnique({
-    where: { vendorId_categoryId: { vendorId, categoryId: topLevel.id } },
-  });
-  if (!grant) {
-    throw new ApiError('VALIDATION_ERROR', 'Your business has not been granted access to this category');
-  }
-}
-
-/**
  * D10: categories are created by staff and open to every member, so this checks only that the
  * category (or the top-level category above a subcategory) has the required module `type`. No
- * `VendorCategoryAccess` grant is read. Used by product create/update; deals and therapists
- * still use the grant check until task P4-15.
+ * `VendorCategoryAccess` grant is read. Used by deal, product and therapist create/update.
  */
 export async function assertCategoryOfType(categoryId: string, requiredType: CategoryType) {
   const topLevel = await resolveTopLevelCategory(categoryId);
   if (topLevel.type !== requiredType) {
     throw new ApiError('VALIDATION_ERROR', `This category is not a ${requiredType.toLowerCase()} category`);
-  }
-}
-
-/**
- * The branch-level counterpart to `assertVendorHasCategoryAccess` — a `BranchCategoryAccess`
- * grant only ever narrows what the vendor already holds (see
- * `vendor.service.ts#setBranchCategoryAccess`), so this only needs to resolve `categoryId` to
- * its top-level ancestor (same `resolveTopLevelCategory` used vendor-side) and check a
- * `BranchCategoryAccess` row exists for that branch + top-level category — the vendor-level type
- * check already happened via `assertVendorHasCategoryAccess`, so it isn't repeated here.
- */
-export async function assertBranchHasCategoryAccess(branchId: string, categoryId: string) {
-  const topLevel = await resolveTopLevelCategory(categoryId);
-  const grant = await prisma.branchCategoryAccess.findUnique({
-    where: { branchId_categoryId: { branchId, categoryId: topLevel.id } },
-  });
-  if (!grant) {
-    throw new ApiError('VALIDATION_ERROR', 'This branch is not mapped to this category');
-  }
-}
-
-/**
- * Unlike `assertBranchHasCategoryAccess` (a specific category), this checks that a branch has
- * AT LEAST ONE `BranchCategoryAccess` grant of the given top-level `type` — the gate
- * `createTherapist`/`updateTherapist` needs so a branch with zero Therapy mapping can't receive
- * a therapist just by omitting `specializationCategoryId` (the frontend's own branch picker
- * already filters to these branches; this is the real, un-bypassable enforcement).
- */
-export async function assertBranchHasAnyCategoryAccessOfType(branchId: string, type: CategoryType) {
-  const grant = await prisma.branchCategoryAccess.findFirst({
-    where: { branchId, category: { type } },
-  });
-  if (!grant) {
-    throw new ApiError('VALIDATION_ERROR', `This branch has not been granted access to any ${type.toLowerCase()} category`);
-  }
-}
-
-/**
- * The branch-level counterpart to `assertCategoryChildOf`'s subcategory check — `categoryId` here
- * is already the resolved TOP-LEVEL id (the caller resolves it once via
- * `assertBranchHasCategoryAccess`/`resolveTopLevelCategory` and passes it straight through; this
- * function does not re-resolve it). Throws if the branch isn't even mapped to the top-level
- * category at all, or if it's mapped but `subcategoryId` wasn't explicitly enabled under it (see
- * `BranchSubcategoryAccess`'s own schema doc comment — subcategory access is always explicit,
- * never implied by the parent grant).
- */
-export async function assertBranchHasSubcategoryAccess(branchId: string, categoryId: string, subcategoryId: string) {
-  const categoryGrant = await prisma.branchCategoryAccess.findUnique({
-    where: { branchId_categoryId: { branchId, categoryId } },
-  });
-  if (!categoryGrant) {
-    throw new ApiError('VALIDATION_ERROR', 'This branch is not mapped to this category');
-  }
-  const subcategoryGrant = await prisma.branchSubcategoryAccess.findUnique({
-    where: { branchCategoryAccessId_subcategoryId: { branchCategoryAccessId: categoryGrant.id, subcategoryId } },
-  });
-  if (!subcategoryGrant) {
-    throw new ApiError('VALIDATION_ERROR', 'This branch is not mapped to this subcategory');
   }
 }
 
@@ -359,10 +252,6 @@ export async function deleteCategory(id: string) {
   const productCount = await prisma.product.count({ where: { OR: [{ categoryId: id }, { subcategoryId: id }] } });
   if (productCount > 0) {
     throw new ApiError('CONFLICT', 'Category is still referenced by one or more products');
-  }
-  const vendorAccessCount = await prisma.vendorCategoryAccess.count({ where: { categoryId: id } });
-  if (vendorAccessCount > 0) {
-    throw new ApiError('CONFLICT', 'Category is still granted to one or more vendors; revoke access first');
   }
   await prisma.category.delete({ where: { id } });
 }

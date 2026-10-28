@@ -1,7 +1,11 @@
-import { fireEvent, render, within } from '@testing-library/react';
+import { act, fireEvent, render, within } from '@testing-library/react';
 import type { ReactElement, ReactNode } from 'react';
+import { hydrateRoot } from 'react-dom/client';
+import { renderToString } from 'react-dom/server';
+import type { SkyProductCard } from '@skylabs-monorepo/shared-ui';
+import '@skylabs-monorepo/shared-ui';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import type { CatalogDeal, CatalogProduct } from '../../../api/catalog';
 import content from '../../../content.json';
 import { OfferCard } from './offer-card';
@@ -112,6 +116,27 @@ describe('OfferCard', () => {
     renderCard(<OfferCard item={{ type: 'deal', deal }} />);
     fireEvent.click(document.querySelector('md-outlined-icon-button[aria-label="Save Hydro massage to wishlist"]') as HTMLElement);
     expect(m.toggle).toHaveBeenCalledWith('d1');
+  });
+
+  it('keeps its options after prerender and hydration (kebab-case attributes)', async () => {
+    const ui = (
+      <MemoryRouter>
+        <OfferCard item={{ type: 'deal', deal: { ...deal, images: ['/a.jpg'] } }} tag={{ label: 'New', color: 'tertiary', tone: 'tonal' }} />
+      </MemoryRouter>
+    );
+    const host = document.createElement('div');
+    host.innerHTML = renderToString(ui);
+    document.body.append(host);
+    onTestFinished(() => host.remove());
+    await act(async () => {
+      hydrateRoot(host, ui);
+    });
+    const el = host.querySelector('sky-product-card') as SkyProductCard;
+    expect(el.priceFirst).toBe(true);
+    expect(el.badgeColor).toBe('tertiary');
+    expect(el.badgeTone).toBe('tonal');
+    expect(el.originalPrice).toBe('₹6,500');
+    expect(el.imageAlt).toBeTruthy();
   });
 
   describe('slider', () => {

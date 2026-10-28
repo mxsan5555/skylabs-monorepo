@@ -4,6 +4,7 @@ import { ApiError } from '../lib/http';
 import type { Prisma } from '../generated/prisma-client';
 import type { CartAddItemSchema } from '../schemas/cart.schema';
 import { VISIBLE_DEAL_WHERE, VISIBLE_THERAPIST_WHERE } from './catalog-visibility';
+import { assertDealPurchasable, hasPurchaseLimits } from './deal-limits';
 
 type CartAddItemInput = z.infer<typeof CartAddItemSchema>;
 
@@ -143,7 +144,16 @@ async function assertServiceDeal(dealId: string, dealPackageId: string) {
   const pkg = await prisma.dealPackage.findUnique({ where: { id: dealPackageId } });
   if (!pkg || pkg.dealId !== deal.id) throw new ApiError('NOT_FOUND', 'Deal package not found');
   if (!pkg.isActive) throw new ApiError('VALIDATION_ERROR', 'Selected package is not currently available');
-  return { unitPrice: pkg.sellingPrice };
+  return { unitPrice: pkg.sellingPrice, deal };
+}
+
+/** Units of `dealId` already in the cart (every package), minus one line when it is being replaced. */
+async function cartUnitsOfDeal(cartId: string, dealId: string, exceptItemId?: string) {
+  const result = await prisma.cartItem.aggregate({
+    where: { cartId, dealId, ...(exceptItemId ? { id: { not: exceptItemId } } : {}) },
+    _sum: { quantity: true },
+  });
+  return result._sum.quantity ?? 0;
 }
 
 /** Therapist line — `therapistId` + `therapistPackageId`, entirely independent of any Deal (see
@@ -191,13 +201,16 @@ export async function addItem(customerId: string, input: CartAddItemInput) {
   const isTherapistLine = !!input.therapistId;
   const isProductLine = !isTherapistLine && !!input.productId;
 
-  const { unitPrice } = isTherapistLine
-    ? await assertTherapist(input.therapistId!, input.therapistPackageId!)
-    : isProductLine
-      ? await assertProduct(input.productId!)
-      : await assertServiceDeal(input.dealId!, input.dealPackageId!);
+  const serviceDeal = isTherapistLine || isProductLine ? null : await assertServiceDeal(input.dealId!, input.dealPackageId!);
+  const { unitPrice } = serviceDeal
+    ?? (isTherapistLine ? await assertTherapist(input.therapistId!, input.therapistPackageId!) : await assertProduct(input.productId!));
 
   const cart = await prisma.cart.upsert({ where: { customerId }, update: {}, create: { customerId } });
+  // Stock and the per-customer limit count every unit of the deal in the cart (PLANNING §2.7).
+  if (serviceDeal && hasPurchaseLimits(serviceDeal.deal)) {
+    const { deal } = serviceDeal;
+    await assertDealPurchasable(deal, customerId, (await cartUnitsOfDeal(cart.id, deal.id)) + input.quantity);
+  }
 
   const matchWhere = {
     cartId: cart.id,
@@ -219,7 +232,11 @@ export async function addItem(customerId: string, input: CartAddItemInput) {
 }
 
 export async function updateItemQuantity(customerId: string, itemId: string, quantity: number) {
-  await getOwnedCartItemOrThrow(customerId, itemId);
+  const item = await getOwnedCartItemOrThrow(customerId, itemId);
+  if (item.dealId) {
+    const deal = await prisma.deal.findUnique({ where: { id: item.dealId }, select: { id: true, maxBookings: true, limitPerCustomer: true } });
+    if (deal && hasPurchaseLimits(deal)) await assertDealPurchasable(deal, customerId, (await cartUnitsOfDeal(item.cartId, deal.id, itemId)) + quantity);
+  }
   await prisma.cartItem.update({ where: { id: itemId }, data: { quantity } });
   return getOrCreateCart(customerId);
 }

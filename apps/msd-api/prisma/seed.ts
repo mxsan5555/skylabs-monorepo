@@ -21,7 +21,8 @@ import { permissionKeyFor } from '@skylabs-monorepo/shared-permissions';
 import { ensureUniqueSlug } from '../src/lib/slug';
 import { getMenuForApp } from '@skylabs-monorepo/shared-menu';
 import { normalizeIdentifier } from '../src/lib/normalizeIdentifier';
-import { migrateSharedKeySplitGrants, applyPermissionMatrix } from '../src/services/permission-migration.service';
+import { migrateSharedKeySplitGrants } from '../src/services/permission-migration.service';
+import { syncDealPriceFromPackages } from '../src/services/deal.service';
 import { CATEGORY_TAXONOMY } from './category-taxonomy';
 import { PERMISSION_MATRIX_GRANTS, MATRIX_GOVERNED_MENU_KEYS } from './permission-matrix';
 import { auditAndMigrateMultiRoleAccounts } from './role-migration';
@@ -75,8 +76,8 @@ const EXTRA_ACTIONS_BY_MENU_KEY: Record<string, PermissionAction[]> = {
   // the Role Permission Matrix shows a disabled dash for that cell, same as any other
   // not-yet-grantable action (see permission-matrix.tsx's own doc comment).
   'vendors.branches': ['create', 'edit', 'status_change'],
-  // Admin-on-behalf Deal CRUD, including the admin-only approve/reject moderation actions.
-  'vendors.deals': ['create', 'edit', 'delete', 'status_change', 'approve', 'reject'],
+  // Admin-on-behalf Deal CRUD. No approve/reject: deals publish without approval (D6).
+  'vendors.deals': ['create', 'edit', 'delete', 'status_change'],
   // Admin-on-behalf Therapist CRUD — no delete-via-status distinction beyond status_change/delete
   // both existing as real endpoints.
   'vendors.therapists': ['create', 'edit', 'delete', 'status_change'],
@@ -698,28 +699,49 @@ async function backfillTherapistSlugs(): Promise<number> {
 }
 
 /** Same demo hours every weekday, a shorter Saturday, closed Sunday — good enough for local dev. */
+/** Written in the `{ open, start, end }` shape `OpeningHoursSchema` accepts and the storefront reads. */
+const WEEKDAY_HOURS = { open: true, start: '09:00', end: '20:00' };
 const DEMO_OPENING_HOURS = {
-  mon: '09:00-20:00',
-  tue: '09:00-20:00',
-  wed: '09:00-20:00',
-  thu: '09:00-20:00',
-  fri: '09:00-20:00',
-  sat: '10:00-18:00',
-  sun: 'closed',
+  mon: WEEKDAY_HOURS,
+  tue: WEEKDAY_HOURS,
+  wed: WEEKDAY_HOURS,
+  thu: WEEKDAY_HOURS,
+  fri: WEEKDAY_HOURS,
+  sat: { open: true, start: '10:00', end: '18:00' },
+  sun: { open: false },
 };
 
-/** One-off backfill for `Branch.openingHours` (same migration as Vendor.slug) — every existing
- *  Branch row predates this column. Fetches the (small, demo-sized) branch list and filters in
- *  application code rather than a Prisma Json-null `where` clause (Json columns need
- *  `Prisma.DbNull`/`Prisma.JsonNull`, not a bare `null`, and this dataset is small enough that
- *  the extra round-trip cost is irrelevant). Idempotent and safe to re-run. */
+const LEGACY_HOURS = /^(\d{2}:\d{2})-(\d{2}:\d{2})$/;
+
+/** Earlier seeds wrote each day as a string (`"09:00-20:00"` / `"closed"`), which the storefront
+ *  shows as closed. Returns the structured shape, or null when the value needs no change. */
+function upgradeLegacyHours(hours: Prisma.JsonValue): Prisma.InputJsonValue | null {
+  if (!hours || typeof hours !== 'object' || Array.isArray(hours)) return null;
+  const days = Object.entries(hours);
+  if (!days.some(([, v]) => typeof v === 'string')) return null;
+  return Object.fromEntries(
+    days.map(([day, v]) => {
+      if (typeof v !== 'string') return [day, v];
+      const match = LEGACY_HOURS.exec(v);
+      return [day, match ? { open: true, start: match[1], end: match[2] } : { open: false }];
+    }),
+  ) as Prisma.InputJsonValue;
+}
+
+/** Fills `Branch.openingHours` where it is empty and upgrades legacy string days. Fetches the
+ *  (small, demo-sized) branch list and filters in application code rather than a Prisma Json-null
+ *  `where` clause (Json columns need `Prisma.DbNull`/`Prisma.JsonNull`, not a bare `null`).
+ *  Idempotent and safe to re-run. */
 async function backfillBranchOpeningHours(): Promise<number> {
-  const branches = await prisma.branch.findMany();
-  const missing = branches.filter((b) => b.openingHours === null);
-  for (const b of missing) {
-    await prisma.branch.update({ where: { id: b.id }, data: { openingHours: DEMO_OPENING_HOURS as Prisma.InputJsonValue } });
+  const branches = await prisma.branch.findMany({ select: { id: true, openingHours: true } });
+  let changed = 0;
+  for (const b of branches) {
+    const next = b.openingHours === null ? (DEMO_OPENING_HOURS as Prisma.InputJsonValue) : upgradeLegacyHours(b.openingHours);
+    if (!next) continue;
+    await prisma.branch.update({ where: { id: b.id }, data: { openingHours: next } });
+    changed++;
   }
-  return missing.length;
+  return changed;
 }
 
 // ─── Demo marketplace dataset ────────────────────────────────────────────────
@@ -1181,7 +1203,7 @@ const PACKAGE_MULTIPLIERS = [1, 1.6, 2.2] as const;
  *  requires selecting a package before a service Deal can be added to cart (see CartItem's own
  *  schema doc comment), so demo data needs real packages to exercise that flow. Priced as a
  *  multiple of the deal's own base price, rounded to a clean ten. Idempotent via DealPackage's
- *  own `@@unique([dealId, durationMinutes])` upsert key. */
+ *  own `@@unique([dealId, durationMinutes, persons])` key (1 person). */
 async function seedDealPackages(): Promise<number> {
   const serviceDeals = await prisma.deal.findMany({ select: { id: true, salePrice: true, originalPrice: true } });
   let created = 0;
@@ -1189,7 +1211,7 @@ async function seedDealPackages(): Promise<number> {
     const base = deal.salePrice.toNumber();
     const baseOriginal = deal.originalPrice ? deal.originalPrice.toNumber() : null;
     for (const [i, durationMinutes] of PACKAGE_DURATIONS.entries()) {
-      const existing = await prisma.dealPackage.findUnique({ where: { dealId_durationMinutes: { dealId: deal.id, durationMinutes } } });
+      const existing = await prisma.dealPackage.findUnique({ where: { dealId_durationMinutes_persons: { dealId: deal.id, durationMinutes, persons: 1 } } });
       if (existing) continue;
       const multiplier = PACKAGE_MULTIPLIERS[i];
       await prisma.dealPackage.create({
@@ -1203,6 +1225,8 @@ async function seedDealPackages(): Promise<number> {
       });
       created++;
     }
+    // Same rule as a package save in the console: the cheapest package sets the deal's price.
+    await syncDealPriceFromPackages(prisma, deal.id);
   }
   return created;
 }

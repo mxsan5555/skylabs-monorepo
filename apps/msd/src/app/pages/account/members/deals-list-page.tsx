@@ -1,18 +1,17 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FilledButton, Icon } from '@skylabs-monorepo/shared-ui/react';
-import { listVendorDealsForAdmin, setDealStatus, deleteDeal, type AdminDeal } from '../../../../api/rbac/vendors';
+import { listBranches, listVendorDealsForAdmin, setDealStatus, deleteDeal, type AdminDeal } from '../../../../api/rbac/vendors';
+import { fromPriceLabel } from './deal-format';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useConfirmDialog } from '../../../components/confirm-dialog';
 
 interface DealsListPageProps {
   token: string | null;
   vendorId: string;
-  /** Gates "Add deal" and each row's Edit/Toggle-status action — computed by the caller from
-   *  `vendors.deals:edit` (never the blanket `members:edit`; the backend's `vendors.deals:*`
-   *  permissions are the real enforcement either way). */
+  /** `vendors.deals:edit`: Add deal, Edit and Activate / Deactivate (the API re-checks). */
   canEdit: boolean;
-  /** Gates the Delete row action — computed by the caller from `vendors.deals:delete`. */
+  /** `vendors.deals:delete`; the API also requires Super Admin (PLANNING §2.7). */
   canDelete: boolean;
 }
 
@@ -36,20 +35,20 @@ function toRow(d: AdminDeal): Record<string, string | number> {
     Title: d.title,
     Branch: d.branch.name,
     Category: d.category?.name ?? '—',
-    Price: `₹${d.salePrice}`,
+    Price: fromPriceLabel(d),
     Therapists: therapistCount > 0 ? `${therapistCount} linked` : 'None linked',
     Status: d.status,
   };
 }
 
-/** Deals — data table, vendor-wide (every branch). Plugged into `MemberDetailPage`'s
- *  `section="deals"`. Add/Edit are full pages (`/deals/new`, `/deals/:dealId`), mirroring
- *  Branches' own list+form pattern; a deal's Delete is a real hard delete (blocked server-side,
- *  409, if it has order/cart history — use the status toggle instead in that case). */
+/** Deals tab of the member page: every deal of the member, every branch. Add/Edit open the deal
+ *  form (`/deals/new`, `/deals/:dealId`). With no branch yet it asks for one first (PLANNING §2.7);
+ *  Delete is Super Admin only and 409s for a deal with orders. */
 export function DealsListPage({ token, vendorId, canEdit, canDelete }: DealsListPageProps) {
   const navigate = useNavigate();
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const [deals, setDeals] = useState<AdminDeal[]>([]);
+  const [branchCount, setBranchCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const tableRef = useRef<HTMLElement>(null);
@@ -58,8 +57,9 @@ export function DealsListPage({ token, vendorId, canEdit, canDelete }: DealsList
     setLoading(true);
     setError('');
     try {
-      const { data } = await listVendorDealsForAdmin(token, vendorId);
+      const [{ data }, branches] = await Promise.all([listVendorDealsForAdmin(token, vendorId), listBranches(token, vendorId)]);
       setDeals(data);
+      setBranchCount(branches.data.length);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Could not load deals.');
     } finally {
@@ -120,7 +120,7 @@ export function DealsListPage({ token, vendorId, canEdit, canDelete }: DealsList
           <h2 className="section-title">Deals</h2>
           <p className="field-hint">{loading ? 'Loading…' : `${deals.length} deal${deals.length === 1 ? '' : 's'}`}</p>
         </div>
-        {canEdit && (
+        {canEdit && branchCount !== 0 && (
           <div className="page-head__actions">
             <FilledButton onClick={() => navigate(`/account/members/${vendorId}/deals/new`)}>
               <Icon slot="icon" aria-hidden="true">add</Icon>
@@ -132,7 +132,11 @@ export function DealsListPage({ token, vendorId, canEdit, canDelete }: DealsList
 
       {error && <p className="error-state" role="alert">{error}</p>}
 
-      {!loading && !error && deals.length === 0 ? (
+      {!loading && branchCount === 0 ? (
+        <p className="empty-state">
+          Add a branch first: a deal is sold at one branch. <Link to={`/account/members/${vendorId}/branches/new`}>Add a branch</Link>
+        </p>
+      ) : !loading && deals.length === 0 ? (
         <p className="empty-state">No deals yet. Add one for a branch.</p>
       ) : !loading && error ? null : (
         <sky-data-table

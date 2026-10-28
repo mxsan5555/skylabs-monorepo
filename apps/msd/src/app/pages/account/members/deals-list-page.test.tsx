@@ -12,6 +12,7 @@ vi.mock('react-router-dom', async () => {
 });
 
 const listVendorDealsForAdminMock = vi.fn();
+const listBranchesMock = vi.fn();
 const setDealStatusMock = vi.fn();
 const deleteDealMock = vi.fn();
 vi.mock('../../../../api/rbac/vendors', async () => {
@@ -19,6 +20,7 @@ vi.mock('../../../../api/rbac/vendors', async () => {
   return {
     ...actual,
     listVendorDealsForAdmin: (...args: unknown[]) => listVendorDealsForAdminMock(...args),
+    listBranches: (...args: unknown[]) => listBranchesMock(...args),
     setDealStatus: (...args: unknown[]) => setDealStatusMock(...args),
     deleteDeal: (...args: unknown[]) => deleteDealMock(...args),
   };
@@ -35,11 +37,14 @@ const DEAL_A: AdminDeal = {
   originalPrice: '1499.00',
   salePrice: '1299.00',
   status: 'ACTIVE',
-  approvalStatus: 'APPROVED',
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
   category: { id: 'c1', name: 'Spa', slug: 'spa', parentId: null, isActive: true },
   branch: { id: 'b1', name: 'Lower Parel Branch' },
+  packages: [
+    { id: 'p1', dealId: 'd1', name: null, durationMinutes: 60, persons: 1, sellingPrice: '1299.00', originalPrice: '1499.00', inclusions: [], isActive: true, sortOrder: 0 },
+    { id: 'p2', dealId: 'd1', name: null, durationMinutes: 90, persons: 1, sellingPrice: '1799.00', originalPrice: null, inclusions: [], isActive: true, sortOrder: 1 },
+  ],
   therapists: [{ id: 't1', personName: 'Ramesh Kumar', therapistType: 'Massage Therapist', isActive: true }],
 };
 
@@ -69,6 +74,7 @@ function renderPage(canEdit = true, canDelete = true) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  listBranchesMock.mockResolvedValue({ data: [{ id: 'b1', name: 'Lower Parel Branch' }] });
 });
 
 describe('DealsListPage', () => {
@@ -77,7 +83,7 @@ describe('DealsListPage', () => {
     await waitFor(() => expect(listVendorDealsForAdminMock).toHaveBeenCalledWith('tok', 'v1'));
     await waitFor(() => expect(JSON.parse(table().getAttribute('rows') ?? '[]')).toHaveLength(2));
     const rows = JSON.parse(table().getAttribute('rows') ?? '[]') as Record<string, string>[];
-    expect(rows[0]).toMatchObject({ Title: 'Deep Tissue Massage', Branch: 'Lower Parel Branch', Price: '₹1299.00', Therapists: '1 linked', Status: 'ACTIVE' });
+    expect(rows[0]).toMatchObject({ Title: 'Deep Tissue Massage', Branch: 'Lower Parel Branch', Price: 'From ₹1,299', Therapists: '1 linked', Status: 'ACTIVE' });
     expect(rows[1]).toMatchObject({ Title: 'Foot Reflexology', Therapists: 'None linked', Status: 'DRAFT' });
   });
 
@@ -123,6 +129,14 @@ describe('DealsListPage', () => {
     fireEvent(table(), new CustomEvent('sky-dt-row-action', { detail: { action: 'toggle-status', rowIndex: 0 } }));
     await waitFor(() => expect(setDealStatusMock).toHaveBeenCalledWith('tok', 'v1', 'b1', 'd1', 'INACTIVE'));
     await waitFor(() => expect(listVendorDealsForAdminMock).toHaveBeenCalledTimes(2));
+  });
+
+  it('shows the DEAL_NOT_READY message when a deal cannot go live yet', async () => {
+    setDealStatusMock.mockRejectedValue(new ApiRequestError('DEAL_NOT_READY', 'Before going live: add at least one image', 422));
+    renderPage();
+    await waitFor(() => expect(JSON.parse(table().getAttribute('rows') ?? '[]')).toHaveLength(2));
+    fireEvent(table(), new CustomEvent('sky-dt-row-action', { detail: { action: 'toggle-status', rowIndex: 1 } }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Before going live: add at least one image');
   });
 
   it('toggle-status flips a non-ACTIVE deal (DRAFT) to ACTIVE', async () => {
@@ -187,5 +201,18 @@ describe('DealsListPage', () => {
       </MemoryRouter>,
     );
     expect(await screen.findByText(/No deals yet/)).toBeTruthy();
+  });
+
+  it('asks for a branch first when the member has none (PLANNING §2.7)', async () => {
+    listVendorDealsForAdminMock.mockResolvedValue({ data: [] });
+    listBranchesMock.mockResolvedValue({ data: [] });
+    render(
+      <MemoryRouter>
+        <DealsListPage token="tok" vendorId="v1" canEdit canDelete />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText(/Add a branch first/)).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Add a branch' }).getAttribute('href')).toBe('/account/members/v1/branches/new');
+    expect(screen.queryByText('Add deal')).toBeNull();
   });
 });

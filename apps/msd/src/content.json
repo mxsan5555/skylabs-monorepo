@@ -54,20 +54,38 @@
       "dialogTitle": "Choose your city",
       "useCurrent": "Use my current location",
       "listLabel": "Cities with partner spas",
-      "close": "Close"
+      "close": "Close",
+      "filterLabel": "Search partner cities",
+      "filterPlaceholder": "Type a city",
+      "noMatch": "No partner city matches “{query}”",
+      "locateFailedTitle": "We could not find your location.",
+      "locateFailedText": "Allow location access for this site in your browser settings, or pick a city below."
     },
     "searchSuggestions": {
-      "listLabel": "Search suggestions",
+      "listLabel": "Search results",
       "loading": "Searching…",
-      "noResults": "No results found",
+      "noResults": "No results for “{query}”. Try another word or a different location.",
+      "near": "Near {city}",
+      "nearYou": "Near your current location",
+      "noLocation": "Set your location to see deals near you",
+      "change": "Change",
+      "setLocation": "Set location",
+      "locationTitle": "Choose your location",
+      "back": "Back to results",
+      "from": "From {price}",
+      "showAll": "Show all results",
+      "showAllCount": "Show all {count} results",
+      "showAllOne": "Show 1 result",
+      "dealsElsewhere": "No deals in {city} yet. These are from other states.",
       "groups": {
-        "deals": "Deals",
-        "products": "Products",
-        "therapists": "Therapists",
+        "browse": "Browse categories",
         "categories": "Categories",
-        "subcategories": "Subcategories"
+        "deals": "Deals",
+        "therapists": "Therapists",
+        "products": "Products"
       }
-    }
+    },
+    "searchClear": "Clear search"
   },
   "tabBar": {
     "label": "Primary",
@@ -277,7 +295,7 @@
     },
     "sections": {
       "browseByCategory": {
-        "heading": "Shop by category",
+        "heading": "Deals by category",
         "seeAll": "See all",
         "seeAllTo": "/explore"
       },
@@ -405,90 +423,31 @@
   },
   "search": {
     "heading": "Explore deals, products and therapists",
-    "placeholder": "Search spas, treatments, locations…",
-    "ariaLabel": "Search deals",
-    "resultLabel": "results",
-    "noResults": "No results found. Try adjusting your filters.",
-    "emptySuggestion": "No spas found",
-    "view": {
-      "groupLabel": "Results view",
-      "list": "List view",
-      "grid": "Grid view",
-      "map": "Map view"
+    "description": "Search every deal, product and therapist from verified partners. Filter by distance, price and tag.",
+    "resultsFor": "Results for “{q}”",
+    "kindsLabel": "Result types",
+    "kindChip": "{label} ({count})",
+    "kinds": {
+      "all": "All",
+      "deals": "Deals",
+      "products": "Products",
+      "therapists": "Therapists"
     },
-    "filters": {
-      "price": {
-        "label": "Price",
-        "min": 499,
-        "max": 15000,
-        "activeLabel": "Price (up to {price})",
-        "priceLevels": [
-          {
-            "value": "$",
-            "label": "Budget (₹499–₹1,499)"
-          },
-          {
-            "value": "$$",
-            "label": "Mid-range (₹1,500–₹4,999)"
-          },
-          {
-            "value": "$$$",
-            "label": "Premium (₹5,000+)"
-          }
-        ],
-        "dialogTitle": "Filter by Price",
-        "priceUpTo": "Price up to:",
-        "clear": "Clear",
-        "apply": "Apply"
-      },
-      "suggested": {
-        "label": "Suggested"
-      },
-      "category": {
-        "label": "Category",
-        "dialogTitle": "Select Category",
-        "ariaLabel": "Category",
-        "all": "All categories",
-        "clear": "Clear",
-        "apply": "Apply",
-        "browseAll": "Browse all categories →"
-      },
-      "location": {
-        "label": "Location",
-        "dialogTitle": "Filter by Location",
-        "stateLabel": "State",
-        "stateAll": "All states",
-        "cityLabel": "City",
-        "cityAll": "All cities",
-        "clear": "Clear",
-        "apply": "Apply"
-      },
-      "clearAll": "Clear filters"
+    "resultsAriaLabel": "Search results",
+    "resultCount": {
+      "singular": "result",
+      "plural": "results"
     },
-    "results": {
-      "listAriaLabel": "Search results list",
-      "gridAriaLabel": "Search results grid",
-      "mapAriaLabel": "Search results map",
-      "mapImageLabel": "Map showing deal locations",
-      "mapResultsSuffix": "results in view"
+    "empty": {
+      "heading": "No results found",
+      "subheading": "Try another search or clear the filters."
     },
-    "labels": {
-      "addToCart": "Add to Cart",
-      "service": "Deal",
-      "product": "Product",
-      "durationSuffix": "min",
-      "book": "Book",
-      "removeWishlist": "Remove from wishlist",
-      "saveWishlist": "Save to wishlist",
-      "therapist": "Therapist"
+    "breadcrumb": {
+      "home": "Home",
+      "explore": "Explore"
     },
-    "loading": {
-      "deals": "Loading deals…",
-      "categories": "Loading categories…"
-    },
-    "errors": {
-      "loadDeals": "Could not load deals."
-    }
+    "loading": "Loading results…",
+    "loadError": "Could not load results."
   },
   "category": {
     "sortOptions": [
@@ -507,6 +466,14 @@
       {
         "value": "distance",
         "label": "Distance: Nearest"
+      },
+      {
+        "value": "newest",
+        "label": "Newest"
+      },
+      {
+        "value": "discount",
+        "label": "Biggest discount"
       }
     ],
     "view": {
@@ -585,8 +552,8 @@
       "clearAll": "Clear all",
       "showMore": "Show more",
       "showLess": "Show less",
-      "countOne": ", 1 deal",
-      "countMany": ", {count} deals",
+      "countOne": ", 1 result",
+      "countMany": ", {count} results",
       "location": {
         "title": "Your location",
         "notSet": "Not set",
@@ -604,6 +571,14 @@
         "max": "Max",
         "minLabel": "Minimum price",
         "maxLabel": "Maximum price"
+      },
+      "category": {
+        "title": "Category",
+        "search": "Search categories"
+      },
+      "tags": {
+        "title": "Tags",
+        "search": "Search tags"
       },
       "business": {
         "title": "Business",
@@ -637,7 +612,6 @@
     },
     "dealsAriaLabelSuffix": "deals",
     "loading": "Loading category…",
-    "loadingDeals": "Loading deals…",
     "durationSuffix": "min",
     "offeringLabels": {
       "service": "Deal",
@@ -654,8 +628,7 @@
     },
     "errors": {
       "loadCategory": "Could not load category.",
-      "addToCart": "Could not add to cart.",
-      "loadDeals": "Could not load deals."
+      "addToCart": "Could not add to cart."
     },
     "notFound": {
       "metaTitle": "Category Not Found | MSD",
@@ -684,8 +657,6 @@
     "off": "{percent}% off",
     "originalPrice": "Original price {price}",
     "details": "Details",
-    "notes": "Notes",
-    "policy": "Policy",
     "terms": "Terms & Conditions",
     "cancellationPolicy": "Cancellation policy",
     "cancellationText": "Cancel up to 24 hours before your appointment for a full refund. Same-day cancellations are non-refundable.",
@@ -693,6 +664,10 @@
     "locationAndHours": "Location and hours",
     "hours": "Hours",
     "getDirections": "Get directions",
+    "map": {
+      "label": "Map of {name}",
+      "loading": "Loading map"
+    },
     "quantity": "Quantity",
     "decrease": "Decrease quantity",
     "increase": "Increase quantity",
@@ -706,7 +681,17 @@
     "copied": "Link copied",
     "thumbnails": "Gallery thumbnails",
     "viewImage": "View image {n} of {count}",
-    "related": "You May Also Like"
+    "related": "You May Also Like",
+    "gallery": {
+      "open": "Open image {n} of {count} full screen",
+      "dialog": "{title} photos",
+      "close": "Close full-screen view",
+      "previous": "Previous image",
+      "next": "Next image",
+      "counter": "{n} of {count}"
+    },
+    "soldOut": "Sold out",
+    "call": "Call {phone}"
   },
   "dealDetail": {
     "loading": "Loading deal…",
@@ -730,7 +715,9 @@
     "meta": {
       "titleSuffix": " | MSD",
       "defaultDescription": "Book {name} at MSD.",
-      "locationPrefix": "in"
+      "locationPrefix": "in",
+      "titleTemplate": "{title} at {member}, {city}",
+      "titleTemplateNoCity": "{title} at {member}"
     },
     "labels": {
       "service": "Deal",
@@ -771,7 +758,49 @@
       "5:00 PM",
       "6:00 PM"
     ],
-    "description": "Description"
+    "description": "Description",
+    "sections": {
+      "whatYouGet": "What you get",
+      "howToRedeem": "How to redeem",
+      "cancellation": "Cancellation",
+      "finePrint": "Fine print",
+      "eligibility": "Who can use it",
+      "therapists": "Therapists for this deal",
+      "about": "About {name}",
+      "faqs": "Questions and answers",
+      "related": "More {category} deals"
+    },
+    "highlights": "Highlights",
+    "redeem": {
+      "bookingRequired": "Book a time with the branch before you visit.",
+      "walkIn": "No booking needed: show your voucher at the branch.",
+      "validFor": "Use within {days} days of purchase.",
+      "validForOne": "Use within 1 day of purchase."
+    },
+    "cancellation": {
+      "FREE_24H": "Free cancellation up to 24 hours before your appointment.",
+      "FREE_48H": "Free cancellation up to 48 hours before your appointment.",
+      "NON_REFUNDABLE": "This deal is non-refundable."
+    },
+    "termsLink": "Read the MSD Terms of Service",
+    "availability": {
+      "soldOut": "Sold out",
+      "bought": "{count} bought",
+      "endsInDays": "Ends in {days}d {hours}h",
+      "endsInHours": "Ends in {hours}h",
+      "stockLeft": "Only {count} left",
+      "limit": "Up to {limit} per customer"
+    },
+    "package": {
+      "forPeople": "For {count} people",
+      "includes": "Includes"
+    },
+    "about": {
+      "website": "Visit website",
+      "allDeals": "See all deals from {name}",
+      "call": "Call {phone}"
+    },
+    "breadcrumbCity": "Deals in {city}"
   },
   "therapistDetail": {
     "loading": "Loading therapist…",
@@ -831,7 +860,13 @@
     "distance": "{km} km",
     "discount": "-{percent}%",
     "serviceTag": "Service",
-    "productTag": "Product"
+    "productTag": "Product",
+    "tags": {
+      "expire_soon": "Expire soon",
+      "hot": "Hot",
+      "new": "New",
+      "deal": "Deal"
+    }
   },
   "gallery": {
     "previous": "Previous image of {title}",
@@ -1223,53 +1258,6 @@
     "vendorLabel": "Continue as Vendor"
   },
   "products": {
-    "listing": {
-      "title": "Wellness Products",
-      "subtitle": "Oils, creams, masks and kits — shop top-rated skincare and wellness products.",
-      "loading": "Loading products…",
-      "searchLabel": "Search",
-      "resultsAriaLabel": "Product results",
-      "filterAriaLabel": "Search and sort products",
-      "addToCart": "Add to Cart",
-      "addToCartSuccess": "Added \"{item}\" to your cart.",
-      "addToCartError": "Could not add to cart.",
-      "offSuffix": "OFF",
-      "filters": {
-        "all": "All",
-        "day": "Day",
-        "night": "Night",
-        "skinCare": "Skin Care"
-      },
-      "errors": {
-        "load": "Could not load products."
-      },
-      "breadcrumb": {
-        "home": "Home",
-        "products": "Products"
-      },
-      "sortOptions": [
-        {
-          "value": "popular",
-          "label": "Popularity"
-        },
-        {
-          "value": "price-asc",
-          "label": "Price: Low to High"
-        },
-        {
-          "value": "price-desc",
-          "label": "Price: High to Low"
-        },
-        {
-          "value": "newest",
-          "label": "Newest"
-        }
-      ],
-      "sortLabel": "Sort by",
-      "resultLabel": "products",
-      "emptyHeading": "No products found",
-      "emptySubheading": "Try selecting a different category or check back later."
-    },
     "detail": {
       "loading": "Loading product…",
       "addToCart": "Add to Cart",
@@ -1314,10 +1302,6 @@
       "accordionHowToUse": "How To Use",
       "accordionIngredients": "Ingredients",
       "accordionReturn": "Return / Refund Policy"
-    },
-    "meta": {
-      "listingTitle": "Wellness Products | MSD – MySpaDeal",
-      "listingDescription": "Shop massage oils, face masks, body scrubs, aromatherapy sets and wellness kits from top Indian wellness brands."
     }
   },
   "categories": {
@@ -1342,25 +1326,6 @@
     "subcategory": {
       "singular": "subcategory",
       "plural": "subcategories"
-    }
-  },
-  "therapists": {
-    "path": "/therapists",
-    "metaTitle": "Therapists | MSD",
-    "metaDescription": "Browse therapists directly and book their own duration and price packages. No deal required.",
-    "breadcrumb": {
-      "home": "Home",
-      "therapists": "Therapists"
-    },
-    "title": "Therapists",
-    "subtitle": "Browse our therapists and book their own duration and price packages directly.",
-    "loading": "Loading therapists…",
-    "empty": {
-      "title": "No therapists yet",
-      "description": "Check back soon."
-    },
-    "errors": {
-      "load": "Could not load therapists."
     }
   },
   "invoice": {
@@ -1917,6 +1882,101 @@
       "metaTitle": "Application received · MSD",
       "heading": "Application received",
       "text": "Thanks for applying to become a member on MySpaDeal. Our team reviews your business details and contacts you by email or phone once they are verified. You do not need to do anything else right now."
+    }
+  },
+  "listingPages": {
+    "deals": {
+      "title": "Spa and wellness deals",
+      "description": "Every massage, spa and beauty deal from verified partners in one place. Filter by distance, price and tag, or pick a category.",
+      "cityTitle": "Spa and wellness deals in {city}",
+      "cityDescription": "Massage, spa and beauty deals from verified partners in {city}. Compare prices, check the distance and book online.",
+      "breadcrumb": "Deals",
+      "chipsLabel": "Deal categories",
+      "all": "All deals",
+      "ariaLabel": "Deal results",
+      "loading": "Loading deals…",
+      "loadError": "Could not load deals."
+    },
+    "products": {
+      "title": "Wellness products",
+      "description": "Oils, creams, masks and kits from our partner spas and salons. Filter by category, price and tag.",
+      "breadcrumb": "Products",
+      "chipsLabel": "Product categories",
+      "all": "All products",
+      "ariaLabel": "Product results",
+      "empty": {
+        "heading": "No products found",
+        "subheading": "Try another category or clear the filters."
+      },
+      "loading": "Loading products…",
+      "loadError": "Could not load products."
+    },
+    "therapists": {
+      "title": "Therapists",
+      "description": "Book a therapist directly and pick a package by session length and price. Filter by distance, price and business.",
+      "cityTitle": "Therapists in {city}",
+      "cityDescription": "Book massage and wellness therapists in {city} directly, with a price for each session length.",
+      "breadcrumb": "Therapists",
+      "chipsLabel": "Therapy categories",
+      "all": "All therapists",
+      "ariaLabel": "Therapist results",
+      "loading": "Loading therapists…",
+      "loadError": "Could not load therapists."
+    }
+  },
+  "customerDashboard": {
+    "metaTitle": "My Dashboard",
+    "loading": {
+      "heading": "Loading your dashboard",
+      "subheading": "Please wait..."
+    },
+    "errors": {
+      "load": "Could not load your dashboard.",
+      "icon": "error_outline"
+    },
+    "stats": {
+      "deals": {
+        "label": "Booked Deals",
+        "icon": "spa"
+      },
+      "products": {
+        "label": "Purchased Products",
+        "icon": "inventory_2"
+      },
+      "cart": {
+        "label": "Your Cart",
+        "icon": "shopping_cart"
+      },
+      "wishlist": {
+        "label": "Wishlist",
+        "icon": "favorite"
+      },
+      "linkIcon": "arrow_forward"
+    },
+    "quickActions": {
+      "orders": {
+        "icon": "receipt_long",
+        "heading": "Your orders",
+        "subheading": "Track booked deals and purchased products.",
+        "button": "View Orders"
+      },
+      "profile": {
+        "icon": "person",
+        "heading": "Manage your profile",
+        "subheading": "View and update your personal account information.",
+        "button": "View Profile"
+      },
+      "logout": {
+        "icon": "logout",
+        "heading": "Sign out",
+        "subheading": "Sign out from your MySpaDeal account.",
+        "button": "Logout"
+      }
+    },
+    "icons": {
+      "error": "error_outline",
+      "arrowForward": "arrow_forward",
+      "logout": "logout"
     }
   }
 }

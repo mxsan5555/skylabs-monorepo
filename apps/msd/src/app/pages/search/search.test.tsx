@@ -1,274 +1,163 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { CatalogCategoryWithChildren, CatalogDeal, CatalogLocation } from '../../../api/catalog';
-
-const listCatalogCategoriesMock = vi.fn();
-const listCatalogDealsMock = vi.fn();
-const listCatalogLocationsMock = vi.fn();
-
-vi.mock('../../../api/catalog', async () => {
-  const actual = await vi.importActual<typeof import('../../../api/catalog')>('../../../api/catalog');
-  return {
-    ...actual,
-    listCatalogCategories: (...args: unknown[]) => listCatalogCategoriesMock(...args),
-    listCatalogDeals: (...args: unknown[]) => listCatalogDealsMock(...args),
-    listCatalogLocations: (...args: unknown[]) => listCatalogLocationsMock(...args),
-  };
-});
-
-vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
-  useAuth: () => ({ isAuthenticated: false, token: null }),
-}));
-
-vi.mock('../../../wishlist/wishlist-context', () => ({
-  useWishlist: () => ({ toggle: vi.fn(), has: () => false, toggleProduct: vi.fn(), hasProduct: () => false }),
-}));
-
-import { Search } from './search';
+import type { CatalogCategoryWithChildren, CatalogDeal } from '../../../api/catalog';
+import type { CatalogShellValue } from '../../../catalog/catalog-shell';
 import content from '../../../content.json';
+import { Search } from './search';
 
-const LOCATIONS: CatalogLocation[] = [
-  { state: 'Maharashtra', city: 'Mumbai' },
-  { state: 'Maharashtra', city: 'Pune' },
-  { state: 'Karnataka', city: 'Bengaluru' },
-];
+/**
+ * Explore (ST-43, TESTING §4.4): kind chips with counts, the filter panel following the kind,
+ * offer and therapist cards, `?category=` from treatment links, `noindex, follow`, and the
+ * signed-out Add to cart path keeping the search.
+ */
+const m = vi.hoisted(() => ({
+  listDeals: vi.fn(),
+  listProducts: vi.fn(),
+  listTherapists: vi.fn(),
+  facets: vi.fn(),
+  shell: { value: null as unknown as CatalogShellValue },
+}));
 
-function cat(overrides: Partial<CatalogCategoryWithChildren>): CatalogCategoryWithChildren {
-  return { id: 'cat-1', name: 'Massage', slug: 'massage', description: null, children: [], ...overrides };
-}
+vi.mock('../../../api/catalog', async () => ({
+  ...(await vi.importActual<typeof import('../../../api/catalog')>('../../../api/catalog')),
+  listCatalogDeals: (...a: unknown[]) => m.listDeals(...a),
+  listCatalogProducts: (...a: unknown[]) => m.listProducts(...a),
+  listCatalogTherapists: (...a: unknown[]) => m.listTherapists(...a),
+  getCatalogDealFacets: (...a: unknown[]) => m.facets(...a),
+  getCatalogProductFacets: (...a: unknown[]) => m.facets(...a),
+  getCatalogTherapistFacets: (...a: unknown[]) => m.facets(...a),
+}));
+vi.mock('../../../catalog/catalog-shell', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../catalog/catalog-shell')>()),
+  useCatalogShell: () => m.shell.value,
+}));
+vi.mock('../../../location/location-context', () => ({
+  useVisitorLocation: () => ({ status: 'none', source: 'none', city: null, state: null, coords: null, setCity: vi.fn(), requestBrowser: vi.fn() }),
+}));
+vi.mock('@skylabs-monorepo/shared-auth/react', () => ({ useAuth: () => ({ isAuthenticated: false, token: null }) }));
+vi.mock('../../../wishlist/wishlist-context', () => ({
+  useWishlist: () => ({ toggle: vi.fn(), has: () => false, toggleProduct: vi.fn(), hasProduct: () => false, isProductPending: () => false }),
+}));
+vi.mock('../../components/banner-slot/banner-slot', () => ({ BannerSlot: () => null }));
+vi.mock('../../components/deal-map/deal-map', () => ({ DealMap: () => <div data-testid="deal-map" /> }));
 
-function deal(overrides: Partial<CatalogDeal>): CatalogDeal {
-  return {
-    id: 'deal-1',
-    title: 'Full Body Massage',
-    slug: 'full-body-massage',
-    shortDescription: null,
-    description: null,
+const t = content.search;
+const MASSAGE = { id: '0b0b0b0b-0000-4000-8000-000000000001', name: 'Massage', slug: 'massage', description: null, type: 'SERVICE', children: [] } as unknown as CatalogCategoryWithChildren;
+
+const deal = (id: string) =>
+  ({
+    id,
+    title: `Deal ${id}`,
     originalPrice: '999',
     salePrice: '699',
     discountPercent: 30,
-    durationMinutes: 60,
-    images: [],
-    category: null,
-    subcategory: null,
-    product: null,
+    packages: [],
     vendor: null,
     branch: null,
-    packages: [],
-    ...overrides,
-  } as CatalogDeal;
-}
+    tag: null,
+  }) as unknown as CatalogDeal;
+const product = { id: 'p1', name: 'Massage Oil', price: '499', originalPrice: '599', discount: 17, vendor: null, image: null, tag: null };
+const therapist = { id: 't1', therapistType: 'Massage Therapist', personName: 'Asha', packages: [], vendor: null, branch: null };
 
-/** Renders the current URL search string as plain text — a reliable way to assert on
- *  react-router's `useSearchParams` sync without depending on any Material web component's
- *  internal (non-attribute-reflecting, jsdom-unfriendly) reactive properties. */
 function LocationBar() {
   const location = useLocation();
   return <div data-testid="location-bar">{location.pathname}{location.search}</div>;
 }
 
-function renderSearch(initialEntries: string[] = ['/explore']) {
+function renderAt(path = '/explore') {
   return render(
-    <MemoryRouter initialEntries={initialEntries}>
+    <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route
-          path="/explore"
-          element={
-            <>
-              <LocationBar />
-              <Search />
-            </>
-          }
-        />
+        <Route path="/explore" element={<><LocationBar /><Search /></>} />
+        <Route path="/sign-in" element={<LocationBar />} />
       </Routes>
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 }
 
-function currentUrl(): string {
-  return screen.getByTestId('location-bar').textContent ?? '';
-}
+const currentUrl = () => screen.getByTestId('location-bar').textContent ?? '';
+type Chip = HTMLElement & { label?: string };
+const chipLabels = () => (Array.from(document.querySelectorAll('md-filter-chip')) as Chip[]).map((c) => c.label ?? c.getAttribute('label'));
+const chip = (label: string) => (Array.from(document.querySelectorAll('md-filter-chip')) as Chip[]).find((c) => (c.label ?? c.getAttribute('label'))?.startsWith(label)) as Chip;
+const panelHeaders = async () => {
+  const aside = await screen.findByRole('complementary', { name: content.category.filterPanel.title });
+  return Array.from(aside.querySelectorAll('sky-accordion-item')).map((s) => (s as HTMLElement & { header?: string }).header ?? s.getAttribute('header'));
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
-  listCatalogCategoriesMock.mockResolvedValue({ data: [cat({})] });
-  listCatalogLocationsMock.mockResolvedValue({ data: LOCATIONS });
-  listCatalogDealsMock.mockResolvedValue({ data: [deal({})] });
+  vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+  m.shell.value = { status: 'ready', locationsStatus: 'ready', categories: [MASSAGE], socialLinks: [], locations: [] } as CatalogShellValue;
+  m.listDeals.mockResolvedValue({ data: [deal('d1')], meta: { total: 5 } });
+  m.listProducts.mockResolvedValue({ data: [product], meta: { total: 2 } });
+  m.listTherapists.mockResolvedValue({ data: [therapist], meta: { total: 1 } });
+  m.facets.mockResolvedValue({ data: { vendors: [], branches: [], distance: [], price: null, tags: [], categories: [] } });
 });
 
-/** The Location filter trigger is the 4th (last) `md-filter-chip` in the filter bar (Price,
- *  Suggested, Category, Location — see search.tsx's chip order). */
-function locationChipElement(): HTMLElement {
-  const chips = Array.from(document.querySelectorAll('md-filter-chip')) as HTMLElement[];
-  const chip = chips[chips.length - 1];
-  if (!chip) throw new Error('Location filter chip not found');
-  return chip;
-}
-
-/** Same custom-element accessibility gap as elsewhere in this suite: `<md-outlined-select
- *  label="State">` doesn't expose a queryable accessible name under jsdom, so `getByLabelText`
- *  can't find it. The Location dialog's State select is the first (and, until a State is picked,
- *  only) `md-outlined-select` inside it; City is the second, rendered only once a State is set. */
-function locationDialogSelects(): HTMLElement[] {
-  const dialog = Array.from(document.querySelectorAll('md-dialog')).find((d) => d.textContent?.includes('Filter by Location'));
-  if (!dialog) throw new Error('Location dialog not found');
-  return Array.from(dialog.querySelectorAll('md-outlined-select')) as HTMLElement[];
-}
-
-function findLocationDialogClearButton(): HTMLElement {
-  const dialog = Array.from(document.querySelectorAll('md-dialog')).find((d) => d.textContent?.includes('Filter by Location'));
-  if (!dialog) throw new Error('Location dialog not found');
-  const clearButton = Array.from(dialog.querySelectorAll('md-text-button')).find((el) => el.textContent === 'Clear');
-  if (!clearButton) throw new Error('Clear button not found in Location dialog');
-  return clearButton as HTMLElement;
-}
-
-/**
- * Feature: /explore location filter
- * Scenario: State/City selections stay in sync with the URL (`state`/`city` query params),
- * matching the existing `q`/`category`/`sort` pattern exactly, and narrow the `listCatalogDeals`
- * call.
- *
- * Given: a customer opens /explore and picks a State (and optionally a City)
- * When: the Location filter dialog's selects change
- * Then: the URL gains `state`/`city` params and `listCatalogDeals` is called with them
- *
- * Edge cases:
- * - clearing the location removes both params and re-fetches without them
- * - a `?state=&city=` URL present on load (e.g. from browser back/forward) restores filter state
- */
-describe('Search — location filter URL sync', () => {
-  it('reads an initial ?state=&city= from the URL on mount and passes them to listCatalogDeals', async () => {
-    renderSearch(['/explore?state=Maharashtra&city=Mumbai']);
+describe('Explore', () => {
+  it('one h1 naming the query; kind chips carry their counts; the total sits on the chip row', async () => {
+    renderAt('/explore?q=massage');
+    expect(screen.getAllByRole('heading', { level: 1 }).map((h) => h.textContent)).toEqual([t.resultsFor.replace('{q}', 'massage')]);
     await waitFor(() =>
-      expect(listCatalogDealsMock).toHaveBeenCalledWith(
-        expect.objectContaining({ state: 'Maharashtra', city: 'Mumbai' }),
-      ),
+      expect(chipLabels()).toEqual([
+        t.kindChip.replace('{label}', t.kinds.all).replace('{count}', '8'),
+        t.kindChip.replace('{label}', t.kinds.deals).replace('{count}', '5'),
+        t.kindChip.replace('{label}', t.kinds.products).replace('{count}', '2'),
+        t.kindChip.replace('{label}', t.kinds.therapists).replace('{count}', '1'),
+      ]),
     );
-    expect(currentUrl()).toBe('/explore?state=Maharashtra&city=Mumbai');
+    await waitFor(() => expect(document.querySelector('.chip-nav-row__end')?.textContent).toBe('8 results'));
+    expect(m.listDeals).toHaveBeenCalledWith(expect.objectContaining({ search: 'massage', page: 1, pageSize: 12 }));
   });
 
-  // NOTE: the forward direction (picking a State/City in the dialog's <md-outlined-select> and
-  // watching it WRITE to the URL) is intentionally NOT driven here via a simulated DOM event.
-  // Verified by direct reproduction: this repo's installed `@lit/react@1.0.8` registers its
-  // custom-element property/event bindings (incl. `onChange`) inside a `useLayoutEffect` whose
-  // ref-timing does not fire correctly under React 19.2.7 in jsdom — a manually-`addEventListener`'d
-  // native `change` listener on the very same `<md-outlined-select>` node receives a dispatched
-  // event immediately, but the listener `@lit/react` is supposed to attach via its wrapper never
-  // does, so `search.tsx`'s own `onChange` handler is never invoked no matter how the DOM event is
-  // dispatched. This is a pre-existing dependency-version gap in the whole app's test
-  // infrastructure (affects every `onChange`/`onInput`-driven `md-*` control, not just this one),
-  // not something introduced by or fixable within this feature. The "select a State/City and see
-  // it take effect" flow is covered instead at the Playwright E2E level (a real browser's Shadow
-  // DOM/custom-element runtime doesn't have this limitation) — see `apps/msd-e2e/src/vendor-onboarding.spec.ts`'s
-  // public storefront location filter scenario.
-  it('populates the State/City selects from listCatalogLocations, restricted to that state\'s own cities', async () => {
-    renderSearch();
-    await waitFor(() => expect(listCatalogLocationsMock).toHaveBeenCalled());
-    fireEvent.click(locationChipElement());
-
-    await waitFor(() => expect(locationDialogSelects().length).toBeGreaterThan(0));
-    const stateOptions = Array.from(locationDialogSelects()[0].querySelectorAll('md-select-option')).map((o) => o.textContent?.trim());
-    expect(stateOptions).toEqual(['All states', 'Karnataka', 'Maharashtra']);
+  it('All mixes offer and therapist cards and shows location, distance and price filters', async () => {
+    renderAt();
+    await waitFor(() => expect(document.querySelectorAll('sky-product-card').length).toBe(3));
+    expect(await panelHeaders()).toEqual([
+      content.category.filterPanel.location.title,
+      content.category.filterPanel.distance.title,
+      content.category.filterPanel.price.title,
+    ]);
   });
 
-  // Edge case: clearing removes both params
-  it('clearing the location filter drops state/city from the URL and the next listCatalogDeals call', async () => {
-    renderSearch(['/explore?state=Maharashtra&city=Mumbai']);
-    await waitFor(() =>
-      expect(listCatalogDealsMock).toHaveBeenCalledWith(expect.objectContaining({ state: 'Maharashtra', city: 'Mumbai' })),
-    );
-
-    fireEvent.click(findLocationDialogClearButton());
-
-    await waitFor(() => expect(currentUrl()).toBe('/explore'));
-    expect(listCatalogDealsMock).toHaveBeenLastCalledWith(expect.objectContaining({ state: undefined, city: undefined }));
+  it('a kind chip sets ?kind= and the panel and API call follow it', async () => {
+    renderAt('/explore?q=oil');
+    await waitFor(() => expect(chip(t.kinds.products)).toBeTruthy());
+    fireEvent.click(chip(t.kinds.products));
+    await waitFor(() => expect(currentUrl()).toBe('/explore?q=oil&kind=products'));
+    await waitFor(() => expect(m.listProducts.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ search: 'oil', pageSize: 12 })));
+    expect(await panelHeaders()).toEqual([content.category.filterPanel.price.title, content.category.filterPanel.tags.title]);
   });
 
-  // Edge case: simulated back/forward — the URL changes under the same mounted Search instance
-  // (not a remount), and its own `useEffect` on `params` re-syncs local filter state from it —
-  // see search.tsx's own doc comment on why that resync effect exists.
-  it('re-syncs filter state and re-fetches when the URL changes externally (simulated browser back/forward)', async () => {
-    function NavBackHelper() {
-      const navigate = useNavigate();
-      return (
-        <button type="button" onClick={() => navigate('/explore')}>
-          simulate-back
-        </button>
-      );
-    }
-    render(
-      <MemoryRouter initialEntries={['/explore?state=Maharashtra&city=Mumbai']}>
-        <Routes>
-          <Route
-            path="/explore"
-            element={
-              <>
-                <LocationBar />
-                <Search />
-                <NavBackHelper />
-              </>
-            }
-          />
-        </Routes>
-      </MemoryRouter>
-    );
-    await waitFor(() =>
-      expect(listCatalogDealsMock).toHaveBeenCalledWith(expect.objectContaining({ state: 'Maharashtra', city: 'Mumbai' })),
-    );
+  it('?category= from a treatment link narrows to that category and its kind', async () => {
+    renderAt('/explore?q=swedish&category=massage');
+    await waitFor(() => expect(m.listDeals).toHaveBeenCalledWith(expect.objectContaining({ categoryId: MASSAGE.id, page: 1, pageSize: 12 })));
+    expect(m.listProducts).not.toHaveBeenCalledWith(expect.objectContaining({ categoryId: MASSAGE.id }));
+  });
 
-    // Simulate the browser restoring a prior history entry with the filter cleared — same
-    // mounted Search component, only the URL/params change underneath it.
-    fireEvent.click(screen.getByText('simulate-back'));
-
-    await waitFor(() => expect(currentUrl()).toBe('/explore'));
-    await waitFor(() =>
-      expect(listCatalogDealsMock).toHaveBeenLastCalledWith(expect.objectContaining({ state: undefined, city: undefined })),
-    );
+  it('is noindex, follow with canonical /explore', async () => {
+    renderAt('/explore?q=massage');
+    await waitFor(() => expect(document.head.querySelector('meta[name="robots"]')?.getAttribute('content')).toBe('noindex, follow'));
   });
 });
 
 /**
- * Regression coverage for the login-redirect fix: an "Add to Cart" click while logged out
- * (`useAuth` is mocked `isAuthenticated: false` for this whole file) must send the visitor to
- * `/sign-in` with the CURRENT `/explore` URL — query string included — captured as `?next=`, so
- * a successful login returns them to these exact search results instead of always landing on
- * Home. Covers requirement 1's own named example (`/explore?q=Swedish%20Massage`).
+ * A logged-out shopper clicking Add to Cart on a search result goes to sign in, and a successful
+ * sign-in returns them to these exact search results.
  */
-describe('Search — Add to Cart while logged out preserves the return destination', () => {
-  function renderSearchWithSignInRoute(initialEntries: string[]) {
-    return render(
-      <MemoryRouter initialEntries={initialEntries}>
-        <Routes>
-          <Route path="/explore" element={<><LocationBar /><Search /></>} />
-          <Route path="/sign-in" element={<LocationBar />} />
-        </Routes>
-      </MemoryRouter>
-    );
-  }
-
-  it('redirects to /sign-in?next=<current /explore URL, query preserved> when Add to Cart is clicked while logged out', async () => {
-    renderSearchWithSignInRoute(['/explore?q=Swedish%20Massage']);
-    await waitFor(() => expect(listCatalogDealsMock).toHaveBeenCalled());
-
-    // The deal's offer card (OfferCard) runs the sign-in check before opening the package picker.
-    const [addToCartTrigger] = await screen.findAllByText(content.offerCard.addToCart);
-    fireEvent.click(addToCartTrigger);
-
-    await waitFor(() =>
-      expect(currentUrl()).toBe(`/sign-in?next=${encodeURIComponent('/explore?q=Swedish%20Massage')}`),
-    );
+describe('Explore — Add to Cart while logged out preserves the return destination', () => {
+  it('redirects to /sign-in?next=<current /explore URL, query preserved>', async () => {
+    renderAt('/explore?q=Swedish%20Massage');
+    const [addToCart] = await screen.findAllByText(content.offerCard.addToCart);
+    fireEvent.click(addToCart);
+    await waitFor(() => expect(currentUrl()).toBe(`/sign-in?next=${encodeURIComponent('/explore?q=Swedish%20Massage')}`));
   });
 
-  it('redirects to /sign-in?next=%2Fexplore (bare path, no trailing query) when /explore itself has no query string', async () => {
-    renderSearchWithSignInRoute(['/explore']);
-    await waitFor(() => expect(listCatalogDealsMock).toHaveBeenCalled());
-
-    // The deal's offer card (OfferCard) runs the sign-in check before opening the package picker.
-    const [addToCartTrigger] = await screen.findAllByText(content.offerCard.addToCart);
-    fireEvent.click(addToCartTrigger);
-
+  it('redirects to /sign-in?next=%2Fexplore when /explore has no query string', async () => {
+    renderAt('/explore');
+    const [addToCart] = await screen.findAllByText(content.offerCard.addToCart);
+    fireEvent.click(addToCart);
     await waitFor(() => expect(currentUrl()).toBe('/sign-in?next=%2Fexplore'));
   });
 });

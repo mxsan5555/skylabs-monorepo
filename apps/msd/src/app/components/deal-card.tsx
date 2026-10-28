@@ -7,6 +7,7 @@ import { Icon, FilledTonalIconButton } from '@skylabs-monorepo/shared-ui/react';
 import './deal-card.css';
 import '@skylabs-monorepo/shared-ui';
 import { ProductCardGallery } from './product-card-gallery';
+import { dealHref } from '../../catalog/catalog-shell';
 /**
  * What `DealCard` actually needs to render — a relaxed superset of the mock `Deal` type (still
  * satisfied by it structurally) that also accepts a real `CatalogDeal` adapted to this shape. Real deals
@@ -15,9 +16,8 @@ import { ProductCardGallery } from './product-card-gallery';
  */
 export interface DealCardDeal {
   id: string;
-  /** Canonical slug for the card's own stretched link (see `href`'s doc comment below) — mock
-   *  data callers omit it and the card falls back to `/deal/:id`. */
-  slug?: string;
+  /** The deal page address (`/deal/<slug>`); the id is used when absent. */
+  slug?: string | null;
   title: string;
   image: string;
   imageAlt: string;
@@ -101,7 +101,7 @@ export function DealCard({
           : undefined
       }
       priceNote={deal.priceNote}
-      href={href ?? dealPath(deal)}
+      href={href ?? dealHref(deal)}
     >
 <ProductCardGallery
   slot="media"

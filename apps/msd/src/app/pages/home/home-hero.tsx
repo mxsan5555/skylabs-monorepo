@@ -14,6 +14,7 @@ import { OfferCard, type OfferItem, type OfferTag } from '../../components/offer
 import { dealPath } from '../../seo/public-urls';
 import content from '../../../content.json';
 import type { DealCardDeal } from '../../components/deal-card';
+import { dealHref } from '../../../catalog/catalog-shell';
 
 const { home } = content;
 const heroSrcSet = imageSrcSet(home.hero.image, [640, 960, 1400]);
@@ -28,11 +29,11 @@ type SwiperHost = HTMLElement & {
 
 /** The single best-discount deal shown over the hero photo when no slider is live. A broken
  *  thumbnail swaps to a neutral placeholder frame. */
-function SpotlightCard({ dealId, card }: { dealId: string; card: DealCardDeal }) {
+function SpotlightCard({ href, card }: { href: string; card: DealCardDeal }) {
   const [imgFailed, setImgFailed] = useState(false);
   const showImage = Boolean(card.image) && !imgFailed;
   return (
-    <Link to={dealPath({ id: dealId, slug: card.slug })} className="home-spotlight">
+    <Link to={href} className="home-spotlight">
       {showImage ? (
         <img
           className="home-spotlight__thumb"
@@ -218,7 +219,7 @@ export function HomeHero({ spotlight }: { spotlight?: CatalogDeal }) {
               height={1050}
               fetchPriority="high"
             />
-            {spotlight && fallbackCard && <SpotlightCard dealId={spotlight.id} card={fallbackCard} />}
+            {spotlight && fallbackCard && <SpotlightCard href={dealHref(spotlight)} card={fallbackCard} />}
           </div>
         )}
       </div>

@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { AdminTherapist, Branch, Vendor, VendorCategoryAccessRow } from '../../../../api/rbac/vendors';
+import type { AdminTherapist, Branch, Category, Vendor } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { TherapistFormPage } from './therapist-form-page';
 
@@ -13,7 +13,7 @@ vi.mock('react-router-dom', async () => {
 
 const listBranchesMock = vi.fn();
 const listVendorTherapistsForAdminMock = vi.fn();
-const getVendorCategoryAccessMock = vi.fn();
+const listCategoriesMock = vi.fn();
 const createVendorTherapistMock = vi.fn();
 const updateVendorTherapistMock = vi.fn();
 const getVendorMock = vi.fn();
@@ -24,14 +24,14 @@ vi.mock('../../../../api/rbac/vendors', async () => {
     ...actual,
     listBranches: (...args: unknown[]) => listBranchesMock(...args),
     listVendorTherapistsForAdmin: (...args: unknown[]) => listVendorTherapistsForAdminMock(...args),
-    getVendorCategoryAccess: (...args: unknown[]) => getVendorCategoryAccessMock(...args),
+    listCategories: (...args: unknown[]) => listCategoriesMock(...args),
     createVendorTherapist: (...args: unknown[]) => createVendorTherapistMock(...args),
     updateVendorTherapist: (...args: unknown[]) => updateVendorTherapistMock(...args),
     getVendor: (...args: unknown[]) => getVendorMock(...args),
   };
 });
 
-const THERAPY_BRANCH: Branch = {
+const BRANCH: Branch = {
   id: 'b1',
   vendorId: 'v1',
   name: 'Lower Parel Branch',
@@ -50,18 +50,12 @@ const THERAPY_BRANCH: Branch = {
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
   _count: { deals: 0 },
-  categoryTypes: ['THERAPY'],
 };
 
-const NON_THERAPY_BRANCH: Branch = { ...THERAPY_BRANCH, id: 'b2', name: 'Colaba Branch', categoryTypes: ['SERVICE'] };
+const OTHER_BRANCH: Branch = { ...BRANCH, id: 'b2', name: 'Colaba Branch' };
 
-const THERAPY_GRANT: VendorCategoryAccessRow = {
-  id: 'grant-1',
-  vendorId: 'v1',
-  categoryId: 'c1',
-  createdAt: '2026-01-01T00:00:00Z',
-  category: { id: 'c1', name: 'Physiotherapy', slug: 'physiotherapy', parentId: null, isActive: true, type: 'THERAPY' },
-};
+const THERAPY_CATEGORY: Category = { id: 'c1', name: 'Physiotherapy', slug: 'physiotherapy', parentId: null, isActive: true, type: 'THERAPY' };
+const THERAPY_SUBCATEGORY: Category = { id: 'c1a', name: 'Sports rehab', slug: 'sports-rehab', parentId: 'c1', isActive: true };
 
 const EXISTING_THERAPIST: AdminTherapist = {
   id: 't1',
@@ -126,9 +120,9 @@ function findSaveButton() {
 }
 
 function renderAt(url: string) {
-  listBranchesMock.mockResolvedValue({ data: [THERAPY_BRANCH, NON_THERAPY_BRANCH] });
+  listBranchesMock.mockResolvedValue({ data: [BRANCH, OTHER_BRANCH] });
   listVendorTherapistsForAdminMock.mockResolvedValue({ data: [EXISTING_THERAPIST] });
-  getVendorCategoryAccessMock.mockResolvedValue({ data: [THERAPY_GRANT] });
+  listCategoriesMock.mockResolvedValue({ data: [THERAPY_CATEGORY, THERAPY_SUBCATEGORY] });
   getVendorMock.mockResolvedValue({ data: VENDOR });
   return render(
     <MemoryRouter initialEntries={[url]}>
@@ -145,7 +139,7 @@ beforeEach(() => {
 });
 
 describe('TherapistFormPage — Add', () => {
-  it('shows only THERAPY-eligible branches in the Branch select', async () => {
+  it('offers every branch of the member and every active top-level Therapy category (D10: no grants)', async () => {
     renderAt('/account/members/v1/therapists/new');
     expect(await screen.findByRole('heading', { name: 'Add therapist' })).toBeTruthy();
     const branchSelect = await waitFor(() => {
@@ -155,7 +149,16 @@ describe('TherapistFormPage — Add', () => {
     });
     const optionLabels = Array.from(branchSelect.querySelectorAll('md-select-option [slot="headline"]')).map((o) => o.textContent);
     expect(optionLabels).toContain('Lower Parel Branch');
-    expect(optionLabels).not.toContain('Colaba Branch');
+    expect(optionLabels).toContain('Colaba Branch');
+    expect(listCategoriesMock).toHaveBeenCalledWith('tok', { type: 'THERAPY' });
+    const specialization = await waitFor(() => {
+      const el = selectByLabel('Specialization');
+      if (!el) throw new Error('not rendered yet');
+      return el;
+    });
+    const specializations = Array.from(specialization.querySelectorAll('md-select-option [slot="headline"]')).map((o) => o.textContent);
+    expect(specializations).toContain('Physiotherapy');
+    expect(specializations).not.toContain('Sports rehab');
   });
 
   it('validates branch/type/name and never calls createVendorTherapist when all are missing', async () => {

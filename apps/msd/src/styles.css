@@ -958,12 +958,6 @@ a.dashboard-stat:focus-visible {
   gap: 16px;
 }
 
-.category-grant-grid__group {
-  border-radius: 12px;
-  background-color: var(--md-sys-color-surface-container, #eef1f6);
-  padding: 12px 16px;
-}
-
 .category-grant-grid__option {
   display: flex;
   align-items: center;
@@ -971,16 +965,104 @@ a.dashboard-stat:focus-visible {
   min-height: 44px;
 }
 
-/* Branch-level Category → Subcategory tree (branch-category-access-dialog.tsx) — subcategories
-   nest under their parent category's checkbox, indented rather than in their own grid group. */
-.category-grant-grid__subgroup {
+/* Deal form (pages/account/members/deal-form-page.tsx, PLANNING §2.7): short text lists,
+   package cards, questions and the go-live checklist. */
+.string-list-field {
   display: flex;
   flex-direction: column;
-  margin-left: 24px;
+  gap: 8px;
 }
 
-.category-grant-grid__option--indented {
-  min-height: 40px;
+.string-list-field__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.string-list-field__items li {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-inline-start: 12px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-small, 8px);
+  color: var(--md-sys-color-on-surface);
+}
+
+.string-list-field__add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.string-list-field__add md-outlined-text-field {
+  flex: 1 1 240px;
+}
+
+.deal-packages {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.deal-packages__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.deal-packages__card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-medium, 12px);
+  background-color: var(--md-sys-color-surface);
+}
+
+.deal-packages__summary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.deal-packages__name {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--md-sys-color-on-surface);
+}
+
+.deal-packages__price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.deal-packages__price strong {
+  font-size: 1.1rem;
+  color: var(--md-sys-color-primary);
+}
+
+.deal-faq {
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-medium, 12px);
+}
+
+.deal-readiness {
+  margin: 4px 0 0;
+  padding-inline-start: 20px;
 }
 /* ── Vendor Profile Form ─────────────────────────────────────────────── */
 .vendor-fields-grid md-outlined-text-field {

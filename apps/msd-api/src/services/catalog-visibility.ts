@@ -5,18 +5,17 @@
  */
 
 /**
- * The one definition of "is this deal visible to a customer / still purchasable": active +
- * approved, its member active, its branch active. Used by the catalog list and single-deal
+ * The one definition of "is this deal visible to a customer / still purchasable": active, its
+ * member active, its branch active. No approval step (D6). Used by the catalog list and single-deal
  * lookups, cart add, checkout revalidation and the public promotions read.
  */
 export const VISIBLE_DEAL_WHERE = {
   status: 'ACTIVE' as const,
-  approvalStatus: 'APPROVED' as const,
   vendor: { status: 'ACTIVE' as const },
   branch: { isActive: true },
 };
 
-/** The same bar for a Product: active product, active member (no branch, no approval). */
+/** The same bar for a Product: active product, active member (no branch). */
 export const VISIBLE_PRODUCT_WHERE = {
   isActive: true as const,
   vendor: { status: 'ACTIVE' as const },

@@ -4,6 +4,7 @@ import { ApiError } from '../lib/http';
 import { Prisma, type OrderStatus, type OrderType } from '../generated/prisma-client';
 import { getVendorByOwnerUserId } from './vendor.service';
 import { VISIBLE_DEAL_WHERE, VISIBLE_PRODUCT_WHERE, VISIBLE_THERAPIST_WHERE } from './catalog.service';
+import { assertDealPurchasable, hasPurchaseLimits } from './deal-limits';
 import type { OrderContactDetailsSchema } from '../schemas/order.schema';
 import { env } from '../config/env';
 
@@ -312,6 +313,11 @@ export async function createOrderFromCart(customerId: string, contactDetails: Or
       });
       if (!deal) {
         throw new ApiError('CONFLICT', 'One or more items in your cart are no longer available — please review your cart');
+      }
+      // Stock and the per-customer limit, over every line of this deal in the cart (PLANNING §2.7).
+      if (hasPurchaseLimits(deal)) {
+        const dealUnits = cart.items.filter((i) => i.dealId === deal.id).reduce((sum, i) => sum + i.quantity, 0);
+        await assertDealPurchasable(deal, customerId, dealUnits, tx);
       }
 
       if (!primaryVendor) primaryVendor = deal.vendor;

@@ -67,21 +67,6 @@ export function SkyProductCardWC({
   }, [gallery]);
 
   useEffect(() => {
-    const el = ref.current as
-      | (HTMLElement & {
-        favorite?: boolean;
-        favoriteActive?: boolean;
-      })
-      | null;
-
-    if (!el) {
-      return;
-    }
-
-    el.favorite = Boolean(favorite);
-    el.favoriteActive = Boolean(favoriteActive);
-  }, [favorite, favoriteActive]);
-  useEffect(() => {
     const el = ref.current;
 
     if (!el || !onFavorite) {
@@ -96,7 +81,11 @@ export function SkyProductCardWC({
       el.removeEventListener('favorite', handleFavorite);
     };
   }, [onFavorite]);
-  const attrs: Record<string, string | number> = {};
+  // Booleans as attributes so prerendered HTML carries them; React omits `false`.
+  const attrs: Record<string, string | number | boolean> = {
+    favorite: Boolean(favorite),
+    'favorite-active': Boolean(favoriteActive),
+  };
 
   Object.entries(props).forEach(([key, value]) => {
     if (value === undefined || value === null) {
@@ -111,7 +100,7 @@ export function SkyProductCardWC({
 
   return (
     <div className="sky-product-card-wc">
-      <sky-product-card ref={ref as any} {...(attrs as any)}>
+      <sky-product-card ref={ref} {...attrs}>
         {gallery && gallery.length > 0 && (
           <ProductCardGallery
             slot="media"

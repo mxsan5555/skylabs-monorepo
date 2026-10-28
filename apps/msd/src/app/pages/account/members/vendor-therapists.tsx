@@ -14,7 +14,7 @@ import type { SkyDataTableParamsDetail } from '@skylabs-monorepo/shared-ui';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import {
   createTherapist,
-  getMyVendorCategoryAccess,
+  listCategories,
   listMyBranches,
   listMyTherapists,
   setTherapistStatus,
@@ -85,8 +85,8 @@ export function VendorTherapists() {
   const { token } = useAuth();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [therapists, setTherapists] = useState<TherapistWithBranch[]>([]);
-  // The vendor's granted THERAPY categories — flat, top-level only (see plan decision #6), used
-  // to restrict the Specialization picker instead of the old free-text field.
+  // Every active top-level Therapy category (D10: open to every member), used to restrict the
+  // Specialization picker instead of the old free-text field.
   const [specializationCategories, setSpecializationCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -126,10 +126,8 @@ export function VendorTherapists() {
   }, [load]);
 
   useEffect(() => {
-    // The `getMyVendorCategoryAccess` grant rows already nest the category — no separate
-    // vendorId-scoped `listCategories` call needed for this self-service-only page.
-    getMyVendorCategoryAccess(token)
-      .then(({ data }) => setSpecializationCategories(data.filter((row) => row.category.type === 'THERAPY').map((row) => row.category)))
+    listCategories(token, { type: 'THERAPY' })
+      .then(({ data }) => setSpecializationCategories(data.filter((c) => !c.parentId)))
       .catch(() => setSpecializationCategories([]));
   }, [token]);
 
@@ -166,13 +164,6 @@ export function VendorTherapists() {
     [specializationCategories],
   );
   const rows = useMemo(() => JSON.stringify(therapists.map((t) => toRow(t, specializationNameMap))), [therapists, specializationNameMap]);
-  // Only a branch with at least one currently-granted THERAPY category (`categoryTypes`,
-  // computed server-side by `listMyBranches`/`listBranches`) is eligible to host a therapist —
-  // mirrors the admin-side `vendor-wizard-therapists.tsx` filter so revoking a branch's Therapy
-  // access in Branch Access hides it here immediately and after a refresh. `?.` mirrors that same
-  // file's guard — `updateBranch`/`createBranch`/`setBranchStatus` never return `categoryTypes`
-  // (only `listBranches` computes it), so a freshly-saved branch object can transiently lack it.
-  const therapyBranches = useMemo(() => branches.filter((b) => b.categoryTypes?.includes('THERAPY')), [branches]);
 
   useEffect(() => {
     const el = tableRef.current;
@@ -215,7 +206,7 @@ export function VendorTherapists() {
           <p>Staff therapists across your business's branches.</p>
         </div>
         <div className="page-head__actions">
-          {therapyBranches.length > 0 && (
+          {branches.length > 0 && (
             <OutlinedButton onClick={() => addDialogRef.current?.show()}>
               <Icon slot="icon" aria-hidden="true">add</Icon>
               Add therapist
@@ -226,10 +217,6 @@ export function VendorTherapists() {
 
       {message && <p className="field-hint" role="status">{message}</p>}
       {error && <p className="error-state" role="alert">{error}</p>}
-
-      {!loading && branches.length > 0 && therapyBranches.length === 0 && (
-        <p className="empty-state">No branch currently has Therapy category access — map one under "Branches &amp; Deals" first.</p>
-      )}
 
       {!loading && branches.length === 0 ? (
         <p className="empty-state">Add a branch under "Branches &amp; Deals" before adding therapists.</p>
@@ -247,10 +234,10 @@ export function VendorTherapists() {
         />
       )}
 
-      {therapyBranches.length > 0 && (
+      {branches.length > 0 && (
         <TherapistFormDialog
           dialogRef={addDialogRef}
-          branches={therapyBranches}
+          branches={branches}
           specializationCategories={specializationCategories}
           token={token}
           onSave={(input, branchId) => save(input, branchId)}
@@ -295,7 +282,7 @@ function TherapistFormDialog({
 }: {
   dialogRef: RefObject<MdDialog | null>;
   branches: Branch[];
-  /** The vendor's granted THERAPY categories — restricts the Specialization picker instead of
+  /** Every active top-level Therapy category — restricts the Specialization picker instead of
    *  the old free-text field (see `Therapist.specializationCategoryId`'s own doc comment). */
   specializationCategories: Category[];
   therapist?: TherapistWithBranch;
@@ -398,7 +385,7 @@ function TherapistFormDialog({
           </OutlinedSelect>
         ) : (
           <p className="empty-state">
-            No Therapy categories have been granted to this business yet — grant one under Business Modules &amp; Category Access first.
+            No active Therapy categories yet. Staff add them in Category Master.
           </p>
         )}
         {therapist?.specialization && (

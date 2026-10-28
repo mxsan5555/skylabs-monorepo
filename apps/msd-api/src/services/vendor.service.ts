@@ -18,19 +18,15 @@ import {
 import { getProductScopedOrThrow } from './product.service';
 import * as mediaService from './media.service';
 import type { MediaFile } from './media.service';
-import * as notificationService from './notification.service';
 import { documentsSummary } from './member-document.service';
 import { documentsDueAt } from './member-reminder-policy';
 import { sendMemberNotice } from './member-notice.service';
 import { ROLE_KEYS } from '../lib/role-keys';
 import {
   Prisma,
-  type CategoryType,
   type MemberStatus,
   type MemberDocumentStatus,
   type KycStatus,
-  type DealStatus,
-  type DealApprovalStatus,
 } from '../generated/prisma-client';
 import type {
   VendorCreateSchema,
@@ -39,9 +35,6 @@ import type {
   VendorSelfUpdateSchema,
   BranchCreateSchema,
   BranchUpdateSchema,
-  BranchCategoryAccessInputSchema,
-  DealCreateSchema,
-  DealUpdateSchema,
   TherapistCreateSchema,
   TherapistUpdateSchema,
   TherapistPackageCreateSchema,
@@ -168,7 +161,7 @@ export async function attachLiveCounts<T extends { id: string }>(vendors: T[]): 
   const vendorId = { in: vendors.map((v) => v.id) };
   const [branches, deals, products, therapists] = await Promise.all([
     prisma.branch.groupBy({ by: ['vendorId'], where: { vendorId, isActive: true }, _count: { _all: true } }),
-    prisma.deal.groupBy({ by: ['vendorId'], where: { vendorId, status: 'ACTIVE', approvalStatus: 'APPROVED' }, _count: { _all: true } }),
+    prisma.deal.groupBy({ by: ['vendorId'], where: { vendorId, status: 'ACTIVE' }, _count: { _all: true } }),
     prisma.product.groupBy({ by: ['vendorId'], where: { vendorId, isActive: true }, _count: { _all: true } }),
     prisma.therapist.groupBy({ by: ['vendorId'], where: { vendorId, isActive: true }, _count: { _all: true } }),
   ]);
@@ -752,8 +745,8 @@ export async function listAllBranches(opts: { page: number; pageSize: number; se
  *  (duplicated as a plain boolean check, not imported, to avoid a cross-service module
  *  dependency for four conditions) — used only to LABEL each row for the admin (e.g. the Home
  *  Hero slide picker's "X/5 eligible" indicator), never to filter what an admin can see. */
-function isDealPubliclyEligible(deal: { status: string; approvalStatus: string; vendor: { status: string }; branch: { isActive: boolean } }): boolean {
-  return deal.status === 'ACTIVE' && deal.approvalStatus === 'APPROVED' && deal.vendor.status === 'ACTIVE' && deal.branch.isActive;
+function isDealPubliclyEligible(deal: { status: string; vendor: { status: string }; branch: { isActive: boolean } }): boolean {
+  return deal.status === 'ACTIVE' && deal.vendor.status === 'ACTIVE' && deal.branch.isActive;
 }
 
 export async function listAllDeals(opts: { page: number; pageSize: number; search?: string; state?: string }) {
@@ -778,15 +771,16 @@ export async function listAllDeals(opts: { page: number; pageSize: number; searc
       include: {
         vendor: { select: { id: true, businessName: true, status: true } },
         branch: { select: { id: true, name: true, state: true, isActive: true } },
-        // Reuses the same OFFERING_INCLUDE shape (packages + media) every single-vendor deal
-        // read already uses — the cross-vendor Deals list needed these too for a "From ₹X"
-        // package summary and a thumbnail image, previously omitted here.
-        ...OFFERING_INCLUDE,
+        // Packages and media for the "From ₹X" summary and the thumbnail.
+        category: { select: { id: true, name: true } },
+        subcategory: { select: { id: true, name: true } },
+        packages: { orderBy: [{ sortOrder: 'asc' as const }, { durationMinutes: 'asc' as const }] },
+        mediaImages: { orderBy: [{ isPrimary: 'desc' as const }, { sortOrder: 'asc' as const }] },
       },
     }),
     prisma.deal.count({ where }),
   ]);
-  return { items: items.map((d) => ({ ...flattenDealTherapists(d), eligible: isDealPubliclyEligible(d) })), total };
+  return { items: items.map((d) => ({ ...d, eligible: isDealPubliclyEligible(d) })), total };
 }
 
 export async function listAllTherapists(opts: { page: number; pageSize: number; search?: string }) {
@@ -818,27 +812,14 @@ export async function listAllTherapists(opts: { page: number; pageSize: number; 
 
 // ─── Branch (shared by admin `:vendorId` path and self-derived vendorId) ─────
 
-/**
- * `categoryTypes` — the distinct `CategoryType`s this branch currently has ANY `BranchCategoryAccess`
- * grant for (e.g. `['THERAPY']`) — lets a caller (the Add Therapist/Deal forms' branch picker)
- * know which branches are currently eligible for a given module WITHOUT a separate
- * `getBranchCategoryAccess` round-trip per branch. Computed from the same single query as the
- * rest of this response (`include`, not a follow-up call), so listing N branches is still exactly
- * one query — never N+1 — regardless of how many categories each branch has mapped.
- */
+/** Every branch of a member, newest first, with its deal count. Any branch can hold deals and
+ *  therapists of any active category (D10: no category grants). */
 export async function listBranches(vendorId: string) {
-  const branches = await prisma.branch.findMany({
+  return prisma.branch.findMany({
     where: { vendorId },
     orderBy: { createdAt: 'desc' },
-    include: {
-      _count: { select: { deals: true } },
-      categoryAccess: { select: { category: { select: { type: true } } } },
-    },
+    include: { _count: { select: { deals: true } } },
   });
-  return branches.map(({ categoryAccess, ...branch }) => ({
-    ...branch,
-    categoryTypes: [...new Set(categoryAccess.map((a) => a.category.type).filter((t): t is CategoryType => t !== null))],
-  }));
 }
 
 /** 404 if the branch doesn't exist at all; 403 if it exists but belongs to a different vendor. */
@@ -867,93 +848,6 @@ export async function updateBranch(vendorId: string, branchId: string, input: Br
 export async function setBranchStatus(vendorId: string, branchId: string, isActive: boolean) {
   await getBranchScopedOrThrow(vendorId, branchId);
   return prisma.branch.update({ where: { id: branchId }, data: { isActive } });
-}
-
-// ─── Branch category access (narrows the vendor's own VendorCategoryAccess grants — see
-// BranchCategoryAccess/BranchSubcategoryAccess's own schema doc comments) ────────────────────
-
-export async function getBranchCategoryAccess(vendorId: string, branchId: string) {
-  await getBranchScopedOrThrow(vendorId, branchId);
-  return prisma.branchCategoryAccess.findMany({
-    where: { branchId },
-    include: { category: true, subcategories: { include: { subcategory: true } } },
-  });
-}
-
-/**
- * Replace-the-full-set pattern (same shape as `setVendorModulesAndCategoryAccess` above) — each
- * `categoryId` must be a top-level SERVICE/THERAPY category, and each `subcategoryIds` entry must
- * be a real child of that `categoryId` (`assertCategoryChildOf`).
- *
- * Unlike the original design, this no longer requires the vendor to already hold a
- * `VendorCategoryAccess` grant for the category — Step 2's separate "Business Modules + Category
- * Access" screen for Service/Therapy was removed (category/subcategory access for those two
- * modules is now managed entirely from the branch), so this is the only place left that grants
- * them. A category with no existing vendor-level grant gets one created here automatically
- * (`offersService`/`offersTherapy` flipped to `true` as needed) in the same transaction, rather
- * than rejecting the save — see `category.type` below. Never auto-*revokes* on removal: unmapping
- * a category from one branch must never invalidate an existing Deal/Therapist at a different
- * branch still relying on that same vendor-level grant (`assertVendorHasCategoryAccess`) or flip a
- * module flag back off under a vendor's feet. Product is unaffected — it still only ever goes
- * through the explicit `setVendorModulesAndCategoryAccess` grant, since Product has no branch
- * scoping and never flows through this function.
- */
-export async function setBranchCategoryAccess(vendorId: string, branchId: string, input: BranchCategoryAccessInput) {
-  await getBranchScopedOrThrow(vendorId, branchId);
-
-  const categoriesById = new Map<string, { id: string; name: string; type: CategoryType | null }>();
-  for (const mapping of input.mappings) {
-    const category = await prisma.category.findUnique({ where: { id: mapping.categoryId } });
-    if (!category) throw new ApiError('VALIDATION_ERROR', 'categoryId does not exist');
-    if (category.parentId !== null) {
-      throw new ApiError('VALIDATION_ERROR', `Category "${category.name}" is a subcategory — map its top-level category instead`);
-    }
-    if (category.type !== 'SERVICE' && category.type !== 'THERAPY') {
-      throw new ApiError('VALIDATION_ERROR', `Category "${category.name}" is not a Service or Therapy category`);
-    }
-    categoriesById.set(category.id, category);
-    for (const subcategoryId of mapping.subcategoryIds) {
-      await assertCategoryChildOf(mapping.categoryId, subcategoryId);
-    }
-  }
-
-  const existingGrants = await prisma.vendorCategoryAccess.findMany({
-    where: { vendorId, categoryId: { in: [...categoriesById.keys()] } },
-    select: { categoryId: true },
-  });
-  const grantedIds = new Set(existingGrants.map((g) => g.categoryId));
-  const toGrant = [...categoriesById.values()].filter((c) => !grantedIds.has(c.id));
-
-  await prisma.$transaction(async (tx) => {
-    if (toGrant.length > 0) {
-      await tx.vendorCategoryAccess.createMany({
-        data: toGrant.map((c) => ({ vendorId, categoryId: c.id })),
-        skipDuplicates: true,
-      });
-      const flags: Prisma.MemberUpdateInput = {};
-      if (toGrant.some((c) => c.type === 'SERVICE')) flags.offersService = true;
-      if (toGrant.some((c) => c.type === 'THERAPY')) flags.offersTherapy = true;
-      if (Object.keys(flags).length > 0) {
-        await tx.member.update({ where: { id: vendorId }, data: flags });
-      }
-    }
-
-    // Cascades to BranchSubcategoryAccess automatically (onDelete: Cascade).
-    await tx.branchCategoryAccess.deleteMany({ where: { branchId } });
-    for (const mapping of input.mappings) {
-      await tx.branchCategoryAccess.create({
-        data: {
-          branchId,
-          categoryId: mapping.categoryId,
-          subcategories: {
-            create: mapping.subcategoryIds.map((subcategoryId) => ({ subcategoryId })),
-          },
-        },
-      });
-    }
-  });
-
-  return getBranchCategoryAccess(vendorId, branchId);
 }
 
 // ─── Therapist (shared by self-derived vendorId, mirrors Branch's scoping pattern) ───────────
@@ -1002,7 +896,7 @@ export async function getTherapistScopedOrThrow(vendorId: string, therapistId: s
  *  (mirrors getBranchScopedOrThrow/getTherapistScopedOrThrow's vendor/branch discipline). This is
  *  the real security boundary for Deal<->Therapist linking; the frontend's branch-filtered
  *  therapist picker is UX only. No-op for an empty list. */
-async function assertTherapistsBelongToBranch(vendorId: string, branchId: string, therapistIds: string[]) {
+export async function assertTherapistsBelongToBranch(vendorId: string, branchId: string, therapistIds: string[]) {
   if (therapistIds.length === 0) return;
   const uniqueIds = [...new Set(therapistIds)];
   const therapists = await prisma.therapist.findMany({
@@ -1029,31 +923,8 @@ async function assertTherapistsBelongToBranch(vendorId: string, branchId: string
  *  find-recent-then-reuse idempotency pattern rather than inventing a new mechanism. */
 const DUPLICATE_SUBMIT_WINDOW_MS = 10_000;
 
-/**
- * `Therapist.specializationCategoryId` may point at ANY tree depth (unlike Deal's two-column
- * categoryId/subcategoryId split — see Therapist's own schema doc comment), so the branch-access
- * check walks at most one `parentId` hop: a top-level pick only needs the branch's own
- * `BranchCategoryAccess` grant; a child pick needs the branch mapped to its parent (as the
- * category) AND that specific child explicitly enabled as a subcategory under it (see
- * BranchSubcategoryAccess's own schema doc comment on why subcategory access is always explicit).
- */
-async function assertBranchHasSpecializationCategoryAccess(branchId: string, specializationCategoryId: string) {
-  const category = await prisma.category.findUnique({ where: { id: specializationCategoryId } });
-  if (!category) throw new ApiError('VALIDATION_ERROR', 'specializationCategoryId does not exist');
-  if (category.parentId === null) {
-    await assertBranchHasCategoryAccess(branchId, specializationCategoryId);
-  } else {
-    await assertBranchHasCategoryAccess(branchId, category.parentId);
-    await assertBranchHasSubcategoryAccess(branchId, category.parentId, specializationCategoryId);
-  }
-}
-
 export async function createTherapist(vendorId: string, branchId: string, input: TherapistCreateInput) {
   await getBranchScopedOrThrow(vendorId, branchId);
-  // Unconditional — `specializationCategoryId` is optional on the input, so without this a
-  // branch with zero THERAPY access could still receive a therapist just by omitting that
-  // field. This is the real security boundary; the frontend's branch picker filtering is UX only.
-  await assertBranchHasAnyCategoryAccessOfType(branchId, 'THERAPY');
   const recentDuplicate = await prisma.therapist.findFirst({
     where: {
       vendorId,
@@ -1088,11 +959,8 @@ export async function createTherapist(vendorId: string, branchId: string, input:
 }
 
 export async function updateTherapist(vendorId: string, therapistId: string, input: TherapistUpdateInput) {
-  const therapist = await getTherapistScopedOrThrow(vendorId, therapistId);
-  if (input.specializationCategoryId) {
-    await assertVendorHasCategoryAccess(vendorId, input.specializationCategoryId, 'THERAPY');
-    await assertBranchHasSpecializationCategoryAccess(therapist.branchId, input.specializationCategoryId);
-  }
+  await getTherapistScopedOrThrow(vendorId, therapistId);
+  if (input.specializationCategoryId) await assertCategoryOfType(input.specializationCategoryId, 'THERAPY');
   return prisma.therapist.update({
     where: { id: therapistId },
     // `bio` is a `<sky-rich-text-editor>`-backed field — sanitized server-side before it ever

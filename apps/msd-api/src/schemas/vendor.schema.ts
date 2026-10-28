@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { PaginationQuerySchema, richTextField } from './common.schema';
 import { normalizeIdentifier } from '../lib/normalizeIdentifier';
+import { isIndiaLocation } from '@skylabs-monorepo/shared-utils';
 
 extendZodWithOpenApi(z);
 
@@ -74,10 +75,6 @@ export const VendorProductIdParamSchema = z.object({
   vendorId: z.string().uuid(),
   productId: z.string().uuid(),
 });
-
-const decimalString = z
-  .string()
-  .regex(/^\d+(\.\d{1,2})?$/, 'must be a plain decimal amount with up to 2 places, e.g. "199.00"');
 
 const slugString = z
   .string()
@@ -251,23 +248,6 @@ export const MemberDocumentReviewSchema = z
   .strict()
   .openapi('MemberDocumentReview');
 
-/**
- * Onboarding wizard Step 2's "Business Modules + Category Access" save — replace-the-full-set
- * semantics (same shape as rbac.schema.ts's RolePermissionsUpdateSchema). Each `categoryIds`
- * entry must be a top-level category whose `type` matches one of the *true* module flags below
- * (validated server-side in vendor.service.ts#setVendorModulesAndCategoryAccess — a module
- * checked with zero granted categories is a valid intermediate state, e.g. mid-wizard, but the
- * Step 6 submission gate requires >=1 category per enabled module).
- */
-export const VendorModulesAndCategoryAccessSchema = z
-  .object({
-    offersService: z.boolean(),
-    offersProduct: z.boolean(),
-    offersTherapy: z.boolean(),
-    categoryIds: z.array(z.string().uuid()).default([]),
-  })
-  .openapi('VendorModulesAndCategoryAccess');
-
 // ─── Branch ──────────────────────────────────────────────────────────────────
 
 /** Route param for the admin-scoped `/:vendorId/branches/:branchId/...` sub-resources — same
@@ -314,8 +294,11 @@ const OpeningHoursSchema = z.object({
 const BranchFieldsSchema = z.object({
   name: z.string().min(1).max(150),
   address: z.string().max(500).optional(),
-  city: z.string().max(100).optional(),
-  state: z.string().max(100).optional(),
+  addressLine2: z.string().max(200).optional(),
+  /** State and city come from the India location list (`@skylabs-monorepo/shared-utils`), so a
+   *  branch always lines up with the storefront location filters (PLANNING §2.7, C-03). */
+  city: z.string().trim().min(1).max(100),
+  state: z.string().trim().min(1).max(100),
   country: z.string().max(100).optional(),
   pincode: branchPincodeSchema,
   /** Same Map Location URL contract as `VendorFieldsSchema.mapLocationUrl` above — see that
@@ -326,30 +309,19 @@ const BranchFieldsSchema = z.object({
   openingHours: OpeningHoursSchema.optional(),
 });
 
-export const BranchCreateSchema = BranchFieldsSchema.openapi('BranchCreate');
-export const BranchUpdateSchema = BranchFieldsSchema.partial().openapi('BranchUpdate');
-export const BranchStatusUpdateSchema = z.object({ isActive: z.boolean() }).openapi('BranchStatusUpdate');
+const LOCATION_MESSAGE = 'Pick a state and one of its cities from the list';
 
-/**
- * A branch's own category/subcategory access map — replace-the-full-set semantics (same shape as
- * `VendorModulesAndCategoryAccessSchema` above). Each `categoryId` must be a top-level category
- * the VENDOR already holds via `VendorCategoryAccess` (a branch can only narrow the vendor's
- * grants, never exceed them); each `subcategoryIds` entry must be a real child of that
- * `categoryId` (validated server-side in vendor.service.ts#setBranchCategoryAccess). An empty
- * `subcategoryIds` array means the branch offers the category's top level with none of its
- * subcategories explicitly enabled yet — see BranchSubcategoryAccess's own schema doc comment for
- * why subcategory access is always explicit, never implied.
- */
-export const BranchCategoryAccessInputSchema = z
-  .object({
-    mappings: z.array(
-      z.object({
-        categoryId: z.string().uuid(),
-        subcategoryIds: z.array(z.string().uuid()).default([]),
-      }),
-    ),
-  })
-  .openapi('BranchCategoryAccessInput');
+export const BranchCreateSchema = BranchFieldsSchema.refine((b) => isIndiaLocation(b.state, b.city), {
+  message: LOCATION_MESSAGE,
+  path: ['city'],
+}).openapi('BranchCreate');
+
+/** State and city change together: both or neither. */
+export const BranchUpdateSchema = BranchFieldsSchema.partial()
+  .refine((b) => (b.state === undefined) === (b.city === undefined), { message: 'Send state and city together', path: ['city'] })
+  .refine((b) => b.state === undefined || b.city === undefined || isIndiaLocation(b.state, b.city), { message: LOCATION_MESSAGE, path: ['city'] })
+  .openapi('BranchUpdate');
+export const BranchStatusUpdateSchema = z.object({ isActive: z.boolean() }).openapi('BranchStatusUpdate');
 
 // ─── Therapist ───────────────────────────────────────────────────────────────
 
@@ -407,7 +379,9 @@ export const TherapistPackageUpdateSchema = TherapistPackageFieldsSchema
   })
   .openapi('TherapistPackageUpdate');
 
-// ─── Deal ────────────────────────────────────────────────────────────────────
+// ─── Deal (docs/msd/PLANNING.md §2.7, API.md §2.1) ──────────────────────────
+// Prices, discount and duration are never accepted: the server derives them from the cheapest
+// active package. `.strict()` turns any other key (status, notes, policy, salePrice, ...) into 422.
 
 const DealFieldsSchema = z.object({
   categoryId: z.string().uuid(),
@@ -445,56 +419,117 @@ const DealFieldsSchema = z.object({
   therapistIds: z.array(z.string().uuid()).optional(),
 });
 
-/** A service Deal's own duration/price menu — mirrors TherapistPackageFieldsSchema exactly (see
- *  DealPackage's own schema doc comment for the full rationale). `id` present = update that
- *  existing package row; absent = create a new one. */
-const DealPackageFieldsSchema = z.object({
-  id: z.string().uuid().optional(),
-  durationMinutes: z.number().int().positive(),
-  sellingPrice: z.number().min(0),
-  originalPrice: z.number().min(0).optional(),
-  isActive: z.boolean().optional(),
-  sortOrder: z.number().int().min(0).optional(),
-});
+const DealFaqInputSchema = z
+  .object({
+    question: z.string().trim().min(1).max(200),
+    answer: z.string().trim().min(1).max(1000),
+  })
+  .strict();
+
+const DealFieldsSchema = z
+  .object({
+    categoryId: z.string().uuid(),
+    subcategoryId: z.string().uuid().optional(),
+    title: z.string().trim().min(5).max(120),
+    /** Generated as `{title}-{member}-{city}` when omitted. */
+    slug: slugString.max(90).optional(),
+    /** Stored in `shortDescription`: subtitle under the h1 and the meta description. */
+    tagline: z.string().trim().max(140).optional(),
+    highlights: plainItems(6, 80).optional(),
+    description: z.string().max(5000).optional(),
+    startDate: z.string().datetime().optional(),
+    endDate: z.string().datetime().optional(),
+    validityDays: z.number().int().min(1).max(365).optional(),
+    maxBookings: z.number().int().min(0).optional(),
+    limitPerCustomer: z.number().int().min(1).max(20).optional(),
+    bookingRequired: z.boolean().optional(),
+    bookingInstructions: z.string().max(2000).optional(),
+    cancellationPolicy: z.enum(['FREE_24H', 'FREE_48H', 'NON_REFUNDABLE']).optional(),
+    cancellationNote: z.string().trim().max(500).optional(),
+    eligibility: plainItems(6, 40).optional(),
+    termsAndConditions: z.string().max(5000).optional(),
+    /** Array order is the display order; replaces the set when sent. */
+    faqs: z.array(DealFaqInputSchema).max(10).optional(),
+    /** Therapists of this deal's branch; replaces the set when sent (`[]` clears it). */
+    therapistIds: z.array(z.string().uuid()).optional(),
+  })
+  .strict();
+
+const endAfterStart = (d: { startDate?: string | null; endDate?: string | null }) =>
+  !d.startDate || !d.endDate || new Date(d.endDate) > new Date(d.startDate);
+
+/** One package card. `durationMinutes` + `persons` are unique within a deal. */
+export const DealPackageCreateSchema = z
+  .object({
+    name: z.string().trim().max(80).optional(),
+    durationMinutes: z.number().int().min(15).max(480),
+    persons: z.number().int().min(1).max(6).default(1),
+    sellingPrice: z.number().min(0),
+    originalPrice: z.number().min(0).optional(),
+    inclusions: plainItems(8, 80).default([]),
+    isActive: z.boolean().default(true),
+  })
+  .strict()
+  .refine((p) => p.originalPrice === undefined || p.originalPrice >= p.sellingPrice, {
+    message: 'Original price must not be below the price',
+    path: ['originalPrice'],
+  })
+  .openapi('DealPackageCreate');
+
+export const DealPackageUpdateSchema = z
+  .object({
+    name: z.string().trim().max(80).nullable().optional(),
+    durationMinutes: z.number().int().min(15).max(480).optional(),
+    persons: z.number().int().min(1).max(6).optional(),
+    sellingPrice: z.number().min(0).optional(),
+    originalPrice: z.number().min(0).nullable().optional(),
+    inclusions: plainItems(8, 80).optional(),
+    isActive: z.boolean().optional(),
+  })
+  .strict()
+  .refine((p) => p.originalPrice == null || p.sellingPrice === undefined || p.originalPrice >= p.sellingPrice, {
+    message: 'Original price must not be below the price',
+    path: ['originalPrice'],
+  })
+  .openapi('DealPackageUpdate');
+
+export const DealPackageReorderSchema = z
+  .object({ packageIds: z.array(z.string().uuid()).min(1).max(10) })
+  .strict()
+  .openapi('DealPackageReorder');
 
 export const DealCreateSchema = DealFieldsSchema.extend({
-  /** Required (>=1) — the customer always selects a specific package to add to cart, never the
-   *  Deal's own price directly (see cart.service.ts#addItem). */
-  packages: z.array(DealPackageFieldsSchema).optional(),
+  packages: z.array(DealPackageCreateSchema).min(1, 'Add at least one package').max(10),
 })
-  .refine((data) => data.packages && data.packages.length > 0, {
-    message: 'At least one package (duration + price) is required for a service deal.',
-    path: ['packages'],
-  })
-  .refine((data) => (data.packages ?? []).every((p) => p.originalPrice === undefined || p.originalPrice >= p.sellingPrice), {
-    message: "Each package's originalPrice must be greater than or equal to its sellingPrice.",
+  .refine(endAfterStart, { message: 'Sale end must be after sale start', path: ['endDate'] })
+  .refine((d) => new Set(d.packages.map((p) => `${p.durationMinutes}:${p.persons}`)).size === d.packages.length, {
+    message: 'Two packages have the same duration and people',
     path: ['packages'],
   })
   .openapi('DealCreate');
 
+/** Packages are managed through their own routes on an existing deal. `null` clears a field. */
 export const DealUpdateSchema = DealFieldsSchema.partial()
   .extend({
-    /** Omit entirely to leave existing packages untouched. When present, replaces the full set
-     *  (diff by `id` — entries with an id update that row, entries without one are created, any
-     *  existing row whose id is no longer present is deleted — see
-     *  vendor.service.ts#updateDeal) and must have >=1 entry (a service deal can never be left
-     *  with zero packages via update either). */
-    packages: z.array(DealPackageFieldsSchema).optional(),
+    subcategoryId: z.string().uuid().nullable().optional(),
+    startDate: z.string().datetime().nullable().optional(),
+    endDate: z.string().datetime().nullable().optional(),
+    validityDays: z.number().int().min(1).max(365).nullable().optional(),
+    maxBookings: z.number().int().min(0).nullable().optional(),
+    limitPerCustomer: z.number().int().min(1).max(20).nullable().optional(),
   })
-  .refine((data) => data.packages === undefined || data.packages.length > 0, {
-    message: 'A service deal must have at least one package — omit `packages` to leave them unchanged instead of clearing them.',
-    path: ['packages'],
-  })
-  .refine((data) => (data.packages ?? []).every((p) => p.originalPrice === undefined || p.originalPrice >= p.sellingPrice), {
-    message: "Each package's originalPrice must be greater than or equal to its sellingPrice.",
-    path: ['packages'],
-  })
+  .strict()
+  .refine(endAfterStart, { message: 'Sale end must be after sale start', path: ['endDate'] })
   .openapi('DealUpdate');
 
 export const DealStatusUpdateSchema = z
-  .object({ status: z.enum(['DRAFT', 'ACTIVE', 'INACTIVE', 'EXPIRED']) })
+  .object({ status: z.enum(['DRAFT', 'ACTIVE', 'INACTIVE']) })
+  .strict()
   .openapi('DealStatusUpdate');
 
-export const DealRejectSchema = z
-  .object({ rejectionReason: z.string().min(1).max(1000) })
-  .openapi('DealReject');
+export const DealCopySchema = z.object({ branchId: z.string().uuid() }).strict().openapi('DealCopy');
+
+export const DealImageUpdateSchema = z
+  .object({ altText: z.string().trim().max(125) })
+  .strict()
+  .openapi('DealImageUpdate');

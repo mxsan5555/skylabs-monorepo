@@ -100,6 +100,8 @@ const subFacialFixture = { id: SUB_FACIAL_ID, name: 'Facial', parentId: CATEGORY
 // -> Spa -> Facial only" scenario.
 const branchBServiceGrantFixture = { id: 'branch-b-grant-service', branchId: BRANCH_B_ID, categoryId: CATEGORY_ID };
 
+const LOCATION = { state: 'Uttar Pradesh', city: 'Gorakhpur' };
+
 const baseServiceDealBody = { categoryId: CATEGORY_ID, title: 'Haircut deal', slug: 'haircut-deal', originalPrice: '399.00', salePrice: '299.00' };
 
 /** A byte-exact, magic-byte-valid JPEG buffer, well under any size ceiling — same helper shape as
@@ -186,27 +188,16 @@ describe('Security: vendor cross-tenant isolation', () => {
     expect(res.status).toBe(403);
   });
 
-  it("403s when Vendor A's token tries to touch Vendor B's deal via /vendors/me/branches/:branchId/deals/:dealId", async () => {
+  it("404s when Vendor A's token tries to touch Vendor B's deal via /vendors/me/branches/:branchId/deals/:dealId", async () => {
     resolveMock.mockResolvedValue(['members:custom']);
     prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
-    prismaMock.branch.findUnique.mockResolvedValue(branchBFixture);
+    prismaMock.deal.findUnique.mockResolvedValue({ ...dealAFixture, vendorId: VENDOR_B_ID, branchId: BRANCH_B_ID });
     const res = await request(app)
       .patch(`/api/v1/vendors/me/branches/${BRANCH_B_ID}/deals/${DEAL_A_ID}`)
       .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
       .send({ title: 'Hijacked title' });
-    expect(res.status).toBe(403);
-  });
-
-  it('a vendor cannot activate its own deal before admin approval', async () => {
-    resolveMock.mockResolvedValue(['members:custom']);
-    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
-    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-    prismaMock.deal.findUnique.mockResolvedValue(dealAFixture); // approvalStatus: PENDING
-    const res = await request(app)
-      .patch(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}/status`)
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({ status: 'ACTIVE' });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
+    expect(prismaMock.deal.update).not.toHaveBeenCalled();
   });
 });
 
@@ -331,7 +322,7 @@ describe('GET /api/v1/vendors (admin)', () => {
     expect(res.status).toBe(200);
     expect(res.body.data[0].liveCounts).toEqual({ branches: 0, deals: 5, products: 0, therapists: 2 });
     expect(prismaMock.deal.groupBy).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ status: 'ACTIVE', approvalStatus: 'APPROVED' }) }),
+      expect.objectContaining({ where: { vendorId: expect.anything(), status: 'ACTIVE' } }),
     );
     expect(prismaMock.branch.groupBy).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ isActive: true }) }),
@@ -659,7 +650,7 @@ describe('POST /api/v1/vendors/:vendorId/branches — mapLocationUrl/pincode val
     const res = await request(app)
       .post(`/api/v1/vendors/${VENDOR_A_ID}/branches`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ name: 'Golghar Branch', mapLocationUrl: 'https://maps.app.goo.gl/o3WNRifqzdctDuiF9', pincode: '273001' });
+      .send({ ...LOCATION, name: 'Golghar Branch', mapLocationUrl: 'https://maps.app.goo.gl/o3WNRifqzdctDuiF9', pincode: '273001' });
 
     expect(res.status).toBe(201);
     expect(resolveMapLocationMock).toHaveBeenCalledWith('https://maps.app.goo.gl/o3WNRifqzdctDuiF9');
@@ -678,7 +669,7 @@ describe('POST /api/v1/vendors/:vendorId/branches — mapLocationUrl/pincode val
     const res = await request(app)
       .post(`/api/v1/vendors/${VENDOR_A_ID}/branches`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ name: 'Golghar Branch', latitude: 26.7606, longitude: 83.3732 });
+      .send({ ...LOCATION, name: 'Golghar Branch', latitude: 26.7606, longitude: 83.3732 });
 
     expect(res.status).toBe(201);
     expect(resolveMapLocationMock).not.toHaveBeenCalled();
@@ -696,7 +687,7 @@ describe('POST /api/v1/vendors/:vendorId/branches — mapLocationUrl/pincode val
     const res = await request(app)
       .post(`/api/v1/vendors/${VENDOR_A_ID}/branches`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ name: 'Golghar Branch', mapLocationUrl: 'not-a-url' });
+      .send({ ...LOCATION, name: 'Golghar Branch', mapLocationUrl: 'not-a-url' });
 
     expect(res.status).toBe(422);
     expect(resolveMapLocationMock).not.toHaveBeenCalled();
@@ -713,7 +704,7 @@ describe('POST /api/v1/vendors/:vendorId/branches — mapLocationUrl/pincode val
     const res = await request(app)
       .post(`/api/v1/vendors/${VENDOR_A_ID}/branches`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ name: 'Golghar Branch', ...badField });
+      .send({ ...LOCATION, name: 'Golghar Branch', ...badField });
 
     expect(res.status).toBe(422);
     expect(prismaMock.branch.create).not.toHaveBeenCalled();
@@ -728,6 +719,45 @@ describe('POST /api/v1/vendors/:vendorId/branches — mapLocationUrl/pincode val
  * `resolveMapLocationForUpdate`, plus the same resolver-rejection-surfaces-as-422 behavior on
  * every entry point that accepts a `mapLocationUrl`.
  */
+/** C-03 / PLANNING §2.7: a branch's state and city come from the India location list. */
+describe('Branch state and city (India location list)', () => {
+  const post = (body: Record<string, unknown>) =>
+    request(app)
+      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send(body);
+
+  beforeEach(() => {
+    resolveMock.mockResolvedValue(['vendors.branches:create', 'vendors.branches:edit']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.branch.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: BRANCH_A_ID, ...data }));
+  });
+
+  it('creates a branch with a listed state and city, and keeps address line 2', async () => {
+    const res = await post({ name: 'Golghar', ...LOCATION, addressLine2: 'Near clock tower' });
+    expect(res.status).toBe(201);
+    expect(prismaMock.branch.create.mock.calls[0][0]!.data).toMatchObject({ state: 'Uttar Pradesh', city: 'Gorakhpur', addressLine2: 'Near clock tower' });
+  });
+
+  it.each([
+    ['no state or city', {}],
+    ['a city of another state', { state: 'Maharashtra', city: 'Gorakhpur' }],
+    ['an unknown state', { state: 'Atlantis', city: 'Gorakhpur' }],
+  ])('refuses %s with 422', async (_label, location) => {
+    expect((await post({ name: 'Golghar', ...location })).status).toBe(422);
+    expect(prismaMock.branch.create).not.toHaveBeenCalled();
+  });
+
+  it('an update sends state and city together', async () => {
+    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
+    const res = await request(app)
+      .patch(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ city: 'Lucknow' });
+    expect(res.status).toBe(422);
+  });
+});
+
 describe('mapLocationUrl — update-time resolve/skip semantics + resolver-rejection surfacing', () => {
   const branchWithLocation = { ...branchAFixture, mapLocationUrl: 'https://maps.app.goo.gl/existing', latitude: 26.7606, longitude: 83.3732 };
 
@@ -807,7 +837,7 @@ describe('mapLocationUrl — update-time resolve/skip semantics + resolver-rejec
     const res = await request(app)
       .post(`/api/v1/vendors/${VENDOR_A_ID}/branches`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ name: 'Golghar Branch', mapLocationUrl: 'https://maps.app.goo.gl/deadlink' });
+      .send({ ...LOCATION, name: 'Golghar Branch', mapLocationUrl: 'https://maps.app.goo.gl/deadlink' });
 
     expect(res.status).toBe(422);
     expect(prismaMock.branch.create).not.toHaveBeenCalled();
@@ -947,7 +977,7 @@ describe('POST/PATCH /api/v1/vendors/:vendorId/branches — openingHours persist
     const res = await request(app)
       .post(`/api/v1/vendors/${VENDOR_A_ID}/branches`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ name: 'Golghar Branch', openingHours });
+      .send({ ...LOCATION, name: 'Golghar Branch', openingHours });
     expect(res.status).toBe(201);
     expect(res.body.data.openingHours).toEqual(openingHours);
     expect(prismaMock.branch.create).toHaveBeenCalledWith(
@@ -975,7 +1005,7 @@ describe('POST/PATCH /api/v1/vendors/:vendorId/branches — openingHours persist
     const res = await request(app)
       .post(`/api/v1/vendors/${VENDOR_A_ID}/branches`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ name: 'Golghar Branch', openingHours: { mon: { open: true, start: '10 AM', end: '20:00' } } });
+      .send({ ...LOCATION, name: 'Golghar Branch', openingHours: { mon: { open: true, start: '10 AM', end: '20:00' } } });
     expect(res.status).toBe(422);
     expect(prismaMock.branch.create).not.toHaveBeenCalled();
   });
@@ -1606,68 +1636,76 @@ describe('Admin-on-behalf deal media routes (previously missing entirely)', () =
  * this `include` ever omits `packages` again, every existing DealPackage silently disappears from
  * the Edit form even though the rows are still in the database untouched.
  */
-describe('GET .../branches/:branchId/deals — includes packages (regression)', () => {
-  const packagesFixture = [
-    { id: 'pkg-1', dealId: DEAL_A_ID, durationMinutes: 30, sellingPrice: '500.00', originalPrice: null, isActive: true, sortOrder: 0 },
-    { id: 'pkg-2', dealId: DEAL_A_ID, durationMinutes: 60, sellingPrice: '900.00', originalPrice: null, isActive: true, sortOrder: 1 },
-  ];
-
-  it('self-service GET /me/branches/:branchId/deals includes each deal\'s packages', async () => {
+/**
+ * Feature: deal routes (docs/msd/PLANNING.md §2.7, API.md §2.2, TESTING.md §4.2 "Deals"). One
+ * set of handlers for the member (`/me`, `members:custom`) and staff (`/:vendorId`,
+ * `vendors.deals:<action>`). Service rules are covered in deal.service.test.ts; these check the
+ * route contract: guards, strict bodies, ownership as 404, Super Admin-only delete.
+ */
+describe('Deal routes (member and staff)', () => {
+  const deal = (overrides: Record<string, unknown> = {}) => ({
+    ...dealAFixture,
+    slug: 'deep-tissue-vendor-a-spa-gorakhpur',
+    previousSlugs: [],
+    publishedAt: null,
+    maxBookings: null,
+    shortDescription: null,
+    ...overrides,
+  });
+  const loaded = (overrides: Record<string, unknown> = {}) => ({
+    ...deal(),
+    packages: [{ id: 'pkg-1', durationMinutes: 60, persons: 1, sellingPrice: '1499.00', originalPrice: '1999.00', isActive: true }],
+    faqs: [],
+    mediaImages: [],
+    mediaVideo: null,
+    therapistLinks: [{ therapist: { id: 'th-1', personName: 'Asha', therapistType: 'Massage Therapist', isActive: true } }],
+    ...overrides,
+  });
+  const createBody = {
+    categoryId: CATEGORY_ID,
+    title: 'Deep tissue massage',
+    packages: [{ durationMinutes: 60, sellingPrice: 1499, originalPrice: 1999 }],
+  };
+  const memberAuth = () => bearerFor({ sub: USER_A_ID, roles: ['member'] });
+  const staffAuth = () => bearerFor({ sub: 'admin-1', roles: ['admin'] });
+  const asMember = () => {
     resolveMock.mockResolvedValue(['members:custom']);
     prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
-    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-    prismaMock.deal.findMany.mockResolvedValue([{ ...dealAFixture, packages: packagesFixture }]);
-    const res = await request(app)
-      .get(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
-    expect(res.status).toBe(200);
-    expect(res.body.data[0].packages).toHaveLength(2);
-    expect(res.body.data[0].packages[0].durationMinutes).toBe(30);
-    expect(prismaMock.deal.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ include: expect.objectContaining({ packages: expect.anything() }) }),
-    );
+  };
+
+  beforeEach(() => {
+    prismaMock.branch.findUnique.mockResolvedValue({ ...branchAFixture, city: 'Gorakhpur' });
+    prismaMock.category.findUnique.mockResolvedValue(serviceCategoryFixture);
+    prismaMock.deal.findFirst.mockResolvedValue(null);
+    prismaMock.deal.findUnique.mockResolvedValue(deal());
+    prismaMock.deal.create.mockResolvedValue({ id: DEAL_A_ID });
+    prismaMock.deal.findUniqueOrThrow.mockResolvedValue(loaded());
+    prismaMock.dealPackage.findFirst.mockResolvedValue(null);
+    prismaMock.orderItem.groupBy.mockResolvedValue([]);
   });
 
-  it('admin-on-behalf GET /:vendorId/branches/:branchId/deals also includes each deal\'s packages', async () => {
+  it('lists a branch\'s deals with packages, a per-package discount and flat therapists (member and staff)', async () => {
+    asMember();
+    prismaMock.deal.findMany.mockResolvedValue([loaded()]);
+    const mine = await request(app).get(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/deals`).set('Authorization', memberAuth());
+    expect(mine.status).toBe(200);
+    expect(mine.body.data[0].packages[0].discountPercent).toBe(25);
+    expect(mine.body.data[0].therapists).toEqual([{ id: 'th-1', personName: 'Asha', therapistType: 'Massage Therapist', isActive: true }]);
+    expect(mine.body.data[0].therapistLinks).toBeUndefined();
+
     resolveMock.mockResolvedValue(['vendors.deals:view']);
-    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-    prismaMock.deal.findMany.mockResolvedValue([{ ...dealAFixture, packages: packagesFixture }]);
-    const res = await request(app)
-      .get(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
-    expect(res.status).toBe(200);
-    expect(res.body.data[0].packages).toHaveLength(2);
-    expect(res.body.data[0].packages[1].sellingPrice).toBe('900.00');
+    const staff = await request(app).get(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`).set('Authorization', staffAuth());
+    expect(staff.status).toBe(200);
+    expect(staff.body.data).toHaveLength(1);
   });
-});
 
-describe('GET /:vendorId/deals (admin, vendor-wide across every branch)', () => {
-  it('403s without vendors.deals:view', async () => {
+  it('GET /:vendorId/deals lists the member\'s deals across branches; 403 without vendors.deals:view', async () => {
     resolveMock.mockResolvedValue([]);
-    const res = await request(app)
-      .get(`/api/v1/vendors/${VENDOR_A_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
-    expect(res.status).toBe(403);
-  });
-
-  it('returns every deal for the vendor, across branches, with branch info and a flat therapists array (not the raw join rows)', async () => {
+    expect((await request(app).get(`/api/v1/vendors/${VENDOR_A_ID}/deals`).set('Authorization', staffAuth())).status).toBe(403);
     resolveMock.mockResolvedValue(['vendors.deals:view']);
-    const therapistFixture = { id: 'therapist-1', personName: 'Ramesh Kumar', therapistType: 'Massage Therapist', isActive: true };
-    prismaMock.deal.findMany.mockResolvedValue([
-      {
-        ...dealAFixture,
-        branch: { id: BRANCH_A_ID, name: 'Branch A' },
-        packages: [],
-        therapistLinks: [{ therapist: therapistFixture }],
-      },
-    ]);
-    const res = await request(app)
-      .get(`/api/v1/vendors/${VENDOR_A_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+    prismaMock.deal.findMany.mockResolvedValue([loaded()]);
+    const res = await request(app).get(`/api/v1/vendors/${VENDOR_A_ID}/deals`).set('Authorization', staffAuth());
     expect(res.status).toBe(200);
-    expect(res.body.data[0].branch).toEqual({ id: BRANCH_A_ID, name: 'Branch A' });
-    expect(res.body.data[0].therapists).toEqual([therapistFixture]);
-    expect(res.body.data[0].therapistLinks).toBeUndefined();
     expect(prismaMock.deal.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { vendorId: VENDOR_A_ID } }));
   });
 
@@ -1690,535 +1728,251 @@ describe('GET /:vendorId/deals (admin, vendor-wide across every branch)', () => 
   });
 });
 
-describe('Admin nested branch/deal approval', () => {
-  it('approves a deal, jumping it straight to ACTIVE', async () => {
-    resolveMock.mockResolvedValue(['vendors.deals:approve']);
-    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-    prismaMock.deal.findUnique.mockResolvedValue(dealAFixture);
-    prismaMock.deal.update.mockResolvedValue({ ...dealAFixture, approvalStatus: 'APPROVED', status: 'ACTIVE' });
+  it('GET one deal for the edit form', async () => {
+    resolveMock.mockResolvedValue(['vendors.deals:view']);
     const res = await request(app)
-      .patch(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}/approve`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+      .get(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}`)
+      .set('Authorization', staffAuth());
     expect(res.status).toBe(200);
-    expect(res.body.data.approvalStatus).toBe('APPROVED');
-    expect(res.body.data.status).toBe('ACTIVE');
+    expect(res.body.data.id).toBe(DEAL_A_ID);
   });
 
-  it('404s (not 500) when the branch does not exist under that vendor at all', async () => {
-    resolveMock.mockResolvedValue(['vendors.deals:view']);
-    prismaMock.branch.findUnique.mockResolvedValue(null);
-    const res = await request(app)
-      .get(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_B_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
-    expect(res.status).toBe(404);
-  });
-
-  it('403s when the branch exists but under a different vendor than the URL claims', async () => {
-    resolveMock.mockResolvedValue(['vendors.deals:view']);
+  it('a member creating on another member\'s branch gets 404 and nothing is created', async () => {
+    asMember();
     prismaMock.branch.findUnique.mockResolvedValue(branchBFixture);
-    const res = await request(app)
-      .get(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_B_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
-    expect(res.status).toBe(403);
+    const res = await request(app).post(`/api/v1/vendors/me/branches/${BRANCH_B_ID}/deals`).set('Authorization', memberAuth()).send(createBody);
+    expect(res.status).toBe(404);
+    expect(prismaMock.deal.create).not.toHaveBeenCalled();
   });
 
-  /**
-   * Feature: Superadmin hard-delete for Deal (Vendor Validation/Delete audit, Phase 4).
-   * `CartItem`/`OrderItem`'s `deal` relation has no `onDelete` (Postgres default = restrict), so a
-   * Deal referenced by any real order/cart can never be hard-deleted — Postgres blocks it with a
-   * clean P2003, translated to CONFLICT.
-   */
-  describe('DELETE /api/v1/vendors/:vendorId/branches/:branchId/deals/:dealId', () => {
-    it('deletes a deal and writes an audit log entry', async () => {
-      resolveMock.mockResolvedValue(['vendors.deals:delete']);
-      prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-      prismaMock.deal.findUnique.mockResolvedValue(dealAFixture);
-      prismaMock.deal.delete.mockResolvedValue(dealAFixture);
+  it('a member creates a Draft deal on their own branch, slug generated, audit row written', async () => {
+    asMember();
+    const res = await request(app).post(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/deals`).set('Authorization', memberAuth()).send(createBody);
+    expect(res.status).toBe(201);
+    expect(prismaMock.deal.create.mock.calls[0][0]!.data).toMatchObject({
+      vendorId: VENDOR_A_ID,
+      branchId: BRANCH_A_ID,
+      status: 'DRAFT',
+      slug: 'deep-tissue-massage-vendor-a-spa-gorakhpur',
+    });
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: 'deal.create' }) }));
+  });
+
+  it.each([
+    ['salePrice', { salePrice: '299.00' }],
+    ['discountPercent', { discountPercent: 10 }],
+    ['status', { status: 'ACTIVE' }],
+    ['notes', { notes: 'old field' }],
+    ['policy', { policy: 'old field' }],
+  ])('create refuses the unknown key %s with 422', async (_key, extra) => {
+    asMember();
+    const res = await request(app)
+      .post(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/deals`)
+      .set('Authorization', memberAuth())
+      .send({ ...createBody, ...extra });
+    expect(res.status).toBe(422);
+  });
+
+  it('create refuses no package, 11 packages and a duplicate duration + people (422)', async () => {
+    asMember();
+    const post = (packages: unknown[]) =>
+      request(app).post(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/deals`).set('Authorization', memberAuth()).send({ ...createBody, packages });
+    expect((await post([])).status).toBe(422);
+    expect((await post(Array.from({ length: 11 }, (_, i) => ({ durationMinutes: 15 + i * 15, sellingPrice: 100 })))).status).toBe(422);
+    expect((await post([{ durationMinutes: 60, sellingPrice: 100 }, { durationMinutes: 60, sellingPrice: 200 }])).status).toBe(422);
+    expect((await post([{ durationMinutes: 60, sellingPrice: 100 }, { durationMinutes: 60, persons: 2, sellingPrice: 200 }])).status).toBe(201);
+  });
+
+  it('create refuses a title under 5 characters and a sale end before the start', async () => {
+    asMember();
+    const post = (extra: Record<string, unknown>) =>
+      request(app).post(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/deals`).set('Authorization', memberAuth()).send({ ...createBody, ...extra });
+    expect((await post({ title: 'Spa' })).status).toBe(422);
+    expect((await post({ startDate: '2026-11-10T00:00:00.000Z', endDate: '2026-11-01T00:00:00.000Z' })).status).toBe(422);
+  });
+
+  it('staff with vendors.deals:create create for a member; without it 403', async () => {
+    resolveMock.mockResolvedValue(['vendors.deals:view']);
+    const denied = await request(app).post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`).set('Authorization', staffAuth()).send(createBody);
+    expect(denied.status).toBe(403);
+    resolveMock.mockResolvedValue(['vendors.deals:create']);
+    const ok = await request(app).post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`).set('Authorization', staffAuth()).send(createBody);
+    expect(ok.status).toBe(201);
+  });
+
+  it('a member patching another member\'s deal gets 404', async () => {
+    asMember();
+    prismaMock.deal.findUnique.mockResolvedValue(deal({ vendorId: VENDOR_B_ID }));
+    const res = await request(app)
+      .patch(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}`)
+      .set('Authorization', memberAuth())
+      .send({ title: 'Hijacked title' });
+    expect(res.status).toBe(404);
+    expect(prismaMock.deal.update).not.toHaveBeenCalled();
+  });
+
+  it('update refuses packages and price fields (packages have their own routes)', async () => {
+    asMember();
+    const res = await request(app)
+      .patch(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}`)
+      .set('Authorization', memberAuth())
+      .send({ packages: [{ durationMinutes: 60, sellingPrice: 1 }] });
+    expect(res.status).toBe(422);
+  });
+
+  it('status: a member\'s ready deal goes Active with no approval; EXPIRED is not settable', async () => {
+    asMember();
+    prismaMock.deal.findUniqueOrThrow
+      .mockResolvedValueOnce({ branch: { isActive: true }, vendor: { status: 'ACTIVE' }, _count: { mediaImages: 1, packages: 1 } })
+      .mockResolvedValue(loaded({ status: 'ACTIVE' }));
+    const res = await request(app)
+      .patch(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}/status`)
+      .set('Authorization', memberAuth())
+      .send({ status: 'ACTIVE' });
+    expect(res.status).toBe(200);
+    const expired = await request(app)
+      .patch(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}/status`)
+      .set('Authorization', memberAuth())
+      .send({ status: 'EXPIRED' });
+    expect(expired.status).toBe(422);
+  });
+
+  it('status: Active with no image is 422 DEAL_NOT_READY', async () => {
+    asMember();
+    prismaMock.deal.findUniqueOrThrow.mockResolvedValueOnce({ branch: { isActive: true }, vendor: { status: 'ACTIVE' }, _count: { mediaImages: 0, packages: 1 } });
+    const res = await request(app)
+      .patch(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}/status`)
+      .set('Authorization', memberAuth())
+      .send({ status: 'ACTIVE' });
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('DEAL_NOT_READY');
+    expect(res.body.error.details.missing).toEqual(['image']);
+  });
+
+  it('approve and reject routes are gone (404)', async () => {
+    resolveMock.mockResolvedValue(['vendors.deals:edit']);
+    for (const action of ['approve', 'reject']) {
       const res = await request(app)
-        .delete(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+        .patch(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}/${action}`)
+        .set('Authorization', staffAuth())
+        .send({});
+      expect(res.status).toBe(404);
+    }
+  });
+
+  describe('DELETE (Super Admin only)', () => {
+    const del = () => request(app).delete(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}`).set('Authorization', staffAuth());
+
+    it('403s for a staff user holding vendors.deals:delete who is not a Super Admin', async () => {
+      resolveMock.mockResolvedValue(['vendors.deals:delete']);
+      prismaMock.userRole.count.mockResolvedValue(0);
+      const res = await del();
+      expect(res.status).toBe(403);
+      expect(prismaMock.deal.delete).not.toHaveBeenCalled();
+    });
+
+    it('a Super Admin deletes a deal with no orders and an audit row is written', async () => {
+      resolveMock.mockResolvedValue(['vendors.deals:delete']);
+      prismaMock.userRole.count.mockResolvedValue(1);
+      prismaMock.deal.delete.mockResolvedValue(dealAFixture);
+      const res = await del();
       expect(res.status).toBe(200);
       expect(prismaMock.deal.delete).toHaveBeenCalledWith({ where: { id: DEAL_A_ID } });
       expect(prismaMock.auditLog.create).toHaveBeenCalledOnce();
     });
 
-    it('403s (not a raw delete) when the deal belongs to a different vendor than the URL claims', async () => {
+    it('409s when the deal has orders or cart lines', async () => {
       resolveMock.mockResolvedValue(['vendors.deals:delete']);
-      prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-      prismaMock.deal.findUnique.mockResolvedValue({ ...dealAFixture, vendorId: VENDOR_B_ID });
-      const res = await request(app)
-        .delete(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
-      expect(res.status).toBe(403);
+      prismaMock.userRole.count.mockResolvedValue(1);
+      const { Prisma } = await import('../generated/prisma-client');
+      prismaMock.deal.delete.mockRejectedValue(new Prisma.PrismaClientKnownRequestError('FK', { code: 'P2003', clientVersion: 'test' }));
+      expect((await del()).status).toBe(409);
+    });
+
+    it('members have no delete route', async () => {
+      asMember();
+      const res = await request(app).delete(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}`).set('Authorization', memberAuth());
+      // No /me delete route: the path falls through to /:vendorId, where "me" is not a uuid.
+      expect([404, 422]).toContain(res.status);
       expect(prismaMock.deal.delete).not.toHaveBeenCalled();
     });
+  });
 
-    it('returns a clean 409 (not a raw 500) when the deal has real order/cart history blocking the delete', async () => {
-      resolveMock.mockResolvedValue(['vendors.deals:delete']);
-      prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-      prismaMock.deal.findUnique.mockResolvedValue(dealAFixture);
-      const { Prisma } = await import('../generated/prisma-client');
-      prismaMock.deal.delete.mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('Foreign key constraint failed', { code: 'P2003', clientVersion: 'test' }),
-      );
+  describe('package cards', () => {
+    const PACKAGE_ID = 'a3a3a3a3-0000-4000-8000-000000000012';
+
+    it('adds, edits and deletes a package (member)', async () => {
+      asMember();
+      prismaMock.dealPackage.count.mockResolvedValue(1);
+      const base = `/api/v1/vendors/me/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}/packages`;
+      const added = await request(app).post(base).set('Authorization', memberAuth()).send({ durationMinutes: 90, sellingPrice: 1999, inclusions: ['Steam'] });
+      expect(added.status).toBe(201);
+
+      prismaMock.dealPackage.findUnique.mockResolvedValue({ id: PACKAGE_ID, dealId: DEAL_A_ID, isActive: true, sellingPrice: 1999, originalPrice: null });
+      const edited = await request(app).patch(`${base}/${PACKAGE_ID}`).set('Authorization', memberAuth()).send({ name: 'Long session' });
+      expect(edited.status).toBe(200);
+
+      prismaMock.cartItem.count.mockResolvedValue(0);
+      prismaMock.orderItem.count.mockResolvedValue(0);
+      const deleted = await request(app).delete(`${base}/${PACKAGE_ID}`).set('Authorization', memberAuth());
+      expect(deleted.status).toBe(200);
+      expect(prismaMock.dealPackage.delete).toHaveBeenCalledWith({ where: { id: PACKAGE_ID } });
+    });
+
+    it('deleting the last active package is 409 LAST_PACKAGE', async () => {
+      resolveMock.mockResolvedValue(['vendors.deals:edit']);
+      prismaMock.dealPackage.findUnique.mockResolvedValue({ id: PACKAGE_ID, dealId: DEAL_A_ID, isActive: true });
+      prismaMock.dealPackage.count.mockResolvedValue(0);
       const res = await request(app)
-        .delete(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+        .delete(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}/packages/${PACKAGE_ID}`)
+        .set('Authorization', staffAuth());
       expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe('LAST_PACKAGE');
     });
 
-    it('403s without members:delete', async () => {
-      resolveMock.mockResolvedValue(['members:view']);
-      const res = await request(app)
-        .delete(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
-      expect(res.status).toBe(403);
-    });
-  });
-});
-
-describe('Deal offering integration (direct category access)', () => {
-  // A service deal now requires >=1 package (see DealCreateSchema's own refinement) — every
-  // service-deal test body below includes one. `deal.findUniqueOrThrow` is what createDeal/
-  // updateDeal actually return from (they read back inside the same $transaction after
-  // create/update + package sync) — mock it per test to mirror whatever `deal.create`/
-  // `deal.update` was mocked to return.
-  const baseServicePackages = [{ durationMinutes: 30, sellingPrice: 299 }];
-
-  beforeEach(() => {
-    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-    prismaMock.deal.findUnique.mockResolvedValue(null); // slug free, by default
-    prismaMock.dealPackage.findFirst.mockResolvedValue(null); // syncDealPriceFromPackages: no-op unless a test overrides
-  });
-
-  it('1. creates a service deal when the vendor holds SERVICE category access', async () => {
-    resolveMock.mockResolvedValue(['vendors.deals:create']);
-    prismaMock.category.findUnique.mockResolvedValue(serviceCategoryFixture); // assertCategoryChildOf + resolveTopLevelCategory
-    prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(serviceGrantFixture);
-    prismaMock.branchCategoryAccess.findUnique.mockResolvedValue(branchServiceGrantFixture);
-    prismaMock.deal.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-      Promise.resolve({ id: DEAL_A_ID, ...data }),
-    );
-    prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ id: DEAL_A_ID, productId: null, packages: [] });
-    const res = await request(app)
-      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ ...baseServiceDealBody, durationMinutes: 30, packages: baseServicePackages });
-    expect(res.status).toBe(201);
-    expect(res.body.data.productId).toBeNull();
-  });
-
-  it('3. rejects a service deal when the vendor has no grant for that category', async () => {
-    resolveMock.mockResolvedValue(['vendors.deals:create']);
-    prismaMock.category.findUnique.mockResolvedValue(serviceCategoryFixture);
-    prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(null); // no grant
-    const res = await request(app)
-      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ ...baseServiceDealBody, durationMinutes: 30, packages: baseServicePackages });
-    expect(res.status).toBe(422);
-    expect(prismaMock.deal.create).not.toHaveBeenCalled();
-  });
-
-  it('5. rejects a service deal missing durationMinutes', async () => {
-    resolveMock.mockResolvedValue(['vendors.deals:create']);
-    prismaMock.category.findUnique.mockResolvedValue(serviceCategoryFixture);
-    prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(serviceGrantFixture);
-    const res = await request(app)
-      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send(baseServiceDealBody);
-    expect(res.status).toBe(422);
-    expect(prismaMock.deal.create).not.toHaveBeenCalled();
-  });
-
-  it('7. a vendor can create a deal for its own branch (self-service)', async () => {
-    resolveMock.mockResolvedValue(['members:custom']);
-    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture); // getMyVendorOrThrow -> vendor A
-    prismaMock.category.findUnique.mockResolvedValue(serviceCategoryFixture);
-    prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(serviceGrantFixture);
-    prismaMock.branchCategoryAccess.findUnique.mockResolvedValue(branchServiceGrantFixture);
-    prismaMock.deal.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-      Promise.resolve({ id: DEAL_A_ID, ...data }),
-    );
-    prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ id: DEAL_A_ID, vendorId: VENDOR_A_ID, status: 'DRAFT', packages: [] });
-    const res = await request(app)
-      .post(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({ ...baseServiceDealBody, durationMinutes: 30, packages: baseServicePackages });
-    expect(res.status).toBe(201);
-    expect(res.body.data.vendorId).toBe(VENDOR_A_ID); // always server-derived, never from the client
-    expect(res.body.data.status).toBe('DRAFT'); // vendor self-service starts DRAFT/PENDING, not ACTIVE/APPROVED
-  });
-
-  it("8. a vendor cannot create a deal for another vendor's branch (self-service)", async () => {
-    resolveMock.mockResolvedValue(['members:custom']);
-    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
-    prismaMock.branch.findUnique.mockResolvedValue(branchBFixture); // branch actually belongs to vendor B
-    const res = await request(app)
-      .post(`/api/v1/vendors/me/branches/${BRANCH_B_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({ ...baseServiceDealBody, durationMinutes: 30, packages: baseServicePackages });
-    expect(res.status).toBe(403);
-    expect(prismaMock.deal.create).not.toHaveBeenCalled();
-  });
-
-  it('9. admin can create a deal per existing members:create permission; a caller without it cannot', async () => {
-    resolveMock.mockResolvedValue([]);
-    const res = await request(app)
-      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ ...baseServiceDealBody, durationMinutes: 30, packages: baseServicePackages });
-    expect(res.status).toBe(403);
-  });
-
-  it('10. rejects create when the branch does not belong to the vendor in the URL', async () => {
-    resolveMock.mockResolvedValue(['vendors.deals:create']);
-    prismaMock.branch.findUnique.mockResolvedValue(branchBFixture); // belongs to vendor B, not vendor A
-    const res = await request(app)
-      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ ...baseServiceDealBody, durationMinutes: 30, packages: baseServicePackages });
-    expect(res.status).toBe(403);
-    expect(prismaMock.deal.create).not.toHaveBeenCalled();
-  });
-
-  it('10b. a genuine double-submit race on the same slug returns a clean 409, not a raw 500', async () => {
-    // Both requests pass the app-level "slug free" pre-check before either commits (the actual
-    // race window) — the DB's own slug @unique constraint is what catches it, surfacing as a
-    // Prisma P2002 from the create call itself.
-    resolveMock.mockResolvedValue(['vendors.deals:create']);
-    prismaMock.category.findUnique.mockResolvedValue(serviceCategoryFixture);
-    prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(serviceGrantFixture);
-    prismaMock.branchCategoryAccess.findUnique.mockResolvedValue(branchServiceGrantFixture);
-    const { Prisma } = await import('../generated/prisma-client');
-    prismaMock.deal.create.mockRejectedValue(
-      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: '6.19.3' }),
-    );
-    const res = await request(app)
-      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ ...baseServiceDealBody, durationMinutes: 30, packages: baseServicePackages });
-    expect(res.status).toBe(409);
-    expect(res.body.error.message).toMatch(/already exists/i);
-  });
-
-  it('12. updating only salePrice (not touching category/product/duration) does not re-validate category access', async () => {
-    resolveMock.mockResolvedValue(['vendors.deals:edit']);
-    prismaMock.deal.findUnique.mockResolvedValue(dealAFixture);
-    prismaMock.deal.update.mockResolvedValue({ ...dealAFixture, salePrice: '249.00' });
-    prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ ...dealAFixture, salePrice: '249.00', packages: [] });
-    const res = await request(app)
-      .patch(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ salePrice: '249.00' });
-    expect(res.status).toBe(200);
-    expect(res.body.data.salePrice).toBe('249.00');
-    expect(prismaMock.vendorCategoryAccess.findUnique).not.toHaveBeenCalled();
-  });
-
-  /**
-   * Feature: Deal Edit — existing packages must never be silently deleted (the actual data-loss
-   * risk behind "packages disappear after refresh"). Root cause was `listDeals` omitting
-   * `packages` from its `include` (fixed separately) — DealDialog always seeds its package state
-   * from `deal.packages` and always resubmits the full current array on every save of a service
-   * deal, so once the load-side bug was fixed, a correctly-loaded existing package's real `id`
-   * flows straight back into the PATCH body and `updateDeal`'s diff-by-id logic below updates it
-   * in place. These tests lock in that guarantee at the API layer, independent of the frontend.
-   */
-  describe('13. Deal packages — update never silently deletes existing rows', () => {
-    const EXISTING_PKG_A = 'e1e1e1e1-0000-4000-8000-0000000000f1';
-    const EXISTING_PKG_B = 'e2e2e2e2-0000-4000-8000-0000000000f2';
-
-    it('PATCH with no `packages` key at all leaves existing packages completely untouched', async () => {
-      resolveMock.mockResolvedValue(['vendors.deals:edit']);
-      prismaMock.deal.findUnique.mockResolvedValue(dealAFixture);
-      prismaMock.deal.update.mockResolvedValue({ ...dealAFixture, title: 'Renamed' });
-      prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ ...dealAFixture, title: 'Renamed', packages: [] });
-      const res = await request(app)
-        .patch(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ title: 'Renamed' });
-      expect(res.status).toBe(200);
-      expect(prismaMock.dealPackage.findMany).not.toHaveBeenCalled();
-      expect(prismaMock.dealPackage.deleteMany).not.toHaveBeenCalled();
-      expect(prismaMock.dealPackage.update).not.toHaveBeenCalled();
-      expect(prismaMock.dealPackage.create).not.toHaveBeenCalled();
-    });
-
-    it('PATCH resubmitting existing packages by id (unchanged values) updates each in place — never deletes, never recreates', async () => {
-      resolveMock.mockResolvedValue(['vendors.deals:edit']);
-      prismaMock.deal.findUnique.mockResolvedValue(dealAFixture);
-      prismaMock.deal.update.mockResolvedValue(dealAFixture);
-      prismaMock.dealPackage.findMany.mockResolvedValue([{ id: EXISTING_PKG_A }, { id: EXISTING_PKG_B }]);
-      prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ ...dealAFixture, packages: [] });
-      const res = await request(app)
-        .patch(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({
-          packages: [
-            { id: EXISTING_PKG_A, durationMinutes: 30, sellingPrice: 500 },
-            { id: EXISTING_PKG_B, durationMinutes: 60, sellingPrice: 900 },
-          ],
-        });
-      expect(res.status).toBe(200);
-      expect(prismaMock.dealPackage.deleteMany).not.toHaveBeenCalled();
-      expect(prismaMock.dealPackage.create).not.toHaveBeenCalled();
-      expect(prismaMock.dealPackage.update).toHaveBeenCalledTimes(2);
-      expect(prismaMock.dealPackage.update).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: EXISTING_PKG_A } }),
-      );
-      expect(prismaMock.dealPackage.update).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: EXISTING_PKG_B } }),
-      );
-    });
-
-    it('A modified + B unchanged + C newly added + D removed → A/B updated, C created, D deleted (nothing else touched)', async () => {
-      const EXISTING_PKG_D = 'e3e3e3e3-0000-4000-8000-0000000000f3';
-      resolveMock.mockResolvedValue(['vendors.deals:edit']);
-      prismaMock.deal.findUnique.mockResolvedValue(dealAFixture);
-      prismaMock.deal.update.mockResolvedValue(dealAFixture);
-      // D existed before this save but is absent from the submitted array below — must be deleted.
-      prismaMock.dealPackage.findMany.mockResolvedValue([{ id: EXISTING_PKG_A }, { id: EXISTING_PKG_B }, { id: EXISTING_PKG_D }]);
-      prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ ...dealAFixture, packages: [] });
-      const res = await request(app)
-        .patch(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({
-          packages: [
-            { id: EXISTING_PKG_A, durationMinutes: 45, sellingPrice: 600 }, // modified
-            { id: EXISTING_PKG_B, durationMinutes: 60, sellingPrice: 900 }, // unchanged
-            { durationMinutes: 90, sellingPrice: 1200 }, // new, no id
-          ],
-        });
-      expect(res.status).toBe(200);
-      expect(prismaMock.dealPackage.update).toHaveBeenCalledTimes(2);
-      expect(prismaMock.dealPackage.update).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: EXISTING_PKG_A }, data: expect.objectContaining({ durationMinutes: 45 }) }),
-      );
-      expect(prismaMock.dealPackage.update).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: EXISTING_PKG_B }, data: expect.objectContaining({ durationMinutes: 60 }) }),
-      );
-      expect(prismaMock.dealPackage.create).toHaveBeenCalledExactlyOnceWith(
-        expect.objectContaining({ data: expect.objectContaining({ dealId: DEAL_A_ID, durationMinutes: 90 }) }),
-      );
-      expect(prismaMock.dealPackage.deleteMany).toHaveBeenCalledExactlyOnceWith({ where: { id: { in: [EXISTING_PKG_D] } } });
-    });
-
-    it('PATCH with an empty packages array ([]) is rejected at validation (422) before it can ever reach the delete logic — DealUpdateSchema\'s own existing safety net', async () => {
-      resolveMock.mockResolvedValue(['vendors.deals:edit']);
-      const res = await request(app)
-        .patch(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ packages: [] });
-      expect(res.status).toBe(422);
-      expect(JSON.stringify(res.body.error)).toMatch(/omit `packages` to leave them unchanged/);
-      // Never even reaches the deal lookup, let alone the package diff/delete logic.
-      expect(prismaMock.deal.findUnique).not.toHaveBeenCalled();
-      expect(prismaMock.dealPackage.deleteMany).not.toHaveBeenCalled();
+    it('a package body with an unknown key or a duration under 15 minutes is 422', async () => {
+      asMember();
+      const base = `/api/v1/vendors/me/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}/packages`;
+      expect((await request(app).post(base).set('Authorization', memberAuth()).send({ durationMinutes: 10, sellingPrice: 1 })).status).toBe(422);
+      expect((await request(app).post(base).set('Authorization', memberAuth()).send({ durationMinutes: 30, sellingPrice: 1, id: 'x' })).status).toBe(422);
     });
   });
 
-  describe('Superadmin notification on vendor deal submission', () => {
-    it('a vendor (non-admin) creating a deal notifies every Superadmin — DEAL_PENDING_APPROVAL, PENDING approvalStatus', async () => {
-      resolveMock.mockResolvedValue(['members:custom']);
-      prismaMock.member.findUnique.mockResolvedValue(vendorAFixture); // both getMyVendorOrThrow AND the notification's own businessName lookup
-      prismaMock.category.findUnique.mockResolvedValue(serviceCategoryFixture);
-      prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(serviceGrantFixture);
-      prismaMock.branchCategoryAccess.findUnique.mockResolvedValue(branchServiceGrantFixture);
-      prismaMock.deal.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-        Promise.resolve({ id: DEAL_A_ID, ...data }),
-      );
-      prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ id: DEAL_A_ID, vendorId: VENDOR_A_ID, approvalStatus: 'PENDING', packages: [] });
-      prismaMock.user.findMany.mockResolvedValue([{ id: 'superadmin-1' }, { id: 'superadmin-2' }]);
-
+  describe('copy and media', () => {
+    it('copies to another own branch as Draft (201)', async () => {
+      asMember();
+      prismaMock.deal.findUniqueOrThrow.mockResolvedValueOnce({ ...deal(), packages: [], faqs: [] }).mockResolvedValue(loaded());
       const res = await request(app)
-        .post(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/deals`)
-        .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-        .send({ ...baseServiceDealBody, durationMinutes: 30, packages: baseServicePackages });
-
+        .post(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}/copy`)
+        .set('Authorization', memberAuth())
+        .send({ branchId: BRANCH_A_ID });
       expect(res.status).toBe(201);
-      expect(prismaMock.notification.create).toHaveBeenCalledTimes(2); // one per Superadmin user
-      expect(prismaMock.notification.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            recipientUserId: 'superadmin-1',
-            recipientType: 'SUPERADMIN',
-            type: 'DEAL_PENDING_APPROVAL',
-            title: 'New Deal Pending Approval',
-            message: expect.stringContaining('Vendor A Spa'),
-            entityType: 'DEAL',
-            entityId: DEAL_A_ID,
-          }),
-        }),
-      );
+      expect(prismaMock.deal.create.mock.calls[0][0]!.data).toMatchObject({ status: 'DRAFT' });
     });
 
-    it('an admin-created (auto-approved) deal does NOT notify any Superadmin', async () => {
-      resolveMock.mockResolvedValue(['vendors.deals:create']);
-      prismaMock.category.findUnique.mockResolvedValue(serviceCategoryFixture);
-      prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(serviceGrantFixture);
-      prismaMock.branchCategoryAccess.findUnique.mockResolvedValue(branchServiceGrantFixture);
-      prismaMock.deal.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-        Promise.resolve({ id: DEAL_A_ID, ...data }),
-      );
-      prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ id: DEAL_A_ID, approvalStatus: 'APPROVED', packages: [] });
-      prismaMock.user.findMany.mockResolvedValue([{ id: 'superadmin-1' }]);
-
+    it('staff upload deal images under vendors.deals:edit', async () => {
+      resolveMock.mockResolvedValue(['vendors.deals:edit']);
+      prismaMock.dealImage.count.mockResolvedValue(0);
+      prismaMock.dealImage.create.mockResolvedValue({ id: 'img-1', storageKey: 'k' });
       const res = await request(app)
-        .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ ...baseServiceDealBody, durationMinutes: 30, packages: baseServicePackages });
-
+        .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}/images`)
+        .set('Authorization', staffAuth())
+        .attach('file', validJpeg(), { filename: 'photo.jpg', contentType: 'image/jpeg' });
       expect(res.status).toBe(201);
-      expect(prismaMock.notification.create).not.toHaveBeenCalled();
     });
 
-    it('a deal creation that fails validation (no category access) creates zero notifications — never a stray row on a rolled-back deal', async () => {
-      resolveMock.mockResolvedValue(['members:custom']);
-      prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
-      prismaMock.category.findUnique.mockResolvedValue(serviceCategoryFixture);
-      prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(null); // no grant -> rejected before the transaction even opens
-
+    it('sets an image\'s alt text', async () => {
+      asMember();
+      const IMAGE_ID = 'a4a4a4a4-0000-4000-8000-000000000013';
+      prismaMock.dealImage.findUnique.mockResolvedValue({ id: IMAGE_ID, dealId: DEAL_A_ID });
+      prismaMock.dealImage.update.mockResolvedValue({ id: IMAGE_ID, altText: 'Massage room' });
       const res = await request(app)
-        .post(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/deals`)
-        .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-        .send({ ...baseServiceDealBody, durationMinutes: 30, packages: baseServicePackages });
-
-      expect(res.status).toBe(422);
-      expect(prismaMock.deal.create).not.toHaveBeenCalled();
-      expect(prismaMock.notification.create).not.toHaveBeenCalled();
+        .patch(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}/images/${IMAGE_ID}`)
+        .set('Authorization', memberAuth())
+        .send({ altText: 'Massage room' });
+      expect(res.status).toBe(200);
+      expect(prismaMock.dealImage.update).toHaveBeenCalledWith({ where: { id: IMAGE_ID }, data: { altText: 'Massage room' } });
     });
-  });
-});
-
-/**
- * The single most important scenario in the whole feature spec: a vendor-level SERVICE grant on
- * CATEGORY_ID ("Spa") is necessary but not sufficient once a branch has its own narrower
- * BranchCategoryAccess/BranchSubcategoryAccess mapping — a subcategory combination valid for one
- * branch must be rejected for a sibling branch (of the SAME vendor) that was only mapped to a
- * different subcategory of the same top-level category.
- */
-describe('Deal create/update — canonical branch-level subcategory scoping (Branch A -> Spa -> Massage granted, Branch A -> Spa -> Facial NOT)', () => {
-  const baseSpaDealBody = { categoryId: CATEGORY_ID, title: 'Spa deal', slug: 'spa-deal', originalPrice: '399.00', salePrice: '299.00' };
-  const baseServicePackages = [{ durationMinutes: 30, sellingPrice: 299 }];
-
-  function mockCategoryLookup(byId: Record<string, unknown>) {
-    prismaMock.category.findUnique.mockImplementation(({ where }: { where: { id: string } }) =>
-      Promise.resolve(byId[where.id] ?? null),
-    );
-  }
-
-  beforeEach(() => {
-    resolveMock.mockResolvedValue(['vendors.deals:create']);
-    prismaMock.deal.findUnique.mockResolvedValue(null); // slug free
-    prismaMock.dealPackage.findFirst.mockResolvedValue(null);
-    mockCategoryLookup({ [CATEGORY_ID]: serviceCategoryFixture, [SUB_MASSAGE_ID]: subMassageFixture, [SUB_FACIAL_ID]: subFacialFixture });
-    prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(serviceGrantFixture); // vendor-level SERVICE grant on Spa, same for both branches (same vendor)
-    prismaMock.deal.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: DEAL_A_ID, ...data }));
-    prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ id: DEAL_A_ID, packages: [] });
-  });
-
-  it('accepts Branch A -> Spa -> Massage when Branch A is mapped to Spa with Massage enabled', async () => {
-    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-    // Branch A: mapped to CATEGORY_ID (Spa), with SUB_MASSAGE_ID (Massage) explicitly enabled.
-    prismaMock.branchCategoryAccess.findUnique.mockResolvedValue(branchServiceGrantFixture);
-    prismaMock.branchSubcategoryAccess.findUnique.mockImplementation(
-      ({ where }: { where: { branchCategoryAccessId_subcategoryId: { subcategoryId: string } } }) =>
-        Promise.resolve(
-          where.branchCategoryAccessId_subcategoryId.subcategoryId === SUB_MASSAGE_ID
-            ? { id: 'bsa-massage-a', branchCategoryAccessId: branchServiceGrantFixture.id, subcategoryId: SUB_MASSAGE_ID }
-            : null,
-        ),
-    );
-
-    const res = await request(app)
-      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ ...baseSpaDealBody, subcategoryId: SUB_MASSAGE_ID, durationMinutes: 30, packages: baseServicePackages });
-
-    expect(res.status).toBe(201);
-  });
-
-  it('REJECTS the identical Branch A -> Spa -> Massage combination when Branch A is only mapped to Spa -> Facial (canonical scenario)', async () => {
-    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-    // Branch A IS mapped to CATEGORY_ID (Spa) itself...
-    prismaMock.branchCategoryAccess.findUnique.mockResolvedValue(branchServiceGrantFixture);
-    // ...but only Facial was ever explicitly enabled under it — Massage was not.
-    prismaMock.branchSubcategoryAccess.findUnique.mockImplementation(
-      ({ where }: { where: { branchCategoryAccessId_subcategoryId: { subcategoryId: string } } }) =>
-        Promise.resolve(
-          where.branchCategoryAccessId_subcategoryId.subcategoryId === SUB_FACIAL_ID
-            ? { id: 'bsa-facial-a', branchCategoryAccessId: branchServiceGrantFixture.id, subcategoryId: SUB_FACIAL_ID }
-            : null,
-        ),
-    );
-
-    const res = await request(app)
-      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ ...baseSpaDealBody, subcategoryId: SUB_MASSAGE_ID, durationMinutes: 30, packages: baseServicePackages });
-
-    expect(res.status).toBe(422);
-    expect(prismaMock.deal.create).not.toHaveBeenCalled();
-  });
-
-  it('the SAME vendor-wide grant does not help a sibling branch mapped to a different subcategory of the same top-level category (Branch B -> Spa -> Facial only)', async () => {
-    prismaMock.branch.findUnique.mockResolvedValue(branchBFixture);
-    prismaMock.branchCategoryAccess.findUnique.mockResolvedValue(branchBServiceGrantFixture);
-    prismaMock.branchSubcategoryAccess.findUnique.mockResolvedValue(null); // Branch B never enabled Massage at all
-
-    const res = await request(app)
-      .post(`/api/v1/vendors/${VENDOR_B_ID}/branches/${BRANCH_B_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ ...baseSpaDealBody, subcategoryId: SUB_MASSAGE_ID, durationMinutes: 30, packages: baseServicePackages });
-
-    expect(res.status).toBe(422);
-    expect(prismaMock.deal.create).not.toHaveBeenCalled();
-  });
-
-  it('rejects a category that is not branch-mapped at all, even though the vendor holds a valid vendor-wide grant for it', async () => {
-    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-    prismaMock.branchCategoryAccess.findUnique.mockResolvedValue(null); // Branch A has zero mapping for Spa at all
-
-    const res = await request(app)
-      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ ...baseSpaDealBody, durationMinutes: 30, packages: baseServicePackages });
-
-    expect(res.status).toBe(422);
-    expect(prismaMock.deal.create).not.toHaveBeenCalled();
-  });
-
-  it('a deal with no subcategoryId at all still succeeds as long as the top-level category itself is branch-mapped', async () => {
-    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-    prismaMock.branchCategoryAccess.findUnique.mockResolvedValue(branchServiceGrantFixture);
-
-    const res = await request(app)
-      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ ...baseSpaDealBody, durationMinutes: 30, packages: baseServicePackages }); // no subcategoryId
-
-    expect(res.status).toBe(201);
-    // No subcategoryId was sent -> the branch-subcategory check must never even run.
-    expect(prismaMock.branchSubcategoryAccess.findUnique).not.toHaveBeenCalled();
-  });
-
-  it('update: changing only the subcategoryId re-validates branch-subcategory access and rejects an unmapped one', async () => {
-    resolveMock.mockResolvedValue(['vendors.deals:edit']);
-    const existingDeal = { ...dealAFixture, categoryId: CATEGORY_ID, subcategoryId: SUB_MASSAGE_ID };
-    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-    prismaMock.deal.findUnique.mockResolvedValue(existingDeal);
-    prismaMock.branchCategoryAccess.findUnique.mockResolvedValue(branchServiceGrantFixture);
-    prismaMock.branchSubcategoryAccess.findUnique.mockResolvedValue(null); // SUB_FACIAL_ID never enabled on Branch A
-
-    const res = await request(app)
-      .patch(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ subcategoryId: SUB_FACIAL_ID });
-
-    expect(res.status).toBe(422);
-    expect(prismaMock.deal.update).not.toHaveBeenCalled();
   });
 });
 
@@ -2285,446 +2039,49 @@ describe('POST /api/v1/vendors/me/branches/:branchId/therapists — duplicate-su
   });
 });
 
-describe('PUT /api/v1/vendors/me/category-access (business modules + category access)', () => {
-  it('replaces the full set: grants two categories, then a follow-up call with one id revokes the other', async () => {
-    resolveMock.mockResolvedValue(['members:custom']);
+describe('Category grant routes are retired (D10, P4-15)', () => {
+  const ALL = ['members:custom', 'members:view', 'members:edit', 'vendors.branches:view', 'vendors.branches:edit'];
+  const cases: Array<['get' | 'put', string]> = [
+    ['get', '/api/v1/vendors/me/category-access'],
+    ['put', '/api/v1/vendors/me/category-access'],
+    ['get', `/api/v1/vendors/me/branches/${BRANCH_A_ID}/category-access`],
+    ['get', `/api/v1/vendors/${VENDOR_A_ID}/category-access`],
+    ['put', `/api/v1/vendors/${VENDOR_A_ID}/category-access`],
+    ['get', `/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`],
+    ['put', `/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`],
+  ];
+
+  it.each(cases)('%s %s returns 404 and writes nothing', async (method, url) => {
+    resolveMock.mockResolvedValue(ALL);
     prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
-    prismaMock.category.findMany.mockResolvedValue([serviceCategoryFixture, productCategoryFixture]);
-    prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([
-      { id: 'g1', vendorId: VENDOR_A_ID, categoryId: CATEGORY_ID, category: serviceCategoryFixture },
-      { id: 'g2', vendorId: VENDOR_A_ID, categoryId: PRODUCT_CATEGORY_ID, category: productCategoryFixture },
-    ]);
-
-    const res = await request(app)
-      .put('/api/v1/vendors/me/category-access')
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({ offersService: true, offersProduct: true, offersTherapy: false, categoryIds: [CATEGORY_ID, PRODUCT_CATEGORY_ID] });
-
-    expect(res.status).toBe(200);
-    expect(prismaMock.member.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { offersService: true, offersProduct: true, offersTherapy: false } }),
-    );
-    expect(prismaMock.vendorCategoryAccess.deleteMany).toHaveBeenCalledWith({ where: { vendorId: VENDOR_A_ID } });
-    expect(prismaMock.vendorCategoryAccess.createMany).toHaveBeenCalledWith({
-      data: [{ vendorId: VENDOR_A_ID, categoryId: CATEGORY_ID }, { vendorId: VENDOR_A_ID, categoryId: PRODUCT_CATEGORY_ID }],
-    });
+    const res = await request(app)[method](url)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['admin'] }))
+      .send({ offersService: true, offersProduct: false, offersTherapy: false, categoryIds: [CATEGORY_ID], mappings: [] });
+    expect(res.status).toBe(404);
+    expect(prismaMock.vendorCategoryAccess.createMany).not.toHaveBeenCalled();
+    expect(prismaMock.branchCategoryAccess.create).not.toHaveBeenCalled();
   });
 
-  it('revoking down to a single category deletes-then-recreates exactly that one row (replace-the-full-set, not a diff)', async () => {
+  it('GET /vendors/categories lists the same categories for every member and ignores vendorId', async () => {
     resolveMock.mockResolvedValue(['members:custom']);
-    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.category.findMany.mockResolvedValue([serviceCategoryFixture]);
-    prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([
-      { id: 'g1', vendorId: VENDOR_A_ID, categoryId: CATEGORY_ID, category: serviceCategoryFixture },
-    ]);
-
     const res = await request(app)
-      .put('/api/v1/vendors/me/category-access')
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({ offersService: true, offersProduct: false, offersTherapy: false, categoryIds: [CATEGORY_ID] });
-
+      .get(`/api/v1/vendors/categories?type=SERVICE&vendorId=${VENDOR_A_ID}`)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['member'] }));
     expect(res.status).toBe(200);
-    expect(prismaMock.vendorCategoryAccess.deleteMany).toHaveBeenCalledWith({ where: { vendorId: VENDOR_A_ID } });
-    expect(prismaMock.vendorCategoryAccess.createMany).toHaveBeenCalledWith({
-      data: [{ vendorId: VENDOR_A_ID, categoryId: CATEGORY_ID }],
-    });
+    expect(res.body.data).toHaveLength(1);
+    expect(prismaMock.vendorCategoryAccess.findMany).not.toHaveBeenCalled();
   });
 
-  it('rejects granting a category whose type does not match any enabled module', async () => {
-    resolveMock.mockResolvedValue(['members:custom']);
-    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
-    prismaMock.category.findMany.mockResolvedValue([productCategoryFixture]);
-
+  it('the branch list has no categoryTypes and reads no grants', async () => {
+    resolveMock.mockResolvedValue(['vendors.branches:view']);
+    prismaMock.branch.findMany.mockResolvedValue([{ id: BRANCH_A_ID, vendorId: VENDOR_A_ID, name: 'Kothrud', _count: { deals: 0 } }]);
     const res = await request(app)
-      .put('/api/v1/vendors/me/category-access')
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({ offersService: true, offersProduct: false, offersTherapy: false, categoryIds: [PRODUCT_CATEGORY_ID] });
-
-    expect(res.status).toBe(422);
-    expect(prismaMock.vendorCategoryAccess.deleteMany).not.toHaveBeenCalled();
-  });
-
-  it('rejects granting a subcategory instead of its top-level parent', async () => {
-    resolveMock.mockResolvedValue(['members:custom']);
-    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
-    const SUB_ID = 'b6b6b6b6-0000-4000-8000-00000000000f';
-    prismaMock.category.findMany.mockResolvedValue([{ ...serviceCategoryFixture, id: SUB_ID, parentId: CATEGORY_ID }]);
-
-    const res = await request(app)
-      .put('/api/v1/vendors/me/category-access')
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({ offersService: true, offersProduct: false, offersTherapy: false, categoryIds: [SUB_ID] });
-
-    expect(res.status).toBe(422);
-  });
-});
-
-describe('Branch category access (GET/PUT /:vendorId/branches/:branchId/category-access + GET /me mirror)', () => {
-  const SECOND_CATEGORY_ID = 'b9b9b9b9-0000-4000-8000-000000000012'; // a second top-level SERVICE category, distinct grant
-  const secondCategoryFixture = { id: SECOND_CATEGORY_ID, name: 'Fitness', parentId: null, type: 'SERVICE' };
-  const secondCategoryGrantFixture = { id: 'grant-second', vendorId: VENDOR_A_ID, categoryId: SECOND_CATEGORY_ID };
-
-  /** Routes every `category.findUnique` call by the id actually requested, regardless of call
-   *  order/count — `setBranchCategoryAccess`'s per-mapping loop calls this multiple times (once
-   *  for the top-level check, then again inside `assertCategoryChildOf` per subcategory), so a
-   *  single `mockResolvedValue` isn't precise enough once more than one distinct id is involved. */
-  function mockCategoryLookup(byId: Record<string, unknown>) {
-    prismaMock.category.findUnique.mockImplementation(({ where }: { where: { id: string } }) =>
-      Promise.resolve(byId[where.id] ?? null),
-    );
-  }
-
-  describe('GET /:vendorId/branches/:branchId/category-access (admin)', () => {
-    it('returns the branch\'s own mapping', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:view']);
-      prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-      prismaMock.branchCategoryAccess.findMany.mockResolvedValue([
-        {
-          id: 'bca-1',
-          branchId: BRANCH_A_ID,
-          categoryId: CATEGORY_ID,
-          category: serviceCategoryFixture,
-          subcategories: [{ id: 'bsa-1', subcategoryId: SUB_MASSAGE_ID, subcategory: subMassageFixture }],
-        },
-      ]);
-      const res = await request(app)
-        .get(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
-      expect(res.status).toBe(200);
-      expect(res.body.data).toHaveLength(1);
-      expect(res.body.data[0].subcategories[0].subcategoryId).toBe(SUB_MASSAGE_ID);
-    });
-
-    it('403s without members:view', async () => {
-      resolveMock.mockResolvedValue([]);
-      const res = await request(app)
-        .get(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
-      expect(res.status).toBe(403);
-    });
-
-    // The spec draft expected a 404 here ("never confirm existence"), but this route reuses
-    // `getBranchScopedOrThrow`, whose own documented contract (and every other branch-scoped
-    // route's cross-vendor test in this file, e.g. Deal/Therapist above) is 404 only when the
-    // branch doesn't exist AT ALL — 403 when it exists but belongs to a different vendor. Verified
-    // against the actual implementation rather than assumed.
-    it("403s (not 404) when the branch exists but belongs to a different vendor than the URL claims", async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:view']);
-      prismaMock.branch.findUnique.mockResolvedValue(branchBFixture); // belongs to VENDOR_B
-      const res = await request(app)
-        .get(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
-      expect(res.status).toBe(403);
-    });
-
-    it('404s when the branch does not exist at all', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:view']);
-      prismaMock.branch.findUnique.mockResolvedValue(null);
-      const res = await request(app)
-        .get(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
-      expect(res.status).toBe(404);
-    });
-  });
-
-  describe('PUT /:vendorId/branches/:branchId/category-access (admin) — CRUD/validation', () => {
-    beforeEach(() => {
-      prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-    });
-
-    it('CRUD roundtrip: saves a category + subcategory mapping and reads it back', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:edit']);
-      mockCategoryLookup({ [CATEGORY_ID]: serviceCategoryFixture, [SUB_MASSAGE_ID]: subMassageFixture });
-      prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([serviceGrantFixture]);
-      prismaMock.branchCategoryAccess.create.mockResolvedValue({});
-      prismaMock.branchCategoryAccess.findMany.mockResolvedValue([
-        {
-          id: 'bca-1',
-          branchId: BRANCH_A_ID,
-          categoryId: CATEGORY_ID,
-          category: serviceCategoryFixture,
-          subcategories: [{ id: 'bsa-1', subcategoryId: SUB_MASSAGE_ID, subcategory: subMassageFixture }],
-        },
-      ]);
-
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [{ categoryId: CATEGORY_ID, subcategoryIds: [SUB_MASSAGE_ID] }] });
-
-      expect(res.status).toBe(200);
-      expect(prismaMock.branchCategoryAccess.deleteMany).toHaveBeenCalledWith({ where: { branchId: BRANCH_A_ID } });
-      expect(prismaMock.branchCategoryAccess.create).toHaveBeenCalledWith({
-        data: { branchId: BRANCH_A_ID, categoryId: CATEGORY_ID, subcategories: { create: [{ subcategoryId: SUB_MASSAGE_ID }] } },
-      });
-      expect(res.body.data[0].subcategories[0].subcategoryId).toBe(SUB_MASSAGE_ID);
-    });
-
-    it('a duplicate categoryId within the same PUT (DB @@unique(branchId, categoryId)) surfaces as a clean 409, not a raw 500', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:edit']);
-      mockCategoryLookup({ [CATEGORY_ID]: serviceCategoryFixture });
-      prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([serviceGrantFixture]);
-      const { Prisma } = await import('../generated/prisma-client');
-      prismaMock.branchCategoryAccess.create
-        .mockResolvedValueOnce({})
-        .mockRejectedValueOnce(new Prisma.PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: 'test' }));
-
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [{ categoryId: CATEGORY_ID, subcategoryIds: [] }, { categoryId: CATEGORY_ID, subcategoryIds: [] }] });
-
-      expect(res.status).toBe(409);
-    });
-
-    it('a duplicate subcategoryId within one mapping (DB @@unique(branchCategoryAccessId, subcategoryId)) surfaces as a clean 409', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:edit']);
-      mockCategoryLookup({ [CATEGORY_ID]: serviceCategoryFixture, [SUB_MASSAGE_ID]: subMassageFixture });
-      prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([serviceGrantFixture]);
-      const { Prisma } = await import('../generated/prisma-client');
-      prismaMock.branchCategoryAccess.create.mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: 'test' }),
-      );
-
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [{ categoryId: CATEGORY_ID, subcategoryIds: [SUB_MASSAGE_ID, SUB_MASSAGE_ID] }] });
-
-      expect(res.status).toBe(409);
-    });
-
-    it('auto-grants a category the vendor has not been granted at all (no VendorCategoryAccess row) instead of rejecting — the standalone "Business Modules + Category Access" screen was removed, so this is now the only place Service/Therapy grants come from', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:edit']);
-      mockCategoryLookup({ [CATEGORY_ID]: serviceCategoryFixture });
-      prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([]); // vendor never granted this category yet
-      prismaMock.member.update.mockResolvedValue(vendorAFixture);
-      prismaMock.branchCategoryAccess.create.mockResolvedValue({});
-      prismaMock.branchCategoryAccess.findMany.mockResolvedValue([
-        { id: 'bca-1', branchId: BRANCH_A_ID, categoryId: CATEGORY_ID, category: serviceCategoryFixture, subcategories: [] },
-      ]);
-
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [{ categoryId: CATEGORY_ID, subcategoryIds: [] }] });
-
-      expect(res.status).toBe(200);
-      expect(prismaMock.vendorCategoryAccess.createMany).toHaveBeenCalledWith({
-        data: [{ vendorId: VENDOR_A_ID, categoryId: CATEGORY_ID }],
-        skipDuplicates: true,
-      });
-      expect(prismaMock.member.update).toHaveBeenCalledWith({ where: { id: VENDOR_A_ID }, data: { offersService: true } });
-      expect(prismaMock.branchCategoryAccess.deleteMany).toHaveBeenCalledWith({ where: { branchId: BRANCH_A_ID } });
-      expect(prismaMock.branchCategoryAccess.create).toHaveBeenCalledWith({
-        data: { branchId: BRANCH_A_ID, categoryId: CATEGORY_ID, subcategories: { create: [] } },
-      });
-    });
-
-    it('does NOT re-grant or touch the offers* flag for a category the vendor already holds', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:edit']);
-      mockCategoryLookup({ [CATEGORY_ID]: serviceCategoryFixture });
-      prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([serviceGrantFixture]); // already granted
-      prismaMock.branchCategoryAccess.create.mockResolvedValue({});
-      prismaMock.branchCategoryAccess.findMany.mockResolvedValue([
-        { id: 'bca-1', branchId: BRANCH_A_ID, categoryId: CATEGORY_ID, category: serviceCategoryFixture, subcategories: [] },
-      ]);
-
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [{ categoryId: CATEGORY_ID, subcategoryIds: [] }] });
-
-      expect(res.status).toBe(200);
-      expect(prismaMock.vendorCategoryAccess.createMany).not.toHaveBeenCalled();
-      expect(prismaMock.member.update).not.toHaveBeenCalled();
-    });
-
-    it('rejects a category whose type is PRODUCT — Product never flows through branch-level access (it stays on the standalone Product Categories grant)', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:edit']);
-      mockCategoryLookup({ [PRODUCT_CATEGORY_ID]: productCategoryFixture });
-
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [{ categoryId: PRODUCT_CATEGORY_ID, subcategoryIds: [] }] });
-
-      expect(res.status).toBe(422);
-      expect(prismaMock.branchCategoryAccess.deleteMany).not.toHaveBeenCalled();
-    });
-
-    it('rejects a subcategory that does not actually belong to the given categoryId', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:edit']);
-      // SUB_FACIAL_ID is a real category row, but its parent is SECOND_CATEGORY_ID, not CATEGORY_ID.
-      mockCategoryLookup({
-        [CATEGORY_ID]: serviceCategoryFixture,
-        [SUB_FACIAL_ID]: { ...subFacialFixture, parentId: SECOND_CATEGORY_ID },
-      });
-      prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([serviceGrantFixture]);
-
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [{ categoryId: CATEGORY_ID, subcategoryIds: [SUB_FACIAL_ID] }] });
-
-      expect(res.status).toBe(422);
-      expect(prismaMock.branchCategoryAccess.deleteMany).not.toHaveBeenCalled();
-    });
-
-    it('rejects a subcategory row directly (not a top-level category) passed as the mapping\'s own categoryId', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:edit']);
-      mockCategoryLookup({ [SUB_MASSAGE_ID]: subMassageFixture }); // parentId set -> not top-level
-
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [{ categoryId: SUB_MASSAGE_ID, subcategoryIds: [] }] });
-
-      expect(res.status).toBe(422);
-    });
-
-    it("403s (not 404) saving when the branch exists but belongs to a different vendor than the URL claims", async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:edit']);
-      prismaMock.branch.findUnique.mockResolvedValue(branchBFixture);
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [] });
-      expect(res.status).toBe(403);
-      expect(prismaMock.branchCategoryAccess.deleteMany).not.toHaveBeenCalled();
-    });
-
-    it('403s without members:edit', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:view']);
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [] });
-      expect(res.status).toBe(403);
-    });
-
-    it('an empty mappings array wipes the branch\'s entire mapping (deleteMany, no create)', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:edit']);
-      prismaMock.branchCategoryAccess.findMany.mockResolvedValue([]);
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [] });
-      expect(res.status).toBe(200);
-      expect(prismaMock.branchCategoryAccess.deleteMany).toHaveBeenCalledWith({ where: { branchId: BRANCH_A_ID } });
-      expect(prismaMock.branchCategoryAccess.create).not.toHaveBeenCalled();
-    });
-
-    // "Removing a category mapping cascades its subcategory mappings": this is the replace-the-
-    // full-set pattern — the branch previously had CATEGORY_ID + SECOND_CATEGORY_ID mapped; a PUT
-    // that now only lists SECOND_CATEGORY_ID wipes everything (relying on the DB's own
-    // `onDelete: Cascade` from BranchCategoryAccess -> BranchSubcategoryAccess to take
-    // CATEGORY_ID's subcategory rows with it) and recreates only what's still listed.
-    it("dropping a previously-mapped category from the new mappings array cascades away its subcategories (replace-the-full-set)", async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:edit']);
-      mockCategoryLookup({ [SECOND_CATEGORY_ID]: secondCategoryFixture });
-      prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([secondCategoryGrantFixture]);
-      prismaMock.branchCategoryAccess.create.mockResolvedValue({}); // reset — a prior test in this file left this rejecting
-      prismaMock.branchCategoryAccess.findMany.mockResolvedValue([
-        { id: 'bca-2', branchId: BRANCH_A_ID, categoryId: SECOND_CATEGORY_ID, category: secondCategoryFixture, subcategories: [] },
-      ]);
-
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [{ categoryId: SECOND_CATEGORY_ID, subcategoryIds: [] }] });
-
-      expect(res.status).toBe(200);
-      // Full wipe first (this is what actually cascades CATEGORY_ID's now-dropped subcategory rows away).
-      expect(prismaMock.branchCategoryAccess.deleteMany).toHaveBeenCalledWith({ where: { branchId: BRANCH_A_ID } });
-      // Only the still-listed category is recreated — CATEGORY_ID is gone entirely.
-      expect(prismaMock.branchCategoryAccess.create).toHaveBeenCalledOnce();
-      expect(prismaMock.branchCategoryAccess.create).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ categoryId: SECOND_CATEGORY_ID }) }),
-      );
-      expect(prismaMock.branchCategoryAccess.create).not.toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ categoryId: CATEGORY_ID }) }),
-      );
-    });
-
-    // "Removing just one subcategory mapping leaves the rest intact": the category itself stays
-    // mapped, only one of its two previously-enabled subcategories is dropped from this save.
-    it('dropping one subcategory from an otherwise-unchanged category mapping leaves the other subcategory intact', async () => {
-      resolveMock.mockResolvedValue(['vendors.branches:edit']);
-      mockCategoryLookup({ [CATEGORY_ID]: serviceCategoryFixture, [SUB_MASSAGE_ID]: subMassageFixture });
-      prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([serviceGrantFixture]);
-      prismaMock.branchCategoryAccess.create.mockResolvedValue({}); // reset — a prior test in this file left this rejecting
-      prismaMock.branchCategoryAccess.findMany.mockResolvedValue([
-        {
-          id: 'bca-1',
-          branchId: BRANCH_A_ID,
-          categoryId: CATEGORY_ID,
-          category: serviceCategoryFixture,
-          subcategories: [{ id: 'bsa-1', subcategoryId: SUB_MASSAGE_ID, subcategory: subMassageFixture }],
-        },
-      ]);
-
-      // Previously both SUB_MASSAGE_ID and SUB_FACIAL_ID were enabled; this save only re-submits
-      // SUB_MASSAGE_ID, dropping SUB_FACIAL_ID.
-      const res = await request(app)
-        .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-        .send({ mappings: [{ categoryId: CATEGORY_ID, subcategoryIds: [SUB_MASSAGE_ID] }] });
-
-      expect(res.status).toBe(200);
-      expect(prismaMock.branchCategoryAccess.create).toHaveBeenCalledWith({
-        data: { branchId: BRANCH_A_ID, categoryId: CATEGORY_ID, subcategories: { create: [{ subcategoryId: SUB_MASSAGE_ID }] } },
-      });
-      expect(res.body.data[0].subcategories).toHaveLength(1);
-      expect(res.body.data[0].subcategories[0].subcategoryId).toBe(SUB_MASSAGE_ID);
-    });
-  });
-
-  describe('GET /me/branches/:branchId/category-access (self-service mirror)', () => {
-    it("returns the caller's own branch mapping", async () => {
-      resolveMock.mockResolvedValue(['members:custom']);
-      prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
-      prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-      prismaMock.branchCategoryAccess.findMany.mockResolvedValue([
-        { id: 'bca-1', branchId: BRANCH_A_ID, categoryId: CATEGORY_ID, category: serviceCategoryFixture, subcategories: [] },
-      ]);
-      const res = await request(app)
-        .get(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
-      expect(res.status).toBe(200);
-      expect(res.body.data).toHaveLength(1);
-    });
-
-    // The spec draft expected 404 here too ("never confirm existence"); verified against the
-    // actual implementation instead of assumed — same `getBranchScopedOrThrow` contract as the
-    // admin route above, so this is 403 (branch exists, wrong vendor), not 404.
-    it("403s (not 404) when a vendor tries to read another vendor's branch via this route", async () => {
-      resolveMock.mockResolvedValue(['members:custom']);
-      prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
-      prismaMock.branch.findUnique.mockResolvedValue(branchBFixture); // belongs to VENDOR_B
-      const res = await request(app)
-        .get(`/api/v1/vendors/me/branches/${BRANCH_B_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
-      expect(res.status).toBe(403);
-    });
-
-    it('404s when the branch does not exist at all', async () => {
-      resolveMock.mockResolvedValue(['members:custom']);
-      prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
-      prismaMock.branch.findUnique.mockResolvedValue(null);
-      const res = await request(app)
-        .get(`/api/v1/vendors/me/branches/${BRANCH_B_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
-      expect(res.status).toBe(404);
-    });
-
-    it('returns 403 with no members:custom permission', async () => {
-      resolveMock.mockResolvedValue([]);
-      const res = await request(app)
-        .get(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/category-access`)
-        .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
-      expect(res.status).toBe(403);
-    });
+      .get(`/api/v1/vendors/${VENDOR_A_ID}/branches`)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['admin'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data[0]).not.toHaveProperty('categoryTypes');
+    expect(prismaMock.branch.findMany).toHaveBeenCalledWith(expect.objectContaining({ include: { _count: { select: { deals: true } } } }));
   });
 });
 
@@ -2896,45 +2253,43 @@ describe('Product (vendor-scoped self-service + admin-on-behalf)', () => {
   });
 });
 
-describe('Therapist specializationCategoryId (category-access gate)', () => {
+/** D10 / P4-15: a therapist specialization only has to be a THERAPY category; no member or
+ *  branch grant is read. */
+describe('Therapist specializationCategoryId (THERAPY type only, D10)', () => {
   const THERAPY_CATEGORY_ID = 'b5b5b5b5-0000-4000-8000-00000000000e';
-  const therapyCategoryFixture = { id: THERAPY_CATEGORY_ID, name: 'Deep Tissue', parentId: null, type: 'THERAPY' };
-  const therapyGrantFixture = { id: 'grant-therapy', vendorId: VENDOR_A_ID, categoryId: THERAPY_CATEGORY_ID };
-  // Branch-level counterpart (BranchCategoryAccess) — see branchServiceGrantFixture's own comment above.
-  const branchTherapyGrantFixture = { id: 'branch-grant-therapy', branchId: BRANCH_A_ID, categoryId: THERAPY_CATEGORY_ID };
+  const post = () =>
+    request(app)
+      .post(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/therapists`)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
+      .send({ therapistType: 'Massage Therapist', personName: 'Suresh Chandra', specializationCategoryId: THERAPY_CATEGORY_ID });
 
-  it('creates a therapist with a granted THERAPY specializationCategoryId', async () => {
+  beforeEach(() => {
     resolveMock.mockResolvedValue(['members:custom']);
     prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-    prismaMock.category.findUnique.mockResolvedValue(therapyCategoryFixture);
-    prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(therapyGrantFixture);
-    prismaMock.branchCategoryAccess.findUnique.mockResolvedValue(branchTherapyGrantFixture);
     prismaMock.therapist.findFirst.mockResolvedValue(null);
     prismaMock.therapist.findUnique.mockResolvedValue(null as never); // slug uniqueness check
     prismaMock.therapist.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: 'therapist-3', ...data }));
-
-    const res = await request(app)
-      .post(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/therapists`)
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({ therapistType: 'Massage Therapist', personName: 'Suresh Chandra', specializationCategoryId: THERAPY_CATEGORY_ID });
-
-    expect(res.status).toBe(201);
   });
 
-  it('rejects a therapist specializationCategoryId the vendor was not granted', async () => {
-    resolveMock.mockResolvedValue(['members:custom']);
-    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
-    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-    prismaMock.category.findUnique.mockResolvedValue(therapyCategoryFixture);
-    prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(null);
-    prismaMock.therapist.findFirst.mockResolvedValue(null);
+  it('creates a therapist with a THERAPY specialization and no grant rows at all', async () => {
+    prismaMock.category.findUnique.mockResolvedValue({ id: THERAPY_CATEGORY_ID, name: 'Deep Tissue', parentId: null, type: 'THERAPY' });
+    const res = await post();
+    expect(res.status).toBe(201);
+    expect(prismaMock.vendorCategoryAccess.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.branchCategoryAccess.findUnique).not.toHaveBeenCalled();
+  });
 
-    const res = await request(app)
-      .post(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/therapists`)
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({ therapistType: 'Massage Therapist', personName: 'Suresh Chandra', specializationCategoryId: THERAPY_CATEGORY_ID });
+  it('a subcategory of a THERAPY category is accepted', async () => {
+    prismaMock.category.findUnique
+      .mockResolvedValueOnce({ id: THERAPY_CATEGORY_ID, name: 'Sports', parentId: 'parent-1', type: null })
+      .mockResolvedValueOnce({ id: 'parent-1', name: 'Therapy', parentId: null, type: 'THERAPY' });
+    expect((await post()).status).toBe(201);
+  });
 
+  it('rejects a specialization that is not a THERAPY category (422)', async () => {
+    prismaMock.category.findUnique.mockResolvedValue({ id: THERAPY_CATEGORY_ID, name: 'Haircut', parentId: null, type: 'SERVICE' });
+    const res = await post();
     expect(res.status).toBe(422);
     expect(prismaMock.therapist.create).not.toHaveBeenCalled();
   });
@@ -3138,13 +2493,12 @@ describe('Therapist (admin-on-behalf — mirrors Branch/Deal exact admin split)'
     expect(res.body.data.isActive).toBe(false);
   });
 
-  it('rejects an admin-on-behalf therapist create with a specializationCategoryId the vendor was not granted THERAPY access to', async () => {
+  it('rejects an admin-on-behalf therapist create with a specializationCategoryId that is not a THERAPY category', async () => {
     const THERAPY_CATEGORY_ID = 'b6b6b6b6-0000-4000-8000-000000000010';
     resolveMock.mockResolvedValue(['vendors.therapists:create']);
     prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
     prismaMock.therapist.findFirst.mockResolvedValue(null);
-    prismaMock.category.findUnique.mockResolvedValue({ id: THERAPY_CATEGORY_ID, name: 'Deep Tissue', parentId: null, type: 'THERAPY' });
-    prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(null); // no grant
+    prismaMock.category.findUnique.mockResolvedValue({ id: THERAPY_CATEGORY_ID, name: 'Haircut', parentId: null, type: 'SERVICE' });
 
     const res = await request(app)
       .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/therapists`)

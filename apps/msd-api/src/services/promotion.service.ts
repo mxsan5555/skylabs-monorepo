@@ -24,7 +24,7 @@ type Destination = 'ROUTE' | 'CATEGORY' | 'DEAL' | 'PRODUCT';
 
 const PROMOTION_INCLUDE = {
   category: { select: { id: true, name: true, slug: true, isActive: true } },
-  deal: { select: { id: true, title: true, slug: true, status: true, approvalStatus: true } },
+  deal: { select: { id: true, title: true, slug: true, status: true } },
   product: { select: { id: true, name: true, slug: true, isActive: true } },
   mediaImages: { orderBy: { sortOrder: 'asc' as const } },
   placements: { select: { slot: true }, orderBy: { slot: 'asc' as const } },

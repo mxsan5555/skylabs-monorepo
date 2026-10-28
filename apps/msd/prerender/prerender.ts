@@ -92,10 +92,30 @@ async function main() {
   if (apiDown) {
     warn(`no catalog data from ${apiUrl || '(no API URL)'}; skipping prerender, the SPA serves every route`);
   } else {
-    for (const route of bundle.buildRoutes(shell)) {
+    let dealSlugs: string[] = [];
+    try {
+      dealSlugs = await withTimeout(bundle.loadDealSlugs(), timeoutMs, 'deal slugs');
+    } catch (err) {
+      warn(`deal list failed (${(err as Error).message}); deal pages are served by the SPA`);
+    }
+    for (const route of bundle.buildRoutes(shell, dealSlugs)) {
       let payload: PrerenderPayload;
       try {
-        if (!route.slug) {
+        if (route.deal) {
+          const data = await withTimeout(bundle.loadDealData(route.deal), timeoutMs, route.path);
+          if (!data.deal) {
+            warn(`${route.path}: deal not found, skipped`);
+            continue;
+          }
+          payload = { shell, [bundle.dealDataKey(route.deal)]: data };
+        } else if (route.listing) {
+          const data = await withTimeout(bundle.loadListingData(route.listing, route.city, route.state), timeoutMs, route.path);
+          if (bundle.isEmptyCityPage(route, data)) {
+            log(`${route.path}: no results in this city, skipped (not in the sitemap)`);
+            continue;
+          }
+          payload = { shell, [bundle.listingDataKey(route.listing, route.city)]: data };
+        } else if (!route.slug) {
           payload = { shell, home: await withTimeout(bundle.loadHomeData(), timeoutMs, route.path) };
         } else {
           const data = await withTimeout(bundle.loadCategoryData(route.slug, route.city, route.state), timeoutMs, route.path);

@@ -54,8 +54,13 @@ export interface CatalogDealPackage {
   originalPrice: string | null;
 }
 
+/** Card tag computed by msd-api (PLANNING §4 D30): one per deal or product, or null. */
+export type CatalogOfferTag = 'expire_soon' | 'hot' | 'new' | 'deal';
+export const CATALOG_OFFER_TAGS: CatalogOfferTag[] = ['expire_soon', 'hot', 'new', 'deal'];
+
 export interface CatalogDeal {
   id: string;
+  tag?: CatalogOfferTag | null;
   title: string;
   slug: string;
   shortDescription: string | null;
@@ -90,6 +95,54 @@ export interface CatalogDeal {
    *  coordinates are unavailable, never fabricated. Optional (not just nullable) since existing
    *  test fixtures typed as `CatalogDeal` predate this field. */
   distanceKm?: number | null;
+}
+
+export type CatalogCancellationPolicy = 'FREE_24H' | 'FREE_48H' | 'NON_REFUNDABLE';
+
+/** A package on the deal page: the card fields plus name, people, inclusions and its discount. */
+export interface CatalogDealDetailPackage extends CatalogDealPackage {
+  name: string | null;
+  persons: number;
+  inclusions: string[];
+  discountPercent: number | null;
+}
+
+/** `GET /catalog/deals/:idOrSlug` (API.md §4): everything the deal page shows in one call. */
+export interface CatalogDealDetail extends Omit<CatalogDeal, 'packages' | 'branch' | 'vendor' | 'mediaImages'> {
+  tagline: string | null;
+  highlights: string[];
+  eligibility: string[];
+  currency: 'INR';
+  bookingRequired: boolean;
+  bookingInstructions: string | null;
+  validityDays: number | null;
+  limitPerCustomer: number | null;
+  cancellationPolicy: CatalogCancellationPolicy;
+  cancellationNote: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  /** Paid units, or null under 10 (the page shows "{n} bought" from 10). */
+  boughtCount: number | null;
+  isSoldOut: boolean;
+  /** Units left, or null without a stock limit. */
+  stockLeft: number | null;
+  packages: CatalogDealDetailPackage[];
+  faqs: { id: string; question: string; answer: string }[];
+  mediaImages?: (MediaImage & { altText?: string | null })[];
+  vendor: (NonNullable<CatalogDeal['vendor']> & { businessDescription: string | null; website: string | null; mediaImages?: MediaImage[] }) | null;
+  branch:
+    | (NonNullable<CatalogDeal['branch']> & {
+        addressLine2: string | null;
+        state: string | null;
+        pincode: string | null;
+        phone: string | null;
+        mapLocationUrl: string | null;
+        openingHours: CatalogOpeningHours | null;
+      })
+    | null;
+  therapists: CatalogTherapist[];
 }
 
 /** `Branch.openingHours` shape — keys are lowercase 3-letter day codes (`mon`…`sun`); `open:
@@ -175,6 +228,9 @@ export interface CatalogVendorDetail {
   address: string | null;
   branches: CatalogVendorBranch[];
 }
+
+/** A comma-joined list param, or undefined when empty (so it is left out of the query). */
+const joinList = (values?: string[]) => (values?.length ? values.join(',') : undefined);
 
 function toQuery(params: Record<string, string | number | undefined>): string {
   const usp = new URLSearchParams();
@@ -284,13 +340,15 @@ export interface CatalogDealListOptions {
   longitude?: number;
   /** Radius in km around `latitude`/`longitude`; ignored without coordinates. */
   radiusKm?: number;
+  /** Only items whose card tag is one of these. */
+  tags?: CatalogOfferTag[];
 }
 
+const dealQuery = ({ vendorIds, branchIds, tags, ...rest }: Omit<CatalogDealListOptions, 'sort'> & { sort?: string }) =>
+  toQuery({ ...rest, vendorIds: joinList(vendorIds), branchIds: joinList(branchIds), tags: joinList(tags) });
+
 export function listCatalogDeals(opts: CatalogDealListOptions = {}) {
-  return apiGet<CatalogDeal[]>(
-    `/catalog/deals${toQuery({ ...opts, vendorIds: opts.vendorIds?.length ? opts.vendorIds.join(',') : undefined, branchIds: opts.branchIds?.length ? opts.branchIds.join(',') : undefined })}`,
-    null,
-  );
+  return apiGet<CatalogDeal[]>(`/catalog/deals${dealQuery(opts)}`, null);
 }
 
 export interface CatalogDealFacets {
@@ -298,19 +356,19 @@ export interface CatalogDealFacets {
   branches: { id: string; name: string; city: string | null; vendorName: string; count: number }[];
   distance: { km: number; count: number }[];
   price: { min: number; max: number } | null;
+  /** Count per card tag (every tag, zeros included); absent on therapist facets. */
+  tags?: { tag: CatalogOfferTag; count: number }[];
 }
 
 /** Filter-panel counts for the same filters as `listCatalogDeals` (no paging/sort). */
 export function getCatalogDealFacets(opts: Omit<CatalogDealListOptions, 'page' | 'pageSize' | 'sort'> = {}) {
-  const { vendorIds, branchIds, ...rest } = opts;
-  return apiGet<CatalogDealFacets>(
-    `/catalog/deals/facets${toQuery({ ...rest, vendorIds: vendorIds?.length ? vendorIds.join(',') : undefined, branchIds: branchIds?.length ? branchIds.join(',') : undefined })}`,
-    null,
-  );
+  return apiGet<CatalogDealFacets>(`/catalog/deals/facets${dealQuery(opts)}`, null);
 }
 
-export function getCatalogDeal(id: string) {
-  return apiGet<CatalogDeal>(`/catalog/deals/${id}`, null);
+/** The deal page (`GET /catalog/deals/:idOrSlug`): a UUID, the current slug or an old slug. The
+ *  response always carries the current `slug` (PLANNING §2.7 URLs). */
+export function getCatalogDeal(idOrSlug: string) {
+  return apiGet<CatalogDealDetail>(`/catalog/deals/${encodeURIComponent(idOrSlug)}`, null);
 }
 
 /** Product is a fully independent, directly-purchasable catalog entity (see msd-api's Product
@@ -318,6 +376,7 @@ export function getCatalogDeal(id: string) {
  *  fields (Product has no branchId) and no `packages` (no duration/tier concept applies). */
 export interface CatalogProduct {
   id: string;
+  tag?: CatalogOfferTag | null;
   name: string;
   slug: string;
   brand: string | null;
@@ -341,18 +400,37 @@ export interface CatalogProduct {
   popularTags?: CatalogPopularTag[];
 }
 
-export function listCatalogProducts(opts: {
+export interface CatalogProductListOptions {
   page?: number;
   pageSize?: number;
   categoryId?: string;
+  /** Top-level category ids; win over `categoryId`. */
+  categoryIds?: string[];
   subcategoryId?: string;
   vendorId?: string;
   search?: string;
   sort?: CatalogProductSort;
   minPrice?: number;
   maxPrice?: number;
-} = {}) {
-  return apiGet<CatalogProduct[]>(`/catalog/products${toQuery(opts)}`, null);
+  tags?: CatalogOfferTag[];
+}
+
+const productQuery = ({ categoryIds, tags, ...rest }: CatalogProductListOptions) =>
+  toQuery({ ...rest, categoryIds: joinList(categoryIds), tags: joinList(tags) });
+
+export function listCatalogProducts(opts: CatalogProductListOptions = {}) {
+  return apiGet<CatalogProduct[]>(`/catalog/products${productQuery(opts)}`, null);
+}
+
+export interface CatalogProductFacets {
+  categories: { id: string; name: string; slug: string; count: number }[];
+  tags: { tag: CatalogOfferTag; count: number }[];
+  price: { min: number; max: number } | null;
+}
+
+/** Filter-panel counts for the same filters as `listCatalogProducts` (no paging/sort). */
+export function getCatalogProductFacets(opts: Omit<CatalogProductListOptions, 'page' | 'pageSize' | 'sort'> = {}) {
+  return apiGet<CatalogProductFacets>(`/catalog/products/facets${productQuery(opts)}`, null);
 }
 
 export function getCatalogProduct(id: string) {
@@ -369,21 +447,40 @@ export function getCatalogVendor(slug: string, opts: { state?: string; city?: st
   return apiGet<CatalogVendorDetail>(`/catalog/vendors/${encodeURIComponent(slug)}${toQuery(opts)}`, null);
 }
 
-export function listCatalogTherapists(
-  opts: {
-    page?: number;
-    pageSize?: number;
-    categoryId?: string;
-    subcategoryId?: string;
-    vendorId?: string;
-    branchId?: string;
-    search?: string;
-    /** See `listCatalogDeals`'s identical param doc comment. */
-    latitude?: number;
-    longitude?: number;
-  } = {},
-) {
-  return apiGet<CatalogTherapist[]>(`/catalog/therapists${toQuery(opts)}`, null);
+export type CatalogTherapistSort = 'relevance' | 'price_asc' | 'price_desc' | 'distance';
+
+export interface CatalogTherapistListOptions {
+  page?: number;
+  pageSize?: number;
+  categoryId?: string;
+  subcategoryId?: string;
+  vendorId?: string;
+  branchId?: string;
+  vendorIds?: string[];
+  branchIds?: string[];
+  search?: string;
+  state?: string;
+  city?: string;
+  /** Price = the lowest active package; sorted and paged server-side. */
+  sort?: CatalogTherapistSort;
+  minPrice?: number;
+  maxPrice?: number;
+  radiusKm?: number;
+  /** See `listCatalogDeals`'s identical param doc comment. */
+  latitude?: number;
+  longitude?: number;
+}
+
+const therapistQuery = ({ vendorIds, branchIds, ...rest }: CatalogTherapistListOptions) =>
+  toQuery({ ...rest, vendorIds: joinList(vendorIds), branchIds: joinList(branchIds) });
+
+export function listCatalogTherapists(opts: CatalogTherapistListOptions = {}) {
+  return apiGet<CatalogTherapist[]>(`/catalog/therapists${therapistQuery(opts)}`, null);
+}
+
+/** Vendor, branch, distance and price ("From" price) counts for the therapist list. */
+export function getCatalogTherapistFacets(opts: Omit<CatalogTherapistListOptions, 'page' | 'pageSize' | 'sort'> = {}) {
+  return apiGet<CatalogDealFacets>(`/catalog/therapists/facets${therapistQuery(opts)}`, null);
 }
 
 export function getCatalogTherapist(id: string) {

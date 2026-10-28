@@ -18,18 +18,14 @@ const DEAL_COLUMNS = JSON.stringify([
     type: 'status',
     statusMap: { ACTIVE: 'success', DRAFT: 'warning', INACTIVE: 'error', EXPIRED: 'error' },
   },
-  {
-    key: 'Approval Status',
-    label: 'Approval Status',
-    type: 'status',
-    statusMap: { APPROVED: 'success', PENDING: 'warning', REJECTED: 'error' },
-  },
   { key: 'Created', label: 'Created', type: 'date' },
 ]);
 
-/** Not '__view_detail__' — editing a deal happens on its vendor's own page (VendorBranches,
- *  reused there), so the row action here just deep-links to that vendor. */
-const DEAL_ACTIONS = JSON.stringify([{ icon: 'open_in_new', label: 'View vendor', event: 'view-vendor' }]);
+/** Edit opens the one deal form (PLANNING §2.7); View member opens the member page. */
+const DEAL_ACTIONS = JSON.stringify([
+  { icon: 'edit', label: 'Edit deal', event: 'edit-deal' },
+  { icon: 'open_in_new', label: 'View member', event: 'view-vendor' },
+]);
 
 /** "From ₹X" for a deal with 2+ active packages, the single package's price for exactly one, or
  *  a plain dash for a deal with none yet. Mirrors what the customer-facing storefront already
@@ -64,9 +60,9 @@ function toDealRow(deal: Deal): Record<string, string | number> {
     Packages: packagesSummary(deal),
     'Starting Price': startingPrice(deal),
     Status: deal.status,
-    'Approval Status': deal.approvalStatus,
     Created: deal.createdAt,
     'Vendor ID': deal.vendor?.id ?? '',
+    'Deal ID': deal.id,
   };
 }
 
@@ -78,9 +74,8 @@ interface TableParams {
 
 const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 10, search: '' };
 
-/** Cross-vendor Deals sidebar page — read list only; editing a deal happens on its vendor's
- *  own page (`VendorBranches`, reused there), reached via the "View vendor" action. Mirrors
- *  orders.tsx's <sky-data-table> pattern exactly. */
+/** Cross-vendor Deals sidebar page: every deal of every member. "Edit deal" opens the deal form,
+ *  "View member" the member page. Mirrors orders.tsx's <sky-data-table> pattern. */
 export function DealList() {
   const { token } = useAuth();
   const navigate = useNavigate();
@@ -125,9 +120,10 @@ export function DealList() {
     };
     const onRowAction = (e: Event) => {
       const detail = (e as CustomEvent<{ action: string; row: Record<string, unknown> }>).detail;
-      if (detail.action !== 'view-vendor') return;
       const vendorId = detail.row['Vendor ID'];
-      if (typeof vendorId === 'string' && vendorId) navigate(`/account/members?vendorId=${vendorId}`);
+      if (typeof vendorId !== 'string' || !vendorId) return;
+      if (detail.action === 'edit-deal') navigate(`/account/members/${vendorId}/deals/${String(detail.row['Deal ID'])}`);
+      else if (detail.action === 'view-vendor') navigate(`/account/members?vendorId=${vendorId}`);
     };
 
     el.addEventListener('sky-dt-params-change', onParamsChange);
