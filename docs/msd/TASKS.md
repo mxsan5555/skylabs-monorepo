@@ -37,7 +37,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 
 | # | Module | Done | Total | % |
 |---|---|---|---|---|
-| 1 | Admin and staff | 3 | 31 | 10 |
+| 1 | Admin and staff | 4 | 31 | 13 |
 | 2 | Members | 53 | 101 | 52 |
 | 3 | Customers and orders | 2 | 12 | 17 |
 | 4 | Storefront | 17 | 42 | 40 |
@@ -49,7 +49,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
 | 12 | Platform, security and release | 9 | 69 | 13 |
-| | **Total** | **95** | **289** | **33** |
+| | **Total** | **96** | **289** | **33** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -77,7 +77,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [x] | P1-11 | SEC | Super Admin protection on `/rbac`: only a Super Admin manages a Super Admin account or gives/removes the role; no editing a role you hold; last active Super Admin cannot lose the role, be blocked or deleted; a Super Admin cannot be impersonated | M | - | Merged: `services/super-admin-guard.service.ts`, 7 tests in `rbac.routes.test.ts` |
 | [ ] | P2-05 | BE | Read roles from DB (30 s cache) not the token; clear cache on role, permission and user-role change | M | P2-01 | Role change effective within one request after cache clear |
 | [ ] | P2-06 | BE | `denyPreview` middleware for payout, delete, status, refund, staff routes; block impersonating super_admin | S | P2-01 | Preview token gets 403 on listed routes; partly: impersonating a Super Admin returns 403 (P1-11); `denyPreview` open |
-| [ ] | P2-15 | BE | `ROLE_MANAGEMENT_LOCKED` on role create, clone and delete | S | - | Test |
+| [x] | P2-15 | BE | `ROLE_MANAGEMENT_LOCKED` on role create, clone and delete | S | - | Test; done 2026-10-28: the three routes keep their permission check and return 403 `ROLE_MANAGEMENT_LOCKED`; their service functions and the clone schema removed; Role Management drops New role, Clone and Delete (part of P10-08) |
 | [ ] | P4-09 | BE | Notifications: recipient type `MEMBER`/`ADMIN`; new types | S | P3-04 | Migration and test |
 | [ ] | P4-10 | BE | Logs and profile scoped to own for non-super-admin | S | P2-02 | Test |
 | [ ] | P8-01 | BE | `/staff-users` routes with role allowlist and last-super-admin guard | M | P1-07 | Negative tests; partly: last-active-Super-Admin guard on the current `/rbac/users` routes (P1-11) |
@@ -89,7 +89,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | P8-08 | BE | Bootstrap returns `scopes` | S | P1-09 | Contract test |
 | [ ] | P10-01 | SH | `shared-auth/react`: expose `scopeFor()`, scope-aware `can()` and `PermissionButton`; refetch bootstrap after role change | M | P1-09, P8-08 | Component tests |
 | [ ] | P10-06 | FE | Sidebar renders the new menu per role; test each of 7 roles | M | P1-05 | Snapshot per role |
-| [ ] | P10-08 | FE | Role Management: 14-row matrix with V/C/E/D, extra actions, scope badge; hide New role and Clone; system roles marked | L | P10-01 | `roles/permission-matrix.tsx` tests updated |
+| [ ] | P10-08 | FE | Role Management: 14-row matrix with V/C/E/D, extra actions, scope badge; hide New role and Clone; system roles marked | L | P10-01 | `roles/permission-matrix.tsx` tests updated; partly 2026-10-28: New role, Clone and Delete removed with P2-15 |
 | [ ] | P10-09 | FE | Super-admin-only edit, unsaved-change guard, show the self-escalation error | S | P10-08 | Test |
 | [ ] | P10-10 | FE | Staff users page: create, edit, status, delete rules; role dropdown limited; last super admin message | M | P8-01 | `users/` tests updated |
 | [ ] | P10-29 | FE | System settings page (super admin edit, admin view) | M | P8-03 | Tests |

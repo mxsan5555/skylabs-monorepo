@@ -89,10 +89,10 @@ Closing the gap and a CI coverage check are P9-05 and P9-06.
 | POST | `/api/v1/rbac/impersonate` | `rbac.users:custom` |
 | GET | `/api/v1/rbac/permissions/catalog` | `rbac.roles:view` |
 | GET | `/api/v1/rbac/roles` | `rbac.roles:view` |
-| POST | `/api/v1/rbac/roles` | `rbac.roles:create` |
+| POST | `/api/v1/rbac/roles` | `rbac.roles:create`, then 403 `ROLE_MANAGEMENT_LOCKED` (R1) |
 | PATCH | `/api/v1/rbac/roles/:id` | `rbac.roles:edit` |
-| DELETE | `/api/v1/rbac/roles/:id` | `rbac.roles:delete` |
-| POST | `/api/v1/rbac/roles/:id/clone` | `rbac.roles:create` |
+| DELETE | `/api/v1/rbac/roles/:id` | `rbac.roles:delete`, then 403 `ROLE_MANAGEMENT_LOCKED` (R1) |
+| POST | `/api/v1/rbac/roles/:id/clone` | `rbac.roles:create`, then 403 `ROLE_MANAGEMENT_LOCKED` (R1) |
 | GET | `/api/v1/rbac/roles/:id/permissions` | `rbac.roles:view` |
 | PUT | `/api/v1/rbac/roles/:id/permissions` | `rbac.roles:edit` |
 | PATCH | `/api/v1/rbac/roles/:id/status` | `rbac.roles:status_change` |
@@ -112,8 +112,9 @@ Closing the gap and a CI coverage check are P9-05 and P9-06.
 | GET | `/api/v1/rbac/users/me` | signed in (own records, or checked in the handler) |
 | PATCH | `/api/v1/rbac/users/me` | signed in (own records, or checked in the handler) |
 
-Planned: `GET /rbac/bootstrap` adds `scopes`; role create, clone and delete return 403
-`ROLE_MANAGEMENT_LOCKED`; grant edits refuse super-admin-only actions (`ROLE_GRANT_FORBIDDEN`);
+Role create, clone and delete return 403 `ROLE_MANAGEMENT_LOCKED` to anyone holding the permission
+(R1, P2-15, done 2026-10-28; nothing is written); a role's name, status, grants and widgets stay
+editable. Planned: `GET /rbac/bootstrap` adds `scopes`; grant edits refuse super-admin-only actions (`ROLE_GRANT_FORBIDDEN`);
 `/staff-users*` replaces `/rbac/users*` with a role allowlist and last-Super-Admin guard;
 `GET /settings`, `PATCH /settings/:key`; `GET /logs/login-history`, `GET /logs/audit`;
 `GET`/`PATCH /me` (P8).

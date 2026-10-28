@@ -1,15 +1,13 @@
 import { Router } from 'express';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { authenticate } from '../middleware/authenticate';
 import { requirePermission } from '../middleware/requirePermission';
 import { validateBody, validateParams, validateQuery } from '../middleware/validate';
 import { z } from 'zod';
 import { UuidParamSchema, PaginationQuerySchema } from '../schemas/common.schema';
 import {
-  RoleCreateSchema,
   RoleUpdateSchema,
   RoleStatusUpdateSchema,
-  RoleCloneSchema,
   RolePermissionsUpdateSchema,
   RoleWidgetsUpdateSchema,
   DashboardWidgetCreateSchema,
@@ -32,7 +30,7 @@ import { startImpersonation } from '../services/impersonation.service';
 import { getBootstrap } from '../services/bootstrap.service';
 import { writeAuditLog } from '../services/audit.service';
 import { prisma } from '../lib/prisma';
-import { sendData } from '../lib/http';
+import { sendData, sendError } from '../lib/http';
 
 const UserRoleParamsSchema = z.object({ id: z.string().uuid(), roleId: z.string().uuid() });
 
@@ -64,27 +62,16 @@ router.get('/roles', requirePermission('rbac.roles', 'view'), async (_req, res, 
   }
 });
 
-router.post(
-  '/roles',
-  requirePermission('rbac.roles', 'create'),
-  validateBody(RoleCreateSchema),
-  async (req, res, next) => {
-    try {
-      const role = await roleService.createRole(req.body);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'role.create',
-        targetType: 'Role',
-        targetId: role.id,
-        after: role,
-        ...requestMeta(req),
-      });
-      sendData(res, role, { status: 201 });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
+/**
+ * R1 (PLANNING §1, P2-15): the seven roles are fixed. Creating, cloning and deleting a role are
+ * refused for everyone who passes the permission check; a role's name, status and grants stay
+ * editable below.
+ */
+function roleManagementLocked(_req: Request, res: Response) {
+  sendError(res, 'ROLE_MANAGEMENT_LOCKED', 'Roles are fixed. Change what a role can do in its permissions instead.');
+}
+
+router.post('/roles', requirePermission('rbac.roles', 'create'), roleManagementLocked);
 
 router.patch(
   '/roles/:id',
@@ -112,52 +99,9 @@ router.patch(
   },
 );
 
-router.delete(
-  '/roles/:id',
-  requirePermission('rbac.roles', 'delete'),
-  validateParams(UuidParamSchema),
-  async (req, res, next) => {
-    try {
-      const before = await roleService.getRole(req.params.id);
-      await roleService.deleteRole(req.params.id);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'role.delete',
-        targetType: 'Role',
-        targetId: req.params.id,
-        before,
-        ...requestMeta(req),
-      });
-      sendData(res, null);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
+router.delete('/roles/:id', requirePermission('rbac.roles', 'delete'), roleManagementLocked);
 
-router.post(
-  '/roles/:id/clone',
-  requirePermission('rbac.roles', 'create'),
-  validateParams(UuidParamSchema),
-  validateBody(RoleCloneSchema),
-  async (req, res, next) => {
-    try {
-      const clone = await roleService.cloneRole(req.params.id, req.body.key, req.body.name);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'role.clone',
-        targetType: 'Role',
-        targetId: clone.id,
-        before: { sourceRoleId: req.params.id },
-        after: clone,
-        ...requestMeta(req),
-      });
-      sendData(res, clone, { status: 201 });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
+router.post('/roles/:id/clone', requirePermission('rbac.roles', 'create'), roleManagementLocked);
 
 router.patch(
   '/roles/:id/status',

@@ -45,7 +45,7 @@ Known failures at 2026-10-18 (msd recounted 2026-10-27: `india-locations` moved 
 | Project | Failing | Where |
 |---|---|---|
 | msd | 19 tests in 11 files | `permission-matrix` 9, `contact-us` 2, and 1 each in `app.spec`, `widget-registry`, `deal-card`, `media-uploader`, `site-footer`, `wishlist`, `roles`, `settings`; `entry-server.test.tsx` fails to load (`sky-product-card-wc` fixed 2026-10-24). Regressions since commit e756759 (NewOfferCard), not yet fixed: `home` 4 (FAQ section no longer rendered, deal favourite), `category` 1 (product wishlist heart) |
-| msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; recounted 2026-10-28: 1,263 pass) |
+| msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; recounted 2026-10-28: 1,260 pass) |
 | shared-menu | 5 | `index.test.ts` |
 
 Lint and type drift: 30 msd lint errors (`import/first` and `no-empty-function` in older tests), an ESLint ignore error in the shared packages, and
@@ -68,6 +68,11 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
   (403); the last active Super Admin cannot lose the role, be blocked or be deleted (409).
 - Permission revoked while a token is active: the API refuses on the next request after the cache
   clears.
+- Fixed roles (R1, P2-15; `rbac.routes.test.ts` "Role create, clone and delete are locked",
+  `roles.test.tsx` "roles are fixed"): with the permission, create, clone and delete return 403
+  `ROLE_MANAGEMENT_LOCKED` and write nothing (no role row, no audit row); without it, 403
+  `FORBIDDEN`; the Role Management page shows no New role, Clone or Delete for any viewer and says
+  roles are fixed.
 - Session hygiene (P10-38; `packages/shared-auth/src/react/auth-context.test.tsx`,
   `apps/msd/src/auth/role-routing.test.ts`): sign-out calls `POST /auth/logout` with the refresh
   token and clears the access token, refresh token, any preview and the bootstrap, even when the

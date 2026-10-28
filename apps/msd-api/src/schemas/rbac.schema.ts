@@ -36,18 +36,6 @@ export const RoleStatusUpdateSchema = z
   })
   .openapi('RoleStatusUpdate');
 
-export const RoleCloneSchema = z
-  .object({
-    key: z
-      .string()
-      .min(2)
-      .max(50)
-      .regex(/^[a-z][a-z0-9_]*$/, 'key must be a lower_snake_case slug'),
-    name: z.string().min(1).max(100),
-  })
-  .openapi('RoleClone');
-
-
 export const RolePermissionAssignmentSchema = z.object({
   permissionId: z.string().uuid(),
   scope: PermissionScopeSchema,
