@@ -367,7 +367,7 @@ router.get('/me/branches', requirePermission('members', 'custom'), async (req, r
 
 /**
  * Distinct customers who have ordered from the caller's own vendor — for the vendor-facing
- * "Customers" screen. Derived entirely from existing Order rows (no new table); paginates the
+ * "Customers" screen. Phone and email only while the customer has an open (CONFIRMED) order (D19). Derived entirely from existing Order rows (no new table); paginates the
  * distinct-customer list, not the raw Order rows.
  */
 router.get('/me/customers', requirePermission('members', 'custom'), validateQuery(PaginationQuerySchema), async (req, res, next) => {
@@ -376,7 +376,7 @@ router.get('/me/customers', requirePermission('members', 'custom'), validateQuer
     // A member who has not set up a business yet sees an empty Customers list, not an error.
     const vendor = await vendorService.getVendorByOwnerUserId(req.user!.sub);
     const { items, total } = vendor
-      ? await vendorService.listMyCustomers(vendor.id, { page, pageSize })
+      ? await vendorService.listMyCustomers(vendor.id, { page, pageSize, contact: 'open-orders' })
       : { items: [], total: 0 };
     sendData(res, items, { meta: { total, page, pageSize } });
   } catch (err) {
@@ -1133,7 +1133,7 @@ router.get(
   async (req, res, next) => {
     try {
       const { page, pageSize } = req.validatedQuery as ReturnType<typeof PaginationQuerySchema.parse>;
-      const { items, total } = await vendorService.listMyCustomers(req.params.vendorId, { page, pageSize });
+      const { items, total } = await vendorService.listMyCustomers(req.params.vendorId, { page, pageSize, contact: 'full' });
       sendData(res, items, { meta: { total, page, pageSize } });
     } catch (err) {
       next(err);

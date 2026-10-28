@@ -12,6 +12,7 @@ import {
   checkVendorOwnerAvailability,
   createTherapist,
   listVendors,
+  listMyCustomers,
 } from './vendor.service';
 
 const prismaMock = vi.mocked(prisma, true);
@@ -318,5 +319,63 @@ describe('listVendors — member list filters', () => {
     const { items, total } = await listVendors({ page: 1, pageSize: 20 });
     expect(total).toBe(1);
     expect(items[0].documentsSummary).toMatchObject({ complete: false, missing: ['AADHAAR', 'GST'] });
+  });
+});
+
+/**
+ * Member customers (D19, P4-16): name, city, order count, last order date; phone and email only
+ * while the customer has a CONFIRMED order with this member. Staff (`contact: 'full'`) always
+ * get contact details (D12).
+ */
+describe('listMyCustomers', () => {
+  const day = (n: number) => new Date(Date.UTC(2026, 9, n));
+  const item = (orderId: string, customerId: string, status: string, createdAt: Date, shippingCity: string | null = null) => ({
+    orderId,
+    order: { customerId, createdAt, status, shippingCity },
+  });
+
+  beforeEach(() => {
+    prismaMock.orderItem.findMany.mockResolvedValue([
+      // Asha: two lines of one completed order, then a newer confirmed (open) order.
+      item('o1', 'asha', 'COMPLETED', day(1), 'Pune'),
+      item('o1', 'asha', 'COMPLETED', day(1), 'Pune'),
+      item('o2', 'asha', 'CONFIRMED', day(5), null),
+      // Ravi: only a pending-payment order and a cancelled one: nothing open.
+      item('o3', 'ravi', 'PENDING_PAYMENT', day(3), 'Mumbai'),
+      item('o4', 'ravi', 'CANCELLED', day(4), 'Thane'),
+    ] as never);
+    prismaMock.user.findMany.mockResolvedValue([
+      { id: 'asha', name: 'Asha', phone: '+919800000001', email: 'asha@example.com' },
+      { id: 'ravi', name: 'Ravi', phone: '+919800000002', email: 'ravi@example.com' },
+    ] as never);
+  });
+
+  it('reads only this member order lines', async () => {
+    await listMyCustomers('m1', { page: 1, pageSize: 20, contact: 'open-orders' });
+    expect(prismaMock.orderItem.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { vendorId: 'm1' } }));
+  });
+
+  it('member view: contact only with a CONFIRMED order; city from the latest order that has one; distinct order count', async () => {
+    const { items, total } = await listMyCustomers('m1', { page: 1, pageSize: 20, contact: 'open-orders' });
+    expect(total).toBe(2);
+    expect(items[0]).toEqual({
+      id: 'asha', name: 'Asha', city: 'Pune', orderCount: 2, lastActivityAt: day(5), hasOpenOrder: true,
+      phone: '+919800000001', email: 'asha@example.com',
+    });
+    expect(items[1]).toEqual({
+      id: 'ravi', name: 'Ravi', city: 'Thane', orderCount: 2, lastActivityAt: day(4), hasOpenOrder: false,
+      phone: null, email: null,
+    });
+  });
+
+  it('staff view always returns contact details', async () => {
+    const { items } = await listMyCustomers('m1', { page: 1, pageSize: 20, contact: 'full' });
+    expect(items.find((c) => c.id === 'ravi')).toMatchObject({ phone: '+919800000002', email: 'ravi@example.com', hasOpenOrder: false });
+  });
+
+  it('pages after sorting by the latest order, newest first', async () => {
+    const { items, total } = await listMyCustomers('m1', { page: 2, pageSize: 1, contact: 'open-orders' });
+    expect(total).toBe(2);
+    expect(items.map((c) => c.id)).toEqual(['ravi']);
   });
 });

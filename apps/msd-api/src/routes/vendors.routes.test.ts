@@ -1159,6 +1159,20 @@ describe('PATCH /api/v1/vendors/:id/status (member status alias)', () => {
 describe('DELETE /api/v1/vendors/:id (member delete alias)', () => {
   const REASON = { reason: 'Closed the business for good' };
 
+  // The hard delete also reads the media of the member's deals, products and therapists (P3-25).
+  beforeEach(() => {
+    for (const model of [
+      prismaMock.dealImage,
+      prismaMock.dealVideo,
+      prismaMock.productImage,
+      prismaMock.productVideo,
+      prismaMock.therapistImage,
+      prismaMock.therapistVideo,
+    ]) {
+      model.findMany.mockResolvedValue([]);
+    }
+  });
+
   it('hard deletes a SUSPENDED member with no order lines', async () => {
     resolveMock.mockResolvedValue(['members:delete']);
     prismaMock.member.findUnique.mockResolvedValue({ ...vendorAFixture, status: 'SUSPENDED', owner: null });
@@ -2518,6 +2532,35 @@ describe('GET /api/v1/vendors/me/customers — member with no business record', 
     expect(res.status).toBe(200);
     expect(res.body.data).toEqual([]);
     expect(res.body.meta.total).toBe(0);
+  });
+});
+
+describe('Member customers (D19, P4-16)', () => {
+  beforeEach(() => {
+    prismaMock.orderItem.findMany.mockResolvedValue([
+      { orderId: 'o1', order: { customerId: 'cust-1', createdAt: new Date('2026-10-01'), status: 'COMPLETED', shippingCity: 'Pune' } },
+    ]);
+    prismaMock.user.findMany.mockResolvedValue([{ id: 'cust-1', name: 'Asha', phone: '+919800000001', email: 'asha@example.com' }]);
+  });
+
+  it('the member sees name, city and counts but no phone or email without an open order', async () => {
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
+    const res = await request(app)
+      .get('/api/v1/vendors/me/customers')
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['member'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data[0]).toMatchObject({ name: 'Asha', city: 'Pune', orderCount: 1, hasOpenOrder: false, phone: null, email: null });
+    expect(prismaMock.orderItem.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { vendorId: VENDOR_A_ID } }));
+  });
+
+  it('staff on the member page always get phone and email (D12)', async () => {
+    resolveMock.mockResolvedValue(['members:view']);
+    const res = await request(app)
+      .get(`/api/v1/vendors/${VENDOR_A_ID}/customers`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['support'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data[0]).toMatchObject({ phone: '+919800000001', email: 'asha@example.com', hasOpenOrder: false, city: 'Pune' });
   });
 });
 

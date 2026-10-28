@@ -38,7 +38,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | # | Module | Done | Total | % |
 |---|---|---|---|---|
 | 1 | Admin and staff | 2 | 31 | 6 |
-| 2 | Members | 47 | 101 | 47 |
+| 2 | Members | 49 | 101 | 49 |
 | 3 | Customers and orders | 2 | 12 | 17 |
 | 4 | Storefront | 17 | 42 | 40 |
 | 5 | Static content | 0 | 5 | 0 |
@@ -49,7 +49,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
 | 12 | Platform, security and release | 7 | 69 | 10 |
-| | **Total** | **86** | **289** | **30** |
+| | **Total** | **88** | **289** | **30** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -125,7 +125,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | P3-22 | BE | Rename `vendor.service.ts`, `vendors.routes.ts` and the `Vendor*` Zod schemas to member names | S | P3-12 | No `vendor` in those file or schema names; existing tests green |
 | [ ] | P3-23 | FE | Move the member detail page and self-service calls in msd from `/vendors/:id` and `/vendors/me` to `/members/*` before the alias is removed | S | P3-12 | No `/vendors` request left in `apps/msd/src/api` (grep) |
 | [ ] | P3-24 | BE | Return structured fields (from status, to status, document type, actor id) from the member activity API so the client stops parsing summary sentences | S | P3-13 | Activity items carry the fields; `readableActivitySummary` removed from `apps/msd`; tests |
-| [ ] | P3-25 | BE | Hard delete of a member also removes the media files of its deals, products and therapists from R2, not only its own documents, images and video | S | P3-09 | Test: every storage key of the cascaded rows is deleted after commit; archive keeps all files |
+| [x] | P3-25 | BE | Hard delete of a member also removes the media files of its deals, products and therapists from R2, not only its own documents, images and video | S | P3-09 | Test: every storage key of the cascaded rows is deleted after commit; archive keeps all files; done 2026-10-27: `memberStorageKeys` also reads deal, product and therapist images and videos before the delete |
 | [ ] | P4-01 | BE | Members list, get, update through `scopedWhere` | M | P2-02, P3-05 | Member A cannot read B (404) |
 | [ ] | P4-02 | BE | Branches: flat routes plus scope plus status endpoint | M | P4-01 | IDOR test |
 | [ ] | P4-03 | BE | Deals: scope, status, `PUT /deals/:id/therapists` with branch and member checks | L | P4-02 | Cross-branch assignment returns 422 |
@@ -135,7 +135,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | P4-13 | BE | Grant `members:view` and `members:edit` with own scope to role `member`, then retire `members:custom` | M | P4-01 | Member reads and edits only their own record; `members:custom` gone from the seed |
 | [x] | P4-14 | BE | Product category without per-member grants (D10, C-07, C-12 for products): `createProduct` and `updateProduct` check only active `PRODUCT` type and subcategory parentage | S | - | Member with no `VendorCategoryAccess` row creates a product; a `SERVICE` category is rejected; tests |
 | [x] | P4-15 | BE | Finish C-12 for deals and therapists: drop vendor and branch category grant checks, retire the `PUT .../category-access` routes and the onboarding grant step | M | P4-14 | Deal and therapist create work with no grants; grant routes return 404; tests; done 2026-10-27: no grant checks or grant routes (404), branch and therapist forms have no grant step, dashboard counts used categories; grant tables and `offers*` flags dropped in the contract step |
-| [ ] | P4-16 | BE | Member customers view (C-16, D9, D19): `GET /customers` own scope, customers with an order item from the member, name, city, order count, last order date | S | P4-01 | Member sees only own customers; no phone or email unless an order is open |
+| [x] | P4-16 | BE | Member customers view (C-16, D9, D19): `GET /customers` own scope, customers with an order item from the member, name, city, order count, last order date | S | P4-01 | Member sees only own customers; no phone or email unless an order is open; done 2026-10-28: `GET /vendors/me/customers` returns city and `hasOpenOrder`, phone and email only with a CONFIRMED order; staff route keeps full contact; console shows City and "Hidden until an order is open"; flat `GET /customers` own scope moves to P4-01 |
 | [ ] | P5-01 | DB | `MemberDocument` migration: status, masked number, hash, reviewer, expiry, uploader fields | M | P3-01 | Up and down tested; partly: columns in the migration; up and down rehearsal open (P10-45) |
 | [ ] | P5-02 | DB | Copy legacy GST, PAN and `kycDocuments` into `MemberDocument`; verify counts | M | P5-01 | Count and checksum report; partly: existing `VendorDocument` rows become SUBMITTED; legacy GST, PAN and `kycDocuments` columns not copied yet |
 | [x] | P5-03 | BE | Private R2 bucket client, presigned GET (5 min), `.pdf` ContentType fix | M | P2-09 | Merged: `R2_PRIVATE_BUCKET`, `signedFileUrl` (300 s), `.pdf` content type; no fallback to the public bucket |

@@ -582,7 +582,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/vendors/me/customers',
-    summary: 'Distinct customers who have ordered/booked from the caller\'s own vendor',
+    summary: 'The caller\'s own customers: name, city, order count, last order date; phone and email only with an open (CONFIRMED) order (D19)',
     tags: ['Vendors - Self-service'],
     security: bearer,
     request: { query: PaginationQuerySchema },
@@ -1032,7 +1032,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/vendors/{vendorId}/customers',
-    summary: "Distinct customers who have ordered/booked from a vendor (admin, read-only)",
+    summary: "A member's customers with city and full contact details (staff, read-only, D12)",
     tags: ['Vendors - Admin'],
     security: bearer,
     request: { params: z.object({ vendorId: z.string().uuid() }), query: PaginationQuerySchema },
