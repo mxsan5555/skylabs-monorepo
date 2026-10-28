@@ -1917,5 +1917,60 @@
       "loading": "Loading therapists…",
       "loadError": "Could not load therapists."
     }
+  },
+  "customerDashboard": {
+    "metaTitle": "My Dashboard",
+    "loading": {
+      "heading": "Loading your dashboard",
+      "subheading": "Please wait..."
+    },
+    "errors": {
+      "load": "Could not load your dashboard.",
+      "icon": "error_outline"
+    },
+    "stats": {
+      "deals": {
+        "label": "Booked Deals",
+        "icon": "spa"
+      },
+      "products": {
+        "label": "Purchased Products",
+        "icon": "inventory_2"
+      },
+      "cart": {
+        "label": "Your Cart",
+        "icon": "shopping_cart"
+      },
+      "wishlist": {
+        "label": "Wishlist",
+        "icon": "favorite"
+      },
+      "linkIcon": "arrow_forward"
+    },
+    "quickActions": {
+      "orders": {
+        "icon": "receipt_long",
+        "heading": "Your orders",
+        "subheading": "Track booked deals and purchased products.",
+        "button": "View Orders"
+      },
+      "profile": {
+        "icon": "person",
+        "heading": "Manage your profile",
+        "subheading": "View and update your personal account information.",
+        "button": "View Profile"
+      },
+      "logout": {
+        "icon": "logout",
+        "heading": "Sign out",
+        "subheading": "Sign out from your MySpaDeal account.",
+        "button": "Logout"
+      }
+    },
+    "icons": {
+      "error": "error_outline",
+      "arrowForward": "arrow_forward",
+      "logout": "logout"
+    }
   }
 }

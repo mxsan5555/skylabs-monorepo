@@ -110,7 +110,7 @@ export function OrderDetail() {
                         </div>
                         {item.itemType === 'PRODUCT' &&
                           !isCancelled && (
-                            <div className="cart-item__timeline"> <ProductOrderTimeline status={order.status} /></div>
+                            <div className="cart-item__timeline"> <ProductOrderTimeline status={order.status}   paymentStatus={order.payments[0]?.status}/></div>
                           )}
                         {isCancelled && (
                           <div className="cart-item__timeline"> <OrderCancellationTimeline order={order} /></div>
@@ -159,24 +159,6 @@ export function OrderDetail() {
                     })}
                   </span>
                 </div>
-                {order.type === 'PRODUCT' &&
-                  order.shippingAddress && (
-                    <sky-accordion className="cart-summary__delivery">
-                      <sky-accordion-item header="Delivery Address">
-                        <div className="cart-summary__address">
-                          <div className="cart-summary__address-line">
-                            <Icon aria-hidden="true">location_on</Icon>
-                            <span>{order.shippingAddress}</span>
-                          </div>
-                          <div className="cart-summary__address-location">
-                            {order.shippingCity},{' '}
-                            {order.shippingState} -{' '}
-                            {order.shippingPincode}
-                          </div>
-                        </div>
-                      </sky-accordion-item>
-                    </sky-accordion>
-                  )}
                 <Divider />
                 <div className="cart-summary__row cart-summary__row--total">
                   <strong>{orderDetail.labels.total}</strong>
