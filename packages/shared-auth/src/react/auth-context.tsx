@@ -20,10 +20,10 @@ import {
   readSessionValue,
   readStorageValue,
   refreshAccessToken,
+  resolveInitialToken,
   revokeSession,
   writeSessionValue,
   writeStorageValue,
-  type AuthStorageKeys,
 } from '../index';
 
 export interface AuthContextValue {
@@ -42,23 +42,6 @@ export interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-/** The token this tab starts with: a live "Login As" preview from sessionStorage, else the real
- *  token from localStorage. Drops an expired preview, and moves a preview that an older build
- *  left in localStorage back out of the way (P10-38). */
-function initialToken(keys: AuthStorageKeys): string | null {
-  const preview = readSessionValue(keys.previewToken);
-  if (preview && !isJwtExpired(preview)) return preview;
-  if (preview) writeSessionValue(keys.previewToken, null);
-  const stored = readStorageValue(keys.token);
-  if (stored && isPreviewToken(stored)) {
-    const real = readStorageValue(keys.realToken);
-    writeStorageValue(keys.token, real);
-    writeStorageValue(keys.realToken, null);
-    return real;
-  }
-  return stored;
-}
-
 export function AuthProvider({
   appPrefix,
   apiBaseUrl,
@@ -69,7 +52,7 @@ export function AuthProvider({
   children: ReactNode;
 }) {
   const keys = useMemo(() => authStorageKeys(appPrefix), [appPrefix]);
-  const [token, setToken] = useState<string | null>(() => initialToken(keys));
+  const [token, setToken] = useState<string | null>(() => resolveInitialToken(keys));
   const [bootstrap, setBootstrap] = useState<BootstrapResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(!!token);
 

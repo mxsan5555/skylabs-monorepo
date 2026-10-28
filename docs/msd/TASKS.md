@@ -94,7 +94,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | P10-10 | FE | Staff users page: create, edit, status, delete rules; role dropdown limited; last super admin message | M | P8-01 | `users/` tests updated |
 | [ ] | P10-29 | FE | System settings page (super admin edit, admin view) | M | P8-03 | Tests |
 | [ ] | P10-30 | FE | Logs page: login history (all or own) and audit filters | M | P8-04, P8-05 | Tests |
-| [x] | P10-38 | SEC | Logout clears tokens and bootstrap; preview token never persisted past tab; no open redirects after sign-in | S | - | Tests; done 2026-10-28: `shared-auth` sign-out revokes the refresh token and clears everything, preview token in `sessionStorage` only (older localStorage previews migrated), `sanitizeReturnUrl` refuses backslash, control-character and encoded `//` paths. mera-driver's Angular `AuthService` still keeps previews in localStorage (its own task) |
+| [x] | P10-38 | SEC | Logout clears tokens and bootstrap; preview token never persisted past tab; no open redirects after sign-in | S | - | Tests; done 2026-10-28: `shared-auth` sign-out revokes the refresh token and clears everything, preview token in `sessionStorage` only (older localStorage previews migrated), `sanitizeReturnUrl` refuses backslash, control-character and encoded `//` paths. mera-driver's Angular `AuthService` follows the same rules since mera-driver X-06 |
 
 ## 2. Members
 

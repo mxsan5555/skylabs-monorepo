@@ -55,6 +55,23 @@ export const writeStorageValue = (key: string, value: string | null) => writeVal
 export const readSessionValue = (key: string) => readValue('sessionStorage', key);
 export const writeSessionValue = (key: string, value: string | null) => writeValue('sessionStorage', key, value);
 
+/** The token this tab starts with: a live "Login As" preview from sessionStorage, else the real
+ *  token from localStorage. Drops an expired preview, and moves a preview that an older build
+ *  left in localStorage back out of the way (P10-38). */
+export function resolveInitialToken(keys: AuthStorageKeys): string | null {
+  const preview = readSessionValue(keys.previewToken);
+  if (preview && !isJwtExpired(preview)) return preview;
+  if (preview) writeSessionValue(keys.previewToken, null);
+  const stored = readStorageValue(keys.token);
+  if (stored && isPreviewToken(stored)) {
+    const real = readStorageValue(keys.realToken);
+    writeStorageValue(keys.token, real);
+    writeStorageValue(keys.realToken, null);
+    return real;
+  }
+  return stored;
+}
+
 /** Decodes the JWT payload for read-only UI hints (e.g. `preview`). Never trust this for access control — the server re-verifies on every request. */
 export function decodeJwtPayload<T = Record<string, unknown>>(token: string): T | null {
   try {
