@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ApiRequestError } from '../../../../api/rbac/client';
+import { DOCUMENT_MAX_BYTES } from '@skylabs-monorepo/shared-utils';
 import { MemberDocumentsTab } from './member-documents-tab';
 
 const listMock = vi.fn();
@@ -162,6 +163,46 @@ describe('MemberDocumentsTab', () => {
     fireEvent.change(screen.getByLabelText('Upload Aadhaar card file'), { target: { files: [file] } });
     expect(await screen.findByText('Document uploaded for the member.')).toBeTruthy();
     expect(uploadMock).toHaveBeenCalledWith('t', 'm1', 'AADHAAR', file, 'aadhaar.pdf', '234567890123');
+  });
+
+  // P10-37: the upload input, the size check before upload, safe file names and safe links.
+  it('accepts only PDF, JPEG and PNG on the file input', async () => {
+    renderTab();
+    const input = (await screen.findByLabelText('Upload Aadhaar card file')) as HTMLInputElement;
+    expect(input.getAttribute('accept')).toBe('.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png');
+  });
+
+  it('refuses a file over 5 MB before uploading, with a message', async () => {
+    renderTab();
+    const input = await screen.findByLabelText('Upload Aadhaar card file');
+    const big = new File(['x'], 'big.pdf', { type: 'application/pdf' });
+    Object.defineProperty(big, 'size', { value: DOCUMENT_MAX_BYTES + 1 });
+    fireEvent.change(input, { target: { files: [big] } });
+    expect((await screen.findByRole('alert')).textContent).toBe('That file is larger than 5 MB. Choose a smaller file.');
+    expect(uploadMock).not.toHaveBeenCalled();
+  });
+
+  it('shows a file name as plain text, never as markup', async () => {
+    listMock.mockResolvedValue({ data: [{ ...ROWS[0], originalFilename: '<img src=x onerror=alert(1)>.pdf' }] });
+    renderTab();
+    expect(await screen.findByText('<img src=x onerror=alert(1)>.pdf')).toBeTruthy();
+    expect(document.querySelector('img')).toBeNull();
+  });
+
+  it('opens a document in a new tab with noopener and noreferrer, and says so', async () => {
+    listMock.mockResolvedValue({ data: [{ ...ROWS[0], fileUrl: 'https://files.example/signed/pan.pdf' }] });
+    renderTab();
+    const link = await screen.findByRole('link', { name: 'View PAN card file (opens in a new tab)' });
+    expect(link.getAttribute('href')).toBe('https://files.example/signed/pan.pdf');
+    expect(link.getAttribute('target')).toBe('_blank');
+    expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+  });
+
+  it('shows no file link to viewers who get no file URL', async () => {
+    listMock.mockResolvedValue({ data: SUPPORT_ROWS });
+    renderTab({ canEdit: false, canApprove: false, canReject: false });
+    await screen.findByText('PAN card');
+    expect(screen.queryByRole('link')).toBeNull();
   });
 
   it('removes a document that is not approved', async () => {

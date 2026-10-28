@@ -94,6 +94,11 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
   `member-document.service.test.ts`, `member-documents-tab.test.tsx`): an on-behalf upload names the
   staff member ("Uploaded by Priya for the member"), a missing account reads "staff", the member's
   own upload has no name, and the list makes one name lookup (none without on-behalf rows).
+  Upload safety (P10-37; `member-documents-tab.test.tsx`, `shared-utils` `document-upload.test.ts`):
+  the file input accepts PDF, JPEG and PNG only; a file over 5 MB is refused before upload with a
+  message (the server limit is the same shared constant); a file name renders as text, never
+  markup; "View <document> file" opens the signed URL in a new tab with `rel="noopener noreferrer"`
+  and says so to screen readers; viewers without a file URL get no link.
 - Counts (P10-49; `vendors.routes.test.ts` "customer and order counts", `member-detail-page.test.tsx`,
   `vendor-customers.test.tsx`, `orders.test.tsx`): the detail response counts distinct orders and
   distinct customers (two lines of one order count once; two orders of one customer, one

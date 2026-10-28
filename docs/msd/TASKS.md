@@ -38,7 +38,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | # | Module | Done | Total | % |
 |---|---|---|---|---|
 | 1 | Admin and staff | 3 | 31 | 10 |
-| 2 | Members | 52 | 101 | 51 |
+| 2 | Members | 53 | 101 | 52 |
 | 3 | Customers and orders | 2 | 12 | 17 |
 | 4 | Storefront | 17 | 42 | 40 |
 | 5 | Static content | 0 | 5 | 0 |
@@ -48,8 +48,8 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 9 | Payments, payouts and reports | 0 | 11 | 0 |
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
-| 12 | Platform, security and release | 8 | 69 | 12 |
-| | **Total** | **93** | **289** | **32** |
+| 12 | Platform, security and release | 9 | 69 | 13 |
+| | **Total** | **95** | **289** | **33** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -170,7 +170,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [x] | P10-14 | FE | Tabs: Profile, Documents, Branches/Deals/Therapists, Activity | M | P10-13 | Keyboard and ARIA tab pattern |
 | [x] | P10-15 | FE | Status change with inline confirm and reason (10 to 500 chars), history list | M | P3-07 | Tests |
 | [x] | P10-16 | FE | Delete member (super admin only) with inline confirm; message for the ARCHIVED outcome | S | P3-09 | Tests |
-| [ ] | P10-17 | FE | Documents tab: per-document status chips, masked number input, upload, approve, reject with reason, "uploaded by X for member", view via signed URL in new tab | L | P5-06, P5-09 | Tests; support sees status only; partly: status chips, masked number, upload on behalf, approve and reject done; uploader name done (P5-15); signed URL view done (P5-14) |
+| [x] | P10-17 | FE | Documents tab: per-document status chips, masked number input, upload, approve, reject with reason, "uploaded by X for member", view via signed URL in new tab | L | P5-06, P5-09 | Tests; support sees status only; partly: status chips, masked number, upload on behalf, approve and reject done; uploader name done (P5-15); signed URL from P5-14 (server only); done 2026-10-28: "View <document> file" link added with P10-37, every part now built and tested |
 | [x] | P10-18 | FE | Activity tab: reminders, warnings, status timeline | M | P3-13, P6-01 | Merged: reminders, manual reminders and the review flag in the Activity tab |
 | [x] | P10-19 | FE | "Ready for suspension review" badge with reason prefilled "Documents not completed" | S | P6-05, P10-15 | Merged: the flag is now set by the reminder job; badge, filter and prefilled reason read it |
 | [ ] | P10-20 | FE | My profile and business profile (own view/edit) | M | P8-06 | Tests |
@@ -378,7 +378,7 @@ Removed 2026-10-24: ST-17 (therapist city filter is in ST-40; products are not l
 | [ ] | P9-08 | FE | Generate typed API client from OpenAPI for msd | M | P9-05 | Build uses generated types |
 | [ ] | P10-34 | FE | Form UX: inline errors with `aria-describedby`, 422 mapped to fields, focus first error, live region for status | M | P10-03 | Axe has 0 violations |
 | [ ] | P10-35 | SEC | No PII in console, URLs, localStorage or error reports; masked values only; Sentry scrubbing rules | M | - | Test and manual review |
-| [ ] | P10-37 | SEC | Upload inputs: `accept`, size pre-check (UX only), filename display escaped; open links with `rel="noopener noreferrer"` | S | P10-17 | Test |
+| [x] | P10-37 | SEC | Upload inputs: `accept`, size pre-check (UX only), filename display escaped; open links with `rel="noopener noreferrer"` | S | P10-17 | Test; done 2026-10-28: `DOCUMENT_ACCEPT` and the 5 MB limit shared from `shared-utils` (msd-api uses the same constant), pre-upload size check, file names render as text, file link opens with `rel="noopener noreferrer"` |
 | [ ] | P10-40 | FE | `noindex` on all `/account/*`; 301 redirects for renamed public vendor routes decided with SEO owner | S | P10-05 | Meta test |
 | [ ] | P10-41 | QA | Accessibility audit WCAG 2.2 AA on every new page (keyboard, focus, contrast, target size) via sahaj | L | P10-30 | Report with 0 blockers |
 | [ ] | P10-42 | QA | Playwright e2e per role (7 roles): login, allowed action works, forbidden action hidden and server-rejected | L | P10-33 | Suite green in CI |
