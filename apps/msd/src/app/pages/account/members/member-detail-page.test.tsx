@@ -29,6 +29,7 @@ vi.mock('./branches-list-page', () => ({ BranchesListPage: () => <p>branches-tab
 vi.mock('./deals-list-page', () => ({ DealsListPage: () => <p>deals-tab</p> }));
 vi.mock('./therapists-list-page', () => ({ TherapistsListPage: () => <p>therapists-tab</p> }));
 vi.mock('./products-list-page', () => ({ ProductsListPage: () => <p>products-tab</p> }));
+vi.mock('./vendor-customers', () => ({ VendorCustomers: (props: { vendorId?: string }) => <p>customers-tab {props.vendorId}</p> }));
 vi.mock('./vendor-profile-form', () => ({
   VendorProfileForm: (props: { canEdit: boolean }) => {
     profileProps(props);
@@ -78,6 +79,8 @@ const MEMBER = {
   reviewFlaggedAt: null,
   owner: { id: 'o1', name: 'Arjun', status: 'active', roles: [] },
   documentsSummary: { complete: false, missing: ['PAN'], rejected: [], dueAt: '2026-10-20T00:00:00Z', overdue: false },
+  customerCount: 1,
+  orderCount: 12,
 } as unknown as Vendor;
 
 function Where() {
@@ -136,10 +139,10 @@ describe('MemberDetailPage', () => {
     await waitFor(() => expect(screen.getByText('deals-tab')).toBeTruthy());
   });
 
-  it('renders the seven tabs wired to one labelled tab panel', async () => {
+  it('renders the eight tabs wired to one labelled tab panel', async () => {
     renderAt('/account/members/m1/documents');
     await waitFor(() => expect(screen.getByText('documents-tab')).toBeTruthy());
-    expect(tabs().map((t) => t.textContent?.trim())).toEqual(['Profile', 'Documents', 'Branches', 'Deals', 'Therapists', 'Products', 'Activity']);
+    expect(tabs().map((t) => t.textContent?.trim())).toEqual(['Profile', 'Documents', 'Branches', 'Deals', 'Therapists', 'Products', 'Customers', 'Activity']);
     expect(document.querySelector('md-tabs')?.getAttribute('aria-label')).toBe('Member sections');
     const active = tab('Documents');
     const panel = screen.getByRole('tabpanel');
@@ -166,11 +169,11 @@ describe('MemberDetailPage', () => {
     expect(screen.getByText(/activity-tab/)).toBeTruthy();
   });
 
-  it('does not show Approve, Reject, setup progress, Customers or Orders', async () => {
+  it('does not show Approve, Reject or setup progress', async () => {
     renderAt('/account/members/m1');
     await waitFor(() => expect(screen.getByText('profile-form')).toBeTruthy());
     const text = document.body.textContent ?? '';
-    expect(text).not.toMatch(/Approve|Reject|Setup progress|Customers|Orders/);
+    expect(text).not.toMatch(/Approve|Reject|Setup progress/);
   });
 
   it('explains a suspended member', async () => {
@@ -301,5 +304,39 @@ describe('MemberDetailPage Remind now', () => {
     await waitFor(() => expect(lastHeader()?.onRemind).toBeTypeOf('function'));
     await lastHeader().onRemind?.();
     expect(await screen.findByText('A reminder already went to this member in the last 24 hours.')).toBeTruthy();
+  });
+});
+
+/** P10-49: total customers and total orders in the header, each linking to its filtered list for
+ *  staff who can open that list (customers:view, orders:view); plain numbers otherwise. */
+describe('MemberDetailPage customer and order counts', () => {
+  it('links the counts to the Customers tab and the filtered Orders list', async () => {
+    renderAt('/account/members/m1');
+    const orders = await screen.findByRole('link', { name: '12 orders' });
+    expect(orders.getAttribute('href')).toBe('/account/orders?vendorId=m1');
+    expect(screen.getByRole('link', { name: '1 customer' }).getAttribute('href')).toBe('/account/members/m1/customers');
+  });
+
+  it('shows plain numbers and no Customers tab without customers:view or orders:view', async () => {
+    useAuthMock.mockReturnValue({ token: 't', can: (key: string) => key !== 'customers' && key !== 'orders' });
+    renderAt('/account/members/m1');
+    expect(await screen.findByText('12 orders')).toBeTruthy();
+    expect(screen.getByText('1 customer')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: '12 orders' })).toBeNull();
+    expect(screen.queryByRole('link', { name: '1 customer' })).toBeNull();
+    expect(tabs().map((t) => t.textContent?.trim())).not.toContain('Customers');
+  });
+
+  it('opens the Customers tab for this member', async () => {
+    renderAt('/account/members/m1/customers');
+    expect(await screen.findByText('customers-tab m1')).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 2, name: 'Customers' })).toBeTruthy();
+  });
+
+  it('falls back to Profile when the Customers tab is not allowed', async () => {
+    useAuthMock.mockReturnValue({ token: 't', can: (key: string) => key !== 'customers' });
+    renderAt('/account/members/m1/customers');
+    expect(await screen.findByText('profile-form')).toBeTruthy();
+    expect(screen.queryByText(/customers-tab/)).toBeNull();
   });
 });

@@ -155,10 +155,13 @@ with incomplete documents can still publish.
 
 ### 2.5 Member detail page
 
-Header: name, status, documents chip, due date, review flag badge, and only the actions the viewer
-may use (Make inactive, Suspend, Reactivate, Delete, Remind now). Tabs: Profile, Documents,
-Branches, Deals, Therapists, Products, Activity (status history, document events, reminders,
-review flag). The All members list filters by status, documents incomplete and ready for review in
+Header: name, status, documents chip, due date, review flag badge, total customers and total
+orders (P10-49: distinct customers and orders with an order line from the member; "N customers"
+links to the Customers tab for `customers:view`, "N orders" to `/account/orders?vendorId=` for
+`orders:view`, plain numbers otherwise), and only the actions the viewer may use (Make inactive,
+Suspend, Reactivate, Delete, Remind now). Tabs: Profile, Documents, Branches, Deals, Therapists,
+Products, Customers (`customers:view`; the member's customers with contact details, D12),
+Activity (status history, document events, reminders, review flag). The All members list filters by status, documents incomplete and ready for review in
 one grouped Filter menu, with distinct tonal colours per status.
 
 ### 2.6 Catalog flow

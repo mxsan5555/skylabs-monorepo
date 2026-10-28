@@ -139,6 +139,9 @@ beforeEach(() => {
   for (const model of [prismaMock.branch, prismaMock.deal, prismaMock.product, prismaMock.therapist]) {
     model.groupBy.mockResolvedValue([]);
   }
+  // The detail route also counts the member's customers and orders (P10-49): none by default.
+  prismaMock.order.count.mockResolvedValue(0);
+  prismaMock.user.count.mockResolvedValue(0);
 });
 
 describe('GET /api/v1/vendors/me', () => {
@@ -989,6 +992,32 @@ describe('Admin onboarding pipeline — per-step saves', () => {
     expect(userSection.complete).toBe(true);
   });
 
+});
+
+describe('GET /api/v1/vendors/:id — customer and order counts (P10-49)', () => {
+  it('counts orders and customers that have an order line from this member, without loading rows', async () => {
+    resolveMock.mockResolvedValue(['members:view']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.order.count.mockResolvedValue(3);
+    prismaMock.user.count.mockResolvedValue(2);
+    const res = await request(app)
+      .get(`/api/v1/vendors/${VENDOR_A_ID}`)
+      .set('Authorization', bearerFor({ sub: 'support-1', roles: ['support'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ orderCount: 3, customerCount: 2 });
+    const hasMemberLine = { items: { some: { vendorId: VENDOR_A_ID } } };
+    expect(prismaMock.order.count).toHaveBeenCalledWith({ where: hasMemberLine });
+    expect(prismaMock.user.count).toHaveBeenCalledWith({ where: { orders: { some: hasMemberLine } } });
+  });
+
+  it('is zero for a member with no orders', async () => {
+    resolveMock.mockResolvedValue(['members:view']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
+    const res = await request(app)
+      .get(`/api/v1/vendors/${VENDOR_A_ID}`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+    expect(res.body.data).toMatchObject({ orderCount: 0, customerCount: 0 });
+  });
 });
 
 describe('Cross-vendor Branches/Deals sidebar lists', () => {

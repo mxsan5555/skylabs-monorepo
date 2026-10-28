@@ -38,7 +38,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | # | Module | Done | Total | % |
 |---|---|---|---|---|
 | 1 | Admin and staff | 3 | 31 | 10 |
-| 2 | Members | 50 | 101 | 50 |
+| 2 | Members | 51 | 101 | 50 |
 | 3 | Customers and orders | 2 | 12 | 17 |
 | 4 | Storefront | 17 | 42 | 40 |
 | 5 | Static content | 0 | 5 | 0 |
@@ -49,7 +49,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
 | 12 | Platform, security and release | 7 | 69 | 10 |
-| | **Total** | **90** | **289** | **31** |
+| | **Total** | **91** | **289** | **31** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -185,7 +185,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | P10-46 | QA | Fix pre-existing lint and test drift: eslint ignore error in shared-* packages and 31 msd lint errors; 26 msd tests in 15 files (permission-matrix, roles, widget-registry, settings, home, wishlist, become-vendor, india-locations, deal-card, sky-product-card-wc, media-uploader, site-footer, contact-us, app.spec, entry-server); msd-api `rbac.routes` and orders image tests; shared-menu `index.test.ts` | M | - | `nx run-many -t lint test` green for msd, msd-api and shared-* |
 | [ ] | P10-47 | FE | Rename "All Member" to "All members" in the sidebar title (`packages/shared-menu/src/msd-menu.json`) and the breadcrumbs of the branch, deal, product and therapist form pages | S | - | grep finds no "All Member" in `apps/msd/src` or `packages/shared-menu`; tests updated |
 | [x] | P10-48 | FE | Product form (member detail Products and member self-service): Category (required), Subcategory and Type (optional) list all active `PRODUCT` categories, not per-member grants; "New" and "Featured" checkboxes stay on the form | S | P4-14 | Member with no grants sees the category list; both checkboxes save `isNew` and `isFeatured`; tests |
-| [ ] | P10-49 | FE | Member detail page shows total customers and total orders (counts linking to the filtered lists) | S | P4-16 | Counts match the lists; support sees counts only |
+| [x] | P10-49 | FE | Member detail page shows total customers and total orders (counts linking to the filtered lists) | S | P4-16 | Counts match the lists; support sees counts only; done 2026-10-28: `customerCount` and `orderCount` on the member detail API; header counts link to a new Customers tab (`customers:view`) and to `/account/orders?vendorId=` (`orders:view`), plain numbers otherwise. "Support sees counts only" replaced by these permission checks (owner decision 2026-10-28: Support holds both views, D12) |
 | [ ] | P5-16 | SEC | Switch `STORE_FULL_DOCUMENT_NUMBER` (default true in development): when false, write only the masked number and hash; production boot warns while it is true (D3) | S | P2-13 | Both modes tested; no full number stored when false |
 | [ ] | DL-01 | DB | Deal schema S18 to S21 and backfill S23 (PLANNING §2.7, DATABASE §2) with `down.sql` | M | owner approval of §2.7 | Migration up and down on a Neon copy; counts of backfilled rows recorded; partly 2026-10-27: migration `20261026100000_deal_page_fields` + `down.sql` written, client generated, applied locally 2026-10-27 (empty `migrate diff`, 38 deals backfilled); Neon rehearsal open |
 | [x] | DL-02 | SH | India location list to `packages/shared-utils`; branch `state` and `city` required from it, `addressLine2` (C-03, S22) | M | - | Unknown state or city returns 422; msd form and API use the one list; report of existing bad rows; partly 2026-10-27: list in `@skylabs-monorepo/shared-utils`, API and both branch forms require state + city, `addressLine2` added; done 2026-10-27: report script `npm run msd-api:prisma:report-branch-locations` (0 bad rows locally), `state`/`city` `NOT NULL` migration; Neon run with DL-01 |

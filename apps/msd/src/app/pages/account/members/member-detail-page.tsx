@@ -15,6 +15,8 @@ import { VendorProfileForm, extractVendorFieldErrors, type VendorFieldErrors } f
 import { MemberHeaderActions } from './member-header-actions';
 import { MemberDocumentsTab } from './member-documents-tab';
 import { MemberActivityTab } from './member-activity-tab';
+import { VendorCustomers } from './vendor-customers';
+import { pluralize } from '../../../../utils/format';
 import {
   MEMBER_STATUS_LABEL,
   MEMBER_STATUS_TONE,
@@ -35,6 +37,7 @@ const TABS = [
   { value: 'deals', label: 'Deals' },
   { value: 'therapists', label: 'Therapists' },
   { value: 'products', label: 'Products' },
+  { value: 'customers', label: 'Customers' },
   { value: 'activity', label: 'Activity' },
 ] as const;
 type Tab = (typeof TABS)[number]['value'];
@@ -49,8 +52,9 @@ const STATUS_DONE: Record<'ACTIVE' | 'INACTIVE' | 'SUSPENDED', string> = {
 };
 
 /**
- * One member's page: `/account/members/:memberId[/:section]`. Status actions sit in the header,
- * seven tabs below. The tab strip is `md-tabs`, which supplies the ARIA tabs pattern (tablist and
+ * One member's page: `/account/members/:memberId[/:section]`. Status actions and the customer and
+ * order counts sit in the header, up to eight tabs below (Customers needs `customers:view`).
+ * The tab strip is `md-tabs`, which supplies the ARIA tabs pattern (tablist and
  * tab roles, aria-selected, roving tabindex, Arrow, Home and End keys); this page adds the ids,
  * `aria-controls` and the `tabpanel`. Raw elements so jsdom tests can read the `active` property.
  */
@@ -67,7 +71,9 @@ export function MemberDetailPage() {
   const canStatusChange = can('members', 'status_change');
   const canDelete = can('members', 'delete');
 
-  const tab: Tab = TABS.find((t) => t.value === section)?.value ?? 'profile';
+  // P10-49: the Customers tab lists the member's customers through the staff route.
+  const visibleTabs = TABS.filter((t) => t.value !== 'customers' || can('customers', 'view'));
+  const tab: Tab = visibleTabs.find((t) => t.value === section)?.value ?? 'profile';
 
   const [member, setMember] = useState<Vendor | null>(null);
   const [loading, setLoading] = useState(true);
@@ -170,7 +176,18 @@ export function MemberDetailPage() {
   const reviewFlagged = Boolean(member.reviewFlaggedAt);
   const tabId = (value: Tab) => `${idBase}-tab-${value}`;
   const panelId = `${idBase}-panel`;
-  const activeLabel = TABS.find((t) => t.value === tab)?.label ?? '';
+  const activeLabel = visibleTabs.find((t) => t.value === tab)?.label ?? '';
+  // Each count links to its filtered list for staff who can open that list (P10-49).
+  const countLink = (count: number, noun: string, to: string, allowed: boolean) => {
+    const text = `${count} ${pluralize(count, noun)}`;
+    return allowed ? (
+      <Link className="text-link" to={to}>
+        {text}
+      </Link>
+    ) : (
+      <span>{text}</span>
+    );
+  };
 
   return (
     <div className="admin-page admin-page--wide">
@@ -184,6 +201,13 @@ export function MemberDetailPage() {
             <sky-badge status={documentsChipTone(summary)}>{documentsChipLabel(summary)}</sky-badge>
             {due && <span className="field-hint"> {due}</span>}
           </p>
+          {member.customerCount !== undefined && member.orderCount !== undefined && (
+            <p className="field-hint">
+              {countLink(member.customerCount, 'customer', `/account/members/${member.id}/customers`, can('customers', 'view'))}
+              {' · '}
+              {countLink(member.orderCount, 'order', `/account/orders?vendorId=${member.id}`, can('orders', 'view'))}
+            </p>
+          )}
           {reviewFlagged && member.status !== 'SUSPENDED' && (
             <p>
               <sky-badge status={REVIEW_FLAG_TONE}>{REVIEW_FLAG_LABEL}</sky-badge>
@@ -223,7 +247,7 @@ export function MemberDetailPage() {
         {createElement(
           'md-tabs',
           { className: 'admin-tabs', 'aria-label': 'Member sections' },
-          TABS.map((t) =>
+          visibleTabs.map((t) =>
             createElement(
               'md-primary-tab',
               {
@@ -281,6 +305,8 @@ export function MemberDetailPage() {
           />
         )}
         {tab === 'products' && <ProductsListPage token={token} vendorId={member.id} canEdit={canEdit} canDelete={canDelete} />}
+
+        {tab === 'customers' && <VendorCustomers vendorId={member.id} />}
 
         {tab === 'activity' && <MemberActivityTab token={token} memberId={member.id} refreshKey={activityKey} />}
       </section>

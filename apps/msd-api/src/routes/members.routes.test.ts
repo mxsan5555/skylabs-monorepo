@@ -75,6 +75,9 @@ beforeEach(() => {
   for (const model of [prismaMock.branch, prismaMock.deal, prismaMock.product, prismaMock.therapist]) {
     model.groupBy.mockResolvedValue([]);
   }
+  // GET /members/:id also counts customers and orders (P10-49): none by default.
+  prismaMock.order.count.mockResolvedValue(0);
+  prismaMock.user.count.mockResolvedValue(0);
 });
 
 describe('/api/v1/members authentication', () => {

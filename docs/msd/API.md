@@ -268,6 +268,11 @@ return 404; the branch list no longer carries `categoryTypes`; `GET /vendors/cat
 same active categories for every member and ignores `vendorId`. Member dashboard `categories` and
 `subCategories` count the categories the member uses on its deals, products and therapists.
 
+Member detail counts (P10-49): `GET /members/:id` (and `/vendors/:id`) also returns
+`customerCount` and `orderCount`: distinct customers and distinct orders with at least one order
+line from the member (any status), the same rows as the Customers list. List routes do not carry
+them. `GET /orders?vendorId=` (existing filter) backs the "N orders" link.
+
 Member activity (P3-24): `GET /members/:id/activity` (and the `/vendors/:id/activity` alias,
 `members:view`) returns items newest first with `kind`, `at`, `summary` (plain sentence, kept for
 older clients) and `detail`, plus typed fields per kind: `status` → `fromStatus`, `toStatus`,

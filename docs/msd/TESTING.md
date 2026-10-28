@@ -45,14 +45,15 @@ Known failures at 2026-10-18 (msd recounted 2026-10-27: `india-locations` moved 
 | Project | Failing | Where |
 |---|---|---|
 | msd | 19 tests in 11 files | `permission-matrix` 9, `contact-us` 2, and 1 each in `app.spec`, `widget-registry`, `deal-card`, `media-uploader`, `site-footer`, `wishlist`, `roles`, `settings`; `entry-server.test.tsx` fails to load (`sky-product-card-wc` fixed 2026-10-24). Regressions since commit e756759 (NewOfferCard), not yet fixed: `home` 4 (FAQ section no longer rendered, deal favourite), `category` 1 (product wishlist heart) |
-| msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; recounted 2026-10-28: 1,256 pass) |
+| msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; recounted 2026-10-28: 1,258 pass) |
 | shared-menu | 5 | `index.test.ts` |
 
 Lint and type drift: 30 msd lint errors (`import/first` and `no-empty-function` in older tests), an ESLint ignore error in the shared packages, and
 `apps/msd-api/src/routes/members.routes.test.ts` type errors in its setup code (P10-46). ESLint
 ignores every file under `apps/msd-api/src` today. Flaky under load: `deals-list-page.test.tsx`
 "toggle-status flips a non-ACTIVE deal" and `popular-tags.test.tsx` "mapping a category calls
-mapPopularTag" (both pass alone).
+mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
+`products-list-page.test.tsx` "delete asks for confirmation" (seen 2026-10-28, pass alone).
 
 ## 4. Acceptance per module
 
@@ -90,6 +91,14 @@ mapPopularTag" (both pass alone).
   images and videos of its deals, products and therapists (P3-25); archive keeps every file.
 - Documents: Support sees type and status only (no file key); masked numbers only; duplicate
   number 409; approve, reject with reason; deleting an Approved document 409.
+- Counts (P10-49; `vendors.routes.test.ts` "customer and order counts", `member-detail-page.test.tsx`,
+  `vendor-customers.test.tsx`, `orders.test.tsx`): the detail response counts distinct orders and
+  distinct customers (two lines of one order count once; two orders of one customer, one
+  customer); a member with no orders shows 0; "N customers" links to the Customers tab with
+  `customers:view`, "N orders" to `/account/orders?vendorId=` with `orders:view`, plain text
+  otherwise; the Customers tab is hidden without `customers:view` and its URL falls back to
+  Profile; the tab uses the staff route with contact details; the Orders page sends `vendorId`,
+  says "Showing one member's orders." and links back to every order.
 - Activity (P3-24; `member-activity.service.test.ts`, `member-activity-tab.test.tsx`): status items
   carry from, to and the actor; document items the type, the event and `byStaff`; reminder items
   the sequence (null when manual), the delivered channels and the sender; the console writes

@@ -7,9 +7,14 @@ import { VendorCustomers } from './vendor-customers';
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({ useAuth: () => ({ token: 'tok' }) }));
 
 const listMyCustomersMock = vi.fn();
+const listVendorCustomersForAdminMock = vi.fn();
 vi.mock('../../../../api/rbac/vendors', async () => {
   const actual = await vi.importActual<typeof import('../../../../api/rbac/vendors')>('../../../../api/rbac/vendors');
-  return { ...actual, listMyCustomers: (...args: unknown[]) => listMyCustomersMock(...args) };
+  return {
+    ...actual,
+    listMyCustomers: (...args: unknown[]) => listMyCustomersMock(...args),
+    listVendorCustomersForAdmin: (...args: unknown[]) => listVendorCustomersForAdminMock(...args),
+  };
 });
 
 /**
@@ -53,5 +58,22 @@ describe('VendorCustomers', () => {
       Phone: 'Hidden until an order is open',
       Email: 'Hidden until an order is open',
     });
+  });
+});
+
+/** P10-49: staff open the same table as the member page's Customers tab, through the staff route,
+ *  with contact details (D12) and without the page header of the member's own screen. */
+describe('VendorCustomers for staff (vendorId given)', () => {
+  it('uses the staff route, shows contact details even without an open order, and renders no page heading', async () => {
+    listVendorCustomersForAdminMock.mockResolvedValue({
+      data: [{ ...CLOSED, phone: '+919800000002', email: 'ravi@example.com' }],
+      meta: { total: 1 },
+    });
+    render(<VendorCustomers vendorId="m1" />);
+    await waitFor(() => expect(tableRows()).toHaveLength(1));
+    expect(listVendorCustomersForAdminMock).toHaveBeenCalledWith('tok', 'm1', { page: 1, pageSize: 20 });
+    expect(listMyCustomersMock).not.toHaveBeenCalled();
+    expect(tableRows()[0]).toMatchObject({ Phone: '+919800000002', Email: 'ravi@example.com' });
+    expect(document.querySelector('h1')).toBeNull();
   });
 });

@@ -874,7 +874,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/members/{id}',
-    summary: 'Get a member by id',
+    summary: 'Get a member by id, with liveCounts, customerCount and orderCount (P10-49)',
     tags: ['Members - Admin'],
     security: bearer,
     request: { params: z.object({ id: z.string().uuid() }) },
