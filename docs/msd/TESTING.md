@@ -255,6 +255,11 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
   (`/help-center`) and Wishlist, and no Gifting link until a gift-card feature exists.
 - One `<main>` per page (ST-04, `one-main-landmark.test.ts`): only the layouts render `<main>`; no
   file under `app/pages` does, so the skip link keeps a single target.
+- Sign-in landing and account links (ST-06, `role-routing.test.ts`, `shell-labels.test.tsx`):
+  staff (super admin, admin, sales, marketing, support) and members land on `/account/dashboard`;
+  a customer who is also a member lands on `/choose-experience`; a customer on `/`. The account
+  link goes to `/my-dashboard` for customers (with or without the member role) and to
+  `/account/dashboard` for members and staff; signed out it goes to `/sign-in`.
 - One `<h1>` per page; prerendered `/` contains the hero `<h1>`, category links and JSON-LD; no
   hydration warnings; `sitemap.xml`, `robots.txt`, `llms.txt` written when `VITE_SITE_URL` is set.
 - Category page (`category.test.tsx`): pills set `?sub=`; sort and filters send the right API
