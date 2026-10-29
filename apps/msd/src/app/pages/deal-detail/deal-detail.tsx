@@ -26,6 +26,9 @@ import { usePrerenderedData, dealDataKey } from '../../../prerender-data/prerend
 import { categoryHref, cityHref, citySlug } from '../../../catalog/catalog-shell';
 import { fillTemplate } from '../../../utils/format';
 import { resolveDealMedia } from '../../../utils/media';
+import { htmlToPlainText } from '../../../utils/rich-text';
+import { dealPath } from '../../seo/public-urls';
+
 import content from '../../../content.json';
 
 const t = content.dealDetail;
@@ -194,27 +197,22 @@ export function DealDetail() {
       setLoading(false);
       return;
     }
-    let cancelled = false;
+   
     setLoading(true);
     setError('');
     getCatalogDeal(slug)
       .then(({ data }) => {
-        if (cancelled) return;
         setDeal(data);
         // An old slug or the UUID: show the current address (the canonical carries it too).
         if (data.slug && data.slug !== slug) navigate(`/deal/${data.slug}`, { replace: true });
       })
       .catch((err: unknown) => {
-        if (cancelled) return;
         if (err instanceof ApiRequestError && err.status === 404) setDeal(null);
         else setError(err instanceof ApiRequestError ? err.message : t.errors.loadDeal);
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        setLoading(false);
       });
-    return () => {
-      cancelled = true;
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `seeded` is read once for the first render
   }, [slug, navigate]);
 

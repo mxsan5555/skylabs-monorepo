@@ -1,0 +1,30 @@
+{
+  "results": [
+    "Driver own profile, existing sidebar and exact saved pill resume",
+    "Real pill issue persisted across reload; driver correction resets affected check and preserves decision history",
+    "Authenticated uploaded image preview",
+    "Driver-owned saved-DL consent persisted; assigned verifier blocked preflight audited with providerCalled=false; live Verify DL stays disabled",
+    "Document replacement archives version 1, preserves its Pass decision, creates current version 2 and permits authorized previews of both originals while denying customers; uploaded PDF opens in the page preview",
+    "Customer existing portal reads its own database fixture booking; website booking creation not verified",
+    "Missing and damaged originals show isolated errors while every other field/document remains readable",
+    "Dedicated continuous details page: partial saved fields, authenticated images/PDF, archived versions, mobile layout, protected staff route and shareable resume",
+    "Server-backed combined city/login list filters",
+    "Manual current-check final KYC approval: verifier denied approval, authorized admin approved, own portal showed Verified",
+    "Authorized backend-generated binary PDFs downloaded for partial and complete drivers"
+  ],
+  "before": {
+    "drivers": 7,
+    "customers": 2,
+    "bookings": 1
+  },
+  "after": {
+    "drivers": 7,
+    "customers": 2,
+    "bookings": 1
+  },
+  "limitations": [
+    "Local signed tokens used; login itself not exercised",
+    "No live IDSPay calls",
+    "Dispatch, payment and Accounts verified separately in connected-smoke.cjs"
+  ]
+}

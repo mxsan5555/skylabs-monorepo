@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { PaginationQuerySchema } from './common.schema';
+import { PaginationQuerySchema, richTextField } from './common.schema';
 import { normalizeIdentifier } from '../lib/normalizeIdentifier';
 import { isIndiaLocation } from '@skylabs-monorepo/shared-utils';
 
@@ -39,6 +39,12 @@ export const VendorIdParamSchema = z.object({
   vendorId: z.string().uuid(),
 });
 
+/** Route param for the member-scoped `/me/customers/:customerId` lookup — same shape as
+ *  `UuidParamSchema`, just keyed `customerId` to match the param name. */
+export const VendorCustomerIdParamSchema = z.object({
+  customerId: z.string().uuid(),
+});
+
 /** Route param for the real KYC file-upload endpoints — `:documentType` must be one of the
  *  three real `VendorDocumentType` enum values (see schema.prisma), never a free-text label
  *  like the deprecated `kycDocuments` JSON blob's `type` field. */
@@ -75,6 +81,9 @@ const slugString = z
   .min(2)
   .max(160)
   .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'slug must be lower-kebab-case');
+
+const plainItems = (maxItems: number, maxLength: number) =>
+  z.array(z.string().trim().min(1).max(maxLength)).max(maxItems);
 
 const kycDocumentSchema = z.object({
   type: z.string().min(1).max(80),
@@ -359,7 +368,7 @@ const TherapistFieldsSchema = z.object({
    *  subcategories) that this vendor has been granted access to; validated in
    *  vendor.service.ts via assertVendorHasCategoryAccess. */
   specializationCategoryId: z.string().uuid().optional(),
-  bio: z.string().max(2000).optional(),
+  bio: richTextField(2000),
   experienceYears: z.number().int().min(0).max(60).optional(),
   /** URL only — matches Vendor.logoUrl/Deal.images' existing validation in this file; no
    *  upload pipeline exists yet. */
@@ -401,8 +410,6 @@ export const TherapistPackageUpdateSchema = TherapistPackageFieldsSchema
 // ─── Deal (docs/msd/PLANNING.md §2.7, API.md §2.1) ──────────────────────────
 // Prices, discount and duration are never accepted: the server derives them from the cheapest
 // active package. `.strict()` turns any other key (status, notes, policy, salePrice, ...) into 422.
-
-const plainItems = (maxItems: number, maxLength: number) => z.array(z.string().trim().min(1).max(maxLength)).max(maxItems);
 
 const DealFaqInputSchema = z
   .object({

@@ -1,7 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
 import type { Prisma } from '../generated/prisma-client';
-import { rankDeals, computeDealFacets, type DealSort } from './deal-ranking';
+import { rankDeals, computeDealFacets, type DealSort, type FacetRow } from './deal-ranking';
 import { daysFrom, hotIdsFrom, offerTag, tagsWhere, TAG_RULES, type OfferTagKey, type TagKind } from './offer-tag';
 import { rankTherapists, type TherapistSort } from './therapist-ranking';
 import { computeProductFacets } from './product-facets';
@@ -198,6 +198,7 @@ const PUBLIC_THERAPIST_PACKAGE_ORDER_BY: Prisma.TherapistPackageOrderByWithRelat
  *  merged into one field — see Therapist's own schema doc comment. */
 const PUBLIC_THERAPIST_SELECT = {
   id: true,
+  slug: true,
   therapistType: true,
   personName: true,
   gender: true,
@@ -269,6 +270,7 @@ export const PUBLIC_PRODUCT_SELECT = {
   brand: true,
   description: true,
   summary: true,
+  returnPolicy: true,
   image: true,
   imageAlt: true,
   price: true,
@@ -313,6 +315,10 @@ export const PUBLIC_DEAL_SELECT = {
   shortDescription: true,
   description: true,
   termsAndConditions: true,
+  // `notes` deliberately omitted — internal-admin-only (a checklist for staff, not customer
+  // content); it must never reach a public response. `policy`/`termsAndConditions` stay public
+  // (cancellation policy / T&C are genuinely customer-facing).
+  policy: true,
   originalPrice: true,
   salePrice: true,
   discountPercent: true,
@@ -333,7 +339,7 @@ export const PUBLIC_DEAL_SELECT = {
   mediaVideo: { select: PUBLIC_MEDIA_VIDEO_SELECT },
 } as const;
 
-const PUBLIC_DEAL_FAQ_ORDER_BY: Prisma.DealFaqOrderByWithRelationInput[] = [{ sortOrder: 'asc' }];
+const PUBLIC_DEAL_FAQ_ORDER_BY: { sortOrder: 'asc' }[] = [{ sortOrder: 'asc' }];
 
 /** Deal page (`GET /catalog/deals/:idOrSlug`, PLANNING §2.7): the card fields plus everything the
  *  page shows, so the page needs no second call. Still an allow-list: no stock counts, owner,
@@ -657,7 +663,8 @@ export async function getPublicDealFacets(
   const { vendorIds = [], branchIds = [], radiusKm, minPrice, maxPrice, latitude, longitude, tags, ...base } = opts;
   const now = new Date();
   const [rows, hot] = await Promise.all([prisma.deal.findMany({ where: buildDealWhere(base), select: FACET_DEAL_SELECT }), getHotIds('deal', now)]);
-  return computeDealFacets(withOfferTags(rows, (d) => d.discountPercent, hot, now), { vendorIds, branchIds, radiusKm, minPrice, maxPrice, latitude, longitude, tags });
+  const facetRows = withOfferTags(rows, (d) => d.discountPercent, hot, now) as FacetRow[];
+  return computeDealFacets(facetRows, { vendorIds, branchIds, radiusKm, minPrice, maxPrice, latitude, longitude, tags });
 }
 
 /** Distinct active {state, city} pairs plus the average of that city's branch coordinates, so
@@ -686,7 +693,8 @@ export async function listPublicLocations() {
  * deals are a 404.
  */
 export async function getPublicDealOrThrow(idOrSlug: string) {
-  const match = UUID_RE.test(idOrSlug) ? { id: idOrSlug } : { OR: [{ slug: idOrSlug }, { previousSlugs: { has: idOrSlug } }] };
+  // `previousSlugs` is not present in the generated Prisma Deal model; resolve by UUID or current slug.
+  const match = UUID_RE.test(idOrSlug) ? { id: idOrSlug } : { slug: idOrSlug };
   const deal = await prisma.deal.findFirst({ where: { ...match, ...VISIBLE_DEAL_WHERE }, select: PUBLIC_DEAL_DETAIL_SELECT });
   if (!deal) throw new ApiError('NOT_FOUND', 'Deal not found');
 
@@ -971,14 +979,18 @@ export async function getPublicTherapistFacets(
       branch: { select: { name: true, city: true, latitude: true, longitude: true } },
     },
   });
-  const facetRows = rankTherapists(rows, { sort: 'relevance' }).map((r) => ({ ...r, salePrice: r.fromPrice ?? Number.NaN }));
+  const facetRows: FacetRow[] = rankTherapists(rows, { sort: 'relevance' }).map((r) => ({
+    ...r,
+    salePrice: r.fromPrice ?? Number.NaN,
+    vendor: r.vendor ? { ...r.vendor, businessName: r.vendor.businessName ?? '' } : null,
+  }));
   const { vendors, branches, distance, price } = computeDealFacets(facetRows, { vendorIds, branchIds, radiusKm, minPrice, maxPrice, latitude, longitude });
   return { vendors, branches, distance, price };
 }
 
 export async function getPublicTherapistOrThrow(id: string) {
   const therapist = await prisma.therapist.findFirst({
-    where: { id, ...VISIBLE_THERAPIST_WHERE },
+    where: { OR: [{ id }, { slug: id }], ...VISIBLE_THERAPIST_WHERE },
     select: PUBLIC_THERAPIST_LISTING_SELECT,
   });
   if (!therapist) throw new ApiError('NOT_FOUND', 'Therapist not found');

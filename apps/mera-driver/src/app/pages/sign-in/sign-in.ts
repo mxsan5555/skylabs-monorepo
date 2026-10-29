@@ -2,10 +2,13 @@ import { Component, CUSTOM_ELEMENTS_SCHEMA, inject, signal, OnInit } from '@angu
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '@skylabs-monorepo/shared-auth/angular';
+import { httpErrorMessage } from '../../core/http-error';
 import { AuthApiService } from '../../core/auth/auth-api.service';
 
+import { authorizedReturn } from '../../core/auth/portal-routing';
+
 type Method = 'email' | 'phone';
-type Persona = 'customer' | 'driver';
+type Persona = 'customer' | 'driver' | 'staff';
 type LoginMode = 'otp' | 'password';
 
 /**
@@ -89,6 +92,7 @@ export class SignIn implements OnInit {
   }
 
   protected sendOtp(): void {
+    if(this.loading())return;
     const val = this.value.trim();
     if (!val) {
       if (this.method() === 'phone') {
@@ -110,19 +114,13 @@ export class SignIn implements OnInit {
             destination: val,
             method: this.method(),
             role: this.role(),
+            redirectTo: this.route.snapshot.queryParamMap.get('redirectTo'),
           },
         });
       },
-      error: () => {
+      error: async (error) => {
         this.loading.set(false);
-        // Navigate to OTP page so user can verify code
-        this.router.navigate(['/otp'], {
-          state: {
-            destination: val,
-            method: this.method(),
-            role: this.role(),
-          },
-        });
+        this.error.set(await httpErrorMessage(error));
       },
     });
   }
@@ -147,18 +145,19 @@ export class SignIn implements OnInit {
 
     this.passwordError.set('');
     this.passwordLoading.set(true);
-    this.authApi.loginWithPassword(val, this.password).subscribe({
+    this.authApi.loginWithPassword(val, this.password, this.role()).subscribe({
       next: async (result) => {
+        this.auth.signOut();
         await this.auth.signIn(result.accessToken, result.refreshToken);
         this.passwordLoading.set(false);
         // A linked Driver or Customer account lands on its own self-service portal, never
         // the admin console — same ownership signal as `driverPortalGuard`/`customerPortalGuard`.
         const bootstrap = this.auth.bootstrap();
-        this.router.navigate([bootstrap?.driver ? '/driver' : bootstrap?.customer ? '/customer' : '/account/dashboard']);
+        this.router.navigateByUrl(authorizedReturn(bootstrap, this.route.snapshot.queryParamMap.get('redirectTo')));
       },
-      error: () => {
+      error: async error => {
         this.passwordLoading.set(false);
-        this.passwordError.set('Invalid identifier or password.');
+        this.passwordError.set(await httpErrorMessage(error));
       },
     });
   }

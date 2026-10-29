@@ -2,6 +2,7 @@
   @if (loading()) {
     <p class="otp-muted">Loading…</p>
   } @else if (driver(); as d) {
+    <md-pill-review [own]="true"></md-pill-review>
     <section class="account-card">
       <div class="account-card__head">
         <h2>Current status</h2>

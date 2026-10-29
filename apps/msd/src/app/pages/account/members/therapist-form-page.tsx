@@ -1,6 +1,7 @@
-import { createElement, useCallback, useEffect, useState, type ChangeEvent } from 'react';
+import { createElement, useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import '@skylabs-monorepo/shared-ui';
+import '@skylabs-monorepo/shared-ui/editor';
 import { FilledButton } from '@skylabs-monorepo/shared-ui/react';
 import {
   createVendorTherapist,
@@ -16,7 +17,11 @@ import {
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
+<<<<<<< HEAD
 import { memberTrail } from './member-crumbs';
+=======
+import { MediaUploader } from '../../../components/media-uploader';
+>>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
 
 interface TherapistFormPageProps {
   token: string | null;
@@ -72,6 +77,26 @@ function renderTextField({
     type,
     onInput: (e: DrivenChangeEvent) => onInput(e.currentTarget.value),
   });
+}
+
+/** Raw `<sky-rich-text-editor>` — see `deal-form-page.tsx`'s own doc comment on `RichTextField`
+ *  for why this is a real component (ref + `addEventListener`), not a plain element-returning
+ *  function: `onsky-change={...}` never actually wires up as a listener for a custom DOM event
+ *  on a custom element. Value is HTML; the backend sanitizes it server-side — UX only. */
+function RichTextField({ label, value, onChange }: { label: string; value: string; onChange: (html: string) => void }) {
+  const ref = useRef<HTMLElement>(null);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const handler = (e: Event) => onChangeRef.current((e as CustomEvent<{ html: string; text: string }>).detail.html);
+    el.addEventListener('sky-change', handler);
+    return () => el.removeEventListener('sky-change', handler);
+  }, []);
+
+  return createElement('sky-rich-text-editor', { ref, label, value });
 }
 
 /** Same convention as `BranchFormPage`/`DealFormPage`'s own `vendorDisplayName`. */
@@ -267,9 +292,24 @@ export function TherapistFormPage({ token }: TherapistFormPageProps) {
           <p className="field-hint">Previously recorded specialization (historical, read-only): {therapist.specialization}</p>
         )}
 
-        {renderTextField({ label: 'Bio', value: form.bio, onInput: (value) => set('bio', value) })}
         {renderTextField({ label: 'Experience (years)', type: 'number', value: form.experienceYears, onInput: (value) => set('experienceYears', value) })}
       </div>
+
+      <div className="form-grid">
+        <p className="field-hint">Bio — shown on the therapist's public page.</p>
+        <RichTextField label="Bio" value={form.bio} onChange={(html) => set('bio', html)} />
+      </div>
+
+      <p className="field-hint">The therapist's photos and an optional short video — shown on their public page.</p>
+      <MediaUploader
+        entityType="therapist"
+        entityId={therapist?.id ?? null}
+        selfService={false}
+        vendorId={vendorId}
+        existingImages={therapist?.mediaImages ?? []}
+        existingVideo={therapist?.mediaVideo ?? null}
+        token={token}
+      />
 
       <div className="form-actions">
         <FilledButton disabled={saving} onClick={() => save()}>

@@ -74,8 +74,10 @@ export function VendorProfileTabs({
           entityType="vendor"
           entityId={vendor.id}
           selfService={selfService}
+          maxImages={1}
+          hideVideo
           existingImages={vendor.mediaImages ?? []}
-          existingVideo={vendor.mediaVideo ?? null}
+          existingVideo={null}
           token={token}
         />
       ) : (

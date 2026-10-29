@@ -27,6 +27,14 @@ model User {
   createdAt              DateTime               @default(now())
   updatedAt              DateTime               @updatedAt
   deletedAt              DateTime?
+  /// Set by the single-role migration sweep (`prisma/role-migration.ts`, run from seed.ts) for an
+  /// account whose legacy multiple-role assignment couldn't be converted automatically (e.g. holds
+  /// both `customer` and `vendor` with no actual linked Vendor business) — requires an authorized
+  /// admin to pick one explicit final role via the Role Conflicts review screen. Never set by
+  /// ordinary application code; cleared only by that same resolution action
+  /// (`resolveAccountRoleConflict`). Not a permission flag — purely "this account's role
+  /// assignment still needs human review."
+  roleConflict           Boolean                @default(false)
   auditLogsAsActor       AuditLog[]             @relation("AuditLogActor")
   cart                   Cart?
   impersonationsAsAdmin  ImpersonationSession[] @relation("ImpersonationSuperAdmin")
@@ -39,6 +47,8 @@ model User {
   vendorProfile          Member?                @relation("VendorOwner")
   wishlistItems          WishlistItem[]
   supportRequests        SupportRequest[]
+  purchaseEntitlements   PurchaseEntitlement[]  @relation("EntitlementCustomer")
+  purchaseDisputes       PurchaseDispute[]      @relation("DisputeCustomer")
 
   @@index([status])
 }
@@ -194,6 +204,17 @@ model RefreshSession {
   id          String    @id @default(uuid())
   userId      String
   hashedToken String    @unique
+  /// SHA-256 hex digest of the raw token — a fast, indexed O(1) lookup key. `hashedToken`
+  /// (bcrypt, salted, non-deterministic) can only ever be checked by loading EVERY active
+  /// session and calling bcrypt.compare on each one; that's fine at a handful of sessions but
+  /// becomes a multi-second linear scan once the table has hundreds of active rows (persistent
+  /// login's whole point is frequent automatic refreshes, so this gets hit constantly). SHA-256
+  /// is safe here specifically because the input is already a 48-byte crypto.randomBytes token,
+  /// not a low-entropy secret like a password — the slow/salted properties bcrypt exists for
+  /// don't apply. Nullable + lookup-with-fallback (see token.service.ts#rotateRefreshToken) so
+  /// sessions issued before this column existed keep working via the old path until they next
+  /// rotate, instead of being invalidated.
+  lookupHash  String?   @unique
   deviceInfo  String?
   ip          String?
   userAgent   String?
@@ -359,6 +380,11 @@ model Member {
   addressLine2               String?
   ownerFirstName             String?
   ownerLastName              String?
+  /// Per-vendor commission override — null means "use `FinanceSettings.defaultCommissionRatePercent`"
+  /// (see `settlement.service.ts#resolveCommissionRateForVendor`). Snapshotted onto every
+  /// `PurchaseEntitlement` at entitlement-creation time, so editing this later never touches
+  /// already-created entitlements' own `commissionRatePercent` — only future orders see the change.
+  commissionRatePercent      Decimal?               @db.Decimal(5, 2)
   branches                   Branch[]
   deals                      Deal[]
   orders                     Order[]
@@ -370,6 +396,8 @@ model Member {
   documents                  MemberDocument[]
   mediaImages                VendorImage[]
   mediaVideo                 VendorVideo?
+  purchaseEntitlements       PurchaseEntitlement[]
+  memberPayouts              MemberPayout[]
 
   @@index([status])
   @@index([ownerUserId])
@@ -518,6 +546,7 @@ model Branch {
   orderItems     OrderItem[]
   therapists     Therapist[]
   categoryAccess BranchCategoryAccess[]
+  purchaseEntitlements PurchaseEntitlement[]
 
   @@index([vendorId])
 }
@@ -551,6 +580,10 @@ model Therapist {
   therapistType            String                @default("Therapist")
   /// Nullable — no non-fabricated default exists for rows that predate this field.
   gender                   String?
+  /// Public storefront URL slug (`/therapist/:slug`). Nullable, same pattern as `Vendor.slug` —
+  /// existing rows predate this field and are backfilled separately (prisma/seed.ts), never
+  /// overwritten in place by the migration itself. Unique so two therapists never collide.
+  slug                     String?               @unique
   /// Restricted choice, added alongside the free-text `specialization` above — validated in
   /// vendor.service.ts's createTherapist/updateTherapist via assertCategoryOfType.
   /// Nullable: not required, and every pre-existing Therapist row predates this column.
@@ -1168,6 +1201,58 @@ model HomeHeroSlide {
   @@index([sortOrder])
 }
 
+enum HomeTagSectionTag {
+  NEW
+  DEAL
+  HOT_DEAL
+  EXPIRE_SOON
+}
+
+/// One row per state x tag (docs/msd/PLANNING.md §7.1); `state: null` is the Global/Default
+/// section, same convention as `HomeHeroSlide`. Unlike the hero (one flat row per slide), a
+/// section's deals live in `HomeTagSectionItem` (join-table shape, like `RoleDashboardWidget`/
+/// `PromotionPlacement`) because a section holds several independently-ordered deals behind one
+/// `isEnabled` switch.
+///
+/// `@@unique([state, tag])` below exists for Prisma Client's own typed `upsert`/`findUnique`
+/// ergonomics (`setSectionEnabled` upserts by this key) — but it is NOT the real NULL-safety
+/// constraint: Postgres treats every NULL as distinct, so this plain index alone would silently
+/// allow several Global (`state: null`) rows for the same tag. The migration additionally hand-
+/// writes two partial unique indexes (`home_tag_section_global_tag_unique` WHERE state IS NULL,
+/// `home_tag_section_state_tag_unique` WHERE state IS NOT NULL) that are what Postgres actually
+/// enforces for the `state: null` case — same "Prisma's declarative DSL can't express this"
+/// pattern as `HomeHeroSlide`'s own `home_hero_slide_one_item` CHECK.
+model HomeTagSection {
+  id        String            @id @default(uuid())
+  state     String?
+  tag       HomeTagSectionTag
+  isEnabled Boolean           @default(false)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  items     HomeTagSectionItem[]
+
+  @@unique([state, tag])
+  @@index([state])
+  @@index([tag])
+}
+
+/// A deal assigned into one `HomeTagSection`, manually picked and ordered by the admin (never
+/// computed) — see `home-tag-section.service.ts`'s own doc comment for the eligibility rules.
+model HomeTagSectionItem {
+  id               String         @id @default(uuid())
+  homeTagSectionId String
+  dealId           String
+  sortOrder        Int            @default(0)
+  createdAt        DateTime       @default(now())
+  section          HomeTagSection @relation(fields: [homeTagSectionId], references: [id], onDelete: Cascade)
+  deal             Deal           @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@unique([homeTagSectionId, dealId])
+  @@index([homeTagSectionId])
+  @@index([dealId])
+  @@index([sortOrder])
+}
+
 /// A Superadmin-managed marketing label ("Trending", "Best Seller", ...) mappable onto any mix
 /// of Category/Deal/Product/Therapist rows. `isActive` is the ONLY thing a deactivate/reactivate
 /// toggle touches — mapping rows are never deleted or recreated by a status change, so
@@ -1308,6 +1393,7 @@ model Deal {
   popularTagLinks         PopularTagDeal[]
   promotionLinks          Promotion[]
   heroSlides              HomeHeroSlide[]
+  homeTagSectionItems     HomeTagSectionItem[]
   wishlistItems           WishlistItem[]
   therapistLinks          DealTherapist[]
 
@@ -1731,6 +1817,9 @@ model OrderItem {
   therapistPackage   TherapistPackage? @relation(fields: [therapistPackageId], references: [id])
   vendor             Member            @relation(fields: [vendorId], references: [id])
   product            Product?          @relation(fields: [productId], references: [id])
+  purchaseEntitlements PurchaseEntitlement[]
+  disputes             PurchaseDispute[]
+  refunds              Refund[]
 
   @@index([orderId])
   @@index([dealId])
@@ -1770,6 +1859,7 @@ model Payment {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   order             Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  refunds           Refund[]
 
   @@index([orderId])
   @@index([status])

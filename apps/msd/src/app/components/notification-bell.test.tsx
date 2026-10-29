@@ -147,7 +147,7 @@ describe('NotificationBell', () => {
 
     fireEvent.click(screen.getByText('New Order Received'));
 
-    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/account/orders?orderId=order-1'));
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/account/orders/order-1'));
     expect(markNotificationReadMock).not.toHaveBeenCalled();
   });
 

@@ -30,7 +30,7 @@ export function ItemThumb({ image, type }: { image: string | null; type: StateIt
 export interface StateItemPickerProps {
   token: string | null;
   /** Which console's search route to call (each checks its own permission). */
-  base: '/home-hero' | '/promotions';
+  base: '/home-hero' | '/promotions' | '/home-tag-sections';
   /** The chosen state; `null` searches every state (Global/Default). */
   state: string | null;
   onPick: (item: StateItem) => void | Promise<void>;
@@ -40,6 +40,11 @@ export interface StateItemPickerProps {
   pickedLabel?: string;
   /** Optional heading rendered above the controls. */
   heading?: ReactNode;
+  /** Home Tag Sections (deals only, never products): hides the All/Deals/Products filter and
+   *  shows each deal's status, discount and end date so the admin can judge a candidate
+   *  themselves — the tag is never computed (PLANNING.md §7.1). Home Hero and Promotions never
+   *  set this, so their picker's rendering is unchanged. */
+  dealsOnly?: boolean;
 }
 
 /**
@@ -57,8 +62,9 @@ export function StateItemPicker({
   pickLabel = 'Add',
   pickedLabel = 'Added',
   heading,
+  dealsOnly = false,
 }: StateItemPickerProps) {
-  const [type, setType] = useState<StateItemType | 'all'>('all');
+  const [type, setType] = useState<StateItemType | 'all'>(dealsOnly ? 'deal' : 'all');
   const [query, setQuery] = useState('');
   const [eligibleOnly, setEligibleOnly] = useState(true);
   const [pageSize, setPageSize] = useState(PAGE);
@@ -117,15 +123,17 @@ export function StateItemPicker({
     <section className="item-browser" aria-describedby={statusId}>
       {heading}
       <div className="item-browser__controls">
-        <ChipNav
-          items={TYPE_FILTERS}
-          value={type}
-          onSelect={(value) => {
-            setType(value as StateItemType | 'all');
-            resetPaging();
-          }}
-          ariaLabel="Item type"
-        />
+        {!dealsOnly && (
+          <ChipNav
+            items={TYPE_FILTERS}
+            value={type}
+            onSelect={(value) => {
+              setType(value as StateItemType | 'all');
+              resetPaging();
+            }}
+            ariaLabel="Item type"
+          />
+        )}
         <label className="item-browser__toggle">
           {createElement('md-switch', {
             selected: eligibleOnly,
@@ -163,7 +171,14 @@ export function StateItemPicker({
                   <span className="item-browser__meta">
                     {TYPE_LABEL[item.type]} · {item.memberName}
                     {item.branchName ? ` · ${item.branchName}` : ''} · {formatINR(Number(item.price))}
+                    {dealsOnly && item.discountPercent ? ` · ${item.discountPercent}% off` : ''}
                   </span>
+                  {dealsOnly && (
+                    <span className="item-browser__meta">
+                      {item.status ? `Status: ${item.status}` : ''}
+                      {item.endDate ? ` · Ends ${new Date(item.endDate).toLocaleDateString()}` : ' · No end date set'}
+                    </span>
+                  )}
                   {!item.eligible && <span className="item-browser__meta item-browser__hidden">Hidden from customers</span>}
                 </span>
                 {picked ? (

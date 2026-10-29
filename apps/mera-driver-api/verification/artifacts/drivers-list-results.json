@@ -1,0 +1,32 @@
+{
+  "views": {
+    "all": 25,
+    "users": 4,
+    "review": 21,
+    "ready": 4
+  },
+  "combinedFilters": true,
+  "oneSearch": true,
+  "hideRetainsValues": true,
+  "pagination": true,
+  "searchResetsPage": true,
+  "returnState": true,
+  "sorting": true,
+  "columnSelection": true,
+  "rowSelection": true,
+  "existingCurrentPageExport": true,
+  "moreActions": true,
+  "mobileNoOverflow": true,
+  "baseline": {
+    "drivers": 7,
+    "users": 12
+  },
+  "after": {
+    "drivers": 7,
+    "users": 12
+  },
+  "limitations": [
+    "Local signed admin token; password login not exercised",
+    "Shared DataTable has no public custom cell/action renderer"
+  ]
+}

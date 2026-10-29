@@ -1,0 +1,189 @@
+directions_car
+mera-driver
+Driver console
+dashboard
+Dashboard
+people
+Customers
+sports_motorsports
+Drivers
+directions_car
+Vehicles
+route
+TRIPS & BOOKINGS
+expand_more
+route
+Admin Dispatch
+sell
+Pricing
+event_available
+Attendance
+account_balance
+ACCOUNTS
+expand_more
+payments
+Overview
+payments
+Booking Payments
+payments
+Commissions
+payments
+Driver Payouts
+payments
+Registration Fees
+payments
+Refunds & Adjustments
+payments
+Reports
+payments
+PAYMENTS & WALLETS
+expand_more
+local_offer
+PROMOTIONS
+expand_more
+quiz
+FAQs
+rate_review
+Feedback
+insights
+Reports
+category
+DRIVER MASTERS
+expand_more
+admin_panel_settings
+ADMINISTRATION
+expand_more
+fact_check
+KYC Assignments
+settings
+Settings
+S
+Super Admin
+9889259224
+person
+logout
+dock_to_right
+Account
+Overview
+Accounts
+From
+To
+City
+Service
+Payment status
+All
+paid
+partial
+unpaid
+Apply filters
+Overview
+Booking Payments
+Commissions
+Driver Payouts
+Registration Fees
+Refunds & Adjustments
+Reports
+
+Bookings created within the range, including all their movements; registration movements posted within the range. Amounts are paise.
+
+Total Bookings
+1
+Total Collected
+₹0.00
+Total Commission
+₹0.00
+Platform Income
+₹0.00
+Driver Payable
+₹0.00
+Driver Paid
+₹0.00
+Registration Fees
+₹0.00
+
+0 completed · 1 pending · 0 cancelled
+
+Registration fees by status
+
+Unpaid: 8 · ₹0.00
+
+Pending: 0 · ₹0.00
+
+Paid: 0 · ₹0.00
+
+Failed: 0 · ₹0.00
+
+Waived: 0 · ₹0.00
+
+Refunded: 0 · ₹0.00
+
+Connected Driver One · Unpaid · ₹0.00 · Optional · 167a6ec7-51a0-430f-a6a3-4ac822abcfec
+
+Connected Driver Two · Unpaid · ₹0.00 · Optional · 0350433e-ed94-49de-bfff-a0409e3e66cc
+
+PwTest885376 · Unpaid · ₹0.00 · Optional · 59a68392-b31b-47ce-9c12-a48a736b5441
+
+PwTest968341 · Unpaid · ₹0.00 · Optional · 66670946-d176-4725-8611-7699efa4188d
+
+VerifyEdited · Unpaid · ₹0.00 · Optional · d0dd0bb5-08d6-4be4-9284-69607188e533
+
+vinay · Unpaid · ₹0.00 · Optional · 3efb5402-cde8-4e74-90a2-db2a3afb50f2
+
+PwTest787873 · Unpaid · ₹0.00 · Optional · 2486a8ba-c616-4fdb-a385-58416909458e
+
+Suresh · Unpaid · ₹0.00 · Optional · 902cb89b-1b28-4c8e-bb22-6f7fc5e65d43
+
+Registration fee policy
+Driver
+Choose driver
+Connected Driver One
+Connected Driver Two
+PwTest885376
+PwTest968341
+VerifyEdited
+vinay
+PwTest787873
+Suresh
+Amount (paise)
+Required for trips
+Policy change reason
+Save fee policy
+Overview
+Booking	Amount	Rule	Commission	Driver share	Collected	Refunded	Payment	Payout
+MD-72334	₹0.00	0%	₹0.00	₹0.00	₹0.00	₹0.00	unpaid	pending · ₹0.00 paid
+Download Accounts report
+Commission policy for new bookings
+Fare rule
+Choose rule
+Delhi NCR · One Way · Unconfigured
+Connected-e52e023c-5af4-447d-a584-7a5729ef7265 · Hourly · 15%
+Commission (basis points, 1500 = 15%)
+Change reason
+Save commission policy
+Financial audit history
+Confirm financial movement
+
+Confirm funds independently before recording an offline payment. Refund and payout entries record completed transfers.
+
+Action
+booking_payment
+booking_refund
+driver_payout
+driver_recovery
+registration_payment
+registration_refund
+registration_waiver
+Booking ID
+Driver ID
+Amount (paise)
+Method
+cash
+bank_transfer
+upi
+waiver
+Unique transaction reference
+Audit reason
+Record confirmation
+Transactions & receipts
+
+No recorded transactions.

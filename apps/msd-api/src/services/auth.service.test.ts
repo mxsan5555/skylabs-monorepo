@@ -18,6 +18,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   prismaMock.refreshSession.create.mockResolvedValue({});
   prismaMock.loginHistory.create.mockResolvedValue({});
+  // Default: no Vendor profile at all (a plain Customer) — matches most of this file's own
+  // tests, which predate the Member-suspension login check and never set this up themselves.
+  prismaMock.member.findUnique.mockResolvedValue(null);
 });
 
 /**
@@ -105,6 +108,44 @@ describe('loginWithIdentifier — blocked account pre-check', () => {
       expect.objectContaining({ update: expect.objectContaining({ lastLoginAt: expect.any(Date) }) }),
     );
   });
+
+  /**
+   * Feature: Member suspension blocks login, distinct from the account-disabled check above
+   * Scenario: `assertUserMayLogIn` also rejects a user whose `User.status` is `active` but who
+   * owns a `Vendor` row with `status: 'SUSPENDED'` — these are deliberately separate states (a
+   * suspended Member's own account is not otherwise disabled), with their own message so a
+   * suspended Member and a disabled account read as different situations.
+   */
+  it('rejects login for the owner of a SUSPENDED vendor even though their own User.status is active', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ id: USER_ID, status: 'active' });
+    prismaMock.member.findUnique.mockResolvedValue({ status: 'SUSPENDED' });
+
+    await expect(loginWithIdentifier('suspended-member@example.com')).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Your member account is suspended. Please contact support.',
+    });
+    expect(prismaMock.user.upsert).not.toHaveBeenCalled();
+    expect(prismaMock.refreshSession.create).not.toHaveBeenCalled();
+    expect(prismaMock.loginHistory.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ userId: USER_ID, success: false }) }),
+    );
+  });
+
+  it('a Member owner whose vendor is merely INACTIVE (not SUSPENDED) can still log in — only SUSPENDED blocks login', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ id: USER_ID, status: 'active' });
+    prismaMock.member.findUnique.mockResolvedValue({ status: 'INACTIVE' });
+    prismaMock.user.upsert.mockResolvedValue({
+      id: USER_ID,
+      name: 'Member Owner',
+      email: 'inactive-vendor@example.com',
+      phone: null,
+      roles: [{ role: CUSTOMER_ROLE }],
+    });
+    prismaMock.userRole.findMany.mockResolvedValue([{ role: CUSTOMER_ROLE }]);
+
+    const result = await loginWithIdentifier('inactive-vendor@example.com');
+    expect(result.accessToken).toBeTruthy();
+  });
 });
 
 describe('loginWithGoogle — blocked account pre-check', () => {
@@ -126,6 +167,17 @@ describe('loginWithGoogle — blocked account pre-check', () => {
     expect(prismaMock.loginHistory.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ method: 'google', success: false }) }),
     );
+  });
+
+  it('rejects Google login for a suspended Member just as it does for OTP — suspension cannot be bypassed by login method', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ id: USER_ID, status: 'active', email: 'suspended-member@example.com' });
+    prismaMock.member.findUnique.mockResolvedValue({ status: 'SUSPENDED' });
+
+    await expect(loginWithGoogle('google-sub-3', 'suspended-member@example.com', 'Suspended Member')).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Your member account is suspended. Please contact support.',
+    });
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
   });
 
   it('a brand-new Google profile (no existing row) always succeeds — never subject to the block', async () => {

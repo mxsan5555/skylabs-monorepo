@@ -1,0 +1,13 @@
+{
+  "requestedRoute": "/account/vendor-payments",
+  "actualUrl": "http://localhost:4207/sign-in",
+  "desktopViewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "mobileViewport": {
+    "width": 390,
+    "height": 844
+  },
+  "errors": []
+}

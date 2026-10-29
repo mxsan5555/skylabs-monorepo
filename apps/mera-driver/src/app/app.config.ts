@@ -8,7 +8,8 @@ import {
   withRouterConfig,
 } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
-import { provideSharedAuth } from '@skylabs-monorepo/shared-auth/angular';
+import { AuthService, provideSharedAuth } from '@skylabs-monorepo/shared-auth/angular';
+import { MeraAuthService } from './core/auth/mera-auth.service';
 import { appRoutes } from './app.routes';
 import { authInterceptor } from './core/auth/auth.interceptor';
 import { environment } from '../environments/environment';
@@ -28,5 +29,6 @@ export const appConfig: ApplicationConfig = {
     ),
     provideHttpClient(withInterceptors([authInterceptor])),
     provideSharedAuth({ appPrefix: 'mera_driver', apiBaseUrl: environment.apiUrl, unauthorizedRedirectPath: '/unauthorized' }),
+    { provide: AuthService, useClass: MeraAuthService },
   ],
 };

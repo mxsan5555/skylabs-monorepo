@@ -1,0 +1,74 @@
+[
+  {
+    "label": "Reported GET",
+    "status": 200,
+    "bookingId": "c9cfe85b-79be-48ee-9aaa-7e14f7ba12f5",
+    "requestCount": 4,
+    "eventCount": 2,
+    "error": null
+  },
+  {
+    "label": "Unknown booking is a record 404",
+    "response": {
+      "status": 404,
+      "data": null,
+      "error": {
+        "code": "NOT_FOUND",
+        "message": "Booking not found"
+      }
+    }
+  },
+  {
+    "label": "Existing POST assignment route rejects nonexistent booking without mutation",
+    "response": {
+      "status": 404,
+      "data": null,
+      "error": {
+        "code": "NOT_FOUND",
+        "message": "Booking not found"
+      }
+    }
+  },
+  {
+    "label": "Missing route remains distinct",
+    "response": {
+      "status": 404,
+      "data": null,
+      "error": {
+        "code": "NOT_FOUND",
+        "message": "No route for GET /workflow/dispatch/c9cfe85b-79be-48ee-9aaa-7e14f7ba12f5/missing-route"
+      }
+    }
+  },
+  {
+    "label": "Anonymous denied",
+    "response": {
+      "status": 401,
+      "data": null,
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Missing bearer token"
+      }
+    }
+  },
+  {
+    "label": "Customer staff detail denied",
+    "response": {
+      "status": 403,
+      "data": null,
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Missing permission trips.bookings:view"
+      }
+    }
+  },
+  {
+    "label": "Reported booking View succeeds in running UI"
+  },
+  {
+    "label": "Assign opens actual summary/history and candidates without mutation"
+  },
+  {
+    "label": "Reassign opens actual summary/history and candidates without mutation"
+  }
+]

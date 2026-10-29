@@ -314,6 +314,12 @@
         "heading": "Book a therapist",
         "seeAll": "See all",
         "seeAllTo": "/therapists"
+      },
+      "homeTagSections": {
+        "NEW": { "heading": "New", "seeAll": "See all", "seeAllTo": "/explore" },
+        "HOT_DEAL": { "heading": "Hot Deal", "seeAll": "See all", "seeAllTo": "/explore" },
+        "DEAL": { "heading": "Deal", "seeAll": "See all", "seeAllTo": "/explore" },
+        "EXPIRE_SOON": { "heading": "Expire Soon", "seeAll": "See all", "seeAllTo": "/explore" }
       }
     },
     "howItWorks": {

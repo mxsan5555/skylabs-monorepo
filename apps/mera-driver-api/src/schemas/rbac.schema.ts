@@ -9,16 +9,20 @@ export const CreateRoleSchema = z
       .string()
       .min(2)
       .regex(/^[a-z][a-z0-9_]*$/, 'key must be snake_case'),
-    name: z.string().min(1),
-    description: z.string().optional(),
+    name: z.string().trim().min(1).max(120),
+    description: z.string().trim().max(2000).optional(),
+    isActive: z.boolean().optional(),
+    permissionIds: z.array(z.string().uuid()).optional(),
   })
   .openapi('CreateRole');
 
 export const UpdateRoleSchema = z
   .object({
-    name: z.string().min(1).optional(),
-    description: z.string().optional(),
-  })
+    name: z.string().trim().min(1).max(120).optional(),
+    description: z.string().trim().max(2000).optional(),
+    isActive: z.boolean().optional(),
+    permissionIds: z.array(z.string().uuid()).optional(),
+  }).strict()
   .openapi('UpdateRole');
 
 export const CloneRoleSchema = z
@@ -27,7 +31,7 @@ export const CloneRoleSchema = z
       .string()
       .min(2)
       .regex(/^[a-z][a-z0-9_]*$/, 'key must be snake_case'),
-    name: z.string().min(1),
+    name: z.string().trim().min(1).max(120),
   })
   .openapi('CloneRole');
 
@@ -59,26 +63,32 @@ export const CreateDashboardWidgetSchema = z
     key: z.string().min(1),
     title: z.string().min(1),
     module: z.string().min(1),
-    description: z.string().optional(),
+    description: z.string().trim().max(2000).optional(),
   })
   .openapi('CreateDashboardWidget');
 
 export const CreateUserSchema = z
   .object({
-    name: z.string().min(1),
+    name: z.string().trim().min(1).max(120),
     email: z.string().email().optional(),
     phone: z.string().min(3).optional(),
     roleIds: z.array(z.string().uuid()).optional(),
+    status:z.enum(['active','inactive','blocked']).optional(),
   })
   .openapi('CreateUser');
 
 export const UpdateUserSchema = z
   .object({
-    name: z.string().min(1).optional(),
+    name: z.string().trim().min(1).max(120).optional(),
     email: z.string().email().optional(),
     phone: z.string().min(3).optional(),
   })
   .openapi('UpdateUser');
+
+export const AdminUpdateUserSchema = UpdateUserSchema.extend({
+  status:z.enum(['active','inactive','blocked']).optional(),
+  roleIds:z.array(z.string().uuid()).optional(),
+}).strict();
 
 export const SetUserStatusSchema = z
   .object({

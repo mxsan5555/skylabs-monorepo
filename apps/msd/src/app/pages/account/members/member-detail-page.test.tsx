@@ -17,8 +17,25 @@ const headerProps = vi.fn();
 const documentsProps = vi.fn();
 const activityProps = vi.fn();
 const profileProps = vi.fn();
+const branchesProps = vi.fn();
+const dealsProps = vi.fn();
+const therapistsProps = vi.fn();
+const productsProps = vi.fn();
 
-vi.mock('@skylabs-monorepo/shared-auth/react', () => ({ useAuth: () => useAuthMock() }));
+vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
+  useAuth: () => useAuthMock(),
+  // `api/rbac/vendors` drags in `api/rbac/client.ts`, which calls this at module scope to build
+  // its 401-retry token store — stubbed minimally so that import doesn't throw; nothing in this
+  // file exercises token refresh/logout. Pre-existing gap (unrelated to this file's own tests),
+  // same fix as `roles.test.tsx`.
+  getTokenStore: () => ({
+    getToken: () => 't',
+    setToken: vi.fn(),
+    subscribe: vi.fn().mockReturnValue(vi.fn()),
+    refresh: vi.fn().mockResolvedValue(null),
+    logout: vi.fn().mockResolvedValue(undefined),
+  }),
+}));
 vi.mock('../../../../api/rbac/members', () => ({
   getMember: (...a: unknown[]) => getMemberMock(...a),
   changeMemberStatus: (...a: unknown[]) => changeStatusMock(...a),
@@ -245,6 +262,57 @@ describe('MemberDetailPage', () => {
     expect(documentsProps).toHaveBeenLastCalledWith(
       expect.objectContaining({ token: 't', memberId: 'm1', canEdit: false, canApprove: true, canReject: false }),
     );
+  });
+
+  it('gates Branches/Deals/Therapists/Products by their own vendors.* key, never the blanket members:edit/delete', async () => {
+    // members:edit/delete both false; each catalog resource's own key is granted instead.
+    useAuthMock.mockReturnValue({
+      token: 't',
+      can: (menuKey: string, action: string) => {
+        if (menuKey === 'members') return action === 'view';
+        if (menuKey === 'vendors.branches') return action === 'edit';
+        if (menuKey === 'vendors.deals') return action === 'edit' || action === 'delete';
+        if (menuKey === 'vendors.therapists') return action === 'edit' || action === 'delete';
+        if (menuKey === 'vendors.products') return action === 'edit' || action === 'delete';
+        return false;
+      },
+    });
+    renderAt('/account/members/m1');
+    await waitFor(() => expect(screen.getByText('profile-form')).toBeTruthy());
+
+    fireEvent.click(tab('Branches'));
+    await waitFor(() => expect(branchesProps).toHaveBeenCalled());
+    expect(branchesProps).toHaveBeenLastCalledWith(expect.objectContaining({ canEdit: true }));
+
+    fireEvent.click(tab('Deals'));
+    await waitFor(() => expect(dealsProps).toHaveBeenCalled());
+    expect(dealsProps).toHaveBeenLastCalledWith(expect.objectContaining({ canEdit: true, canDelete: true }));
+
+    fireEvent.click(tab('Therapists'));
+    await waitFor(() => expect(therapistsProps).toHaveBeenCalled());
+    expect(therapistsProps).toHaveBeenLastCalledWith(expect.objectContaining({ canEdit: true, canDelete: true }));
+
+    fireEvent.click(tab('Products'));
+    await waitFor(() => expect(productsProps).toHaveBeenCalled());
+    expect(productsProps).toHaveBeenLastCalledWith(expect.objectContaining({ canEdit: true, canDelete: true }));
+  });
+
+  it('hides Branches/Deals/Therapists/Products edit even when members:edit is granted, if the resource\'s own key is not', async () => {
+    // The inverse of the matrix's default overlap: members:view/edit true, every vendors.* key false.
+    useAuthMock.mockReturnValue({
+      token: 't',
+      can: (menuKey: string, action: string) => menuKey === 'members' && (action === 'view' || action === 'edit'),
+    });
+    renderAt('/account/members/m1');
+    await waitFor(() => expect(screen.getByText('profile-form')).toBeTruthy());
+
+    fireEvent.click(tab('Branches'));
+    await waitFor(() => expect(branchesProps).toHaveBeenCalled());
+    expect(branchesProps).toHaveBeenLastCalledWith(expect.objectContaining({ canEdit: false }));
+
+    fireEvent.click(tab('Deals'));
+    await waitFor(() => expect(dealsProps).toHaveBeenCalled());
+    expect(dealsProps).toHaveBeenLastCalledWith(expect.objectContaining({ canEdit: false, canDelete: false }));
   });
 
   it('shows an access message without members:view', async () => {

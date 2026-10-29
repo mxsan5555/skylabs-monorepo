@@ -64,8 +64,12 @@ export interface CatalogDeal {
   title: string;
   slug: string;
   shortDescription: string | null;
+  /** Rich HTML (sky-rich-text-editor), already server-sanitized — render via
+   *  `dangerouslySetInnerHTML`, never as plain text (see deal-detail.tsx). */
   description: string | null;
   termsAndConditions: string | null;
+  note: string | null;
+  policy: string | null;
   /** A synced "from price"/default-duration display cache (kept in sync with the cheapest
    *  active `packages[]` entry server-side — see DealPackage's own schema doc comment in
    *  msd-api) — accurate for listing/sort/filter display, but NEVER the authoritative cart/order
@@ -167,6 +171,7 @@ export interface CatalogTherapistPackage {
 
 export interface CatalogVendorTherapist {
   id: string;
+  slug: string | null;
   /** The service/role label a customer browses by (e.g. "Legs Therapist") — distinct from
    *  `personName` below, never merged into one field; the customer must see both clearly. */
   therapistType: string;
@@ -174,6 +179,8 @@ export interface CatalogVendorTherapist {
   personName: string;
   gender: string | null;
   specialization: string | null;
+  /** Rich HTML (sky-rich-text-editor), already server-sanitized — render via
+   *  `dangerouslySetInnerHTML`, never as plain text (see therapist-detail.tsx). */
   bio: string | null;
   experienceYears: number | null;
   photoUrl: string | null;
@@ -295,6 +302,22 @@ export function getCatalogHomeHero(state?: string) {
   return apiGet<CatalogHomeHero>(`/catalog/home-hero${state ? `?state=${encodeURIComponent(state)}` : ''}`, null);
 }
 
+/** Public Home Tag Section rails — New / Deal / Hot Deal / Expire soon (docs/msd/PLANNING.md
+ *  §7.1). Each tag resolves independently to the visitor's state or Global/Default; a tag with
+ *  no eligible section anywhere is simply absent from the array. */
+export type CatalogHomeTagSectionTag = 'NEW' | 'DEAL' | 'HOT_DEAL' | 'EXPIRE_SOON';
+
+export interface CatalogHomeTagSection {
+  tag: CatalogHomeTagSectionTag;
+  title: string;
+  state: string | null;
+  deals: CatalogDeal[];
+}
+
+export function getCatalogHomeTagSections(state?: string) {
+  return apiGet<CatalogHomeTagSection[]>(`/catalog/home-tag-sections${state ? `?state=${encodeURIComponent(state)}` : ''}`, null);
+}
+
 export interface CatalogDealListOptions {
   page?: number;
   pageSize?: number;
@@ -357,8 +380,13 @@ export interface CatalogProduct {
   name: string;
   slug: string;
   brand: string | null;
+  /** Rich HTML (sky-rich-text-editor), already server-sanitized — render via
+   *  `dangerouslySetInnerHTML`, never as plain text (see product-detail.tsx). */
   description: string | null;
   summary: string | null;
+  /** Rich HTML, same as `description` — previously saved by vendors but never exposed/rendered
+   *  on the public page; now shown in its own accordion section. */
+  returnPolicy: string | null;
   image: string | null;
   imageAlt: string | null;
   price: string;

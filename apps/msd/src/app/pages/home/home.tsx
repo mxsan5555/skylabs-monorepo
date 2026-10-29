@@ -8,8 +8,10 @@ import { PageSection } from '../../components/page-section/page-section';
 import { Seo } from '../../seo/seo';
 import { faqPageJsonLd, itemListJsonLd, type JsonLdObject } from '../../seo/jsonld';
 import { SITE_URL } from '../../seo/site-url';
+import { dealPath, productPath, therapistPath } from '../../seo/public-urls';
 import { CategoryTiles } from './category-tiles';
 import { DealsNearYou } from './deals-near-you';
+import { HomeTagSections } from './home-tag-sections';
 import { HomeHero } from './home-hero';
 import { BannerSlot } from '../../components/banner-slot/banner-slot';
 import { HowItWorks } from './how-it-works';
@@ -54,7 +56,7 @@ export function Home() {
             .slice(0, HOME_RAIL_SIZE)
             .map((d) => ({
               name: d.title,
-              path: dealHref(d),
+              path: dealPath(d),
               price: Number(d.salePrice),
               image: primaryImage(resolveDealMedia(d)) || undefined,
             })),
@@ -111,33 +113,7 @@ const renderDealSection = (
         categories={categories}
         renderDeal={renderDeal}
       />
-      {/* tagwise sections */}
-      {ready && catalog.deals.length > 0 && (
-        <>
-     {renderDealSection(
-  'new-heading',
-  'New Arrivals',
-  '/deals?tag=new',
-  HOME_DEAL_TAGS.new,
-  'surface',
-)}
-
-{renderDealSection(
-  'hot-heading',
-  '	Trending Deals',
-  '/deals?tag=hot',
-  HOME_DEAL_TAGS.hot,
-  'tint',
-)}
-
-{renderDealSection(
-  'expiry-soon-heading',
-  'Ending Soon',
-  '/deals?tag=expiry-soon',
-  HOME_DEAL_TAGS.expirySoon,
-  'surface',
-)}  </>
-      )}
+      <HomeTagSections renderDeal={renderDeal} />
       <HowItWorks />
       {ready && catalog.therapists.length > 0 && (
         <PageSection tone="tint" aria-labelledby="therapists-heading">

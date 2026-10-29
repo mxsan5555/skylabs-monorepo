@@ -53,6 +53,7 @@ export function MediaUploader({
   existingImages,
   existingVideo,
   hideVideo,
+  maxImages,
   token,
   onImagesChange,
   onVideoChange,
@@ -72,6 +73,12 @@ export function MediaUploader({
    *  merely leaving it unwired, so there's no dead control a category editor could click into an
    *  error. Every other entity keeps the section (defaults to `false`). */
   hideVideo?: boolean;
+  /** Caps the gallery at N images — once reached, the file input drops its `multiple` attribute
+   *  and the "Upload images" button hides entirely (replace is still "remove, then add new" —
+   *  no separate replace affordance needed for a cap of 1). Undefined (default) keeps today's
+   *  unlimited-gallery behavior for every existing Deal/Product/Therapist/Vendor caller. Used by
+   *  the Member User step's single profile-image field (`maxImages={1}`). */
+  maxImages?: number;
   token: string | null;
   onImagesChange?: (images: MediaImage[]) => void;
   onVideoChange?: (video: MediaVideo | null) => void;
@@ -143,7 +150,12 @@ export function MediaUploader({
   async function handleImagesSelected(files: FileList | null) {
     if (!files || files.length === 0) return;
     setError('');
-    const picked = Array.from(files);
+    const remainingSlots = maxImages !== undefined ? Math.max(0, maxImages - images.length - staged.length) : undefined;
+    const picked = remainingSlots !== undefined ? Array.from(files).slice(0, remainingSlots) : Array.from(files);
+    if (picked.length === 0) {
+      if (imageInputRef.current) imageInputRef.current.value = '';
+      return;
+    }
 
     if (!entityId) {
       const newStaged: StagedImage[] = picked.map((file) => ({
@@ -341,15 +353,20 @@ export function MediaUploader({
           ref={imageInputRef}
           type="file"
           accept="image/jpeg,image/png,image/webp"
-          multiple
+          multiple={maxImages !== 1}
           hidden
           onChange={(e) => handleImagesSelected(e.target.files)}
         />
-        <OutlinedButton onClick={() => imageInputRef.current?.click()} disabled={busy}>
-          <Icon slot="icon" aria-hidden="true">add_photo_alternate</Icon>
-          Upload images
-        </OutlinedButton>
-        <p className="field-hint">JPG, PNG, or WEBP — 30 KB to 80 KB each (compressed automatically).</p>
+        {(maxImages === undefined || images.length + staged.length < maxImages) && (
+          <OutlinedButton onClick={() => imageInputRef.current?.click()} disabled={busy}>
+            <Icon slot="icon" aria-hidden="true">add_photo_alternate</Icon>
+            {maxImages === 1 ? 'Upload image' : 'Upload images'}
+          </OutlinedButton>
+        )}
+        <p className="field-hint">
+          JPG, PNG, or WEBP — 30 KB to 80 KB each (compressed automatically).
+          {maxImages === 1 && ' Remove the current image to replace it.'}
+        </p>
       </div>
 
       {!hideVideo && (

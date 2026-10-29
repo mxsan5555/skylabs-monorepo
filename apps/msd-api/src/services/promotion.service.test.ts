@@ -201,4 +201,40 @@ describe('CTA banner — public read by slot and state (getPublicBanners)', () =
     const banners = await getPublicBanners({ slot: 'HOME_AFTER_DEALS', state: null });
     expect(banners.map((b) => b.href)).toEqual(['/category/massage', `/deal/${DEAL_ID}`]);
   });
+
+  /** Regression: a DEAL-destination promotion used to keep linking to its Deal with only
+   *  `{id, title, slug}` selected — no visibility check at all — so a banner could point at a
+   *  Deal whose vendor had since been suspended (or the deal itself deactivated/unapproved,
+   *  or its branch deactivated). Mirrors `VISIBLE_DEAL_WHERE`'s bar exactly. */
+  const dealDestination = (deal: Record<string, unknown>) => ({
+    ...basePromotion,
+    destinationType: 'DEAL' as const,
+    dealId: 'deal-1',
+    deal: { id: 'deal-1', title: 'Deep Tissue Massage', slug: 'deep-tissue-massage', status: 'ACTIVE', approvalStatus: 'APPROVED', vendor: { status: 'ACTIVE' }, branch: { isActive: true }, ...deal },
+    mediaImages: [],
+  });
+
+  it('keeps the linked deal when it is fully visible (active, approved, active vendor, active branch)', async () => {
+    prismaMock.promotion.findMany.mockResolvedValue([dealDestination({})]);
+    const result = await getPublicPromotions();
+    expect(result[0].deal).toEqual({ id: 'deal-1', title: 'Deep Tissue Massage', slug: 'deep-tissue-massage' });
+  });
+
+  it('hides the linked deal (returns deal: null) when its vendor has been suspended', async () => {
+    prismaMock.promotion.findMany.mockResolvedValue([dealDestination({ vendor: { status: 'SUSPENDED' } })]);
+    const result = await getPublicPromotions();
+    expect(result[0].deal).toBeNull();
+  });
+
+  it('hides the linked deal when the deal itself is no longer ACTIVE', async () => {
+    prismaMock.promotion.findMany.mockResolvedValue([dealDestination({ status: 'INACTIVE' })]);
+    const result = await getPublicPromotions();
+    expect(result[0].deal).toBeNull();
+  });
+
+  it('hides the linked deal when its branch has been deactivated', async () => {
+    prismaMock.promotion.findMany.mockResolvedValue([dealDestination({ branch: { isActive: false } })]);
+    const result = await getPublicPromotions();
+    expect(result[0].deal).toBeNull();
+  });
 });

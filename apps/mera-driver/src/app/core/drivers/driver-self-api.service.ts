@@ -10,6 +10,11 @@ export interface DriverSelfDocument {
   type: string;
   regNo: string | null;
   fileName: string | null;
+  filePath?: string | null;
+  version?: number;
+  archivedAt?: string | null;
+  expiresAt?: string | null;
+  createdAt?: string;
 }
 
 export interface DriverSelf {
@@ -52,6 +57,12 @@ export interface DriverSelf {
   branchName: string | null;
   upiIdOrChequeNo: string | null;
   languages: string[];
+  city: string | null;
+  accountPaymentMethod: string | null;
+  completedSubSteps: number[];
+  currentStep: number;
+  currentSubStep: number;
+  completionPercentage: number;
   /** Read-only — the driver portal never sends this back; only staff can change it. */
   status: string;
   /** Read-only — staff-set reason for the current `status`. */
@@ -60,7 +71,7 @@ export interface DriverSelf {
 }
 
 /** The self-editable subset — everything in `DriverSelf` minus the read-only fields. */
-export type DriverSelfUpdate = Partial<Omit<DriverSelf, 'id' | 'status' | 'verificationNotes' | 'documents'>>;
+export type DriverSelfUpdate = Partial<Omit<DriverSelf, 'id' | 'status' | 'verificationNotes' | 'documents' | 'completedSubSteps' | 'currentStep' | 'currentSubStep' | 'completionPercentage'>>;
 
 @Injectable({ providedIn: 'root' })
 export class DriverSelfApiService {
@@ -75,6 +86,10 @@ export class DriverSelfApiService {
     return this.http.patch<ApiEnvelope<DriverSelf>>(this.base, input).pipe(map(unwrap));
   }
 
+  savePill(tab: number, pill: number, complete: boolean, fields: DriverSelfUpdate): Observable<DriverSelf> {
+    return this.http.patch<ApiEnvelope<DriverSelf>>(`${this.base}/pill`, { tab, pill, complete, fields }).pipe(map(unwrap));
+  }
+
   listDocuments(): Observable<DriverSelfDocument[]> {
     return this.http.get<ApiEnvelope<DriverSelfDocument[]>>(`${this.base}/documents`).pipe(map(unwrap));
   }
@@ -84,17 +99,26 @@ export class DriverSelfApiService {
     type: string,
     regNo: string,
     file: File,
+    expiresAt?: string,
+    typeKey?:string,replaceDocumentId?:string,
   ): Observable<DriverSelfDocument> {
     const form = new FormData();
     form.append('category', category);
     form.append('type', type);
+    if(typeKey)form.append('typeKey',typeKey);
+    if(replaceDocumentId)form.append('replaceDocumentId',replaceDocumentId);
     if (regNo) form.append('regNo', regNo);
+    if (expiresAt) form.append('expiresAt', expiresAt);
     form.append('file', file);
     return this.http.post<ApiEnvelope<DriverSelfDocument>>(`${this.base}/documents`, form).pipe(map(unwrap));
   }
 
   deleteDocument(docId: string): Observable<{ id: string }> {
     return this.http.delete<ApiEnvelope<{ id: string }>>(`${this.base}/documents/${docId}`).pipe(map(unwrap));
+  }
+
+  updateLocation(lat: number, lng: number): Observable<{ lat: number; lng: number; updatedAt: string }> {
+    return this.http.patch<ApiEnvelope<{ lat: number; lng: number; updatedAt: string }>>(`${this.base}/location`, { lat, lng }).pipe(map(unwrap));
   }
 }
 

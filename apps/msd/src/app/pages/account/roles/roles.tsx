@@ -8,13 +8,24 @@ import {
 
 import {
   FilledButton,
+<<<<<<< HEAD
   OutlinedTextField,
   Switch,
+=======
+  OutlinedButton,
+  OutlinedTextField,
+  Switch,
+  Icon,
+>>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
 } from '@skylabs-monorepo/shared-ui/react';
 
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 
 import {
+<<<<<<< HEAD
+=======
+  deleteRole,
+>>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
   getPermissionCatalog,
   getRolePermissions,
   getRoleWidgets,
@@ -23,11 +34,11 @@ import {
   setRolePermissions,
   setRoleStatus,
   setRoleWidgets,
+  updateRole,
   type DashboardWidgetRecord,
   type PermissionCatalogRow,
   type PermissionScope,
   type Role,
-  updateRole,
 } from '../../../../api/rbac/roles';
 
 import { ApiRequestError } from '../../../../api/rbac/client';
@@ -60,6 +71,13 @@ export function RoleManagement() {
     Map<string, Map<string, PermissionScope>>
   >(new Map());
 
+  // The last-persisted grant set per role, so the matrix can tell an edited-but-unsaved
+  // checkbox apart from one that already matches the database. Only ever replaced wholesale
+  // (initial load, or a role's own successful save) — never mutated by `toggleRolePermission`.
+  const [savedPermissionsByRole, setSavedPermissionsByRole] = useState<
+    Map<string, Map<string, PermissionScope>>
+  >(new Map());
+
   const [dirtyRoleIds, setDirtyRoleIds] = useState<Set<string>>(new Set());
 
   const [selectedWidgets, setSelectedWidgets] = useState<
@@ -81,6 +99,10 @@ export function RoleManagement() {
   const [actionError, setActionError] = useState('');
 
   const canEdit = can('rbac.roles', 'edit');
+<<<<<<< HEAD
+=======
+  const canDelete = can('rbac.roles', 'delete');
+>>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
   const canChangeStatus = can('rbac.roles', 'status_change');
 
   const selectedRole = useMemo(
@@ -91,7 +113,10 @@ export function RoleManagement() {
   // Keep every role available in the matrix, including custom roles.
   const matrixRoles = roles;
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
   const loadRoles = useCallback(async () => {
     setRolesLoading(true);
     setRolesError('');
@@ -219,6 +244,7 @@ export function RoleManagement() {
         if (cancelled) return;
 
         setPermissionsByRole(new Map(entries));
+        setSavedPermissionsByRole(new Map(entries.map(([roleId, perms]) => [roleId, new Map(perms)])));
         setDirtyRoleIds(new Set());
       })
       .catch((error) => {
@@ -455,6 +481,12 @@ export function RoleManagement() {
             return next;
           });
 
+          setSavedPermissionsByRole((previous) => {
+            const next = new Map(previous);
+            next.set(role.id, new Map(savedPermissions));
+            return next;
+          });
+
           setDirtyRoleIds((previous) => {
             const next = new Set(previous);
             next.delete(role.id);
@@ -529,10 +561,18 @@ export function RoleManagement() {
       <header className="page-head">
         <div>
           <h1>Role Management</h1>
+<<<<<<< HEAD
           <p>Control exactly what each role can see and do.</p>
           {/* R1 / P2-15: the API refuses role create, clone and delete. */}
           <p className="field-hint">Roles are fixed. Change what a role can do in the permission matrix.</p>
         </div>
+=======
+          <p>
+            Define roles and control exactly what each one can see and do.
+          </p>
+        </div>
+
+>>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
       </header>
 
       {actionMessage && (
@@ -665,6 +705,7 @@ export function RoleManagement() {
                   ? permissionsByRole.get(selectedRoleId) ?? new Map<string, PermissionScope>()
                   : new Map<string, PermissionScope>()
               }
+              savedPermissions={selectedRoleId ? savedPermissionsByRole.get(selectedRoleId) : undefined}
               onPermissionToggle={toggleRolePermission}
               disabled={!canEdit || savingPermissions}
             />

@@ -4,6 +4,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SnackbarHost } from '../../../../snackbar/snackbar';
 import type { BlogPost } from '../../../../api/rbac/blog-posts';
 
+import { BlogList } from './blog-list';
+
 let grantedPermissions: Set<string>;
 
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
@@ -26,6 +28,13 @@ vi.mock('../../../../api/rbac/blog-posts', async () => {
   const actual = await vi.importActual<typeof import('../../../../api/rbac/blog-posts')>('../../../../api/rbac/blog-posts');
   return {
     ...actual,
+    blogArticlesApi: {
+      listBlogPosts: (...args: unknown[]) => listBlogPostsMock(...args),
+      createBlogPost: (...args: unknown[]) => createBlogPostMock(...args),
+      updateBlogPost: (...args: unknown[]) => updateBlogPostMock(...args),
+      setBlogPostStatus: (...args: unknown[]) => setBlogPostStatusMock(...args),
+      deleteBlogPost: (...args: unknown[]) => deleteBlogPostMock(...args),
+    },
     listBlogPosts: (...args: unknown[]) => listBlogPostsMock(...args),
     createBlogPost: (...args: unknown[]) => createBlogPostMock(...args),
     updateBlogPost: (...args: unknown[]) => updateBlogPostMock(...args),
@@ -57,8 +66,6 @@ vi.mock('../../../../api/media', async () => {
   };
 });
 
-import { BlogList } from './blog-list';
-
 const POST: BlogPost = {
   id: 'post-1',
   title: 'Deep Tissue Massage Benefits',
@@ -79,11 +86,12 @@ const POST: BlogPost = {
   mediaImages: [],
 };
 
+describe.each(['pages', 'articles'] as const)('BlogList %s', (scope) => {
 function renderList() {
   return render(
     <>
       <MemoryRouter>
-        <BlogList />
+        <BlogList scope={scope} />
       </MemoryRouter>
       <SnackbarHost />
     </>,
@@ -134,7 +142,7 @@ async function dispatchRowActionUntil(action: string, assert: () => void, rowInd
 
 beforeEach(() => {
   vi.clearAllMocks();
-  grantedPermissions = new Set(['cms.blog.pages:create', 'cms.blog.pages:edit', 'cms.blog.pages:delete']);
+  grantedPermissions = new Set([`cms.blog.${scope}:create`, `cms.blog.${scope}:edit`, `cms.blog.${scope}:delete`]);
   listBlogPostsMock.mockResolvedValue({ data: [POST], meta: { total: 1 } });
   listBlogCategoriesMock.mockResolvedValue({ data: [{ id: 'cat-1', name: 'Wellness', slug: 'wellness', description: '', isActive: true, sortOrder: 0, createdAt: '', updatedAt: '' }] });
 });
@@ -263,4 +271,6 @@ describe('BlogList', () => {
     const actions = JSON.parse(table().getAttribute('actions') ?? '[]') as { event: string }[];
     expect(actions.map((a) => a.event)).toEqual(['view']);
   });
+});
+
 });

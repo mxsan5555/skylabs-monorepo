@@ -18,6 +18,7 @@ import { useDealPurchaseSelection } from '../../../hooks/use-deal-purchase-selec
 import { useTherapistPurchaseSelection } from '../../../hooks/use-therapist-purchase-selection';
 import { formatINR, pluralize, formatTime12h, formatStreetAddress } from '../../../utils/format';
 import { resolveDealMedia, resolveProductMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
+import { productPath } from '../../seo/public-urls';
 import { showSnackbar } from '../../../snackbar/snackbar';
 import './vendor.css';
 import content from '../../../content.json';
@@ -585,7 +586,7 @@ export function VendorPage() {
                           : undefined
                       }
                       discount={product.discount ? `-${product.discount}%` : undefined}
-                      href={`/products/${product.id}`}
+                      href={productPath(product)}
                     >
                       <div onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
                         <FilledButton onClick={() => addProductToCart(product)}>

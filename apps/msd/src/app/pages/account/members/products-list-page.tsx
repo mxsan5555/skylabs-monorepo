@@ -9,10 +9,10 @@ import { useConfirmDialog } from '../../../components/confirm-dialog';
 interface ProductsListPageProps {
   token: string | null;
   vendorId: string;
-  /** Gates "Add product" and each row's Edit/Toggle-status action — same coarse `vendors:edit`
-   *  prop `BranchesListPage`/`DealsListPage`/`TherapistsListPage` already take. */
+  /** Gates "Add product" and each row's Edit/Toggle-status action — computed by the caller
+   *  from `vendors.products:edit` (never the blanket `members:edit`). */
   canEdit: boolean;
-  /** Gates the Delete row action — mirrors `member-detail-page.tsx`'s own `canDelete`. */
+  /** Gates the Delete row action — computed by the caller from `vendors.products:delete`. */
   canDelete: boolean;
 }
 

@@ -70,7 +70,8 @@ export interface EligibleCount {
   minimumRequired: number;
 }
 
-/** One search result from `GET /home-hero/search-items` or `/promotions/search-items`. */
+/** One search result from `GET /home-hero/search-items`, `/promotions/search-items` or
+ *  `/home-tag-sections/search-items`. */
 export interface StateItem {
   type: StateItemType;
   id: string;
@@ -80,6 +81,11 @@ export interface StateItem {
   price: string;
   image: string | null;
   eligible: boolean;
+  /** Deals only — Home Tag Sections' picker shows these since its tag is manually judged, never
+   *  computed (PLANNING.md §7.1). Always undefined for a product or for the other two consoles. */
+  status?: string;
+  discountPercent?: number | null;
+  endDate?: string | null;
 }
 
 export function toQuery(params: Record<string, string | number | undefined>): string {
@@ -123,7 +129,7 @@ export function getHomeHeroEligibleCount(token: string | null, state: string | n
 /** Deals and products of a state; `state: null` searches every state (Global/Default). */
 export function searchStateItems(
   token: string | null,
-  base: '/home-hero' | '/promotions',
+  base: '/home-hero' | '/promotions' | '/home-tag-sections',
   opts: { state: string | null; q: string; type: StateItemType | 'all'; pageSize?: number; eligibleOnly?: boolean },
 ) {
   return apiGet<StateItem[]>(

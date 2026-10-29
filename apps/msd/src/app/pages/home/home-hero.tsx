@@ -11,6 +11,7 @@ import { formatINR } from '../../../utils/format';
 import { imageSrcSet, toDealCardDeal } from './home-data';
 import { PageSection } from '../../components/page-section/page-section';
 import { OfferCard, type OfferItem, type OfferTag } from '../../components/offer-card/offer-card';
+import { dealPath } from '../../seo/public-urls';
 import content from '../../../content.json';
 import type { DealCardDeal } from '../../components/deal-card';
 import { dealHref } from '../../../catalog/catalog-shell';

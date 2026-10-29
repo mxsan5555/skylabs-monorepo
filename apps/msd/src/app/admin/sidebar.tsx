@@ -1,4 +1,4 @@
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import type { MenuNode } from '@skylabs-monorepo/shared-types';
 import { Icon, IconButton, TextButton } from '@skylabs-monorepo/shared-ui/react';
@@ -25,6 +25,7 @@ interface SidebarProps {
 export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const { bootstrap, isPreviewing, signOut } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const menu = bootstrap?.menu ?? [];
   const visibleMenu = isPreviewing ? menu.filter((node) => node.id !== 'administration') : menu;
   const initial = (bootstrap?.user.name ?? '?').charAt(0).toUpperCase();

@@ -1,0 +1,10 @@
+import { documentChoices, availableDocumentChoices, documentKey, duplicateDocumentRow } from './document-type-selection';
+describe('document type selection',()=>{
+ const choices=[{id:'a',name:'Certificate A',status:'Active'},{id:'b',name:'Certificate B',status:'Active'},{id:'old',name:'Old certificate',status:'Inactive'}];
+ const row=(type:string,id?:string)=>({id,type,file:'',regNo:''});
+ it('reserves saved and unsaved selections while retaining the current selection',()=>{const rows=[row('Certificate A','saved'),row('Certificate B')];expect(availableDocumentChoices(choices,rows,0).map(c=>c.id)).toEqual(['a']);expect(availableDocumentChoices(choices,rows)).toEqual([]);});
+ it('clearing a file keeps its type reserved; deleting the row releases it',()=>{const rows=[{...row('Certificate A'),file:'file.pdf'}];rows[0].file='';expect(availableDocumentChoices(choices,rows).map(c=>c.id)).toEqual(['b']);expect(availableDocumentChoices(choices,[]).map(c=>c.id)).toEqual(['a','b']);});
+ it('uses stable master IDs, preserves inactive and historical current choices and scopes drivers separately',()=>{expect(documentKey('Certificate A',choices)).toBe('a');expect(availableDocumentChoices(choices,[row('Old certificate')],0).map(c=>c.id)).toContain('old');expect(availableDocumentChoices(choices,[]).map(c=>c.id)).not.toContain('old');expect(availableDocumentChoices(choices,[]).map(c=>c.id)).toContain('a');expect(availableDocumentChoices(choices,[row('Historical')],0).at(-1)?.name).toBe('Historical');});
+ it('flags both legacy duplicate rows without removing files',()=>{const rows=[row('Certificate A','first'),row('Certificate A','second')];expect(duplicateDocumentRow(choices,rows,0)).toBe(true);expect(duplicateDocumentRow(choices,rows,1)).toBe(true);expect(rows).toHaveLength(2);});
+ it('keeps education documents separate from normal education levels',()=>{const education=documentChoices('education',{education:[{id:'degree',name:'Degree',status:'Active'}]});expect(education[0].id).toBe('education:10th');expect(education.some(c=>c.id==='degree')).toBe(false);});
+});

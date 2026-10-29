@@ -211,6 +211,11 @@ describe('POST /api/v1/orders/me/:id/pay-cod', () => {
       prismaMock.orderItem.findMany.mockResolvedValue([{ vendorId: 'vendor-1' }]);
       prismaMock.member.findUnique.mockResolvedValue({ ownerUserId: 'vendor-1-owner' });
       prismaMock.user.findMany.mockResolvedValue([{ id: 'superadmin-1' }]);
+      // createEntitlementsForOrder's own supporting calls — this test cares about notifications,
+      // not voucher generation, so these are harmless no-op-shaped defaults.
+      prismaMock.order.findUniqueOrThrow.mockResolvedValue({ customerId: CUSTOMER_ID });
+      prismaMock.financeSettings.upsert.mockResolvedValue({ defaultCommissionRatePercent: '10' });
+      prismaMock.purchaseEntitlement.findFirst.mockResolvedValue(null);
 
       const res = await request(app)
         .post(`/api/v1/orders/me/${ORDER_ID}/pay-cod`)
@@ -237,7 +242,16 @@ describe('POST /api/v1/orders/me/:id/pay-cod', () => {
       prismaMock.member.findUnique.mockImplementation(({ where }: { where: { id: string } }) =>
         Promise.resolve({ ownerUserId: where.id === 'vendor-A' ? 'owner-A' : 'owner-B' }),
       );
+      prismaMock.member.findMany.mockResolvedValue([
+        { id: 'vendor-A', commissionRatePercent: null },
+        { id: 'vendor-B', commissionRatePercent: null },
+      ]);
       prismaMock.user.findMany.mockResolvedValue([]);
+      // createEntitlementsForOrder's own supporting calls — this test cares about notifications,
+      // not voucher generation, so these are harmless no-op-shaped defaults.
+      prismaMock.order.findUniqueOrThrow.mockResolvedValue({ customerId: CUSTOMER_ID });
+      prismaMock.financeSettings.upsert.mockResolvedValue({ defaultCommissionRatePercent: '10' });
+      prismaMock.purchaseEntitlement.findFirst.mockResolvedValue(null);
 
       const res = await request(app)
         .post(`/api/v1/orders/me/${ORDER_ID}/pay-cod`)
@@ -586,6 +600,11 @@ describe('POST /api/v1/payments/webhook/razorpay', () => {
     prismaMock.orderItem.findMany.mockResolvedValue([{ vendorId: 'vendor-1' }]);
     prismaMock.member.findUnique.mockResolvedValue({ ownerUserId: 'vendor-1-owner' });
     prismaMock.user.findMany.mockResolvedValue([{ id: 'superadmin-1' }]);
+    // createEntitlementsForOrder's own supporting calls — this test cares about notifications,
+    // not voucher generation, so these are harmless no-op-shaped defaults.
+    prismaMock.order.findUniqueOrThrow.mockResolvedValue({ customerId: CUSTOMER_ID });
+    prismaMock.financeSettings.upsert.mockResolvedValue({ defaultCommissionRatePercent: '10' });
+    prismaMock.purchaseEntitlement.findFirst.mockResolvedValue(null);
     const signature = signWebhook(capturedEvent);
     const res = await request(app).post('/api/v1/payments/webhook/razorpay').set('x-razorpay-signature', signature).send(capturedEvent);
     expect(res.status).toBe(200);

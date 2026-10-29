@@ -34,6 +34,10 @@ const customerFixture = {
 beforeEach(() => {
   vi.clearAllMocks();
   resolveMock.mockResolvedValue(['customers:view']);
+  // customer.service.ts's loadOrderStats runs 3 groupBy queries per list/get call — default to
+  // "no orders" so every pre-existing test here (none of which cares about these stats) doesn't
+  // have to mock them individually.
+  prismaMock.order.groupBy.mockResolvedValue([]);
 });
 
 describe('GET /api/v1/customers', () => {
@@ -84,6 +88,47 @@ describe('GET /api/v1/customers', () => {
     });
   });
 
+  /**
+   * Feature: Customer order-stats (Net Paid / Awaiting Payment / Last Order)
+   * Scenario: these are real money figures computed from `Order.total`/`Order.status` via
+   * batched `groupBy` queries (`loadOrderStats`), never a placeholder — and since an Order only
+   * ever reaches CONFIRMED/COMPLETED via a verified payment (see msd-api's payment.service.ts),
+   * "Net Paid" is exactly the sum of CONFIRMED+COMPLETED order totals, "Awaiting Payment" is the
+   * sum of PENDING_PAYMENT order totals. There is no refund concept anywhere in this schema, so
+   * no "completed refunds" figure is ever computed or returned.
+   */
+  it('attaches netPaid/awaitingPayment/lastOrderAt computed from Order groupBy queries', async () => {
+    prismaMock.user.findMany.mockResolvedValue([customerFixture]);
+    prismaMock.user.count.mockResolvedValue(1);
+    prismaMock.order.groupBy
+      .mockResolvedValueOnce([{ customerId: CUSTOMER_ID, _sum: { total: 1500 } }]) // paid
+      .mockResolvedValueOnce([{ customerId: CUSTOMER_ID, _sum: { total: 400 } }]) // awaiting
+      .mockResolvedValueOnce([{ customerId: CUSTOMER_ID, _max: { createdAt: new Date('2026-03-01T00:00:00.000Z') } }]); // last order
+
+    const res = await request(app)
+      .get('/api/v1/customers')
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data[0]).toMatchObject({
+      netPaid: 1500,
+      awaitingPayment: 400,
+      lastOrderAt: '2026-03-01T00:00:00.000Z',
+    });
+  });
+
+  it('defaults netPaid/awaitingPayment to 0 and lastOrderAt to null when the customer has no orders', async () => {
+    prismaMock.user.findMany.mockResolvedValue([customerFixture]);
+    prismaMock.user.count.mockResolvedValue(1);
+    // beforeEach's default already resolves every groupBy call to [] (no rows).
+
+    const res = await request(app)
+      .get('/api/v1/customers')
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+
+    expect(res.body.data[0]).toMatchObject({ netPaid: 0, awaitingPayment: 0, lastOrderAt: null });
+  });
+
   it('applies search across name/phone/email', async () => {
     prismaMock.user.findMany.mockResolvedValue([]);
     prismaMock.user.count.mockResolvedValue(0);
@@ -96,6 +141,67 @@ describe('GET /api/v1/customers', () => {
       { phone: { contains: 'priya', mode: 'insensitive' } },
       { email: { contains: 'priya', mode: 'insensitive' } },
     ]);
+  });
+});
+
+describe('POST /api/v1/customers — Super Admin adding a customer directly (matrix: Customers = VC)', () => {
+  it('returns 401 with no token', async () => {
+    const res = await request(app).post('/api/v1/customers').send({ name: 'New Customer', phone: '9876543210' });
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 403 without customers:create (e.g. Admin, whose matrix cell is View-only)', async () => {
+    resolveMock.mockResolvedValue(['customers:view']);
+    const res = await request(app)
+      .post('/api/v1/customers')
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ name: 'New Customer', phone: '9876543210' });
+    expect(res.status).toBe(403);
+  });
+
+  it('creates a customer, normalizes the phone, and assigns the existing customer role as its single role', async () => {
+    resolveMock.mockResolvedValue(['customers:create']);
+    const customerRole = { id: 'role-customer', key: 'customer' };
+    prismaMock.role.findUnique.mockResolvedValue(customerRole);
+    prismaMock.user.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ id: CUSTOMER_ID, name: data.name, email: data.email, phone: data.phone, status: 'active', createdAt: new Date(), _count: { orders: 0 } }),
+    );
+    const res = await request(app)
+      .post('/api/v1/customers')
+      .set('Authorization', bearerFor({ sub: 'super-admin-1', roles: ['super_admin'] }))
+      .send({ name: 'New Customer', phone: '9876543210' });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ phone: '+919876543210', roles: { create: [{ roleId: 'role-customer' }] } }),
+      }),
+    );
+  });
+
+  it('returns 409 (not a raw 500) when the email/phone unique constraint is hit at the DB', async () => {
+    resolveMock.mockResolvedValue(['customers:create']);
+    prismaMock.role.findUnique.mockResolvedValue({ id: 'role-customer', key: 'customer' });
+    const { Prisma } = await import('../generated/prisma-client');
+    prismaMock.user.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: 'test' }),
+    );
+    const res = await request(app)
+      .post('/api/v1/customers')
+      .set('Authorization', bearerFor({ sub: 'super-admin-1', roles: ['super_admin'] }))
+      .send({ name: 'New Customer', email: 'taken@example.com' });
+    expect(res.status).toBe(409);
+  });
+
+  it('rejects a payload with neither email nor phone', async () => {
+    resolveMock.mockResolvedValue(['customers:create']);
+    prismaMock.role.findUnique.mockResolvedValue({ id: 'role-customer', key: 'customer' });
+    const res = await request(app)
+      .post('/api/v1/customers')
+      .set('Authorization', bearerFor({ sub: 'super-admin-1', roles: ['super_admin'] }))
+      .send({ name: 'No Contact' });
+    expect(res.status).toBe(422);
+    expect(prismaMock.user.create).not.toHaveBeenCalled();
   });
 });
 

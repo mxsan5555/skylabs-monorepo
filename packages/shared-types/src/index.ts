@@ -45,6 +45,12 @@ export const PERMISSION_ACTIONS: PermissionAction[] = [
   'custom',
 ];
 
+/** Whether a granted permission applies to every record (`ALL`) or only the caller's own
+ *  (`OWN`, e.g. a Member seeing only their own branches). Mirrors each API's
+ *  `RolePermission.scope` column — not every `${menuKey}:${action}` has real OWN-enforcement
+ *  code behind it yet, so `scopes` only ever reflects what the backend actually enforces. */
+export type PermissionScope = 'ALL' | 'OWN';
+
 export type UserStatus = 'active' | 'inactive' | 'blocked';
 
 export interface Role {
@@ -118,6 +124,11 @@ export interface BootstrapResponse {
   user: Pick<User, 'id' | 'name' | 'email' | 'phone' | 'status'>;
   roles: Pick<Role, 'id' | 'key' | 'name' | 'isSuperAdmin'>[];
   permissions: string[]; // flattened `${menuKey}:${action}` keys granted across all of the user's roles
+  /** Scope per granted permission key, highest-scope-wins across the user's roles. Optional —
+   *  only msd-api populates it so far (mera-driver-api doesn't use RolePermission.scope yet).
+   *  Only present for keys the backend actually enforces OWN-scope for; absent/untouched keys
+   *  stay implicitly `ALL` since `requirePermission()` itself never reads this. */
+  scopes?: Record<string, PermissionScope>;
   menu: MenuNode[]; // already filtered server-side to what `permissions` allows
   dashboardWidgets: WidgetConfig[];
   /** Present only for a "Login As" preview token. */

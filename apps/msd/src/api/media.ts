@@ -10,7 +10,7 @@ import { apiPostForm, apiDelete, apiPatch } from './rbac/client';
  * `onVideoChange`.
  */
 
-export type MediaEntityType = 'deal' | 'product' | 'therapist' | 'vendor' | 'category' | 'blog' | 'about-us' | 'promotion';
+export type MediaEntityType = 'deal' | 'product' | 'therapist' | 'vendor' | 'category' | 'blog' | 'blog-article' | 'about-us' | 'promotion';
 
 export interface MediaImage {
   id: string;
@@ -35,7 +35,9 @@ export interface MediaVideo {
 interface EntityRef {
   entityType: MediaEntityType;
   entityId: string;
-  /** Deal only — its routes nest under `/vendors/me/branches/:branchId/deals/:dealId/...`. */
+  /** Deal only — its routes nest under a branch (self-service `/vendors/me/branches/:branchId/
+   *  deals/:dealId/...` or admin-on-behalf `/vendors/:vendorId/branches/:branchId/deals/
+   *  :dealId/...`, same `selfService`/`vendorId` split as Product/Therapist below). */
   branchId?: string;
   /** Vendor/Product/Therapist only — the caller's own vendor/product/therapist (self-service,
    *  `/vendors/me/...`, gated on `vendors:custom`/`products:*`) vs. an admin managing a different
@@ -67,6 +69,8 @@ function basePath(ref: EntityRef): string {
       // exists server-side; `MediaUploader`'s `hideVideo` prop keeps that endpoint unreachable
       // from the Category dialogs).
       return `/categories/${ref.entityId}`;
+    case 'blog-article':
+      return `/blog-articles/${ref.entityId}`;
     case 'blog':
       // Blog Post image routes are top-level (`/blog-posts/:id/images...`, see
       // blog-posts.routes.ts) — no branch/vendor nesting, image-only (no `/video` route exists

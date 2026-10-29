@@ -93,11 +93,12 @@ describe('auth.routes', () => {
       expect(sendSmsOtpMock).toHaveBeenCalledWith('+917234882093', expect.any(String));
     });
 
-    it('returns 500 when the delivery provider reports failure', async () => {
+    it('returns a safe delivery error and expires the undelivered challenge', async () => {
       sendOtpEmailMock.mockResolvedValue(false);
       const res = await request(app).post('/auth/otp/request').send({ identifier: IDENTIFIER, purpose: 'login' });
-      expect(res.status).toBe(500);
-      expect(res.body.error.code).toBe('SERVER_ERROR');
+      expect(res.status).toBe(503);
+      expect(res.body.error.code).toBe('OTP_PROVIDER_REJECTED');
+      expect(mockPrisma.otpChallenge.update).toHaveBeenCalledWith({where:{id:'otp-1'},data:{expiresAt:expect.any(Date)}});
     });
 
     it('returns 422 when identifier is missing/too short', async () => {
@@ -134,8 +135,8 @@ describe('auth.routes', () => {
         phone: null,
         name: IDENTIFIER,
       });
-      mockPrisma.role.findUnique.mockResolvedValue(null); // default-role seed not run — service tolerates this
-      mockPrisma.userRole.findMany.mockResolvedValue([]);
+      mockPrisma.role.findUnique.mockResolvedValue({id:'customer-role',key:'customer',isActive:true});
+      mockPrisma.userRole.findMany.mockResolvedValue([{role:{key:'customer'}}]);
       mockPrisma.refreshSession.create.mockResolvedValue({ id: 'session-1' });
       mockPrisma.user.update.mockResolvedValue({});
       mockPrisma.loginHistory.create.mockResolvedValue({});
@@ -148,7 +149,7 @@ describe('auth.routes', () => {
       expect(res.body.data.accessToken).toEqual(expect.any(String));
       expect(res.body.data.refreshToken).toEqual(expect.any(String));
       expect(res.body.data.user).toEqual(
-        expect.objectContaining({ id: 'user-1', email: IDENTIFIER, roles: [] }),
+        expect.objectContaining({ id: 'user-1', email: IDENTIFIER, roles: ['customer'] }),
       );
       // The challenge is marked verified, not deleted.
       expect(mockPrisma.otpChallenge.update).toHaveBeenCalledWith({

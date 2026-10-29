@@ -3,7 +3,7 @@ import { filterMenuByPermissions } from '@skylabs-monorepo/shared-permissions';
 import { getMenuForApp } from '@skylabs-monorepo/shared-menu';
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
-import { resolveGrantedPermissionKeys } from './permission-resolver.service';
+import { resolveGrantedPermissions } from './permission-resolver.service';
 import type { AccessTokenPayload } from '../lib/jwt';
 
 export async function getBootstrap(tokenPayload: AccessTokenPayload): Promise<BootstrapResponse> {
@@ -12,8 +12,22 @@ export async function getBootstrap(tokenPayload: AccessTokenPayload): Promise<Bo
   });
   if (!user) throw new ApiError('NOT_FOUND', 'User not found');
 
+  // Bootstrap is fetched right after login AND on every refresh/mount (see shared-auth's
+  // `loadBootstrap`), which already signs the caller out on a 401/403 response — reusing that
+  // existing behavior here is what actually ends a suspended Member's session client-side, not
+  // just blocks their next login (see `assertUserMayLogIn` in auth.service.ts) or their next
+  // vendor-portal API call (see `getMyVendorOrThrow` in vendor.service.ts). Skipped for a
+  // SuperAdmin's "Login As" preview token (`isPreview`) — previewing a suspended member's own
+  // view is a legitimate admin action, never blocked by the thing being previewed.
+  if (!tokenPayload.isPreview) {
+    const vendor = await prisma.member.findUnique({ where: { ownerUserId: user.id }, select: { status: true } });
+    if (vendor?.status === 'SUSPENDED') {
+      throw new ApiError('FORBIDDEN', 'Your member account is suspended. Please contact support.');
+    }
+  }
+
   const roles = await prisma.role.findMany({ where: { key: { in: tokenPayload.roles } } });
-  const permissions = await resolveGrantedPermissionKeys(tokenPayload.roles);
+  const { keys: permissions, scopes } = await resolveGrantedPermissions(tokenPayload.roles);
   const menu = filterMenuByPermissions(getMenuForApp('msd'), permissions);
 
   const roleIds = roles.map((r) => r.id);
@@ -44,6 +58,7 @@ export async function getBootstrap(tokenPayload: AccessTokenPayload): Promise<Bo
     user: { id: user.id, name: user.name, email: user.email ?? undefined, phone: user.phone ?? undefined, status: user.status },
     roles: roles.map((r) => ({ id: r.id, key: r.key, name: r.name, isSuperAdmin: r.isSuperAdmin })),
     permissions,
+    scopes,
     menu,
     dashboardWidgets,
     member: ownedMember ?? null,

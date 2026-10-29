@@ -7,11 +7,14 @@ import { Component, input } from '@angular/core';
 @Component({
   selector: 'md-admin-page',
   template: `<div class="admin-page">
-    <header class="admin-page__head">
+    <header class="admin-page__head flex flex-wrap items-center justify-between gap-3">
+      <div>
       <h1 class="admin-page__title">{{ title() }}</h1>
       @if (subtitle()) {
         <p class="admin-page__subtitle">{{ subtitle() }}</p>
       }
+      </div>
+      <ng-content select="[page-actions]"></ng-content>
     </header>
     <ng-content></ng-content>
   </div>`,

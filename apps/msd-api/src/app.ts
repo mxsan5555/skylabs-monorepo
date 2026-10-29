@@ -1,6 +1,7 @@
 import './config/env';
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
 import { env } from './config/env';
@@ -15,7 +16,7 @@ import membersRoutes from './routes/members.routes';
 import internalJobsRoutes from './routes/internal-jobs.routes';
 import vendorPublicRoutes from './routes/vendor-public.routes';
 import categoriesRoutes from './routes/categories.routes';
-import blogPostsRoutes from './routes/blog-posts.routes';
+import blogPostsRoutes, { createBlogPostsRouter } from './routes/blog-posts.routes';
 import blogCategoriesRoutes from './routes/blog-categories.routes';
 import faqsRoutes from './routes/faqs.routes';
 import siteContentRoutes from './routes/site-content.routes';
@@ -27,6 +28,7 @@ import popularTagsRoutes from './routes/popular-tags.routes';
 import popularTreatmentsRoutes from './routes/popular-treatments.routes';
 import promotionsRoutes from './routes/promotions.routes';
 import homeHeroRoutes from './routes/home-hero.routes';
+import homeTagSectionsRoutes from './routes/home-tag-sections.routes';
 import catalogRoutes from './routes/catalog.routes';
 import cartRoutes from './routes/cart.routes';
 import wishlistRoutes from './routes/wishlist.routes';
@@ -39,7 +41,15 @@ import dashboardRoutes from './routes/dashboard.routes';
 import notificationsRoutes from './routes/notifications.routes';
 import customerRoutes from './routes/customersummary.routes';
 import supportRoutes from './routes/support.routes';
+<<<<<<< HEAD
 import contactRoutes from './routes/contact.routes';
+=======
+import accountsRoutes from './routes/accounts.routes';
+import settlementsRoutes from './routes/settlements.routes';
+import vouchersRoutes from './routes/vouchers.routes';
+import disputesRoutes from './routes/disputes.routes';
+import refundsRoutes from './routes/refunds.routes';
+>>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
 /**
  * The Express app, wired up but not listening. Split out of main.ts so Supertest can
  * `import app from '../app'` and drive requests in-process without opening a real port
@@ -56,6 +66,7 @@ export function createApp(): express.Express {
   }
   app.use(helmet());
   app.use(cors({ origin: env.corsOrigin, credentials: true }));
+  app.use(cookieParser());
   // `verify` captures the exact raw bytes onto req.rawBody — payment.routes.ts's webhook needs
   // these (not a re-serialized JSON.stringify of the parsed body) to match Razorpay's HMAC
   // signature, which is computed over the literal request body it sent.
@@ -96,6 +107,7 @@ export function createApp(): express.Express {
   api.use('/vendors', vendorsRoutes);
   api.use('/categories', categoriesRoutes);
   api.use('/blog-posts', blogPostsRoutes);
+  api.use('/blog-articles', createBlogPostsRouter('cms.blog.articles'));
   api.use('/blog-categories', blogCategoriesRoutes);
   api.use('/faqs', faqsRoutes);
   // site-content.routes.ts declares its own full paths (`/about-us`, `/contact-us`) rather than
@@ -110,6 +122,7 @@ export function createApp(): express.Express {
   api.use('/popular-treatments', popularTreatmentsRoutes);
   api.use('/promotions', promotionsRoutes);
   api.use('/home-hero', homeHeroRoutes);
+  api.use('/home-tag-sections', homeTagSectionsRoutes);
   api.use('/catalog', catalogRoutes);
   api.use('/cart', cartRoutes);
   api.use('/wishlist', wishlistRoutes);
@@ -120,7 +133,16 @@ export function createApp(): express.Express {
   api.use('/reports', reportsRoutes);
   api.use('/dashboard', dashboardRoutes);
   api.use('/notifications', notificationsRoutes);
+<<<<<<< HEAD
   api.use('/contact', contactRoutes);
+=======
+  api.use('/accounts', accountsRoutes);
+  api.use('/settlements', settlementsRoutes);
+  api.use('/vouchers', vouchersRoutes);
+  api.use('/disputes', disputesRoutes);
+  api.use('/refunds', refundsRoutes);
+
+>>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);
