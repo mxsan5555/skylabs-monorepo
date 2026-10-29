@@ -3,8 +3,6 @@ import './showcase.css';
 import { LOGO_SRC as logo } from '../../../brand';
 // Opt-in: registers <swiper-container> / <swiper-slide> for the carousel demos.
 import '@skylabs-monorepo/shared-ui/carousel';
-// Opt-in: registers <sky-rich-text-editor> (Quill-backed) for the editor demo.
-import '@skylabs-monorepo/shared-ui/editor';
 import {
   applyTheme,
   type ThemeMode,
@@ -544,6 +542,12 @@ function OfferCardDemo() {
  * toggle calls applyTheme() to switch the <html> theme class live.
  */
 export function Showcase() {
+  // Opt-in, browser only: registers <sky-rich-text-editor> (Quill-backed) for the editor demo.
+  // Quill reads `document` when imported, so a static import would break the server render
+  // (prerender, entry-server.test.tsx); the element upgrades once the module loads.
+  useEffect(() => {
+    void import('@skylabs-monorepo/shared-ui/editor');
+  }, []);
   const [mode, setMode] = useState<ThemeMode>('light');
   const [menuOpen, setMenuOpen] = useState(false);
   const dialogRef = useRef<
