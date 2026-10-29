@@ -183,6 +183,47 @@ describe('LocationProvider', () => {
     expect(localStorage.getItem('msd.location')).toBeNull();
   });
 
+  it('requestBrowser resolves far when no partner city is within the cap, and keeps the coordinates (ST-05)', async () => {
+    getCurrentPosition.mockImplementation((ok: PositionCallback) =>
+      ok({ coords: { latitude: 28.6, longitude: 77.2 } } as GeolocationPosition),
+    );
+    let result: string | undefined;
+    function FarProbe() {
+      const { status, source, city, coords, requestBrowser } = useVisitorLocation();
+      return (
+        <>
+          <p data-testid="out">{`${status}|${source}|${city ?? '-'}|${coords ? 'coords' : '-'}`}</p>
+          <button onClick={() => void requestBrowser().then((r) => (result = r))}>locate</button>
+        </>
+      );
+    }
+    render(<LocationProvider><FarProbe /></LocationProvider>);
+    await waitFor(() => expect(out()).toBe('none|none|-|-'));
+
+    act(() => {
+      screen.getByText('locate').click();
+    });
+
+    await waitFor(() => expect(result).toBe('far'));
+    expect(out()).toBe('ready|browser|-|coords');
+  });
+
+  it('requestBrowser resolves located when a partner city is within the cap', async () => {
+    getCurrentPosition.mockImplementation((ok: PositionCallback) =>
+      ok({ coords: { latitude: 18.6, longitude: 73.8 } } as GeolocationPosition),
+    );
+    let result: string | undefined;
+    function NearProbe() {
+      const { requestBrowser } = useVisitorLocation();
+      return <button onClick={() => void requestBrowser().then((r) => (result = r))}>locate</button>;
+    }
+    render(<LocationProvider><NearProbe /></LocationProvider>);
+    act(() => {
+      screen.getByText('locate').click();
+    });
+    await waitFor(() => expect(result).toBe('located'));
+  });
+
   it('requestBrowser failure after a resolved IP city restores the IP result', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ city: 'Nagpur', region: 'MH', latitude: 21.1, longitude: 79.1 }) } as Response);
     render(<LocationProvider><RequestProbe /></LocationProvider>);

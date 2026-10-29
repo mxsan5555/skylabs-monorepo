@@ -14,12 +14,14 @@ export interface LocationValue {
   state: string | null;
   coords: Coordinates | null;
   setCity: (location: CatalogLocation) => void;
-  /** Asks the browser for coordinates. Resolves `failed` when the visitor refused or the lookup
-   *  failed, `superseded` when a newer request or a city pick won meanwhile. */
+  /** Asks the browser for coordinates. Resolves `located`, `far` when it located the visitor but
+   *  no partner city is within `NEAREST_CITY_MAX_KM` (the coordinates still apply for distance
+   *  sorting), `failed` when the visitor refused or the lookup failed, and `superseded` when a
+   *  newer request or a city pick won meanwhile. */
   requestBrowser: () => Promise<BrowserLocateResult>;
 }
 
-export type BrowserLocateResult = 'located' | 'failed' | 'superseded';
+export type BrowserLocateResult = 'located' | 'far' | 'failed' | 'superseded';
 
 interface Resolved {
   status: LocationStatus;
@@ -130,6 +132,10 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   const [resolved, setResolved] = useState<Resolved>({ ...NONE, status: 'locating' });
   const choiceGen = useRef(0);
   const browserRequestId = useRef(0);
+  const locationsRef = useRef(locations);
+  useEffect(() => {
+    locationsRef.current = locations;
+  }, [locations]);
 
   useEffect(() => {
     let cancelled = false;
@@ -184,7 +190,9 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     if (coords) {
       writeSaved(null);
       setResolved({ status: 'ready', source: 'browser', city: null, state: null, coords });
-      return 'located';
+      // Without the catalog cities yet there is nothing to compare with: count it as located.
+      const cities = locationsRef.current;
+      return cities.length > 0 && !nearestCity(coords, cities) ? 'far' : 'located';
     }
     setResolved((r) => ({ ...r, status: r.city || r.coords || r.ipCity ? 'ready' : 'none' }));
     return 'failed';

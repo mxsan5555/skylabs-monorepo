@@ -59,7 +59,9 @@
       "filterPlaceholder": "Type a city",
       "noMatch": "No partner city matches “{query}”",
       "locateFailedTitle": "We could not find your location.",
-      "locateFailedText": "Allow location access for this site in your browser settings, or pick a city below."
+      "locateFailedText": "Allow location access for this site in your browser settings, or pick a city below.",
+      "locateFarTitle": "No partner city near you yet.",
+      "locateFarText": "Our partner cities are more than {km} km from where you are. Pick a city below to see its deals."
     },
     "searchSuggestions": {
       "listLabel": "Search results",

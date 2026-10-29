@@ -348,7 +348,10 @@ A member who opens another member's deal, branch, package or therapist gets 404.
 - **Trust claims:** verified spas and therapists, secure payments via Razorpay, instant booking
   confirmation. No rating badge until reviews exist (task ST-22).
 - **Location:** saved choice, then browser location (only if already granted or on user action),
-  then Vercel IP, then none. Coordinates map to the nearest partner city within 75 km.
+  then Vercel IP, then none. Coordinates map to the nearest partner city within 75 km
+  (`NEAREST_CITY_MAX_KM`). "Use my current location" keeps the picker open with a message when
+  the browser refuses or fails, and when no partner city is within 75 km (the coordinates still
+  sort by distance; the visitor picks a city).
 - **Header search** (`SearchPanel` under the header field, task ST-38): focusing the field opens
   a panel. Its first row names the visitor's location ("Near {city}", Change) or asks for one
   ("Set your location to see what's near you"). With no query it lists the top categories. From 2

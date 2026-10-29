@@ -255,6 +255,10 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
   (`/help-center`) and Wishlist, and no Gifting link until a gift-card feature exists.
 - One `<main>` per page (ST-04, `one-main-landmark.test.ts`): only the layouts render `<main>`; no
   file under `app/pages` does, so the skip link keeps a single target.
+- Use my current location (ST-05, `city-picker.test.tsx`, `location-context.test.tsx`): located
+  near a partner city closes the picker; a refused or failed lookup and a location more than
+  75 km from every partner city each keep it open with their own alert (the button points at it
+  with `aria-describedby`); a far location still keeps the coordinates for distance sorting.
 - Theme colours only (ST-16, `theme-colours.test.ts`): no CSS file outside `assets/theme` holds a
   hex, `rgb()`/`hsl()` or `white`/`black` value (no light fallback inside `var()` either), and no
   TypeScript file holds a hex colour string, so the dark and contrast themes reach every screen.
