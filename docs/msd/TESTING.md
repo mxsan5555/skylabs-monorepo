@@ -56,7 +56,8 @@ Lint and type drift: 30 msd lint errors (`import/first` and `no-empty-function` 
 ignores every file under `apps/msd-api/src` today. Flaky under load: `deals-list-page.test.tsx`
 "toggle-status flips a non-ACTIVE deal" and `popular-tags.test.tsx` "mapping a category calls
 mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
-`products-list-page.test.tsx` "delete asks for confirmation" (seen 2026-10-28, pass alone).
+`products-list-page.test.tsx` "delete asks for confirmation" (seen 2026-10-28, pass alone), and
+`home-hero.test.tsx` (one test, seen 2026-10-28, passes alone).
 
 **`npx nx run msd-api:build` is already red**, found 2026-10-23: 15 pre-existing TypeScript
 errors, none in a file touched by that date's permission-engine change (confirmed file-by-file).
@@ -330,6 +331,41 @@ transform doesn't type-check, which is why these don't block `msd-api:test`.
   (`/help-center`) and Wishlist, and no Gifting link until a gift-card feature exists.
 - One `<main>` per page (ST-04, `one-main-landmark.test.ts`): only the layouts render `<main>`; no
   file under `app/pages` does, so the skip link keeps a single target.
+- Rich text safety (P10-36, shared-ui `sky-rich-text-editor.test.ts`): an initial or later value
+  with `onclick`, `onerror`, `<script>` and a `javascript:` link loads with the text and bold kept
+  and none of those left, and a later value never fires `sky-change`.
+- Blog category page (CO-02, `blog.test.tsx`): `/blog/category/massage` queries only that
+  category, shows "Massage articles" as h1, title and description, links back to `/blog` and
+  hides the Category facet; an unknown slug shows the not-found page; a failed category list still
+  lists the posts; index cards link their category to `/blog/category/<slug>`.
+- Contact page (CO-01, `contact.test.tsx`): defaults without a CMS row; CMS address, phone, email
+  and map embed win; an empty CMS field falls back on its own (no phone row while neither has a
+  phone); the CMS meta title and description override the page defaults; required fields first.
+- Become a Member (ST-01, `header-actions.test.tsx`): the header link opens `/become-member`, and
+  the route table serves the member sign-up page there. The sitemap paths (`prerender/routes.test.ts`)
+  and `llms.txt` list `/become-member` and `/help-center`, and every sitemap path must be a route
+  in `routes.tsx`, so the sitemap never points at a 404.
+- Popular searches in the prerender (ST-18, `hydration.test.tsx`): the server-rendered home page
+  lists every "{Category} in {City}" footer link in catalog order; with a saved city the client
+  moves that city first after hydration, with no hydration error.
+- Facet selections and price bounds (ST-25, `checkbox-facet.test.tsx`, `price-range-field.test.tsx`):
+  a checked option past the limit shows while collapsed after the first rows, and Show more
+  hides when only checked options are left past the limit; checked options stay during a
+  search that does not match them; a checked option the facet stops listing stays with its last
+  label, a 0 count and an enabled checkbox that clears it; URL prices outside the bounds show
+  clamped in both fields and the slider, with min never above max.
+- Use my current location (ST-05, `city-picker.test.tsx`, `location-context.test.tsx`): located
+  near a partner city closes the picker; a refused or failed lookup and a location more than
+  75 km from every partner city each keep it open with their own alert (the button points at it
+  with `aria-describedby`); a far location still keeps the coordinates for distance sorting.
+- Theme colours only (ST-16, `theme-colours.test.ts`): no CSS file outside `assets/theme` holds a
+  hex, `rgb()`/`hsl()` or `white`/`black` value (no light fallback inside `var()` either), and no
+  TypeScript file holds a hex colour string, so the dark and contrast themes reach every screen.
+- Sign-in landing and account links (ST-06, `role-routing.test.ts`, `shell-labels.test.tsx`):
+  staff (super admin, admin, sales, marketing, support) and members land on `/account/dashboard`;
+  a customer who is also a member lands on `/choose-experience`; a customer on `/`. The account
+  link goes to `/my-dashboard` for customers (with or without the member role) and to
+  `/account/dashboard` for members and staff; signed out it goes to `/sign-in`.
 - One `<h1>` per page; prerendered `/` contains the hero `<h1>`, category links and JSON-LD; no
   hydration warnings; `sitemap.xml`, `robots.txt`, `llms.txt` written when `VITE_SITE_URL` is set.
 - Category page (`category.test.tsx`): pills set `?sub=`; sort and filters send the right API
@@ -443,6 +479,16 @@ rollback rehearsal (P11).
 - [ ] No OTP, secret, token or unneeded private field in any response.
 - [ ] Public catalog: only intended records and fields; maximum page size enforced; validated input.
 - [ ] Errors expose no stack traces or database details.
+- [ ] Logs carry a request id and no token, OTP, password, document or bank number (P2-10,
+      `lib/logger.test.ts`, `middleware/requestLogger.test.ts`).
+- [ ] No new loose body schema (P2-14, `body-schemas-strict.test.ts`; the frozen list only shrinks);
+      shared field rules tested in `schemas/common.schema.test.ts`.
+- [ ] Tokens only as bearer headers; the API sets no cookie (P2-16, `lib/token-transport.test.ts`).
+- [ ] Raw SQL only as tagged `$queryRaw` / `$executeRaw` (P11-03, `lib/raw-sql.test.ts`).
+- [ ] Every audit row uses an action from `lib/audit.ts` (P2-11: enforced by the type,
+      `lib/audit.test.ts` checks the list is unique and dotted).
+- [ ] Production boots only with a strong `JWT_SECRET`, exact `CORS_ORIGIN` origins and the four
+      document and job secrets (P2-09, `config/env-checks.test.ts`, including a boot test).
 - [ ] Sensitive admin actions are audited.
 
 API docs prove that a route is registered, not that its runtime checks are right; this checklist

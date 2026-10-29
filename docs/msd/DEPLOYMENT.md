@@ -38,7 +38,8 @@ silently ships the bare SPA); preview and local builds fall back to the SPA. Red
 | `OTP_IDENTIFIER_RATE_LIMIT_PER_HOUR` | `10` (OTP sends per phone or email per hour, any IP) | |
 | `TRUST_PROXY_HOPS` | `1` on Railway (one proxy); leave unset locally | |
 | `API_DOCS` | unset (Swagger `/docs` off in production); `true` only to open it temporarily | |
-| `CORS_ORIGIN` | exact trusted frontend origins, comma-separated; no wildcards | |
+| `REQUEST_LOGGING` | unset (one JSON line per request, with `X-Request-Id`); `false` to silence | |
+| `CORS_ORIGIN` | exact Vercel origins, comma-separated | |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth client id / secret | 🔒 (secret) |
 | `GOOGLE_CALLBACK_URL` | `https://<msd-api-railway-domain>/api/v1/auth/google/callback` | |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` | e.g. `smtp.gmail.com` / `587` / `false` / Gmail address | |
@@ -61,13 +62,11 @@ silently ships the bare SPA); preview and local builds fall back to the SPA. Red
 SMTP, SMS, Razorpay and R2 are checked on first use, so the API boots without them; that feature
 just fails until its group is filled.
 
-The auth API contract and frontend must be deployed as one coordinated release. Users with only
-the previous localStorage refresh token will need to sign in once; refresh tokens are not migrated
-from JavaScript storage. In production, the refresh cookie is `Secure; HttpOnly; SameSite=None`
-and credentialed requests require the exact `CORS_ORIGIN`. Browsers may block third-party cookies
-when the API remains on a Railway hostname; use a same-site custom API host (for example,
-`api.myspadeal.in` alongside the frontend domain) or a same-origin proxy in that case. No schema
-migration or new environment variable is required; configure the existing `CORS_ORIGIN` values.
+**Production boot check (P2-09).** With `NODE_ENV=production` the API refuses to start, naming
+each problem (never a value), when `JWT_SECRET` is under 32 characters, `CORS_ORIGIN` is empty or
+contains `*`, `FIELD_ENCRYPTION_KEY` is missing or not 32 bytes of base64, or `R2_PRIVATE_BUCKET`,
+`DOC_HASH_PEPPER` or `CRON_SECRET` is missing (`src/config/env-checks.ts`). Set all six on
+Railway **before** deploying a build that contains this check, or the deploy will not boot.
 
 ## 3. Scheduled job: member document reminders
 

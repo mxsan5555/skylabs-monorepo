@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
+import { productionEnvProblems } from './env-checks';
 
 // Loaded once, first thing, before any other module reads process.env.
 // apps/msd-api/.env.local is never committed (see .gitignore); .env.example documents the shape.
@@ -60,6 +61,8 @@ export const env = {
   trustProxyHops: optionalInt('TRUST_PROXY_HOPS', 0),
   /** Swagger UI at /docs: on outside production, off in production unless API_DOCS=true. */
   apiDocsEnabled: process.env.API_DOCS === 'true' || process.env.NODE_ENV !== 'production',
+  /** One JSON log line per request (P2-10). On outside tests unless REQUEST_LOGGING=false. */
+  requestLogging: process.env.REQUEST_LOGGING ? process.env.REQUEST_LOGGING === 'true' : process.env.NODE_ENV !== 'test',
 
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? '',
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
@@ -114,3 +117,10 @@ export const env = {
   r2PrivateBucket: process.env.R2_PRIVATE_BUCKET ?? '',
   r2PublicUrl: process.env.R2_PUBLIC_URL ?? '',
 };
+
+// P2-09: production fails fast on weak or missing security settings instead of starting with
+// them. The message names the variables only, never their values.
+if (env.nodeEnv === 'production') {
+  const problems = productionEnvProblems(process.env);
+  if (problems.length > 0) throw new Error(`Unsafe production environment: ${problems.join('; ')}`);
+}

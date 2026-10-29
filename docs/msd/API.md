@@ -33,7 +33,11 @@
   OTP request also per identifier alone, `OTP_IDENTIFIER_RATE_LIMIT_PER_HOUR` per hour (default 10).
   Global and per-action limiters are planned (P2-08).
 - **Schemas:** `<Entity><Action>Schema` (for example `MemberCreateSchema`,
-  `MemberListQuerySchema`); new and changed bodies are `.strict()` (R3).
+  `MemberListQuerySchema`); new and changed bodies are `.strict()` (R3). Common fields come from
+  `schemas/common.schema.ts` (P2-14): `pagination()`, `sortQuery()`, `ReasonSchema` (10 to 500),
+  `dateRangeQuery(maxDays)`, `MoneySchema`, `PhoneSchema` (stored `+91XXXXXXXXXX`), `EmailSchema`.
+  `body-schemas-strict.test.ts` fails on any new route with a loose body schema; the 95 older ones
+  are frozen in `body-schemas-loose.json` and leave it one review at a time (P11-02).
 - **Money:** decimal strings with 2 places (`"1299.00"`), INR.
 - **Dates:** ISO 8601 UTC; ranges `from <= to`, at most 366 days.
 

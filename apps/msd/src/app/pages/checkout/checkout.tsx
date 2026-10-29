@@ -15,7 +15,7 @@ import {
 } from '../../../api/orders';
 
 import { ApiRequestError } from '../../../api/rbac/client';
-import { loadRazorpayScript } from '../../../utils/razorpay';
+import { loadRazorpayScript, RAZORPAY_THEME_COLOR } from '../../../utils/razorpay';
 import { formatINR } from '../../../utils/format';
 import { groupOrderItemsByVendor } from '../../../utils/order-items';
 import content from '../../../content.json';
@@ -226,7 +226,7 @@ export function Checkout() {
           .map((item) => item.itemName)
           .join(', '),
         theme: {
-          color: '#007C2B',
+          color: RAZORPAY_THEME_COLOR,
         },
         modal: {
           ondismiss: () => {

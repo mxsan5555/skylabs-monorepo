@@ -41,12 +41,7 @@ import dashboardRoutes from './routes/dashboard.routes';
 import notificationsRoutes from './routes/notifications.routes';
 import customerRoutes from './routes/customersummary.routes';
 import supportRoutes from './routes/support.routes';
-import contactRoutes from './routes/contact.routes';
-import accountsRoutes from './routes/accounts.routes';
-import settlementsRoutes from './routes/settlements.routes';
-import vouchersRoutes from './routes/vouchers.routes';
-import disputesRoutes from './routes/disputes.routes';
-import refundsRoutes from './routes/refunds.routes';
+import { requestLogger } from './middleware/requestLogger';
 /**
  * The Express app, wired up but not listening. Split out of main.ts so Supertest can
  * `import app from '../app'` and drive requests in-process without opening a real port
@@ -56,6 +51,8 @@ import refundsRoutes from './routes/refunds.routes';
 export function createApp(): express.Express {
   const app = express();
   app.set('trust proxy', env.trustProxyHops);
+  // First, so every response (docs, errors, 404s) carries X-Request-Id and gets one log line.
+  app.use(requestLogger);
 
   // Swagger UI needs inline scripts, so it is mounted before helmet's Content-Security-Policy.
   if (env.apiDocsEnabled) {

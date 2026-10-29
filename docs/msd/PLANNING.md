@@ -343,12 +343,16 @@ A member who opens another member's deal, branch, package or therapist gets 404.
 - **Shell:** desktop two-row header (logo, city chip, search, wishlist, cart, account; then
   category links and an "All categories" panel); phone header plus a bottom tab bar (Home,
   Categories, Wishlist, Cart, Account), no hamburger. Footer: trust strip, newsletter band (UI
-  only until task ST-28), link columns, popular searches ("{Category} in {City}"), legal bar,
-  theme switch.
+  only until task ST-28), link columns, popular searches ("{Category} in {City}", built from the
+  prerendered shell so every prerendered page carries the links; the visitor's city moves first
+  after hydration), legal bar, theme switch.
 - **Trust claims:** verified spas and therapists, secure payments via Razorpay, instant booking
   confirmation. No rating badge until reviews exist (task ST-22).
 - **Location:** saved choice, then browser location (only if already granted or on user action),
-  then Vercel IP, then none. Coordinates map to the nearest partner city within 75 km.
+  then Vercel IP, then none. Coordinates map to the nearest partner city within 75 km
+  (`NEAREST_CITY_MAX_KM`). "Use my current location" keeps the picker open with a message when
+  the browser refuses or fails, and when no partner city is within 75 km (the coordinates still
+  sort by distance; the visitor picks a city).
 - **Header search** (`SearchPanel` under the header field, task ST-38): focusing the field opens
   a panel. Its first row names the visitor's location ("Near {city}", Change) or asks for one
   ("Set your location to see what's near you"). With no query it lists the top categories. From 2
@@ -415,6 +419,10 @@ A member who opens another member's deal, branch, package or therapist gets 404.
     | Therapists (`/therapists`, THERAPY category) | Your location, Distance, Price ("From" price), Business, Branches | Relevance, Price low-high / high-low, Distance (with coordinates) |
     | Explore | the selected kind's sections; "All" shows Your location, Distance, Price | the selected kind's sorts |
     No Reviews filter until a review system exists (ST-22).
+  - **Selections stay visible** (ST-25): a checked facet option is always shown, past "Show
+    more" or outside the facet search (after the list, in its order), and one the facet stops
+    listing keeps its last label with a 0 count so it can be cleared. A URL price outside the
+    facet price range shows clamped into the slider range; the next change sends that range.
   - **Tags** (New, Deal, Hot, Expire soon; one per card on the image, theme role via
     `badge-color` / `badge-tone` as in the showcase): a Tags checkbox facet with counts on deal,
     product, category and explore pages, `?tag=new,hot`. They replace the popular-tag label on
@@ -442,6 +450,13 @@ task P8-07): blog (posts, categories, block editor), FAQs, legal and static page
 others), About us, Contact us, How it works, Careers (page and job listings). Marketing creates
 and edits; Admin cannot delete (P10-31). Public pages read it from the catalog API. Rich text is
 sanitized on write and on render (D18).
+
+Blog category pages (CO-02): `/blog/category/:slug` is the blog index with that category fixed
+(always in the query, not counted as a filter, kept by Clear, Category facet hidden), with its own
+h1, title, description and canonical from `content.blog.category`, and a link back to all
+articles. Each card's category label links there. An unknown slug shows the not-found page; a
+failed category list never does. Blog pages are not prerendered and blog categories are not in
+the sitemap yet.
 
 Public static pages (About, Contact, Help Center, How it works, Careers, legal pages, Become a
 member) share `StaticPage`: breadcrumb, h1 and intro on the left, the brand logo in the header

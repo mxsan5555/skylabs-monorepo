@@ -9,7 +9,7 @@ import { AdminPage } from './admin/admin-page';
 import Home from './pages/home/home';
 import NotFound from './pages/not-found/not-found';
 import Showcase from './pages/showcase/showcase';
-import Blog from './pages/blog/blog';
+import Blog, { BlogCategory } from './pages/blog/blog';
 import BlogDetail from './pages/blog-detail/blog-detail';
 import SignIn from './pages/sign-in/sign-in';
 import Otp from './pages/otp/otp';
@@ -305,6 +305,7 @@ export function AppRoutes() {
 
           {/* ── Content pages ── */}
           <Route path="/blog" element={<Blog />} />
+          <Route path="/blog/category/:slug" element={<BlogCategory />} />
           <Route path="/blog/:slug" element={<BlogDetail />} />
           <Route path="/about" element={<About />} />
           <Route path="/help-center" element={<HelpCenter />} />
@@ -312,7 +313,8 @@ export function AppRoutes() {
           <Route path="/careers" element={<Careers />} />
           {/* Public, unauthenticated Vendor self-registration ("Become a Vendor") — the storefront
             counterpart of the admin "Add Vendor" wizard, see become-vendor.tsx's own doc
-            comment. Linked from the footer's "Partner With Us" entry (content.json). */}
+            comment. Linked from the header's "Become a Member" and the footer's "Partner With Us"
+            entries (content.json). */}
           <Route path="/become-member" element={<BecomeVendor />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
           {/* One legal page component for the 4 fixed WebsitePage rows (see website-page.tsx). */}

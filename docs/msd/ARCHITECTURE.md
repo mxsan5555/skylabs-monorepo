@@ -383,8 +383,24 @@ No code yet (no GA4, GTM or `dataLayer` in `apps/msd`).
 global rate limit plus limiters for upload, status change, payout, refund, export, download;
 production boot fails on a short `JWT_SECRET`, `*` in CORS, or missing `R2_PRIVATE_BUCKET`,
 `DOC_HASH_PEPPER`, `FIELD_ENCRYPTION_KEY`, `CRON_SECRET`; request logger with request id and PII
-redaction; idempotency keys for money; transactional audit; private R2 bucket with 5-minute signed
+redaction (P2-10: `middleware/requestLogger.ts` sets `req.requestId` and `X-Request-Id`, logs one
+`http.request` JSON line per response without body or headers; `lib/logger.ts` redacts tokens,
+OTPs, passwords, document and bank numbers at any depth; unhandled errors log through it and
+answer production clients without detail); idempotency keys for money; transactional audit, every action from the one list in
+`lib/audit.ts` (`AUDIT_ACTIONS`, typed into `writeAuditLog` and `auditLogData`, P2-11; stored
+names never change, new ones are dotted like `member.status.changed`); private R2 bucket with 5-minute signed
 downloads for documents; malware scan decision; gitleaks and `npm audit` in CI.
+
+**Token transport (P2-16, decided 2026-10-29): bearer only.** The access token goes in
+`Authorization: Bearer`; the refresh token is sent in the `/auth/refresh` body. The API sets no
+cookie (no `res.cookie`, cookie parser or session; Passport runs with `session: false`), so a
+browser never attaches credentials on its own and CSRF does not apply. The apps keep the real
+tokens in `localStorage` (keyed per app) and a "Login As" preview in `sessionStorage`
+(`shared-auth`), so XSS is the risk to guard: React escapes text, no CMS HTML is set raw, the rich
+text editor parses values through Quill (P10-36). Any future cookie must be `HttpOnly`, `Secure`,
+`SameSite=Lax` or stricter, with CSRF protection; `lib/token-transport.test.ts` fails on cookie
+code until then. Known gap: the Google callback returns the tokens as JSON on the API domain, so
+the app never receives them (P2-22).
 
 ### 12.3 File storage (decided 2026-10-17)
 

@@ -21,18 +21,39 @@ export interface CheckboxFacetProps {
   countLabel?: (count: number) => string;
 }
 
+const labelsOf = (options: FacetOption[]) => new Map(options.map((o) => [o.value, o.label]));
+
 /** A searchable, "show more"-limited list of checkbox options with a live count per option. Raw
- *  M3 elements so tests can drive checkbox/search state directly. */
+ *  M3 elements so tests can drive checkbox/search state directly. A selected option is always
+ *  shown (ST-25): past the limit or outside the search it follows the list in its original order,
+ *  and one the facet stops listing stays with its last known label and a 0 count, so the visitor
+ *  can always see and clear it. */
 export function CheckboxFacet({ options, selected, onChange, searchLabel, showMore, showLess, limit = 5, countLabel }: CheckboxFacetProps) {
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState(false);
+  // Labels of every option seen so far, updated while rendering (React's "adjust state when a
+  // prop changes" pattern), so a selected option keeps its label after the facet drops it.
+  const [knownLabels, setKnownLabels] = useState(() => labelsOf(options));
+  if (options.some((o) => knownLabels.get(o.value) !== o.label)) {
+    setKnownLabels(new Map([...knownLabels, ...labelsOf(options)]));
+  }
   const selectedSet = new Set(selected);
 
   const filtered = query.trim()
     ? options.filter((o) => o.label.toLowerCase().includes(query.trim().toLowerCase()))
     : options;
-  const canExpand = filtered.length > limit;
-  const visible = expanded ? filtered : filtered.slice(0, limit);
+  const head = expanded ? filtered : filtered.slice(0, limit);
+  const headValues = new Set(head.map((o) => o.value));
+  const listed = new Set(options.map((o) => o.value));
+  const pinned = options.filter((o) => selectedSet.has(o.value) && !headValues.has(o.value));
+  const dropped = selected.flatMap((value) => {
+    const label = listed.has(value) ? undefined : knownLabels.get(value);
+    return label ? [{ value, label, count: 0 }] : [];
+  });
+  const visible = [...head, ...pinned, ...dropped];
+  const canExpand = expanded
+    ? filtered.length > limit
+    : filtered.slice(limit).some((o) => !selectedSet.has(o.value));
 
   const toggle = (value: string, checked: boolean) => {
     onChange(checked ? [...selected, value] : selected.filter((v) => v !== value));
