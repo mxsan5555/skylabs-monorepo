@@ -311,7 +311,7 @@ export interface CatalogDealListOptions {
   sort?: CatalogDealSort;
   minPrice?: number;
   maxPrice?: number;
-  /** From `useCurrentLocation`'s raw `coords` — when both are present, results come back
+  /** From `useVisitorLocation()`'s `coords` — when both are present, results come back
    *  nearest-first with a real `distanceKm` per item; omitted → unchanged behavior. */
   latitude?: number;
   longitude?: number;

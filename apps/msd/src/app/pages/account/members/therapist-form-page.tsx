@@ -16,6 +16,7 @@ import {
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
+import { memberTrail } from './member-crumbs';
 
 interface TherapistFormPageProps {
   token: string | null;
@@ -169,9 +170,7 @@ export function TherapistFormPage({ token }: TherapistFormPageProps) {
 
   const name = therapist?.personName || (isEdit ? 'Therapist' : 'New therapist');
   useSetBreadcrumbs([
-    { label: 'Members' },
-    { label: 'All Member', to: '/account/members' },
-    { label: vendorName ?? 'Member', to: `/account/members/${vendorId}` },
+    ...memberTrail(vendorId, vendorName),
     { label: 'Therapists', to: `/account/members/${vendorId}/therapists` },
     { label: isEdit ? name : 'Add therapist' },
   ]);

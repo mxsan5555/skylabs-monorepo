@@ -4,23 +4,14 @@ import type {
 } from '@skylabs-monorepo/shared-types';
 
 import {
-  apiDelete,
   apiGet,
   apiPatch,
-  apiPost,
   apiPut,
 } from './client';
 
 export type { Role };
 
 export type PermissionScope = 'ALL' | 'OWN';
-
-export interface RoleCreateInput {
-  key: string;
-  name: string;
-  description?: string;
-  isActive?: boolean;
-}
 
 export interface RoleUpdateInput {
   name?: string;
@@ -92,13 +83,6 @@ export function listRoles(token: string | null) {
   return apiGet<Role[]>('/rbac/roles', token);
 }
 
-export function createRole(
-  token: string | null,
-  input: RoleCreateInput,
-) {
-  return apiPost<Role>('/rbac/roles', token, input);
-}
-
 export function updateRole(
   token: string | null,
   id: string,
@@ -108,29 +92,6 @@ export function updateRole(
     `/rbac/roles/${id}`,
     token,
     input,
-  );
-}
-
-export function deleteRole(
-  token: string | null,
-  id: string,
-) {
-  return apiDelete<null>(
-    `/rbac/roles/${id}`,
-    token,
-  );
-}
-
-export function cloneRole(
-  token: string | null,
-  id: string,
-  key: string,
-  name: string,
-) {
-  return apiPost<Role>(
-    `/rbac/roles/${id}/clone`,
-    token,
-    { key, name },
   );
 }
 

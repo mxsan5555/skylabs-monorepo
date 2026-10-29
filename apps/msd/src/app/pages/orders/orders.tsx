@@ -7,6 +7,7 @@ import { listMyOrders, type Order, type OrderStatus, } from '../../../api/orders
 import { ApiRequestError } from '../../../api/rbac/client';
 import './orders.css';
 import content from '../../../content.json';
+import { Seo } from '../../seo/seo';
 import { CardGrid } from '../../components/card-grid/card-grid';
 import { SectionHead } from '../../components/section-head/section-head';
 const t = content.orders;
@@ -55,14 +56,8 @@ export function Orders() {
   ) : undefined;
   return (
     <>
-      <title>{t.metaTitle}</title>
-      <meta name="robots" content="noindex" />
-      <SectionHead
-        as="h1"
-        id="orders-heading"
-        heading={t.title}
-        subheading={t.subtitle}
-      />
+      <Seo title={t.metaTitle} description={content.meta.orders.description} path={content.meta.orders.path} noindex="follow" />
+      <SectionHead as="h1" id="orders-heading" heading={t.title} subheading={t.subtitle} />
       <div className="customer-orders-filters">
         <ChipSet className="chip-nav" aria-label={t.filtersLabel} >
           <FilterChip selected={selectedStatus === 'ALL'} onClick={() => setSelectedStatus('ALL')}>

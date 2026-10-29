@@ -39,26 +39,26 @@ export function BlogDetail() {
 
   if (loading) {
     return (
-      <main className="post post--missing">
+      <div className="post post--missing">
         <title>Loading… · MSD</title>
         <p className="loading-state">Loading…</p>
-      </main>
+      </div>
     );
   }
 
   if (!post) {
     return (
-      <main className="post post--missing">
+      <div className="post post--missing">
         <title>{content.blog.detail.articleNotFoundTitle}</title>
         <meta name="robots" content="noindex" />
         <h1>{content.blog.detail.articleNotFoundHeading}</h1>
         <p>{content.blog.detail.articleNotFoundMessage}</p>
         <Link to="/blog">{content.blog.detail.backToBlog}</Link>
-      </main>
+      </div>
     );
   }
   return (
-    <main className="post">
+    <div className="post">
       <title> {`${post.title}${content.blog.detail.metaTitleSuffix}`}</title>
       <meta name="description" content={post.excerpt} />
       <article>
@@ -111,7 +111,7 @@ export function BlogDetail() {
           </Link>
         </footer>
       </article>
-    </main>
+    </div>
   );
 }
 export default BlogDetail;

@@ -3,9 +3,16 @@
    tokens come from the loaded theme (also main.tsx). Add msd-only global
    overrides here. */
 
+/* Page content width and side gutter (ST-19): every full-width container (header, footer, page
+   sections, breadcrumb) centres its content with these, so the width can't drift. */
+:root {
+  --sky-content-max: 1280px;
+  --sky-content-gutter: 16px;
+}
+
 /* ── Breadcrumb (shared component) ─────────────────────────────────────────── */
 .breadcrumb {
-  max-width: 1280px;
+  max-width: var(--sky-content-max);
   margin: 0 auto;
   list-style: none;
   padding: 0;

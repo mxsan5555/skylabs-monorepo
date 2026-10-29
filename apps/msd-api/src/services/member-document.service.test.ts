@@ -72,6 +72,11 @@ describe('listMemberDocuments', () => {
     uploadedByUserId: 'admin-1', createdAt: new Date(), updatedAt: new Date(), numberHash: 'h', numberEncrypted: 'c',
   };
 
+  // On-behalf rows look up the uploader's name (P5-15); no user found unless a test says so.
+  beforeEach(() => {
+    prismaMock.user.findMany.mockResolvedValue([] as never);
+  });
+
   it('never returns hash or encrypted number, and hides file keys from viewers who cannot open files', async () => {
     prismaMock.memberDocument.findMany.mockResolvedValue([ROW]);
     const [row] = await listMemberDocuments('m1', { includeFiles: false });
@@ -90,6 +95,31 @@ describe('listMemberDocuments', () => {
     expect(row.numberMasked).toBe('ABXXXXX34F');
     expect(row).not.toHaveProperty('numberHash');
     expect(row).not.toHaveProperty('numberEncrypted');
+  });
+
+  it('names the staff member who uploaded on the member behalf, with one lookup for the list (P5-15)', async () => {
+    prismaMock.memberDocument.findMany.mockResolvedValue([
+      ROW,
+      { ...ROW, id: 'd2', documentType: 'GST', uploadedByUserId: 'admin-1' },
+      { ...ROW, id: 'd3', documentType: 'AADHAAR', uploadedOnBehalf: false, uploadedByUserId: 'owner-1' },
+    ]);
+    prismaMock.user.findMany.mockResolvedValue([{ id: 'admin-1', name: 'Priya' }] as never);
+    const rows = await listMemberDocuments('m1', { includeFiles: false });
+    expect(rows.map((r) => r.uploadedByName)).toEqual(['Priya', 'Priya', null]);
+    expect(prismaMock.user.findMany).toHaveBeenCalledTimes(1);
+    expect(prismaMock.user.findMany).toHaveBeenCalledWith({ where: { id: { in: ['admin-1'] } }, select: { id: true, name: true } });
+  });
+
+  it('leaves the name empty when the uploader account is gone, and skips the lookup when nobody uploaded on behalf', async () => {
+    prismaMock.memberDocument.findMany.mockResolvedValue([ROW]);
+    prismaMock.user.findMany.mockResolvedValue([] as never);
+    const [row] = await listMemberDocuments('m1', { includeFiles: false });
+    expect(row.uploadedByName).toBeNull();
+
+    vi.mocked(prismaMock.user.findMany).mockClear();
+    prismaMock.memberDocument.findMany.mockResolvedValue([{ ...ROW, uploadedOnBehalf: false }]);
+    await listMemberDocuments('m1', { includeFiles: false });
+    expect(prismaMock.user.findMany).not.toHaveBeenCalled();
   });
 });
 

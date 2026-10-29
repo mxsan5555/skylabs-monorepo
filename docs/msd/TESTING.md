@@ -45,14 +45,18 @@ Known failures at 2026-10-18 (msd recounted 2026-10-27: `india-locations` moved 
 | Project | Failing | Where |
 |---|---|---|
 | msd | 19 tests in 11 files | `permission-matrix` 9, `contact-us` 2, and 1 each in `app.spec`, `widget-registry`, `deal-card`, `media-uploader`, `site-footer`, `wishlist`, `roles`, `settings`; `entry-server.test.tsx` fails to load (`sky-product-card-wc` fixed 2026-10-24). Regressions since commit e756759 (NewOfferCard), not yet fixed: `home` 4 (FAQ section no longer rendered, deal favourite), `category` 1 (product wishlist heart) |
-| msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; recounted 2026-10-28: 1,253 pass) |
+| msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; recounted 2026-10-28: 1,260 pass) |
 | shared-menu | 5 | `index.test.ts` |
+
+Type check: `npx nx run msd:typecheck` runs `tsconfig.app.json` and `tsconfig.prerender.json` (ST-14,
+`prerender/` has 0 errors; both report the same known `src/` errors until P10-46).
 
 Lint and type drift: 30 msd lint errors (`import/first` and `no-empty-function` in older tests), an ESLint ignore error in the shared packages, and
 `apps/msd-api/src/routes/members.routes.test.ts` type errors in its setup code (P10-46). ESLint
 ignores every file under `apps/msd-api/src` today. Flaky under load: `deals-list-page.test.tsx`
 "toggle-status flips a non-ACTIVE deal" and `popular-tags.test.tsx` "mapping a category calls
-mapPopularTag" (both pass alone).
+mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
+`products-list-page.test.tsx` "delete asks for confirmation" (seen 2026-10-28, pass alone).
 
 ## 4. Acceptance per module
 
@@ -67,6 +71,20 @@ mapPopularTag" (both pass alone).
   (403); the last active Super Admin cannot lose the role, be blocked or be deleted (409).
 - Permission revoked while a token is active: the API refuses on the next request after the cache
   clears.
+- Fixed roles (R1, P2-15; `rbac.routes.test.ts` "Role create, clone and delete are locked",
+  `roles.test.tsx` "roles are fixed"): with the permission, create, clone and delete return 403
+  `ROLE_MANAGEMENT_LOCKED` and write nothing (no role row, no audit row); without it, 403
+  `FORBIDDEN`; the Role Management page shows no New role, Clone or Delete for any viewer and says
+  roles are fixed.
+- Session hygiene (P10-38; `packages/shared-auth/src/react/auth-context.test.tsx`,
+  `apps/msd/src/auth/role-routing.test.ts`): sign-out calls `POST /auth/logout` with the refresh
+  token and clears the access token, refresh token, any preview and the bootstrap, even when the
+  call fails; a "Login As" preview token is kept in `sessionStorage` only (localStorage keeps the
+  real token), so a new tab or a closed tab never carries it; Return to Super Admin restores the
+  real token (renewing it if it lapsed); an expired or refused preview falls back to the real
+  session instead of signing out; a preview left in localStorage by an older build is cleared on
+  load. The sign-in return path accepts only same-site paths: `//host`, `/\host`, tab or newline
+  tricks, encoded `%2F%2F` / `%5C` and absolute URLs are refused.
 
 ### 4.2 Members
 
@@ -80,7 +98,28 @@ mapPopularTag" (both pass alone).
   every media file removed after commit: the member's documents, images and video plus the
   images and videos of its deals, products and therapists (P3-25); archive keeps every file.
 - Documents: Support sees type and status only (no file key); masked numbers only; duplicate
-  number 409; approve, reject with reason; deleting an Approved document 409.
+  number 409; approve, reject with reason; deleting an Approved document 409. Uploader (P5-15;
+  `member-document.service.test.ts`, `member-documents-tab.test.tsx`): an on-behalf upload names the
+  staff member ("Uploaded by Priya for the member"), a missing account reads "staff", the member's
+  own upload has no name, and the list makes one name lookup (none without on-behalf rows).
+  Upload safety (P10-37; `member-documents-tab.test.tsx`, `shared-utils` `document-upload.test.ts`):
+  the file input accepts PDF, JPEG and PNG only; a file over 5 MB is refused before upload with a
+  message (the server limit is the same shared constant); a file name renders as text, never
+  markup; "View <document> file" opens the signed URL in a new tab with `rel="noopener noreferrer"`
+  and says so to screen readers; viewers without a file URL get no link.
+- Counts (P10-49; `vendors.routes.test.ts` "customer and order counts", `member-detail-page.test.tsx`,
+  `vendor-customers.test.tsx`, `orders.test.tsx`): the detail response counts distinct orders and
+  distinct customers (two lines of one order count once; two orders of one customer, one
+  customer); a member with no orders shows 0; "N customers" links to the Customers tab with
+  `customers:view`, "N orders" to `/account/orders?vendorId=` with `orders:view`, plain text
+  otherwise; the Customers tab is hidden without `customers:view` and its URL falls back to
+  Profile; the tab uses the staff route with contact details; the Orders page sends `vendorId`,
+  says "Showing one member's orders." and links back to every order.
+- Activity (P3-24; `member-activity.service.test.ts`, `member-activity-tab.test.tsx`): status items
+  carry from, to and the actor; document items the type, the event and `byStaff`; reminder items
+  the sequence (null when manual), the delivered channels and the sender; the console writes
+  "Status changed from Active to Suspended by Priya" and "Aadhaar card uploaded by staff for the
+  member" from those fields and falls back to `summary` for unknown values or rows without fields.
 - Reminders (all covered by unit tests): nothing before day 14; reminder 1 on the due date; 7-day
   spacing; after missed runs only the next reminder; final reminder carries the suspension
   sentence; documents asked for = missing + rejected; a second run sends nothing; a run that loses
@@ -97,6 +136,9 @@ mapPopularTag" (both pass alone).
   (`PENDING_PAYMENT`, `COMPLETED`, `CANCELLED` keep them hidden); city is the shipping city of the
   latest order that has one; order count counts distinct orders; the staff route always returns
   contact details; the console shows City and "Hidden until an order is open".
+- Breadcrumbs (P10-47; `member-crumbs.test.ts`, `branch-form-page.test.tsx`): every member page starts
+  with Members > All members (linked to the list), then the member ("Member" until the name loads);
+  the sidebar title reads "All members".
 - Members list: the Filter menu sends exactly one filter per option; status and documents columns
   use their tonal colours.
 - Own scope (after P4): member A reading member B's branch, deal, therapist or product gets 404.
@@ -197,6 +239,22 @@ mapPopularTag" (both pass alone).
 - Therapist detail (`therapist-detail.test.tsx`): type as h1, person and experience, Details and
   the location aside, the rail leaves out the current therapist; the price follows the chosen
   package; signed-out Add to cart goes to sign in; a 404 shows the not-found state.
+- Meta descriptions (ST-08; `seo/private-page-meta.test.ts`, `otp.test.tsx`): cart, sign in, OTP,
+  orders, invoice and choose experience each have a 50 to 160 character description and stay
+  noindex (sign in, OTP and choose experience also nofollow); the invoice not-found view is noindex.
+- Branch address line (`utils/format.test.ts` "formatStreetAddress", `deal-detail.test.tsx`): the deal
+  and member pages print the city once when the stored address already ends with it, and keep a
+  state that only shares its last word ("Vasant Kunj, New Delhi, Delhi").
+- Member page branch (ST-20, `vendor.test.tsx`): the page shows the branch nearest the visitor's
+  location from `useVisitorLocation()`, the first branch without a location or mapped branches,
+  and nothing for a member with no branches; `useCurrentLocation` no longer exists.
+- Content width (ST-19, `content-width.test.ts`): `--sky-content-max` (1280px) and
+  `--sky-content-gutter` (16px) are defined once on `:root`; no stylesheet repeats 1280px; header,
+  footer and sections resolve to 1280px with 16px gutters and no sideways scroll at phone width.
+- Footer (ST-07, `site-footer.test.tsx`): every footer link has a page; Help & Info lists Help Center
+  (`/help-center`) and Wishlist, and no Gifting link until a gift-card feature exists.
+- One `<main>` per page (ST-04, `one-main-landmark.test.ts`): only the layouts render `<main>`; no
+  file under `app/pages` does, so the skip link keeps a single target.
 - One `<h1>` per page; prerendered `/` contains the hero `<h1>`, category links and JSON-LD; no
   hydration warnings; `sitemap.xml`, `robots.txt`, `llms.txt` written when `VITE_SITE_URL` is set.
 - Category page (`category.test.tsx`): pills set `?sub=`; sort and filters send the right API

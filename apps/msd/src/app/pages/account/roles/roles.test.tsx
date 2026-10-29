@@ -1,6 +1,7 @@
-﻿import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { DashboardWidgetRecord, PermissionCatalogRow, Role, RoleWidgetRow } from '../../../../api/rbac/roles';
+import { RoleManagement } from './roles';
 
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
   useAuth: () => ({
@@ -30,8 +31,6 @@ vi.mock('../../../../api/rbac/roles', async () => {
     setRoleWidgets: (...args: unknown[]) => setRoleWidgetsMock(...args),
   };
 });
-
-import { RoleManagement } from './roles';
 
 const VENDOR_ROLE: Role = {
   id: 'role-vendor',
@@ -124,6 +123,19 @@ async function waitForFullySettled(): Promise<void> {
   await waitFor(() => expect(screen.getByText('Total Orders')).toBeTruthy());
   await waitFor(() => expect(findButton('Save widgets')).toBeTruthy());
 }
+
+/** R1 / P2-15: the seven roles are fixed, so the page offers no New role, Clone or Delete, even
+ *  to a viewer holding every rbac.roles permission, and says where to change a role instead. */
+describe('RoleManagement — roles are fixed (R1, P2-15)', () => {
+  it('offers no New role, Clone or Delete and explains the matrix is the place to change a role', async () => {
+    renderRoles();
+    await waitFor(() => expect(getRoleWidgetsMock).toHaveBeenCalledWith('test-token', VENDOR_ROLE.id));
+    expect(screen.queryByText('New role')).toBeNull();
+    expect(screen.queryByText('Clone')).toBeNull();
+    expect(screen.queryByText('Delete')).toBeNull();
+    expect(screen.getByText('Roles are fixed. Change what a role can do in the permission matrix.')).toBeTruthy();
+  });
+});
 
 describe('RoleManagement — Dashboard widgets persistence (Vendor role)', () => {
   it("loads the Vendor role's previously-saved widget grants via getRoleWidgets and shows them pre-checked", async () => {

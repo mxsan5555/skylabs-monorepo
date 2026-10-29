@@ -1,3 +1,5 @@
+import { DOCUMENT_MIME_TYPES as SHARED_DOCUMENT_MIME_TYPES } from '@skylabs-monorepo/shared-utils';
+
 /**
  * Hand-rolled magic-byte sniffing for the small, fixed set of formats this upload system
  * accepts (4 image + 3 video). Deliberately not the `file-type` npm package — it's ESM-only and
@@ -50,7 +52,8 @@ export const VIDEO_MIME_TYPES: SniffedMediaType[] = ['video/mp4', 'video/webm', 
 /** JPG/JPEG/PNG/PDF — the KYC-document allow-list (GST/PAN/Aadhaar uploads), per this file's own
  *  "never trust a client-declared mimetype" rule. No WEBP — vendors upload scans/photos of real
  *  documents, not web-optimized images. */
-export const DOCUMENT_MIME_TYPES: SniffedMediaType[] = ['image/jpeg', 'image/png', 'application/pdf'];
+/** One list with the msd console's file picker (`@skylabs-monorepo/shared-utils`, P10-37). */
+export const DOCUMENT_MIME_TYPES: SniffedMediaType[] = [...SHARED_DOCUMENT_MIME_TYPES];
 
 const EXTENSION_BY_TYPE: Record<SniffedMediaType, string> = {
   'image/jpeg': '.jpg',

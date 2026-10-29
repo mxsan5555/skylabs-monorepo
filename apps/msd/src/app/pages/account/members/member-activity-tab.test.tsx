@@ -35,23 +35,35 @@ describe('MemberActivityTab', () => {
     expect(activityMock).toHaveBeenCalledWith('t', 'm1');
   });
 
-  it('turns the server enums into readable text', async () => {
+  it('builds the text from the structured fields, not by parsing the summary (P3-24)', async () => {
     activityMock.mockResolvedValue({
       data: [
-        { kind: 'status', at: '2026-10-14T10:00:00.000Z', summary: 'Status changed from ACTIVE to SUSPENDED by Priya', detail: null },
-        { kind: 'document', at: '2026-10-13T09:00:00.000Z', summary: 'AADHAAR document uploaded by staff for the member', detail: null },
-        { kind: 'document', at: '2026-10-12T09:00:00.000Z', summary: 'GST document rejected', detail: 'Blurry' },
-        { kind: 'document', at: '2026-10-11T09:00:00.000Z', summary: 'PAN document approved', detail: null },
-        { kind: 'status', at: '2026-10-10T09:00:00.000Z', summary: 'Status changed from ACTIVE to SOMETHING_NEW', detail: null },
+        { kind: 'status', at: '2026-10-14T10:00:00.000Z', summary: 'ignored', detail: null, fromStatus: 'ACTIVE', toStatus: 'SUSPENDED', actorId: 'a1', actorName: 'Priya' },
+        { kind: 'status', at: '2026-10-14T09:00:00.000Z', summary: 'ignored', detail: null, fromStatus: 'SUSPENDED', toStatus: 'ACTIVE', actorId: null, actorName: null },
+        { kind: 'document', at: '2026-10-13T09:00:00.000Z', summary: 'ignored', detail: null, documentType: 'AADHAAR', event: 'uploaded', byStaff: true },
+        { kind: 'document', at: '2026-10-12T09:00:00.000Z', summary: 'ignored', detail: 'Blurry', documentType: 'GST', event: 'rejected', byStaff: true },
+        { kind: 'document', at: '2026-10-11T09:00:00.000Z', summary: 'ignored', detail: null, documentType: 'PAN', event: 'approved', byStaff: false },
       ],
     });
     render(<MemberActivityTab token="t" memberId="m1" refreshKey={0} />);
     expect(await screen.findByText('Status changed from Active to Suspended by Priya')).toBeTruthy();
+    expect(screen.getByText('Status changed from Suspended to Active')).toBeTruthy();
     expect(screen.getByText('Aadhaar card uploaded by staff for the member')).toBeTruthy();
     expect(screen.getByText('GST number rejected')).toBeTruthy();
     expect(screen.getByText('PAN card approved')).toBeTruthy();
-    // Anything the map does not know stays as the server sent it.
-    expect(screen.getByText('Status changed from ACTIVE to SOMETHING_NEW')).toBeTruthy();
+    expect(screen.queryByText('ignored')).toBeNull();
+  });
+
+  it('falls back to the server summary for values it does not know or items without fields', async () => {
+    activityMock.mockResolvedValue({
+      data: [
+        { kind: 'status', at: '2026-10-10T09:00:00.000Z', summary: 'Status changed from ACTIVE to SOMETHING_NEW', detail: null, fromStatus: 'ACTIVE', toStatus: 'SOMETHING_NEW', actorId: null, actorName: null },
+        { kind: 'document', at: '2026-10-09T09:00:00.000Z', summary: 'Old server sentence', detail: null },
+      ],
+    });
+    render(<MemberActivityTab token="t" memberId="m1" refreshKey={0} />);
+    expect(await screen.findByText('Status changed from ACTIVE to SOMETHING_NEW')).toBeTruthy();
+    expect(screen.getByText('Old server sentence')).toBeTruthy();
   });
 
   it('shows an empty state', async () => {

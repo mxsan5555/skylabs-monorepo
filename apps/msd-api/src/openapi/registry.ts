@@ -7,10 +7,8 @@ import {
   AuthTokensResponseSchema,
 } from '../schemas/auth.schema';
 import {
-  RoleCreateSchema,
   RoleUpdateSchema,
   RoleStatusUpdateSchema,
-  RoleCloneSchema,
   RolePermissionsUpdateSchema,
   RolePermissionsResponseSchema,
   RoleWidgetsUpdateSchema,
@@ -210,11 +208,10 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'post',
     path: '/rbac/roles',
-    summary: 'Create a role',
+    summary: 'Create a role (locked: the seven roles are fixed, R1)',
     tags: ['RBAC - Roles'],
     security: bearer,
-    request: { body: { content: { 'application/json': { schema: RoleCreateSchema } } } },
-    responses: { 201: { description: 'Created' }, 403: errorResponse, 409: errorResponse },
+    responses: { 403: { description: 'ROLE_MANAGEMENT_LOCKED, or FORBIDDEN without rbac.roles:create' } },
   });
 
   registry.registerPath({
@@ -233,24 +230,21 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'delete',
     path: '/rbac/roles/{id}',
-    summary: 'Delete a role (only if unassigned and non-system)',
+    summary: 'Delete a role (locked: the seven roles are fixed, R1)',
     tags: ['RBAC - Roles'],
     security: bearer,
     request: { params: z.object({ id: z.string().uuid() }) },
-    responses: { 200: { description: 'Deleted' }, 403: errorResponse, 409: errorResponse },
+    responses: { 403: { description: 'ROLE_MANAGEMENT_LOCKED, or FORBIDDEN without rbac.roles:delete' } },
   });
 
   registry.registerPath({
     method: 'post',
     path: '/rbac/roles/{id}/clone',
-    summary: 'Clone a role with its permissions and widgets',
+    summary: 'Clone a role (locked: the seven roles are fixed, R1)',
     tags: ['RBAC - Roles'],
     security: bearer,
-    request: {
-      params: z.object({ id: z.string().uuid() }),
-      body: { content: { 'application/json': { schema: RoleCloneSchema } } },
-    },
-    responses: { 201: { description: 'Cloned' } },
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 403: { description: 'ROLE_MANAGEMENT_LOCKED, or FORBIDDEN without rbac.roles:create' } },
   });
 
   registry.registerPath({
@@ -874,7 +868,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/members/{id}',
-    summary: 'Get a member by id',
+    summary: 'Get a member by id, with liveCounts, customerCount and orderCount (P10-49)',
     tags: ['Members - Admin'],
     security: bearer,
     request: { params: z.object({ id: z.string().uuid() }) },

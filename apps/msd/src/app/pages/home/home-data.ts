@@ -25,7 +25,7 @@ const { home } = content;
  * Adapts a real `CatalogDeal` into the shape `DealCard` renders. Real deals carry no
  * rating/reviews (no such fields exist on the real `Deal` model), so those stay `undefined`
  * rather than fabricated. `distance` is the real Haversine `distanceKm` computed server-side only
- * when the caller's coordinates were sent (see `useCurrentLocation`).
+ * when the caller's coordinates were sent (see `useVisitorLocation`).
  */
 export function toDealCardDeal(deal: CatalogDeal): DealCardDeal {
   const salePrice = Number(deal.salePrice);

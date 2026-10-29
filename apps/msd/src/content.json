@@ -201,10 +201,6 @@
         {
           "label": "Wishlist",
           "to": "/wishlist"
-        },
-        {
-          "label": "Gifting",
-          "to": "/gifting"
         }
       ],
       "partners": [
@@ -1157,7 +1153,28 @@
     },
     "cart": {
       "title": "My Cart | MSD – MySpaDeal",
-      "description": "Review your selected wellness deals and proceed to checkout."
+      "description": "Review your selected wellness deals and proceed to checkout.",
+      "path": "/cart"
+    },
+    "signIn": {
+      "description": "Sign in to MSD with your phone or email to book spa and wellness deals and manage your orders.",
+      "path": "/sign-in"
+    },
+    "otp": {
+      "description": "Enter the one-time code we sent to your phone or email to finish signing in to MSD.",
+      "path": "/otp"
+    },
+    "orders": {
+      "description": "See your MSD orders in one place: booking status, payments, cancellations and invoices.",
+      "path": "/orders"
+    },
+    "invoice": {
+      "description": "View and print the invoice for your MSD order, with the items, taxes and payment details.",
+      "pathTemplate": "/orders/{id}/invoice"
+    },
+    "chooseExperience": {
+      "description": "Choose how to use MSD today: book wellness deals as a customer or manage your business as a member.",
+      "path": "/choose-experience"
     },
     "wishlist": {
       "title": "Saved Items | MSD – MySpaDeal",
