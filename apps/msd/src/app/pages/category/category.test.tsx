@@ -292,10 +292,11 @@ describe('Category page /:city', () => {
     getCatalogCategoryMock.mockResolvedValue({ data: { ...CATEGORY, type: 'PRODUCT' } });
     listCatalogProductsMock.mockResolvedValue({ data: [product] });
 
-    renderAt('/category/product');
+    renderAt(`/category/${CATEGORY.slug}`);
     const favoriteButton = await waitFor(() => {
       const card = document.querySelector('sky-product-card');
-      const button = card?.shadowRoot?.querySelector('md-icon-button.favorite');
+      // OfferCard's heart: a slotted M3 icon button named after the item.
+      const button = card?.querySelector('md-outlined-icon-button[aria-label="Save Massage Oil to wishlist"]');
       if (!button) throw new Error('Product favorite button did not render');
       return button;
     });

@@ -129,6 +129,13 @@ function renderHome() {
 }
 
 const dealsSection = () => document.querySelector('section[aria-labelledby="deals-heading"]') as HTMLElement;
+/** The wishlist heart of the first deal card (OfferCard: a slotted M3 icon button, "Save … to wishlist"). */
+const firstDealHeart = () =>
+  waitFor(() => {
+    const heart = dealsSection()?.querySelector('sky-product-card md-outlined-icon-button[aria-label^="Save "]');
+    if (!heart) throw new Error('Deal heart did not render');
+    return heart as HTMLElement;
+  });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -289,12 +296,8 @@ describe('Home', () => {
 
   it('sends a signed-out visitor to sign in when they favourite a deal', async () => {
     renderHome();
-    // The card attaches its `favorite` listener in an effect, so re-dispatch until it is wired up.
-    await waitFor(() => {
-      const card = dealsSection()?.querySelector('sky-product-card');
-      if (card) fireEvent(card, new CustomEvent('favorite'));
-      expect(screen.getByText('Sign-in page')).toBeTruthy();
-    });
+    fireEvent.click(await firstDealHeart());
+    expect(await screen.findByText('Sign-in page')).toBeTruthy();
   });
 
   it('describes the spotlight price for screen readers and serves a responsive hero image', async () => {
@@ -467,11 +470,8 @@ describe('Home', () => {
   it('toggles the wishlist when a signed-in visitor favourites a deal', async () => {
     m.auth = { isAuthenticated: true, token: 't' };
     renderHome();
-    await waitFor(() => {
-      const card = dealsSection()?.querySelector('sky-product-card');
-      if (card) fireEvent(card, new CustomEvent('favorite'));
-      expect(m.toggle).toHaveBeenCalledWith('d1');
-    });
+    fireEvent.click(await firstDealHeart());
+    await waitFor(() => expect(m.toggle).toHaveBeenCalledWith('d1'));
   });
 
   it('links popular treatments (Admin-managed via the Popular Treatments API) to an /explore search', async () => {

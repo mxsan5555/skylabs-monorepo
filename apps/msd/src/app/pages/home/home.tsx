@@ -14,6 +14,7 @@ import { DealsNearYou } from './deals-near-you';
 import { HomeHero } from './home-hero';
 import { BannerSlot } from '../../components/banner-slot/banner-slot';
 import { HowItWorks } from './how-it-works';
+import { HomeFaq } from './home-faq';
 import { TreatmentDirectory } from './treatment-directory';
 import { HOME_RAIL_SIZE, useHomeCatalog, } from './home-data';
 import content from '../../../content.json';
@@ -111,6 +112,8 @@ export function Home() {
       )}
       <BannerSlot slot="HOME_AFTER_PRODUCTS" />
       <TreatmentDirectory groups={catalog.popularTreatments} />
+      {/* Visible FAQs back the FAQPage JSON-LD above (structured data must match the page). */}
+      <HomeFaq faqs={catalog.faqs} />
       <PageSection flush aria-labelledby="partner-heading">
         <sky-cta-banner
           color="inverse"
