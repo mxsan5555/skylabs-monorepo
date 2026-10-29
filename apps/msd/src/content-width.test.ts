@@ -1,6 +1,7 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, it, expect } from 'vitest';
+import { listSourceFiles } from './testing/source-files';
 
 /**
  * ST-19: the page content width (1280px) and its side gutter live in one place, the
@@ -10,11 +11,6 @@ import { describe, it, expect } from 'vitest';
 const SRC = __dirname;
 const TOKEN_FILE = join(SRC, 'styles.css');
 
-const cssFiles = (dir: string): string[] =>
-  readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
-    e.isDirectory() ? cssFiles(join(dir, e.name)) : e.name.endsWith('.css') ? [join(dir, e.name)] : [],
-  );
-
 describe('page content width token (ST-19)', () => {
   it('defines the width and gutter once, on :root in styles.css', () => {
     const css = readFileSync(TOKEN_FILE, 'utf8');
@@ -23,7 +19,7 @@ describe('page content width token (ST-19)', () => {
   });
 
   it('never repeats 1280px outside the token', () => {
-    const offenders = cssFiles(SRC).flatMap((file) =>
+    const offenders = listSourceFiles(SRC, (name) => name.endsWith('.css')).flatMap((file) =>
       readFileSync(file, 'utf8')
         .split(/\r?\n/)
         .map((line, i) => ({ line, at: `${relative(SRC, file)}:${i + 1}` }))

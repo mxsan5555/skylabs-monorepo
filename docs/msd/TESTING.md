@@ -253,6 +253,8 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
   footer and sections resolve to 1280px with 16px gutters and no sideways scroll at phone width.
 - Footer (ST-07, `site-footer.test.tsx`): every footer link has a page; Help & Info lists Help Center
   (`/help-center`) and Wishlist, and no Gifting link until a gift-card feature exists.
+- One `<main>` per page (ST-04, `one-main-landmark.test.ts`): only the layouts render `<main>`; no
+  file under `app/pages` does, so the skip link keeps a single target.
 - One `<h1>` per page; prerendered `/` contains the hero `<h1>`, category links and JSON-LD; no
   hydration warnings; `sitemap.xml`, `robots.txt`, `llms.txt` written when `VITE_SITE_URL` is set.
 - Category page (`category.test.tsx`): pills set `?sub=`; sort and filters send the right API

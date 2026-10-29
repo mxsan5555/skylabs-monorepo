@@ -137,7 +137,7 @@ export function Blog() {
     );
   }
   return (
-    <main className="blog">
+    <div className="blog">
       <title>Blog · MSD</title>
       <meta
         name="description"
@@ -328,7 +328,7 @@ export function Blog() {
           )}
         </div>
       </div>
-    </main>
+    </div>
   );
 }
 export default Blog;

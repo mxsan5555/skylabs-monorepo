@@ -371,7 +371,7 @@ export function Checkout() {
         </header>
         {step === 'details' ? (
           <div className="checkout-page__layout">
-            <main className="checkout-page__form">
+            <div className="checkout-page__form">
               <section aria-labelledby="step-details-heading" className="checkout-form-section" >
                 <div className="checkout-form-section__header">
                   <div className="checkout-form-section__icon">
@@ -543,7 +543,7 @@ export function Checkout() {
                   </FilledButton>
                 </div>
               </section>
-            </main>
+            </div>
             <aside className="checkout-page__summary" aria-label="Order summary" >
               <div className="checkout-summary-card">
                 <div className="checkout-summary">
@@ -576,7 +576,7 @@ export function Checkout() {
           </div>
         ) : !order ? null : (
           <div className="checkout-page__layout">
-            <main className="checkout-page__form">
+            <div className="checkout-page__form">
               <section
                 aria-labelledby="step-pay-heading"
                 className="checkout-form-section"
@@ -747,7 +747,7 @@ export function Checkout() {
                   <p className="error-state" role="alert" >  {error} </p>
                 )}
               </section>
-            </main>
+            </div>
             <aside className="checkout-page__summary" aria-label="Order summary">
               <div className="checkout-summary-card">
                 <div className="checkout-summary">

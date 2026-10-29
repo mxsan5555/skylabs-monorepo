@@ -630,7 +630,7 @@ export function Showcase() {
   return (
     <div className="showcase-shell">
     <ShowcaseNav />
-    <main className="showcase">
+    <div className="showcase">
       <title>Component showcase · MSD</title>
       <header className="showcase__bar">
         <div className="showcase__title">
@@ -1472,7 +1472,7 @@ export function Showcase() {
           <sky-tile-card icon="nightlight" headline="Inverse" text="color inverse" variant="filled" color="inverse" icon-style="tonal" />
         </div>
       </section>
-    </main>
+    </div>
     </div>
   );
 }
