@@ -275,7 +275,7 @@ Removed 2026-10-24: ST-17 (therapist city filter is in ST-40; products are not l
 | [ ] | P8-07 | BE | Swap every `cms.*` gate to `content:<action>` | M | P1-05 | Matrix test for content |
 | [ ] | P10-31 | FE | Content pages gated by `content` permission; hide delete for admin | M | P8-07 | Tests |
 | [ ] | P10-36 | SEC | Sanitize rich-text output (DOMPurify) wherever `sky-rich-text-editor` content renders | S | - | XSS payload test |
-| [ ] | CO-01 | FE | Public Contact page (both apps): check against the CMS Contact Us content and finish what is missing | S | - | Page renders CMS content |
+| [ ] | CO-01 | FE | Public Contact page (both apps): check against the CMS Contact Us content and finish what is missing | S | - | Page renders CMS content (partly: msd done, every CMS field with per-field fallback and the SEO overrides, `contact.test.tsx`; social links come from the Social Media table, not this row. Left: mera-driver reads a static `/data/contact.json` because mera-driver-api has no CMS; it needs a Contact Us table and endpoint first, which is a schema and API change for review) |
 | [ ] | CO-02 | FE | Blog category page (filtered list) | S | - | Route and tests |
 
 ## 6. CTA banners

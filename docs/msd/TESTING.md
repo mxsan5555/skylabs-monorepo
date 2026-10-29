@@ -255,6 +255,9 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
   (`/help-center`) and Wishlist, and no Gifting link until a gift-card feature exists.
 - One `<main>` per page (ST-04, `one-main-landmark.test.ts`): only the layouts render `<main>`; no
   file under `app/pages` does, so the skip link keeps a single target.
+- Contact page (CO-01, `contact.test.tsx`): defaults without a CMS row; CMS address, phone, email
+  and map embed win; an empty CMS field falls back on its own (no phone row while neither has a
+  phone); the CMS meta title and description override the page defaults; required fields first.
 - Become a Member (ST-01, `header-actions.test.tsx`): the header link opens `/become-member`, and
   the route table serves the member sign-up page there.
 - Popular searches in the prerender (ST-18, `hydration.test.tsx`): the server-rendered home page
