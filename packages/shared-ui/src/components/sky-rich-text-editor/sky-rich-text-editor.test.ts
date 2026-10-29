@@ -32,6 +32,30 @@ describe('sky-rich-text-editor', () => {
     expect(el.querySelector('.sky-rte-editor')?.innerHTML).toContain('Hello world');
   });
 
+  /** P10-36: stored HTML is parsed by Quill (inert document, known formats only), never assigned
+   *  as innerHTML, so handlers and scripts from the database never reach the page. */
+  const UNSAFE = '<p onclick="alert(1)">Hi <b>there</b></p><img src="x" onerror="alert(2)"><script>alert(3)</script><a href="javascript:alert(4)">link</a>';
+  const assertSafe = (el: SkyRichTextEditor) => {
+    const html = el.querySelector('.sky-rte-editor .ql-editor')?.innerHTML ?? '';
+    expect(html).toContain('Hi');
+    expect(html).toContain('<strong>there</strong>');
+    expect(html).not.toMatch(/onclick|onerror|<script|javascript:/i);
+  };
+
+  it('drops handlers, scripts and javascript: links from the initial value', async () => {
+    assertSafe(await create({ value: UNSAFE }));
+  });
+
+  it('drops them when the value changes later, without firing sky-change', async () => {
+    const el = await create({ value: '<p>Start</p>' });
+    const onChange = vi.fn();
+    el.addEventListener('sky-change', onChange);
+    el.value = UNSAFE;
+    await el.updateComplete;
+    assertSafe(el);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it('applies the placeholder as data-placeholder on the Quill root', async () => {
     const el = await create({ placeholder: 'Write something' });
     expect(el.quill?.root.getAttribute('data-placeholder')).toBe('Write something');

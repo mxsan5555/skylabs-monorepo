@@ -41,7 +41,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 2 | Members | 54 | 101 | 53 |
 | 3 | Customers and orders | 2 | 12 | 17 |
 | 4 | Storefront | 29 | 42 | 69 |
-| 5 | Static content | 1 | 5 | 20 |
+| 5 | Static content | 2 | 5 | 40 |
 | 6 | CTA banners | 4 | 5 | 80 |
 | 7 | Home slider | 7 | 8 | 88 |
 | 8 | Masters | 0 | 1 | 0 |
@@ -49,7 +49,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
 | 12 | Platform, security and release | 9 | 69 | 13 |
-| | **Total** | **110** | **289** | **38** |
+| | **Total** | **111** | **289** | **38** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -274,7 +274,7 @@ Removed 2026-10-24: ST-17 (therapist city filter is in ST-40; products are not l
 |---|---|---|---|---|---|---|
 | [ ] | P8-07 | BE | Swap every `cms.*` gate to `content:<action>` | M | P1-05 | Matrix test for content |
 | [ ] | P10-31 | FE | Content pages gated by `content` permission; hide delete for admin | M | P8-07 | Tests |
-| [ ] | P10-36 | SEC | Sanitize rich-text output (DOMPurify) wherever `sky-rich-text-editor` content renders | S | - | XSS payload test |
+| [x] | P10-36 | SEC | Sanitize rich-text output (DOMPurify) wherever `sky-rich-text-editor` content renders | S | - | Done without DOMPurify: the editor loads values through Quill's clipboard parser (inert document, registered formats only) instead of `innerHTML`; public pages render CMS blocks as escaped React text and never set HTML; `sky-rich-text-editor.test.ts` XSS payload tests |
 | [ ] | CO-01 | FE | Public Contact page (both apps): check against the CMS Contact Us content and finish what is missing | S | - | Page renders CMS content (partly: msd done, every CMS field with per-field fallback and the SEO overrides, `contact.test.tsx`; social links come from the Social Media table, not this row. Left: mera-driver reads a static `/data/contact.json` because mera-driver-api has no CMS; it needs a Contact Us table and endpoint first, which is a schema and API change for review) |
 | [x] | CO-02 | FE | Blog category page (filtered list) | S | - | Done: `/blog/category/:slug` (`BlogCategory` in `blog.tsx`), card category links; `blog.test.tsx` |
 

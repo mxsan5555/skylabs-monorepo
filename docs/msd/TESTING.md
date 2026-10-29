@@ -256,6 +256,9 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
   (`/help-center`) and Wishlist, and no Gifting link until a gift-card feature exists.
 - One `<main>` per page (ST-04, `one-main-landmark.test.ts`): only the layouts render `<main>`; no
   file under `app/pages` does, so the skip link keeps a single target.
+- Rich text safety (P10-36, shared-ui `sky-rich-text-editor.test.ts`): an initial or later value
+  with `onclick`, `onerror`, `<script>` and a `javascript:` link loads with the text and bold kept
+  and none of those left, and a later value never fires `sky-change`.
 - Blog category page (CO-02, `blog.test.tsx`): `/blog/category/massage` queries only that
   category, shows "Massage articles" as h1, title and description, links back to `/blog` and
   hides the Category facet; an unknown slug shows the not-found page; a failed category list still
