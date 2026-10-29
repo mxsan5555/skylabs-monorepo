@@ -48,7 +48,8 @@ import { bearerFor } from '../test-utils/auth-test-utils';
 import { ApiError } from '../lib/http';
 
 const resolveMock = vi.mocked(resolveGrantedPermissionKeys);
-const prismaMock = vi.mocked(prisma, true);
+// Route tests use intentionally partial model fixtures.
+const prismaMock = vi.mocked(prisma, true) as any;
 const resolveMapLocationMock = vi.mocked(resolveGoogleMapsLocation);
 
 const USER_A_ID = 'a0a0a0a0-0000-4000-8000-000000000001';
@@ -125,7 +126,19 @@ function validMp4(): Buffer {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  prismaMock.auditLog.create.mockResolvedValue({});
+  prismaMock.auditLog.create.mockResolvedValue({
+    id: 'default-audit-log',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    actorUserId: USER_A_ID,
+    action: 'test',
+    targetType: 'test',
+    targetId: 'test',
+    before: null,
+    after: null,
+    ip: null,
+    userAgent: null,
+  });
   // createDeal now also calls notifySuperAdmins for a vendor (non-admin) submission — harmless
   // default (zero superadmins to notify) for every test in this file that isn't specifically
   // asserting notification behavior (see the dedicated describe block below).
@@ -134,7 +147,12 @@ beforeEach(() => {
   // THERAPY category access (see vendor.service.ts's assertBranchHasAnyCategoryAccessOfType) —
   // harmless "branch has Therapy access" default for every therapist test in this file that
   // isn't specifically asserting that gate's rejection path (which overrides with `null`).
-  prismaMock.branchCategoryAccess.findFirst.mockResolvedValue({ id: 'default-branch-therapy-access' });
+  prismaMock.branchCategoryAccess.findFirst.mockResolvedValue({
+    id: 'default-branch-therapy-access',
+    createdAt: new Date(),
+    branchId: 'default-branch',
+    categoryId: 'default-therapy-category',
+  });
   // The vendor list/detail routes add `liveCounts` through four grouped queries (see
   // vendor.service.ts#attachLiveCounts) — no live rows unless a test arranges some.
   for (const model of [prismaMock.branch, prismaMock.deal, prismaMock.product, prismaMock.therapist]) {
@@ -1726,7 +1744,6 @@ describe('Deal routes (member and staff)', () => {
     expect(res.status).toBe(200);
     expect(res.body.data).toEqual([]);
   });
-});
 
   it('GET one deal for the edit form', async () => {
     resolveMock.mockResolvedValue(['vendors.deals:view']);
@@ -2257,6 +2274,7 @@ describe('Product (vendor-scoped self-service + admin-on-behalf)', () => {
  *  branch grant is read. */
 describe('Therapist specializationCategoryId (THERAPY type only, D10)', () => {
   const THERAPY_CATEGORY_ID = 'b5b5b5b5-0000-4000-8000-00000000000e';
+  const therapyGrantFixture = { id: 'grant-therapy', vendorId: VENDOR_A_ID, categoryId: THERAPY_CATEGORY_ID };
   const post = () =>
     request(app)
       .post(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/therapists`)
@@ -2300,7 +2318,7 @@ describe('Therapist specializationCategoryId (THERAPY type only, D10)', () => {
     resolveMock.mockResolvedValue(['members:custom']);
     prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-    prismaMock.category.findUnique.mockResolvedValue(therapyCategoryFixture);
+    prismaMock.category.findUnique.mockResolvedValue({ id: THERAPY_CATEGORY_ID, name: 'Deep Tissue', parentId: null, type: 'THERAPY' });
     prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(therapyGrantFixture);
     prismaMock.branchCategoryAccess.findUnique.mockResolvedValue(null); // branch never mapped to this THERAPY category
     prismaMock.therapist.findFirst.mockResolvedValue(null);
@@ -2324,8 +2342,9 @@ describe('Therapist specializationCategoryId (THERAPY type only, D10)', () => {
    */
   describe('specializationCategoryId at different tree depths', () => {
     const THERAPY_SUB_ID = 'b6b6b6b6-0000-4000-8000-000000000013';
+    const therapyCategoryFixture = { id: THERAPY_CATEGORY_ID, name: 'Therapy', parentId: null, type: 'THERAPY' };
     const therapySubFixture = { id: THERAPY_SUB_ID, name: 'Sports Massage', parentId: THERAPY_CATEGORY_ID, type: null };
-    const branchTherapySubGrantFixture = { id: 'bsa-therapy', branchCategoryAccessId: branchTherapyGrantFixture.id, subcategoryId: THERAPY_SUB_ID };
+    const branchTherapySubGrantFixture = { id: 'bsa-therapy', branchCategoryAccessId: therapyGrantFixture.id, subcategoryId: THERAPY_SUB_ID };
 
     function mockCategoryLookup(byId: Record<string, unknown>) {
       prismaMock.category.findUnique.mockImplementation(({ where }: { where: { id: string } }) =>
@@ -2345,7 +2364,7 @@ describe('Therapist specializationCategoryId (THERAPY type only, D10)', () => {
 
     it('a top-level pick is validated ONLY against assertBranchHasCategoryAccess — the subcategory check never runs', async () => {
       mockCategoryLookup({ [THERAPY_CATEGORY_ID]: therapyCategoryFixture });
-      prismaMock.branchCategoryAccess.findUnique.mockResolvedValue(branchTherapyGrantFixture);
+      prismaMock.branchCategoryAccess.findUnique.mockResolvedValue(therapyGrantFixture);
 
       const res = await request(app)
         .post(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/therapists`)
@@ -2358,7 +2377,7 @@ describe('Therapist specializationCategoryId (THERAPY type only, D10)', () => {
 
     it('a subcategory-tier pick is validated against BOTH the category and the subcategory branch access — passes when both are mapped', async () => {
       mockCategoryLookup({ [THERAPY_CATEGORY_ID]: therapyCategoryFixture, [THERAPY_SUB_ID]: therapySubFixture });
-      prismaMock.branchCategoryAccess.findUnique.mockResolvedValue(branchTherapyGrantFixture);
+      prismaMock.branchCategoryAccess.findUnique.mockResolvedValue(therapyGrantFixture);
       prismaMock.branchSubcategoryAccess.findUnique.mockResolvedValue(branchTherapySubGrantFixture);
 
       const res = await request(app)
@@ -2368,13 +2387,13 @@ describe('Therapist specializationCategoryId (THERAPY type only, D10)', () => {
 
       expect(res.status).toBe(201);
       expect(prismaMock.branchSubcategoryAccess.findUnique).toHaveBeenCalledWith({
-        where: { branchCategoryAccessId_subcategoryId: { branchCategoryAccessId: branchTherapyGrantFixture.id, subcategoryId: THERAPY_SUB_ID } },
+        where: { branchCategoryAccessId_subcategoryId: { branchCategoryAccessId: therapyGrantFixture.id, subcategoryId: THERAPY_SUB_ID } },
       });
     });
 
     it('a subcategory-tier pick is rejected when the category itself is branch-mapped but this specific subcategory was never enabled', async () => {
       mockCategoryLookup({ [THERAPY_CATEGORY_ID]: therapyCategoryFixture, [THERAPY_SUB_ID]: therapySubFixture });
-      prismaMock.branchCategoryAccess.findUnique.mockResolvedValue(branchTherapyGrantFixture);
+      prismaMock.branchCategoryAccess.findUnique.mockResolvedValue(therapyGrantFixture);
       prismaMock.branchSubcategoryAccess.findUnique.mockResolvedValue(null); // never explicitly enabled
 
       const res = await request(app)
@@ -2390,7 +2409,7 @@ describe('Therapist specializationCategoryId (THERAPY type only, D10)', () => {
       const THERAPIST_ID = 'therapist-update-1';
       prismaMock.therapist.findUnique.mockResolvedValue({ id: THERAPIST_ID, vendorId: VENDOR_A_ID, branchId: BRANCH_A_ID });
       mockCategoryLookup({ [THERAPY_CATEGORY_ID]: therapyCategoryFixture, [THERAPY_SUB_ID]: therapySubFixture });
-      prismaMock.branchCategoryAccess.findUnique.mockResolvedValue(branchTherapyGrantFixture);
+      prismaMock.branchCategoryAccess.findUnique.mockResolvedValue(therapyGrantFixture);
       prismaMock.branchSubcategoryAccess.findUnique.mockResolvedValue(null);
 
       const res = await request(app)

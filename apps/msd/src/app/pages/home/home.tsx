@@ -56,7 +56,7 @@ export function Home() {
             .slice(0, HOME_RAIL_SIZE)
             .map((d) => ({
               name: d.title,
-              path: dealHref(d),
+              path: dealPath(d),
               price: Number(d.salePrice),
               image: primaryImage(resolveDealMedia(d)) || undefined,
             })),
@@ -113,33 +113,7 @@ const renderDealSection = (
         categories={categories}
         renderDeal={renderDeal}
       />
-      {/* tagwise sections */}
-      {ready && catalog.deals.length > 0 && (
-        <>
-     {renderDealSection(
-  'new-heading',
-  'New Arrivals',
-  '/deals?tag=new',
-  HOME_DEAL_TAGS.new,
-  'surface',
-)}
-
-{renderDealSection(
-  'hot-heading',
-  '	Trending Deals',
-  '/deals?tag=hot',
-  HOME_DEAL_TAGS.hot,
-  'tint',
-)}
-
-{renderDealSection(
-  'expiry-soon-heading',
-  'Ending Soon',
-  '/deals?tag=expiry-soon',
-  HOME_DEAL_TAGS.expirySoon,
-  'surface',
-)}  </>
-      )}
+      <HomeTagSections renderDeal={renderDeal} />
       <HowItWorks />
       {ready && catalog.therapists.length > 0 && (
         <PageSection tone="tint" aria-labelledby="therapists-heading">

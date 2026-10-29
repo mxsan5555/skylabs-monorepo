@@ -403,6 +403,35 @@ async function grantStarterPermissions(
   ]);
 }
 
+async function applyPermissionMatrix(
+  roles: Map<string, { id: string; isSuperAdmin: boolean }>,
+  permissionIdByKey: Map<string, string>,
+  grants: Record<string, string[]>,
+  governedMenuKeys: string[],
+): Promise<void> {
+  const governedKeys = new Set(governedMenuKeys);
+  const governedPermissionIds = [...permissionIdByKey.entries()]
+    .filter(([key]) => governedKeys.has(key.slice(0, key.lastIndexOf(':'))))
+    .map(([, id]) => id);
+
+  for (const [roleKey, role] of roles) {
+    if (role.isSuperAdmin) continue;
+    await prisma.rolePermission.deleteMany({
+      where: { roleId: role.id, permissionId: { in: governedPermissionIds } },
+    });
+    const permissionIds = (grants[roleKey] ?? [])
+      .filter((key) => governedKeys.has(key.slice(0, key.lastIndexOf(':'))))
+      .map((key) => permissionIdByKey.get(key))
+      .filter((id): id is string => Boolean(id));
+    if (permissionIds.length) {
+      await prisma.rolePermission.createMany({
+        data: permissionIds.map((permissionId) => ({ roleId: role.id, permissionId })),
+        skipDuplicates: true,
+      });
+    }
+  }
+}
+
 async function seedDashboardWidgets(roles: Map<string, { id: string; isSuperAdmin: boolean }>) {
   const widgets = [
     { key: 'customers-count', title: 'Total Customers', module: 'customers', description: 'Count of active customers.' },
@@ -1203,31 +1232,65 @@ const PACKAGE_MULTIPLIERS = [1, 1.6, 2.2] as const;
  *  requires selecting a package before a service Deal can be added to cart (see CartItem's own
  *  schema doc comment), so demo data needs real packages to exercise that flow. Priced as a
  *  multiple of the deal's own base price, rounded to a clean ten. Idempotent via DealPackage's
- *  own `@@unique([dealId, durationMinutes, persons])` key (1 person). */
+ *  own `@@unique([dealId, durationMinutes])` key. */
 async function seedDealPackages(): Promise<number> {
-  const serviceDeals = await prisma.deal.findMany({ select: { id: true, salePrice: true, originalPrice: true } });
+  const serviceDeals = await prisma.deal.findMany({
+    select: {
+      id: true,
+      salePrice: true,
+      originalPrice: true,
+    },
+  });
+
   let created = 0;
+
   for (const deal of serviceDeals) {
     const base = deal.salePrice.toNumber();
-    const baseOriginal = deal.originalPrice ? deal.originalPrice.toNumber() : null;
+    const baseOriginal = deal.originalPrice
+      ? deal.originalPrice.toNumber()
+      : null;
+
     for (const [i, durationMinutes] of PACKAGE_DURATIONS.entries()) {
-      const existing = await prisma.dealPackage.findUnique({ where: { dealId_durationMinutes_persons: { dealId: deal.id, durationMinutes, persons: 1 } } });
-      if (existing) continue;
+      const persons = 1;
+
+      const existing = await prisma.dealPackage.findUnique({
+        where: {
+          dealId_durationMinutes_persons: {
+            dealId: deal.id,
+            durationMinutes,
+            persons,
+          },
+        },
+      });
+
+      // Skip packages that already exist.
+      if (existing) {
+        continue;
+      }
+
       const multiplier = PACKAGE_MULTIPLIERS[i];
+
       await prisma.dealPackage.create({
         data: {
           dealId: deal.id,
           durationMinutes,
+          persons,
           sellingPrice: Math.round((base * multiplier) / 10) * 10,
-          originalPrice: baseOriginal ? Math.round((baseOriginal * multiplier) / 10) * 10 : null,
+          originalPrice: baseOriginal
+            ? Math.round((baseOriginal * multiplier) / 10) * 10
+            : null,
           sortOrder: i,
         },
       });
+
       created++;
     }
-    // Same rule as a package save in the console: the cheapest package sets the deal's price.
+
+    // Same rule as the console package-save flow:
+    // the cheapest package sets the deal's price.
     await syncDealPriceFromPackages(prisma, deal.id);
   }
+
   return created;
 }
 
@@ -1600,7 +1663,7 @@ async function main() {
   await grantStarterPermissions(roles, permissionIdByKey);
   // Applied LAST (after grantStarterPermissions) so its exact-state reset on the matrix's
   // governed keys is always what's left standing — see `permission-matrix.ts`'s own doc comment.
-  await applyPermissionMatrix(prisma, roles, permissionIdByKey, PERMISSION_MATRIX_GRANTS, MATRIX_GOVERNED_MENU_KEYS);
+  await applyPermissionMatrix(roles, permissionIdByKey, PERMISSION_MATRIX_GRANTS, MATRIX_GOVERNED_MENU_KEYS);
   await seedDashboardWidgets(roles);
   const superAdminUserId = await seedSuperAdminUser(roles);
   console.log(`Seeded ${roles.size} roles and ${permissionIdByKey.size} permissions.`);

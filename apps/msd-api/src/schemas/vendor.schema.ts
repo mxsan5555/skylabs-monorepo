@@ -82,6 +82,9 @@ const slugString = z
   .max(160)
   .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'slug must be lower-kebab-case');
 
+const plainItems = (maxItems: number, maxLength: number) =>
+  z.array(z.string().trim().min(1).max(maxLength)).max(maxItems);
+
 const kycDocumentSchema = z.object({
   type: z.string().min(1).max(80),
   url: z.string().url(),
@@ -382,42 +385,6 @@ export const TherapistPackageUpdateSchema = TherapistPackageFieldsSchema
 // ─── Deal (docs/msd/PLANNING.md §2.7, API.md §2.1) ──────────────────────────
 // Prices, discount and duration are never accepted: the server derives them from the cheapest
 // active package. `.strict()` turns any other key (status, notes, policy, salePrice, ...) into 422.
-
-const DealFieldsSchema = z.object({
-  categoryId: z.string().uuid(),
-  subcategoryId: z.string().uuid().optional(),
-  title: z.string().min(1).max(200),
-  slug: slugString,
-  /** Plain text, deliberately NOT a rich-text field — this is the fallback source for
-   *  `<meta name="description">`/JSON-LD on the public Deal page (see `deal-detail.tsx`), both
-   *  of which require plain text; formatting markup here would either render as literal escaped
-   *  tags or corrupt a meta tag's content attribute. */
-  shortDescription: z.string().max(300).optional(),
-  description: richTextField(5000),
-  originalPrice: decimalString,
-  salePrice: decimalString,
-  discountPercent: z.number().int().min(0).max(100).optional(),
-  /** Required — every Deal is a service offering (see vendor.service.ts's
-   *  assertDurationRequiredForService). */
-  durationMinutes: z.number().int().min(1).max(1440).optional(),
-  termsAndConditions: richTextField(5000),
-  /** Internal-only (never rendered on any public page — see catalog.service.ts's
-   *  PUBLIC_DEAL_SELECT, which omits it) — stays a rich-text field for the admin's own benefit
-   *  (e.g. a checklist), but its own editor never ships to the storefront. */
-  notes: richTextField(5000),
-  policy: richTextField(5000),
-  images: z.array(z.string().url()).optional(),
-  maxBookings: z.number().int().min(0).optional(),
-  availableBookings: z.number().int().min(0).optional(),
-  startDate: z.string().datetime().optional(),
-  endDate: z.string().datetime().optional(),
-  /** The therapist(s) who perform this deal — many-to-many (DealTherapist), each must already
-   *  belong to this deal's own branch (validated in vendor.service.ts#assertTherapistsBelongToBranch).
-   *  On create: omit or `[]` for a deal with no therapist assigned yet. On update: omit entirely
-   *  to leave the existing links untouched; present (including `[]`) replaces the full set —
-   *  same convention as `packages` above. */
-  therapistIds: z.array(z.string().uuid()).optional(),
-});
 
 const DealFaqInputSchema = z
   .object({
