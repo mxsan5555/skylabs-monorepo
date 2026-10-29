@@ -1,196 +1,97 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import type { PermissionCatalogRow } from '../../../../api/rbac/roles';
+import type { PermissionCatalogRow, PermissionScope, Role } from '../../../../api/rbac/roles';
 import { PermissionMatrix } from './permission-matrix';
 
 const catalog: PermissionCatalogRow[] = [
   {
-    id: 'admin-roles',
-    menuKey: 'rbac.roles',
-    title: 'Role Management',
+    id: 'members',
+    menuKey: 'members',
+    title: 'Members',
     actions: [
-      { action: 'view', key: 'rbac.roles:view', permissionId: 'perm-view-1', label: 'View' },
-      { action: 'create', key: 'rbac.roles:create', permissionId: 'perm-create-1', label: 'Create' },
-      { action: 'edit', key: 'rbac.roles:edit', permissionId: 'perm-edit-1', label: 'Edit' },
-      { action: 'delete', key: 'rbac.roles:delete', permissionId: null, label: null },
-      { action: 'status_change', key: 'rbac.roles:status_change', permissionId: 'perm-status-1', label: 'Status change' },
+      { action: 'view', key: 'members:view', permissionId: 'perm-members-view', label: 'Members: view' },
+      { action: 'create', key: 'members:create', permissionId: 'perm-members-create', label: 'Members: create' },
+      { action: 'edit', key: 'members:edit', permissionId: null, label: null },
+      { action: 'status_change', key: 'members:status_change', permissionId: 'perm-members-status', label: 'Members: status' },
     ],
   },
   {
-    id: 'admin-users',
-    menuKey: 'rbac.users',
-    title: 'User Management',
-    actions: [
-      { action: 'view', key: 'rbac.users:view', permissionId: 'perm-view-2', label: 'View' },
-      { action: 'create', key: 'rbac.users:create', permissionId: null, label: null },
-      { action: 'edit', key: 'rbac.users:edit', permissionId: null, label: null },
-      { action: 'delete', key: 'rbac.users:delete', permissionId: null, label: null },
-      { action: 'export', key: 'rbac.users:export', permissionId: 'perm-export-2', label: 'Export' },
-    ],
+    id: 'content',
+    menuKey: 'content',
+    title: 'Content',
+    actions: [{ action: 'view', key: 'content:view', permissionId: 'perm-content-view', label: 'Content: view' }],
   },
 ];
 
+const role = (key: string, name = 'Admin'): Role => ({ id: `role-${key}`, key, name }) as unknown as Role;
+
+function renderMatrix(
+  props: Partial<{ role: Role | null; permissions: ReadonlyMap<string, PermissionScope>; disabled: boolean }> = {},
+) {
+  const onPermissionToggle = vi.fn();
+  render(
+    <PermissionMatrix
+      catalog={catalog}
+      role={props.role === undefined ? role('admin') : props.role}
+      permissions={props.permissions ?? new Map()}
+      onPermissionToggle={onPermissionToggle}
+      disabled={props.disabled}
+    />,
+  );
+  return { onPermissionToggle };
+}
+
+const box = (name: string) => screen.getByRole('checkbox', { name }) as HTMLInputElement;
+
+/** P10-46: the matrix is one checkbox per V/C/E/D action per resource for the selected role. */
 describe('PermissionMatrix', () => {
-  it('renders the catalog as a menu x action grid with row/column headers', () => {
-    render(
-      <PermissionMatrix
-        catalog={catalog}
-        selectedPermissions={new Map()}
-        onScopeChange={vi.fn()}
-      />,
-    );
-    expect(screen.getByRole('columnheader', { name: 'view' })).toBeTruthy();
-    expect(screen.getByRole('columnheader', { name: 'edit' })).toBeTruthy();
-    expect(screen.getByRole('rowheader', { name: 'Role Management' })).toBeTruthy();
-    expect(screen.getByRole('rowheader', { name: 'User Management' })).toBeTruthy();
+  it('asks for a role before showing the grid', () => {
+    renderMatrix({ role: null });
+    expect(screen.getByText('Select a role to view and manage its permissions.')).toBeTruthy();
+    expect(screen.queryByRole('table')).toBeNull();
   });
 
-  it('keeps the selected scope for a granted permission', () => {
-    render(
-      <PermissionMatrix
-        catalog={catalog}
-        selectedPermissions={new Map([['perm-view-1', 'ALL']])}
-        onScopeChange={vi.fn()}
-      />,
-    );
-    const select = screen.getByRole('combobox', { name: 'Role Management — view' }) as HTMLSelectElement;
-    expect(select.value).toBe('ALL');
+  it('lists each resource as a row header with a checkbox per defined V/C/E/D action', () => {
+    renderMatrix();
+    expect(screen.getByRole('rowheader', { name: 'Members' })).toBeTruthy();
+    expect(screen.getByRole('rowheader', { name: 'Content' })).toBeTruthy();
+    expect(box('Admin: Members: View')).toBeTruthy();
+    expect(box('Admin: Members: Create')).toBeTruthy();
+    expect(box('Admin: Content: View')).toBeTruthy();
+    expect(screen.queryByRole('checkbox', { name: 'Admin: Content: Delete' })).toBeNull();
   });
 
-  it('renders an empty option for a cell with no saved scope', () => {
-    render(
-      <PermissionMatrix
-        catalog={catalog}
-        selectedPermissions={new Map()}
-        onScopeChange={vi.fn()}
-      />,
-    );
-    const select = screen.getByRole('combobox', { name: 'Role Management — edit' }) as HTMLSelectElement;
-    expect(select.value).toBe('');
+  it('shows no column for actions outside V/C/E/D, such as status_change', () => {
+    renderMatrix();
+    const labels = screen.getAllByRole('checkbox').map((c) => c.getAttribute('aria-label'));
+    expect(labels.some((l) => /status/i.test(l ?? ''))).toBe(false);
   });
 
-  it('calls onScopeChange with the selected permissionId and scope when a value changes', () => {
-    const onScopeChange = vi.fn();
-    render(
-      <PermissionMatrix
-        catalog={catalog}
-        selectedPermissions={new Map()}
-        onScopeChange={onScopeChange}
-      />,
-    );
-    fireEvent.change(screen.getByRole('combobox', { name: 'User Management — view' }), {
-      target: { value: 'ALL' },
-    });
-    expect(onScopeChange).toHaveBeenCalledExactlyOnceWith('perm-view-2', 'ALL');
+  it('checks the actions the role holds', () => {
+    renderMatrix({ permissions: new Map([['perm-members-view', 'ALL']]) });
+    expect(box('Admin: Members: View').checked).toBe(true);
+    expect(box('Admin: Members: Create').checked).toBe(false);
   });
 
-  it('disables every control when disabled=true', () => {
-    render(
-      <PermissionMatrix
-        catalog={catalog}
-        selectedPermissions={new Map()}
-        onScopeChange={vi.fn()}
-        disabled
-      />,
-    );
-    for (const control of screen.getAllByRole('combobox')) {
-      expect((control as HTMLSelectElement).disabled).toBe(true);
-    }
+  it('reports a toggle with the role, permission, new state and scope', () => {
+    const { onPermissionToggle } = renderMatrix();
+    fireEvent.click(box('Admin: Members: Create'));
+    expect(onPermissionToggle).toHaveBeenCalledWith('role-admin', 'perm-members-create', true, 'ALL');
   });
 
-  it('renders a dash instead of a select for a cell with no permissionId', () => {
-    render(
-      <PermissionMatrix
-        catalog={catalog}
-        selectedPermissions={new Map()}
-        onScopeChange={vi.fn()}
-      />,
-    );
-    expect(screen.queryByRole('combobox', { name: 'Role Management — delete' })).toBeNull();
+  it('grants member resources with own scope to the member role', () => {
+    const { onPermissionToggle } = renderMatrix({ role: role('member', 'Member') });
+    fireEvent.click(box('Member: Members: View'));
+    expect(onPermissionToggle).toHaveBeenCalledWith('role-member', 'perm-members-view', true, 'OWN');
   });
 
-  it('shows an empty-state message when the catalog is empty', () => {
-    render(<PermissionMatrix catalog={[]} selectedPermissions={new Map()} onScopeChange={vi.fn()} />);
-    expect(screen.getByText('The permission catalog is empty.')).toBeTruthy();
+  it('disables an action whose permission row is missing', () => {
+    renderMatrix();
+    expect(box('Admin: Members: Edit').disabled).toBe(true);
   });
 
-  it('renders real unchecked selects (not dashes) for all 4 actions on a navigation-only row once seeded', () => {
-    const navOnlyCatalog: PermissionCatalogRow[] = [
-      {
-        id: 'dashboard',
-        menuKey: 'dashboard',
-        title: 'Dashboard',
-        actions: [
-          { action: 'view', key: 'dashboard:view', permissionId: 'perm-dash-view', label: 'View' },
-          { action: 'create', key: 'dashboard:create', permissionId: 'perm-dash-create', label: 'Create' },
-          { action: 'edit', key: 'dashboard:edit', permissionId: 'perm-dash-edit', label: 'Edit' },
-          { action: 'delete', key: 'dashboard:delete', permissionId: 'perm-dash-delete', label: 'Delete' },
-        ],
-      },
-    ];
-    render(
-      <PermissionMatrix
-        catalog={navOnlyCatalog}
-        selectedPermissions={new Map()}
-        onScopeChange={vi.fn()}
-      />,
-    );
-    for (const action of ['view', 'create', 'edit', 'delete']) {
-      const select = screen.getByRole('combobox', { name: `Dashboard — ${action}` }) as HTMLSelectElement;
-      expect(select.value).toBe('');
-    }
-  });
-
-  it('renders two distinct rows even when they share a menuKey, keyed by the unique row id', () => {
-    const sharedKeyCatalog: PermissionCatalogRow[] = [
-      {
-        id: 'cms-blog-pages',
-        menuKey: 'cms.blog',
-        title: 'Pages',
-        actions: [
-          { action: 'view', key: 'cms.blog:view', permissionId: 'perm-blog-view', label: 'View' },
-          { action: 'create', key: 'cms.blog:create', permissionId: 'perm-blog-create', label: 'Create' },
-          { action: 'edit', key: 'cms.blog:edit', permissionId: 'perm-blog-edit', label: 'Edit' },
-          { action: 'delete', key: 'cms.blog:delete', permissionId: 'perm-blog-delete', label: 'Delete' },
-        ],
-      },
-      {
-        id: 'cms-blog-articles',
-        menuKey: 'cms.blog',
-        title: 'Articles',
-        actions: [
-          { action: 'view', key: 'cms.blog:view', permissionId: 'perm-blog-view', label: 'View' },
-          { action: 'create', key: 'cms.blog:create', permissionId: 'perm-blog-create', label: 'Create' },
-          { action: 'edit', key: 'cms.blog:edit', permissionId: 'perm-blog-edit', label: 'Edit' },
-          { action: 'delete', key: 'cms.blog:delete', permissionId: 'perm-blog-delete', label: 'Delete' },
-        ],
-      },
-    ];
-    render(
-      <PermissionMatrix
-        catalog={sharedKeyCatalog}
-        selectedPermissions={new Map()}
-        onScopeChange={vi.fn()}
-      />,
-    );
-    expect(screen.getByRole('rowheader', { name: 'Pages' })).toBeTruthy();
-    expect(screen.getByRole('rowheader', { name: 'Articles' })).toBeTruthy();
-    expect(screen.getAllByRole('row')).toHaveLength(3);
-  });
-
-  it('renders only the View/Create/Edit/Delete columns, even when the catalog includes legacy actions', () => {
-    render(
-      <PermissionMatrix
-        catalog={catalog}
-        selectedPermissions={new Map()}
-        onScopeChange={vi.fn()}
-      />,
-    );
-    const headers = screen.getAllByRole('columnheader').map((h) => h.textContent);
-    expect(headers).toEqual(['Menu', 'view', 'create', 'edit', 'delete']);
-    expect(screen.queryByRole('columnheader', { name: 'status_change' })).toBeNull();
-    expect(screen.queryByRole('columnheader', { name: 'export' })).toBeNull();
-    expect(screen.queryByRole('combobox', { name: 'Role Management — status_change' })).toBeNull();
-    expect(screen.queryByRole('combobox', { name: 'User Management — export' })).toBeNull();
+  it('disables every checkbox when disabled', () => {
+    renderMatrix({ disabled: true });
+    expect(screen.getAllByRole('checkbox').every((c) => (c as HTMLInputElement).disabled)).toBe(true);
   });
 });

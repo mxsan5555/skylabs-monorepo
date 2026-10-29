@@ -89,7 +89,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | P8-08 | BE | Bootstrap returns `scopes` | S | P1-09 | Contract test |
 | [ ] | P10-01 | SH | `shared-auth/react`: expose `scopeFor()`, scope-aware `can()` and `PermissionButton`; refetch bootstrap after role change | M | P1-09, P8-08 | Component tests |
 | [ ] | P10-06 | FE | Sidebar renders the new menu per role; test each of 7 roles | M | P1-05 | Snapshot per role |
-| [ ] | P10-08 | FE | Role Management: 14-row matrix with V/C/E/D, extra actions, scope badge; hide New role and Clone; system roles marked | L | P10-01 | `roles/permission-matrix.tsx` tests updated; partly 2026-10-28: New role, Clone and Delete removed with P2-15 |
+| [ ] | P10-08 | FE | Role Management: 14-row matrix with V/C/E/D, extra actions, scope badge; hide New role and Clone; system roles marked | L | P10-01 | `roles/permission-matrix.tsx` tests updated; partly 2026-10-28: New role, Clone and Delete removed with P2-15; 2026-10-29: tests follow the checkbox matrix (P10-46). Open: `getScope` in `permission-matrix.tsx` decides Own/All from role keys (`member`, `super_admin`), against the no-role-name rule; scope must come from the server (P10-01, `Bootstrap.scopes`) |
 | [ ] | P10-09 | FE | Super-admin-only edit, unsaved-change guard, show the self-escalation error | S | P10-08 | Test |
 | [ ] | P10-10 | FE | Staff users page: create, edit, status, delete rules; role dropdown limited; last super admin message | M | P8-01 | `users/` tests updated |
 | [ ] | P10-29 | FE | System settings page (super admin edit, admin view) | M | P8-03 | Tests |

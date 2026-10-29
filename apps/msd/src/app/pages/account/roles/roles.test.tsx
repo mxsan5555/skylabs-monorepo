@@ -101,8 +101,9 @@ function widgetCheckbox(title: string): HTMLInputElement {
   return label.querySelector('input[type="checkbox"]') as HTMLInputElement;
 }
 
-function permissionSelect(title: string): HTMLSelectElement {
-  return screen.getByRole('combobox', { name: title }) as HTMLSelectElement;
+/** The matrix checkbox for one action, labelled `{role}: {resource}: {Action}`. */
+function permissionCheckbox(name: string): HTMLInputElement {
+  return screen.getByRole('checkbox', { name }) as HTMLInputElement;
 }
 
 function findButton(text: string): HTMLElement {
@@ -200,16 +201,16 @@ describe('RoleManagement — widget and permission selection stay independent', 
     renderRoles();
     await waitForFullySettled();
 
-    const dashboardViewSelect = permissionSelect('Dashboard — view');
-    expect(dashboardViewSelect.value).toBe('');
+    const dashboardView = permissionCheckbox('Vendor: Dashboard: View');
+    expect(dashboardView.checked).toBe(false);
 
     const totalOrdersCheckbox = widgetCheckbox('Total Orders');
     fireEvent.click(totalOrdersCheckbox);
     expect(totalOrdersCheckbox.checked).toBe(true);
-    expect(dashboardViewSelect.value).toBe('');
+    expect(dashboardView.checked).toBe(false);
 
-    fireEvent.change(dashboardViewSelect, { target: { value: 'ALL' } });
-    expect(dashboardViewSelect.value).toBe('ALL');
+    fireEvent.click(dashboardView);
+    expect(dashboardView.checked).toBe(true);
     expect(totalOrdersCheckbox.checked).toBe(true);
     expect(widgetCheckbox('My Business').checked).toBe(false);
   });
