@@ -7,10 +7,18 @@ export interface MyProfileUpdateInput {
   phone?: string;
 }
 
+/** The caller's own row plus their saved delivery address (item 2.2, D37); null until saved. */
+export interface MyProfile extends UserRecord {
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  pincode: string | null;
+}
+
 /** The caller's own user row + roles — works for every authenticated user (Superadmin included),
  *  no `rbac.users:*` permission needed. See `GET /rbac/users/me`'s own doc comment. */
 export function getMyProfile(token: string | null) {
-  return apiGet<UserRecord>('/rbac/users/me', token);
+  return apiGet<MyProfile>('/rbac/users/me', token);
 }
 
 /** Only ever accepts `name`/`email`/`phone` — there is no `role`/`roleIds` field on this endpoint

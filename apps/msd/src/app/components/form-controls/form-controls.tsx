@@ -1,7 +1,8 @@
 import { createElement, type ChangeEvent } from 'react';
 
 /**
- * Raw M3 form controls for the console forms (deal form, package cards). Raw elements, not the
+ * Raw M3 form controls for the console forms (deal form, package cards) and the checkout's state
+ * and city lists. Raw elements, not the
  * shared-ui React wrappers, so tests can drive `value` and the native `input` / `change` events
  * (the wrappers set properties in an effect that does not run under Vitest's `@lit/react`
  * resolution; see CLAUDE.md "Testing gotchas"). Optional props are skipped, never passed as

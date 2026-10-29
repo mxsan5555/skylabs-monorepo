@@ -223,6 +223,10 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
 
 ### 4.3 Customers and orders
 
+- Checkout details (item 2.2, `checkout.test.tsx`): the form fills from `GET /users/me` (name,
+  phone without +91, email, address, state, city, PIN) and Continue sends them; State lists the
+  India states and City only the chosen state's cities; with nothing saved City is locked and
+  Continue names the missing fields without calling checkout.
 - Saved delivery address (item 2.2, `rbac.routes.test.ts`, `orders.routes.test.ts`): `GET
   /users/me` returns it; `PUT /users/me/address` saves a valid India address for the caller only
   and refuses a city outside the state, a bad PIN, an unknown key and no token; checkout with all

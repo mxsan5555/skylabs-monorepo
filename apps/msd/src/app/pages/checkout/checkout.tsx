@@ -15,6 +15,9 @@ import {
 } from '../../../api/orders';
 
 import { ApiRequestError } from '../../../api/rbac/client';
+import { getMyProfile } from '../../../api/rbac/me';
+import { STATES, citiesForState } from '@skylabs-monorepo/shared-utils';
+import { asOptions, renderSelect } from '../../components/form-controls/form-controls';
 import { loadRazorpayScript, RAZORPAY_THEME_COLOR } from '../../../utils/razorpay';
 import { formatINR } from '../../../utils/format';
 import { groupOrderItemsByVendor } from '../../../utils/order-items';
@@ -72,15 +75,41 @@ export function Checkout() {
   const [shippingPincode, setShippingPincode] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [detailsSubmitting, setDetailsSubmitting] = useState(false);
+  // Item 2.2 (D37): the signed-in customer's saved details fill the form; checkout saves them
+  // again, so the next order starts filled. Session details stand in if the profile fails to load.
   useEffect(() => {
-    if (prefilledRef.current || !bootstrap?.user) {
+    if (prefilledRef.current || !token) {
       return;
     }
     prefilledRef.current = true;
-    setContactName(bootstrap.user.name ?? '');
-    setContactPhone((bootstrap.user.phone ?? '').replace(/^\+91/, ''),);
-    setContactEmail(bootstrap.user.email ?? '');
-  }, [bootstrap]);
+    let live = true;
+    const fill = (who: { name?: string | null; phone?: string | null; email?: string | null }) => {
+      setContactName((v) => v || (who.name ?? ''));
+      setContactPhone((v) => v || (who.phone ?? '').replace(/^\+91/, ''));
+      setContactEmail((v) => v || (who.email ?? ''));
+    };
+    getMyProfile(token)
+      .then(({ data }) => {
+        if (!live) return;
+        fill(data);
+        setShippingAddress((v) => v || (data.address ?? ''));
+        setShippingState((v) => v || (data.state ?? ''));
+        setShippingCity((v) => v || (data.city ?? ''));
+        setShippingPincode((v) => v || (data.pincode ?? ''));
+      })
+      .catch(() => {
+        if (live && bootstrap?.user) fill(bootstrap.user);
+      });
+    return () => {
+      live = false;
+    };
+  }, [token, bootstrap]);
+
+  /** A new state clears the city, which belonged to the old one. */
+  const chooseState = (value: string) => {
+    setShippingState(value);
+    if (value !== shippingState) setShippingCity('');
+  };
   useEffect(() => {
     if (initRef.current) {
       return;
@@ -467,40 +496,32 @@ export function Checkout() {
                     )}
                   </div>
                   <div className="checkout-form__fields checkout-form__fields--row">
+                    {/* State first, then its cities: the shared India list, as on branches (D33). */}
                     <div className="checkout-form__field-wrapper">
-                      <OutlinedTextField
-                        label="City"
-                        autocomplete="address-level2"
-                        required
-                        value={shippingCity}
-                        onInput={(e) =>
-                          setShippingCity(
-                            (
-                              e.target as unknown as { value: string; }
-                            ).value,
-                          )
-                        }
-                      />
-                      {fieldErrors.shippingCity && (
-                        <p className="checkout-form__error" role="alert">{fieldErrors.shippingCity} </p>
+                      {renderSelect({
+                        label: checkoutContent.fields.state,
+                        value: shippingState,
+                        required: true,
+                        placeholder: checkoutContent.fields.selectState,
+                        options: asOptions(STATES),
+                        onChange: chooseState,
+                      })}
+                      {fieldErrors.shippingState && (
+                        <p className="checkout-form__error" role="alert">{fieldErrors.shippingState}</p>
                       )}
                     </div>
                     <div className="checkout-form__field-wrapper">
-                      <OutlinedTextField
-                        label="State"
-                        autocomplete="address-level1"
-                        required
-                        value={shippingState}
-                        onInput={(e) =>
-                          setShippingState(
-                            (
-                              e.target as unknown as { value: string; }
-                            ).value,
-                          )
-                        }
-                      />
-                      {fieldErrors.shippingState && (
-                        <p className="checkout-form__error" role="alert">{fieldErrors.shippingState}</p>
+                      {renderSelect({
+                        label: checkoutContent.fields.city,
+                        value: shippingCity,
+                        required: true,
+                        disabled: !shippingState,
+                        placeholder: shippingState ? checkoutContent.fields.selectCity : checkoutContent.fields.selectStateFirst,
+                        options: asOptions(citiesForState(shippingState)),
+                        onChange: setShippingCity,
+                      })}
+                      {fieldErrors.shippingCity && (
+                        <p className="checkout-form__error" role="alert">{fieldErrors.shippingCity} </p>
                       )}
                     </div>
                     <div className="checkout-form__field-wrapper">

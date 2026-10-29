@@ -232,8 +232,8 @@
   min-width: 0;
 }
 
-.checkout-form__field-wrapper
-  md-outlined-text-field {
+.checkout-form__field-wrapper md-outlined-text-field,
+.checkout-form__field-wrapper md-outlined-select {
   width: 100%;
 }
 

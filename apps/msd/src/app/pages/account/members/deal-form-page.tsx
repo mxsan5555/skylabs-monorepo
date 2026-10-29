@@ -29,7 +29,7 @@ import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { showSnackbar } from '../../../../snackbar/snackbar';
 import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
 import { memberTrail } from './member-crumbs';
-import { renderCheckbox, renderSelect, renderTextField } from './form-controls';
+import { renderCheckbox, renderSelect, renderTextField } from '../../../components/form-controls/form-controls';
 import { StringListField } from './string-list-field';
 import { DealPackageCards, packageError, type PackageCard } from './deal-package-cards';
 import { CANCELLATION_OPTIONS, fromDateInput, toDateInput } from './deal-format';

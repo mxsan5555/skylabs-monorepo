@@ -340,6 +340,11 @@ A member who opens another member's deal, branch, package or therapist gets 404.
 
 - Customers sign in with OTP or Google and use cart, wishlist, checkout (Razorpay or COD), order
   history, payments and support requests. They have no console grants (R8).
+- **Checkout details (item 2.2, D37):** checkout and payment need a signed-in customer (page guard
+  and API). The form fills from the customer's profile and saved address; State is a list from the
+  India location list and City lists that state's cities (City locked until a state is chosen,
+  cleared when the state changes). Every field is required; Continue saves the address on the
+  account, so the next checkout starts filled.
 - Staff block or unblock a customer with a reason (`customers:status_change`); customers are never
   deleted.
 - **Refunds (D11):** Support raises a refund request; Admin or Super Admin approves or rejects

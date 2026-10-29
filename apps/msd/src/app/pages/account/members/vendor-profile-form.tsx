@@ -14,7 +14,7 @@ import { MEMBER_STATUS_LABEL } from './member-status';
 import { EMAIL_REGEX, MOBILE_REGEX } from '../../../../utils/format';
 import { VendorDocumentUpload } from '../../../components/vendor-document-upload';
 import { STATES, citiesForState } from '@skylabs-monorepo/shared-utils';
-import { asOptions, renderSelect } from './form-controls';
+import { asOptions, renderSelect } from '../../../components/form-controls/form-controls';
 
 const EMPTY_FORM: VendorFields = {
   businessName: '',
