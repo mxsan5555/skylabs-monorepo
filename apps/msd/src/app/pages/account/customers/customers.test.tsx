@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Customer } from '../../../../api/rbac/customers';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { SnackbarHost } from '../../../../snackbar/snackbar';
+import { CustomerManagement } from './customers';
 
 let grantedPermissions: Set<string>;
 
@@ -28,7 +29,6 @@ vi.mock('../../../../api/rbac/customers', async () => {
   };
 });
 
-import { CustomerManagement } from './customers';
 
 const CUSTOMER: Customer = {
   id: 'customer-1',

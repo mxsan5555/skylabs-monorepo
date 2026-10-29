@@ -51,7 +51,8 @@ Known failures at 2026-10-18 (msd recounted 2026-10-27: `india-locations` moved 
 Type check: `npx nx run msd:typecheck` runs `tsconfig.app.json` and `tsconfig.prerender.json` (ST-14,
 `prerender/` has 0 errors; both report the same known `src/` errors until P10-46).
 
-Lint and type drift: 30 msd lint errors (`import/first` and `no-empty-function` in older tests) and
+Lint and type drift: msd lint has 0 errors since 2026-10-29 (P10-46: late imports moved to the top,
+the reports filter loaders set empty options on failure); still open:
 `apps/msd-api/src/routes/members.routes.test.ts` type errors in its setup code (P10-46). ESLint
 ignores every file under `apps/msd-api/src` today. Flaky under load: `deals-list-page.test.tsx`
 "toggle-status flips a non-ACTIVE deal" and `popular-tags.test.tsx` "mapping a category calls
