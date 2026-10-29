@@ -8,24 +8,16 @@ import {
 
 import {
   FilledButton,
-<<<<<<< HEAD
-  OutlinedTextField,
-  Switch,
-=======
   OutlinedButton,
   OutlinedTextField,
   Switch,
   Icon,
->>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
 } from '@skylabs-monorepo/shared-ui/react';
 
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 
 import {
-<<<<<<< HEAD
-=======
   deleteRole,
->>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
   getPermissionCatalog,
   getRolePermissions,
   getRoleWidgets,
@@ -99,10 +91,7 @@ export function RoleManagement() {
   const [actionError, setActionError] = useState('');
 
   const canEdit = can('rbac.roles', 'edit');
-<<<<<<< HEAD
-=======
   const canDelete = can('rbac.roles', 'delete');
->>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
   const canChangeStatus = can('rbac.roles', 'status_change');
 
   const selectedRole = useMemo(
@@ -113,10 +102,6 @@ export function RoleManagement() {
   // Keep every role available in the matrix, including custom roles.
   const matrixRoles = roles;
 
-<<<<<<< HEAD
-
-=======
->>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
   const loadRoles = useCallback(async () => {
     setRolesLoading(true);
     setRolesError('');
@@ -561,18 +546,11 @@ export function RoleManagement() {
       <header className="page-head">
         <div>
           <h1>Role Management</h1>
-<<<<<<< HEAD
-          <p>Control exactly what each role can see and do.</p>
-          {/* R1 / P2-15: the API refuses role create, clone and delete. */}
-          <p className="field-hint">Roles are fixed. Change what a role can do in the permission matrix.</p>
-        </div>
-=======
           <p>
             Define roles and control exactly what each one can see and do.
           </p>
         </div>
 
->>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
       </header>
 
       {actionMessage && (

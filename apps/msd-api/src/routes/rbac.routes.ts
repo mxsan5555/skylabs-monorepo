@@ -32,13 +32,9 @@ import { startImpersonation } from '../services/impersonation.service';
 import { getBootstrap } from '../services/bootstrap.service';
 import { writeAuditLog } from '../services/audit.service';
 import { prisma } from '../lib/prisma';
-<<<<<<< HEAD
-import { sendData, sendError } from '../lib/http';
-=======
 import { sendData, ApiError } from '../lib/http';
 import { invalidatePermissionCache, isSuperAdminRoleSet, resolveGrantedPermissions } from '../services/permission-resolver.service';
 import { scopeFor } from '@skylabs-monorepo/shared-permissions';
->>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
 
 const UserRoleParamsSchema = z.object({ id: z.string().uuid(), roleId: z.string().uuid() });
 
@@ -70,18 +66,6 @@ router.get('/roles', requirePermission('rbac.roles', 'view'), async (_req, res, 
   }
 });
 
-<<<<<<< HEAD
-/**
- * R1 (PLANNING §1, P2-15): the seven roles are fixed. Creating, cloning and deleting a role are
- * refused for everyone who passes the permission check; a role's name, status and grants stay
- * editable below.
- */
-function roleManagementLocked(_req: Request, res: Response) {
-  sendError(res, 'ROLE_MANAGEMENT_LOCKED', 'Roles are fixed. Change what a role can do in its permissions instead.');
-}
-
-router.post('/roles', requirePermission('rbac.roles', 'create'), roleManagementLocked);
-=======
 router.post(
   '/roles',
   requirePermission('rbac.roles', 'create'),
@@ -96,7 +80,6 @@ router.post(
     }
   },
 );
->>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
 
 router.patch(
   '/roles/:id',
@@ -124,11 +107,6 @@ router.patch(
   },
 );
 
-<<<<<<< HEAD
-router.delete('/roles/:id', requirePermission('rbac.roles', 'delete'), roleManagementLocked);
-
-router.post('/roles/:id/clone', requirePermission('rbac.roles', 'create'), roleManagementLocked);
-=======
 router.delete(
   '/roles/:id',
   requirePermission('rbac.roles', 'delete'),
@@ -171,7 +149,6 @@ router.post(
     }
   },
 );
->>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
 
 router.patch(
   '/roles/:id/status',

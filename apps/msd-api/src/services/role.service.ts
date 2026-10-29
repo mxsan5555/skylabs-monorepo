@@ -43,8 +43,6 @@ export async function getRole(id: string) {
   return role;
 }
 
-<<<<<<< HEAD
-=======
 /**
  * PLANNING.md §1.1/R1: "Seven fixed system roles; none can be deleted. Custom roles are not
  * needed now, so role create, clone and delete are locked." `deleteRole` already blocks every
@@ -64,7 +62,6 @@ export async function createRole(_input: {
   );
 }
 
->>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
 export async function updateRole(
   id: string,
   input: {
@@ -100,8 +97,6 @@ export async function setRoleStatus(
   });
 }
 
-<<<<<<< HEAD
-=======
 export async function deleteRole(id: string) {
   const role = await getRole(id);
 
@@ -149,7 +144,6 @@ export async function cloneRole(
   );
 }
 
->>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
 /**
  * Returns all permissions currently assigned to a role,
  * including their scope.

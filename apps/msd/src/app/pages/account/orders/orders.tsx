@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
-<<<<<<< HEAD
 import { Link, useSearchParams } from 'react-router-dom';
 import { Dialog, FilledButton, OutlinedSelect, SelectOption, TextButton } from '@skylabs-monorepo/shared-ui/react';
-=======
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Dialog, FilledButton, Icon, OutlinedButton, OutlinedSelect, OutlinedTextField, SelectOption, TextButton } from '@skylabs-monorepo/shared-ui/react';
->>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
 import type { SkyDataTableParamsDetail } from '@skylabs-monorepo/shared-ui';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import {
@@ -21,13 +16,7 @@ import {
 } from '../../../../api/rbac/orders';
 import { listVendors, type Vendor } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
-<<<<<<< HEAD
 import { formatStreetAddress } from '../../../../utils/format';
-=======
-import { formatINR } from '../../../../utils/format';
-import { customerDisplayName } from '../customers/customer-list';
-import { CardGrid } from '../../../components/card-grid/card-grid';
->>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
 
 const ALLOWED_NEXT: Record<OrderStatus, OrderStatus[]> = {
   PENDING_PAYMENT: ['CONFIRMED', 'CANCELLED'],
@@ -115,7 +104,6 @@ function toOrderRow(order: Order): Record<string, string | number> {
     Amount: formatINR(Number(order.total)),
     'Payment Status': latestPayment?.status ?? '—',
     'Order Status': order.status,
-<<<<<<< HEAD
     'Created At': new Date(order.createdAt).toLocaleString(),
     'Customer Phone': order.customer.phone ?? '—',
     'Customer Email': order.customer.email ?? '—',
@@ -127,10 +115,6 @@ function toOrderRow(order: Order): Record<string, string | number> {
     'Payment Provider': latestPayment?.provider ?? '—',
     'Payment Failure Reason': latestPayment?.failureReason ?? '—',
     'Cancellation Reason': order.cancellationReason ?? '—',
-=======
-    __orderId: order.id,
-    __customerId: order.customerId,
->>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
   };
 }
 
@@ -264,7 +248,6 @@ export function OrderManagement({ scope = 'admin', refreshKey = 0 }: { scope?: '
   const tableRef = useRef<HTMLElement>(null);
 
   // Deep-link support for a "New Order Received" notification click (see notification-bell.tsx)
-<<<<<<< HEAD
   // — `sky-data-table`'s own row-detail drawer has no public API to open it programmatically, so
   // this fetches the same order via the existing GET /orders/:id and shows it in its own small
   // read-only Dialog (same key/value shape as the table's own drawer, via toOrderRow below).
@@ -286,10 +269,6 @@ export function OrderManagement({ scope = 'admin', refreshKey = 0 }: { scope?: '
       .catch((err) => setDeepLinkError(err instanceof ApiRequestError ? err.message : 'Could not load this order.'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderIdParam]);
-=======
-  // — it now links straight to the routed detail page below, so this list no longer needs its
-  // own `?orderId=` handling or generic drawer dialog.
->>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
 
   const load = useCallback(async () => {
     if (customerFilterUnavailable) {
@@ -319,11 +298,7 @@ export function OrderManagement({ scope = 'admin', refreshKey = 0 }: { scope?: '
     } finally {
       setLoading(false);
     }
-<<<<<<< HEAD
   }, [token, params, vendorIdParam]);
-=======
-  }, [token, params, customerFilterUnavailable]);
->>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
 
   useEffect(() => {
     load();

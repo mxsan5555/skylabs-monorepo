@@ -1,15 +1,10 @@
-<<<<<<< HEAD
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-=======
-import { render, waitFor, fireEvent } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
->>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Order } from '../../../../api/rbac/orders';
 import { OrderManagement } from './orders';
 
-import { OrderManagement } from './orders';
+
 
 // Full-suite runs under worker-pool load can push jsdom async resolution past testing-library's
 // default 1000ms waitFor/findBy timeout even though every assertion here is otherwise correct —
@@ -41,17 +36,6 @@ vi.mock('../../../../api/rbac/orders', async () => {
   };
 });
 
-<<<<<<< HEAD
-=======
-vi.mock('../../../../api/rbac/vendors', async () => {
-  const actual = await vi.importActual<typeof import('../../../../api/rbac/vendors')>('../../../../api/rbac/vendors');
-  return {
-    ...actual,
-    listVendors: (...args: unknown[]) => listVendorsMock(...args),
-  };
-});
-
->>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
 const BASE_ORDER: Order = {
   id: 'order-1',
   customerId: 'cust-1',

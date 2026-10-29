@@ -41,15 +41,12 @@ import dashboardRoutes from './routes/dashboard.routes';
 import notificationsRoutes from './routes/notifications.routes';
 import customerRoutes from './routes/customersummary.routes';
 import supportRoutes from './routes/support.routes';
-<<<<<<< HEAD
 import contactRoutes from './routes/contact.routes';
-=======
 import accountsRoutes from './routes/accounts.routes';
 import settlementsRoutes from './routes/settlements.routes';
 import vouchersRoutes from './routes/vouchers.routes';
 import disputesRoutes from './routes/disputes.routes';
 import refundsRoutes from './routes/refunds.routes';
->>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
 /**
  * The Express app, wired up but not listening. Split out of main.ts so Supertest can
  * `import app from '../app'` and drive requests in-process without opening a real port
@@ -133,16 +130,13 @@ export function createApp(): express.Express {
   api.use('/reports', reportsRoutes);
   api.use('/dashboard', dashboardRoutes);
   api.use('/notifications', notificationsRoutes);
-<<<<<<< HEAD
   api.use('/contact', contactRoutes);
-=======
   api.use('/accounts', accountsRoutes);
   api.use('/settlements', settlementsRoutes);
   api.use('/vouchers', vouchersRoutes);
   api.use('/disputes', disputesRoutes);
   api.use('/refunds', refundsRoutes);
 
->>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);

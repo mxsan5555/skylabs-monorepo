@@ -101,22 +101,6 @@ describe('Role create, clone and delete are locked (R1, P2-15)', () => {
     expect(res.body.error.code).toBe('FORBIDDEN');
   });
 
-<<<<<<< HEAD
-  it.each([
-    ['post', '/api/v1/rbac/roles', { key: 'hr', name: 'HR' }],
-    ['post', `/api/v1/rbac/roles/${ROLE_ID}/clone`, { key: 'hr', name: 'HR' }],
-    ['delete', `/api/v1/rbac/roles/${ROLE_ID}`, undefined],
-  ] as const)('%s %s returns 403 ROLE_MANAGEMENT_LOCKED and writes nothing', async (method, url, body) => {
-    resolveMock.mockResolvedValue(ALL);
-    prismaMock.role.findUnique.mockResolvedValue(roleFixture);
-    const req = request(app)[method](url).set('Authorization', auth());
-    const res = body ? await req.send(body) : await req;
-    expect(res.status).toBe(403);
-    expect(res.body.error.code).toBe('ROLE_MANAGEMENT_LOCKED');
-    expect(prismaMock.role.create).not.toHaveBeenCalled();
-    expect(prismaMock.role.delete).not.toHaveBeenCalled();
-    expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
-=======
   /**
    * PLANNING.md §1.1/R1: role create, clone and delete are locked — custom roles are not
    * needed, unconditionally, regardless of who holds `rbac.roles:create`.
@@ -143,7 +127,6 @@ describe('POST /api/v1/rbac/roles/:id/clone', () => {
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe('ROLE_MANAGEMENT_LOCKED');
     expect(prismaMock.role.create).not.toHaveBeenCalled();
->>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
   });
 });
 describe('GET /api/v1/rbac/users', () => {

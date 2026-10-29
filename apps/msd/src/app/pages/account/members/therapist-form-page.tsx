@@ -17,11 +17,7 @@ import {
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
-<<<<<<< HEAD
-import { memberTrail } from './member-crumbs';
-=======
 import { MediaUploader } from '../../../components/media-uploader';
->>>>>>> 0c62458ad0afe6b2ffe9d33cb79971f4ef19f652
 
 interface TherapistFormPageProps {
   token: string | null;
