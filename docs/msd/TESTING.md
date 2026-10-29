@@ -236,6 +236,8 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
 - Therapist detail (`therapist-detail.test.tsx`): type as h1, person and experience, Details and
   the location aside, the rail leaves out the current therapist; the price follows the chosen
   package; signed-out Add to cart goes to sign in; a 404 shows the not-found state.
+- Footer (ST-07, `site-footer.test.tsx`): every footer link has a page; Help & Info lists Help Center
+  (`/help-center`) and Wishlist, and no Gifting link until a gift-card feature exists.
 - One `<h1>` per page; prerendered `/` contains the hero `<h1>`, category links and JSON-LD; no
   hydration warnings; `sitemap.xml`, `robots.txt`, `llms.txt` written when `VITE_SITE_URL` is set.
 - Category page (`category.test.tsx`): pills set `?sub=`; sort and filters send the right API

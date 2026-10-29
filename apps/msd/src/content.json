@@ -201,10 +201,6 @@
         {
           "label": "Wishlist",
           "to": "/wishlist"
-        },
-        {
-          "label": "Gifting",
-          "to": "/gifting"
         }
       ],
       "partners": [
