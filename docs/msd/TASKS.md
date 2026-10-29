@@ -48,8 +48,8 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 9 | Payments, payouts and reports | 0 | 11 | 0 |
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
-| 12 | Platform, security and release | 11 | 69 | 16 |
-| | **Total** | **113** | **289** | **39** |
+| 12 | Platform, security and release | 12 | 69 | 17 |
+| | **Total** | **114** | **289** | **39** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -384,7 +384,7 @@ Removed 2026-10-24: ST-17 (therapist city filter is in ST-40; products are not l
 | [ ] | P10-42 | QA | Playwright e2e per role (7 roles): login, allowed action works, forbidden action hidden and server-rejected | L | P10-33 | Suite green in CI |
 | [ ] | P11-01 | QA | IDOR suite across all 14 resources (member A vs B, support, sales) | M | P4-12 | All foreign reads return 404 |
 | [ ] | P11-02 | QA | Mass-assignment suite: extra keys on every write return 422 | M | P2-14 | Test generated from schemas |
-| [ ] | P11-03 | SEC | Review all raw SQL and `$queryRaw`; no string concatenation | S | - | Review note |
+| [x] | P11-03 | SEC | Review all raw SQL and `$queryRaw`; no string concatenation | S | - | Done 2026-10-29: the API has no raw SQL; the only raw queries were two constant `$queryRawUnsafe` calls in `prisma/member-status-report.ts`, now tagged `$queryRaw`; `lib/raw-sql.test.ts` fails on any `*Unsafe` raw query or `Prisma.raw` in `src` or `prisma` |
 | [ ] | P11-04 | QA | Auth suite: suspended login, token use after suspend, refresh after suspend, deactivated staff | M | P3-08 | Tests |
 | [ ] | P11-05 | QA | Upload abuse: polyglot, wrong magic, oversize, path traversal filename, zip bomb | M | P5-06 | Tests |
 | [ ] | P11-06 | QA | PII leak scan of logs and API responses for full Aadhaar/PAN | M | P2-10 | Zero matches |
