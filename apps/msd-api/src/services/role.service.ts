@@ -6,10 +6,29 @@ import { RBAC_RESOURCE_CATALOG } from '../modules/rbac/permission-catalog';
 
 export type PermissionScope = 'ALL' | 'OWN';
 
+/**
+ * `RolePermission.scope` has existed since `P1-01` but was never actually read anywhere until
+ * the permission resolver/bootstrap started returning it — meaning every `OWN` grant saved via
+ * the Role Permission Matrix UI before that point was silently a no-op, behaving exactly like
+ * `ALL`. Now that `OWN` can actually change behavior, saving it for a key with no real
+ * OWN-enforcement route code would be worse than inert — it would look restricted while quietly
+ * granting full access. This allowlist is the single place that says "this permission key's
+ * OWN scope is real"; `setRolePermissions` below rejects `OWN` for anything not listed here.
+ * Grow this list only alongside the route change that actually enforces it.
+ */
+export const SCOPE_ENFORCED_PERMISSION_KEYS: readonly string[] = ['rbac.audit-logs:view'];
+
+/**
+ * Excludes `customer` — Customer is a real, undeletable DB role (every external customer login
+ * still resolves to it) but is never shown in Role Management or offered anywhere a role is
+ * assignable: Customer accounts get it automatically through their own registration/login flow,
+ * never through an admin picking it from a list. Every consumer of this endpoint (Role
+ * Management's role list, the staff Add/Edit role dropdown, the staff list's role filter) wants
+ * exactly the same "visible administrative roles" set, so the exclusion lives here once rather
+ * than being repeated — and forgotten — in three different frontend filters.
+ */
 export async function listRoles() {
-  return prisma.role.findMany({
-    orderBy: { createdAt: 'asc' },
-  });
+  return prisma.role.findMany({ where: { key: { not: 'customer' } }, orderBy: { createdAt: 'asc' } });
 }
 
 export async function getRole(id: string) {
@@ -22,6 +41,25 @@ export async function getRole(id: string) {
   }
 
   return role;
+}
+
+/**
+ * PLANNING.md §1.1/R1: "Seven fixed system roles; none can be deleted. Custom roles are not
+ * needed now, so role create, clone and delete are locked." `deleteRole` already blocks every
+ * `isSystem` row (the only rows that exist); this is the matching lock for the two mutations
+ * that had none — unconditional, not scoped to who's asking, since the rule is "no custom roles
+ * at all right now," not a permission a Super Admin could be granted around.
+ */
+export async function createRole(_input: {
+  key: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+}): Promise<never> {
+  throw new ApiError(
+    'ROLE_MANAGEMENT_LOCKED',
+    'Role create, clone and delete are locked — custom roles are not supported yet.',
+  );
 }
 
 export async function updateRole(
@@ -57,6 +95,53 @@ export async function setRoleStatus(
     where: { id },
     data: { isActive },
   });
+}
+
+export async function deleteRole(id: string) {
+  const role = await getRole(id);
+
+  if (role.isSystem) {
+    throw new ApiError(
+      'FORBIDDEN',
+      'System roles cannot be deleted',
+    );
+  }
+
+  const assignedUserCount = await prisma.userRole.count({
+    where: { roleId: id },
+  });
+
+  if (assignedUserCount > 0) {
+    throw new ApiError(
+      'CONFLICT',
+      'Role is still assigned to users; unassign before deleting',
+    );
+  }
+
+  await prisma.$transaction([
+    prisma.rolePermission.deleteMany({
+      where: { roleId: id },
+    }),
+
+    prisma.roleDashboardWidget.deleteMany({
+      where: { roleId: id },
+    }),
+
+    prisma.role.delete({
+      where: { id },
+    }),
+  ]);
+}
+
+export async function cloneRole(
+  _sourceId: string,
+  _key: string,
+  _name: string,
+): Promise<never> {
+  throw new ApiError(
+    'ROLE_MANAGEMENT_LOCKED',
+    'Role create, clone and delete are locked — custom roles are not supported yet.',
+  );
 }
 
 /**
@@ -130,21 +215,38 @@ export async function setRolePermissions(
   }
 
   /**
-   * Validate that every permission exists.
+   * Validate that every permission exists, and (while we're already fetching each permission's
+   * key) that any `OWN` scope request is for a key this app actually enforces OWN-scope for —
+   * see `SCOPE_ENFORCED_PERMISSION_KEYS`'s own doc comment for why this can't be skipped now
+   * that scope is live.
    */
   if (permissionIds.length > 0) {
-    const validCount = await prisma.permission.count({
+    const foundPermissions = await prisma.permission.findMany({
       where: {
         id: {
           in: permissionIds,
         },
       },
+      select: { id: true, key: true },
     });
 
-    if (validCount !== uniquePermissionIds.size) {
+    if (foundPermissions.length !== uniquePermissionIds.size) {
       throw new ApiError(
         'VALIDATION_ERROR',
         'One or more permissionIds do not exist.',
+      );
+    }
+
+    const keyByPermissionId = new Map(foundPermissions.map((p) => [p.id, p.key]));
+    const unsupportedOwnKeys = permissions
+      .filter((p) => p.scope === 'OWN')
+      .map((p) => keyByPermissionId.get(p.permissionId))
+      .filter((key): key is string => Boolean(key) && !SCOPE_ENFORCED_PERMISSION_KEYS.includes(key));
+
+    if (unsupportedOwnKeys.length > 0) {
+      throw new ApiError(
+        'VALIDATION_ERROR',
+        `"Own" scope is not yet enforced for: ${unsupportedOwnKeys.join(', ')}.`,
       );
     }
   }
@@ -298,48 +400,34 @@ export async function setRoleWidgets(
 }
 
 /**
- * Returns the NEW business RBAC permission catalog.
- *
- * IMPORTANT:
- * Do NOT build this from getMenuForApp() / msdMenu.
- *
- * The application menu and business permission matrix are
- * two different concepts.
- *
- * The permission matrix is defined by:
- * RBAC_RESOURCE_CATALOG
- *
- * Example:
- *
- * Members
- *   view
- *   create
- *   edit
- *   delete
- *
- * Orders
- *   view
- *
- * Customers
- *   view
- *
- * etc.
+ * Returns the Role Permission Matrix screen's catalog — one row per PLANNING.md §1.2 resource,
+ * each action backed by the REAL `menuKeys` `RBAC_RESOURCE_CATALOG` declares (the same keys
+ * `requirePermission()` and `filterMenuByPermissions` read), not a parallel key space. A
+ * resource with several real keys (`content`) reports every one of their `permissionIds` for a
+ * given action, so the frontend can grant/revoke the whole group atomically — see
+ * `permission-catalog.ts`'s own doc comment for why this matters.
  */
 export async function getPermissionCatalog() {
-  // Ensure every action in the business catalog has a database Permission row.
-  // `key` is unique (for example `members:view`), so upsert is idempotent.
-  const catalogRows = RBAC_RESOURCE_CATALOG.flatMap((resource) =>
-    resource.actions.map((action: PermissionAction) => ({
-      key: permissionKeyFor(resource.key, action),
-      menuKey: resource.key,
-      action,
-      label: `${resource.title}: ${action}`,
-    })),
+  // Ensure every (menuKey, action) pair the catalog declares has a database Permission row.
+  // `key` is unique (for example `vendors.branches:view`), so upsert is idempotent. Skips a
+  // (menuKey, action) pair declared unsupported for that specific key (e.g. Content's 3
+  // singleton CMS pages have no create/delete).
+  const pairs = RBAC_RESOURCE_CATALOG.flatMap((resource) =>
+    resource.menuKeys.flatMap((menuKey) =>
+      resource.actions
+        .filter((action) => !resource.unsupportedFor?.[action]?.includes(menuKey))
+        .map((action: PermissionAction) => ({
+          key: permissionKeyFor(menuKey, action),
+          menuKey,
+          action,
+          label: `${resource.title}: ${action}`,
+        })),
+    ),
   );
 
   // This is a one-time repair for missing catalog rows. Existing rows/IDs are preserved.
   await prisma.$transaction(
-    catalogRows.map((permission) =>
+    pairs.map((permission) =>
       prisma.permission.upsert({
         where: { key: permission.key },
         update: {},
@@ -349,23 +437,27 @@ export async function getPermissionCatalog() {
   );
 
   const existing = await prisma.permission.findMany({
-    where: { key: { in: catalogRows.map((permission) => permission.key) } },
+    where: { key: { in: pairs.map((pair) => pair.key) } },
   });
   const existingByKey = new Map(existing.map((permission) => [permission.key, permission]));
 
   return RBAC_RESOURCE_CATALOG.map((resource) => ({
     id: resource.key,
-    menuKey: resource.key,
+    menuKey: resource.menuKeys.join(', '),
     title: resource.title,
     actions: resource.actions.map((action: PermissionAction) => {
-      const key = permissionKeyFor(resource.key, action);
-      const permission = existingByKey.get(key);
+      const supportedMenuKeys = resource.menuKeys.filter(
+        (menuKey) => !resource.unsupportedFor?.[action]?.includes(menuKey),
+      );
+      const permissions = supportedMenuKeys
+        .map((menuKey) => existingByKey.get(permissionKeyFor(menuKey, action)))
+        .filter((permission): permission is NonNullable<typeof permission> => Boolean(permission));
 
       return {
         action,
-        key,
-        permissionId: permission?.id ?? null,
-        label: permission?.label ?? null,
+        key: supportedMenuKeys.map((menuKey) => permissionKeyFor(menuKey, action)).join(', '),
+        permissionIds: permissions.map((permission) => permission.id),
+        label: permissions[0]?.label ?? null,
       };
     }),
   }));

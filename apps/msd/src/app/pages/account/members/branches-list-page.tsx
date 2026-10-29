@@ -8,8 +8,8 @@ import { useConfirmDialog } from '../../../components/confirm-dialog';
 interface BranchesListPageProps {
   token: string | null;
   vendorId: string;
-  /** Gates "Add branch" and each row's Edit/Toggle-status action — same coarse `vendors:edit`
-   *  prop `DealsListPage`/`TherapistsListPage`/`ProductsListPage` already take. */
+  /** Gates "Add branch" and each row's Edit/Toggle-status action — computed by the caller
+   *  from `vendors.branches:edit` (never the blanket `members:edit`). */
   canEdit: boolean;
 }
 

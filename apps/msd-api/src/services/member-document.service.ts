@@ -40,7 +40,8 @@ export function documentsSummary(
   return { complete, missing, rejected, dueAt, overdue: !complete && dueAt !== null && dueAt.getTime() < now.getTime() };
 }
 
-type DocumentRow = Partial<Prisma.MemberDocumentGetPayload<Record<string, never>>>;
+type DocumentRow = Pick<Prisma.MemberDocumentGetPayload<Record<string, never>>, 'id'> &
+  Partial<Omit<Prisma.MemberDocumentGetPayload<Record<string, never>>, 'id'>>;
 
 /**
  * The API shape. Hash and ciphertext never leave the server: this picks fields by name, so a

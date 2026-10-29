@@ -736,6 +736,21 @@ export function DealFormPage({ token, surface = 'staff' }: DealFormPageProps) {
           </div>
         </sky-accordion-item>
 
+        <sky-accordion-item header="Media (Images &amp; Video)" disabled={!branchChosen}>
+          <div className="form-grid">
+            <p className="field-hint">The deal's photos and an optional short video — shown on its public page.</p>
+            <MediaUploader
+              entityType="deal"
+              entityId={deal?.id ?? null}
+              branchId={form.branchId}
+              vendorId={vendorId}
+              existingImages={deal?.mediaImages ?? []}
+              existingVideo={deal?.mediaVideo ?? null}
+              token={token}
+            />
+          </div>
+        </sky-accordion-item>
+
         <sky-accordion-item header="Therapists" disabled={!branchChosen}>
           <div className="form-grid">
             <p className="field-hint">Pick who performs this deal from this branch, or add a new therapist to the branch.</p>

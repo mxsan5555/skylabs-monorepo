@@ -33,7 +33,7 @@ export function offerTag(item: TagItem, hotIds: ReadonlySet<string>, now: Date):
   if (end !== undefined && end >= now.getTime() && end <= daysFrom(now, TAG_RULES.expireSoonDays).getTime()) return 'expire_soon';
   if (hotIds.has(item.id)) return 'hot';
   if (item.createdAt.getTime() >= daysFrom(now, -TAG_RULES.newDays).getTime()) return 'new';
-  if ((item.discount ?? 0) >= TAG_RULES.dealMinDiscount) return 'deal';
+  if ((item.discountPercent ?? 0) >= TAG_RULES.dealMinDiscount) return 'deal';
   return null;
 }
 

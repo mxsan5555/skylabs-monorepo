@@ -1,0 +1,102 @@
+directions_car
+mera-driver
+Driver console
+dashboard
+Dashboard
+people
+Customers
+sports_motorsports
+Drivers
+directions_car
+Vehicles
+route
+TRIPS & BOOKINGS
+expand_more
+route
+Admin Dispatch
+sell
+Pricing
+event_available
+Attendance
+account_balance
+ACCOUNTS
+expand_more
+payments
+Overview
+payments
+Booking Payments
+payments
+Registration Fees
+payments
+Commissions
+payments
+Driver Payouts
+payments
+Refunds & Adjustments
+payments
+Reports
+local_offer
+PROMOTIONS
+expand_more
+quiz
+FAQs
+rate_review
+Feedback
+insights
+Reports
+category
+DRIVER MASTERS
+expand_more
+admin_panel_settings
+ADMINISTRATION
+expand_more
+fact_check
+KYC Assignments
+settings
+Settings
+list
+Job Types
+list
+Job Choices
+list
+Work States
+list
+Driver Statuses
+S
+Super Admin
+9889259224
+person
+logout
+dock_to_right
+Account
+Reports
+Accounts · Reports
+From
+To
+City
+Service
+Payment status
+All
+paid
+partial
+unpaid
+Apply filters
+
+Booking creation-date cohort; registration receipts by posted date. COD collected by drivers is separate from platform receipts. Amounts in paise.
+
+Reports
+Download Accounts report
+Financial audit history
+Transactions & receipts
+
+Oct 3, 2026, 9:54:36 AM · COD commission received · ₹150.00 · cash · Reference Connected verification c07b9a85-85e6-43e8-a3fb-de4e96313b40-commission
+MD-C233DA4B Connected Driver One · Recorded by Super Admin
+Local fixture: commission actually received
+
+Oct 3, 2026, 9:54:36 AM · COD collected by driver · ₹1,000.00 · cash · Reference Connected verification c07b9a85-85e6-43e8-a3fb-de4e96313b40-booking
+MD-C233DA4B Connected Driver One · Recorded by Super Admin
+Local fixture: driver cash collection confirmed
+
+Oct 3, 2026, 9:54:29 AM · Registration fee received · ₹500.00 · cash · Reference Connected verification c07b9a85-85e6-43e8-a3fb-de4e96313b40-registration
+Connected Driver One · Recorded by Super Admin
+Isolated offline payment confirmation fixture

@@ -3,7 +3,6 @@ import { z } from 'zod';
 import {
   OtpRequestSchema,
   OtpVerifySchema,
-  RefreshRequestSchema,
   AuthTokensResponseSchema,
 } from '../schemas/auth.schema';
 import {
@@ -23,6 +22,7 @@ import {
   MemberCreateSchema,
   MemberListQuerySchema,
   MemberDocumentReviewSchema,
+  VendorApplicationCreateSchema,
   VendorCreateSchema,
   VendorUpdateSchema,
   VendorSelfUpdateSchema,
@@ -93,6 +93,16 @@ import {
 } from '../schemas/home-hero.schema';
 import { PromotionCreateSchema, PromotionUpdateSchema, PublicBannerQuerySchema } from '../schemas/promotion.schema';
 import { ReportFiltersQuerySchema, TopListQuerySchema, TopVendorsQuerySchema } from '../schemas/reports.schema';
+import {
+  FinanceSettingsUpdateSchema,
+  VendorCommissionRateUpdateSchema,
+  CustomerPaymentsQuerySchema,
+  MemberSettlementsQuerySchema,
+  RecordPayoutSchema,
+} from '../schemas/settlement.schema';
+import { VoucherVerifySchema, VoucherCompleteSchema, VoucherShipSchema } from '../schemas/voucher.schema';
+import { DisputeCreateSchema, DisputeListQuerySchema, DisputeResolveSchema } from '../schemas/dispute.schema';
+import { RefundCreateSchema } from '../schemas/refund.schema';
 
 export function buildOpenApiDocument() {
   const registry = new OpenAPIRegistry();
@@ -158,19 +168,18 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'post',
     path: '/auth/refresh',
-    summary: 'Rotate the refresh token and issue a new access token',
+    summary: 'Rotate the refresh session (read from the HttpOnly cookie) and issue a new access token',
+    description: 'Requires the msd_refresh_token cookie (set on login) and a matching X-CSRF-Token header (double-submit of the msd_csrf_token cookie). No request body.',
     tags: ['Auth'],
-    request: { body: { content: { 'application/json': { schema: RefreshRequestSchema } } } },
-    responses: { 200: { description: 'Rotated' }, 401: errorResponse },
+    responses: { 200: { description: 'Rotated' }, 401: errorResponse, 403: errorResponse },
   });
 
   registry.registerPath({
     method: 'post',
     path: '/auth/logout',
-    summary: 'Revoke the current refresh session',
+    summary: 'Revoke the current refresh session and clear its cookies',
     tags: ['Auth'],
     security: bearer,
-    request: { body: { content: { 'application/json': { schema: RefreshRequestSchema } } } },
     responses: { 200: { description: 'Logged out' } },
   });
 
@@ -769,6 +778,23 @@ export function buildOpenApiDocument() {
       responses: { 200: { description: 'Deleted' }, 403: errorResponse, 404: errorResponse },
     });
   }
+
+  registry.registerPath({
+    method: 'post',
+    path: '/vendors/public/register',
+    summary: 'Submit a public business membership application without creating an account',
+    tags: ['Vendors - Public'],
+    request: { body: { content: { 'application/json': { schema: VendorApplicationCreateSchema } } } },
+    responses: {
+      201: {
+        description: 'Application received',
+        content: { 'application/json': { schema: z.object({ data: z.object({ id: z.string(), status: z.string(), message: z.string(), createdAt: z.string() }) }) } },
+      },
+      422: errorResponse,
+      429: errorResponse,
+      500: errorResponse,
+    },
+  });
 
   registry.registerPath({
     method: 'get',
@@ -2626,6 +2652,218 @@ export function buildOpenApiDocument() {
       responses: { 200: { description: 'Top list' }, 403: errorResponse },
     });
   }
+
+  // ─── Accounts, Member Settlements & Purchase Verification ───────────────────
+
+  registry.registerPath({
+    method: 'get',
+    path: '/accounts/overview',
+    summary: 'Accounts Overview — collections, commission, member liability, pending/on hold/ready-for-payout/paid totals',
+    tags: ['Accounts'],
+    security: bearer,
+    responses: { 200: { description: 'Overview totals' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/accounts/customer-payments',
+    summary: 'Customer payments ledger (paginated)',
+    tags: ['Accounts'],
+    security: bearer,
+    request: { query: CustomerPaymentsQuerySchema },
+    responses: { 200: { description: 'Customer payments' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/accounts/customer-payments/export',
+    summary: 'Customer payments ledger — CSV export',
+    tags: ['Accounts'],
+    security: bearer,
+    request: { query: CustomerPaymentsQuerySchema },
+    responses: { 200: { description: 'CSV file' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/accounts/finance-settings',
+    summary: 'Commission/hold-period/completion-OTP configuration (singleton)',
+    tags: ['Accounts'],
+    security: bearer,
+    responses: { 200: { description: 'Finance settings' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'put',
+    path: '/accounts/finance-settings',
+    summary: 'Update the finance settings singleton',
+    tags: ['Accounts'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: FinanceSettingsUpdateSchema } } } },
+    responses: { 200: { description: 'Updated' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/settlements/members',
+    summary: 'Vendor-wise settlement aggregates (pending/on hold/ready-for-payout/paid)',
+    tags: ['Member Settlements'],
+    security: bearer,
+    request: { query: MemberSettlementsQuerySchema },
+    responses: { 200: { description: 'Vendor aggregates' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/settlements/members/{vendorId}',
+    summary: 'A vendor\'s bank details, order-wise statement, eligible items, payout history, and audit trail',
+    tags: ['Member Settlements'],
+    security: bearer,
+    request: { params: z.object({ vendorId: z.string().uuid() }) },
+    responses: { 200: { description: 'Vendor settlement detail' }, 403: errorResponse, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'put',
+    path: '/settlements/members/{vendorId}/commission-rate',
+    summary: "Override a vendor's commission rate (null clears back to the global default)",
+    tags: ['Member Settlements'],
+    security: bearer,
+    request: {
+      params: z.object({ vendorId: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: VendorCommissionRateUpdateSchema } } },
+    },
+    responses: { 200: { description: 'Updated' }, 403: errorResponse, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/settlements/members/{vendorId}/payouts',
+    summary: 'Record a manual bank-transfer payout (Super-Admin only, even if another role holds the approve permission)',
+    tags: ['Member Settlements'],
+    security: bearer,
+    request: {
+      params: z.object({ vendorId: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: RecordPayoutSchema } } },
+    },
+    responses: { 201: { description: 'Payout recorded' }, 403: errorResponse, 404: errorResponse, 409: errorResponse, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/vouchers/verify',
+    summary: 'Verify a voucher code (member — never mutates state)',
+    tags: ['Purchase Verification'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: VoucherVerifySchema } } } },
+    responses: { 200: { description: 'Verification result' }, 403: errorResponse },
+  });
+
+  for (const [path, summary, schema] of [
+    ['/vouchers/{code}/start', 'Start a service voucher', undefined],
+    ['/vouchers/{code}/request-completion-otp', 'Request a completion OTP, sent to the customer', undefined],
+    ['/vouchers/{code}/complete', 'Complete a voucher with the customer-shared OTP', VoucherCompleteSchema],
+    ['/vouchers/{code}/ship', 'Mark a product voucher shipped', VoucherShipSchema],
+  ] as const) {
+    registry.registerPath({
+      method: 'post',
+      path,
+      summary,
+      tags: ['Purchase Verification'],
+      security: bearer,
+      request: {
+        params: z.object({ code: z.string() }),
+        ...(schema ? { body: { content: { 'application/json': { schema } } } } : {}),
+      },
+      responses: { 200: { description: 'Updated' }, 403: errorResponse, 404: errorResponse, 409: errorResponse },
+    });
+  }
+
+  registry.registerPath({
+    method: 'post',
+    path: '/vouchers/{code}/record-delivery-evidence',
+    summary: 'Record delivery evidence (photo + note) for a shipped product voucher',
+    tags: ['Purchase Verification'],
+    security: bearer,
+    request: {
+      params: z.object({ code: z.string() }),
+      body: { content: { 'multipart/form-data': { schema: z.object({ file: z.any().openapi({ type: 'string', format: 'binary' }), note: z.string().optional() }) } } },
+    },
+    responses: { 200: { description: 'Updated' }, 403: errorResponse, 404: errorResponse, 409: errorResponse, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/disputes',
+    summary: 'Raise a dispute on one of the caller\'s own purchased items (customer)',
+    tags: ['Disputes & Refunds'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: DisputeCreateSchema } } } },
+    responses: { 201: { description: 'Created' }, 404: errorResponse, 409: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/disputes',
+    summary: 'List disputes (admin)',
+    tags: ['Disputes & Refunds'],
+    security: bearer,
+    request: { query: DisputeListQuerySchema },
+    responses: { 200: { description: 'Disputes' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/disputes/{id}',
+    summary: 'Get a dispute by id (admin)',
+    tags: ['Disputes & Refunds'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Dispute' }, 403: errorResponse, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/disputes/{id}/status',
+    summary: 'Move a dispute from OPEN to UNDER_REVIEW (admin)',
+    tags: ['Disputes & Refunds'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Updated' }, 403: errorResponse, 404: errorResponse, 409: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/disputes/{id}/resolve',
+    summary: "Resolve a dispute — REFUNDED requires 'approve', NO_ACTION/OTHER require 'reject' (admin)",
+    tags: ['Disputes & Refunds'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: DisputeResolveSchema } } },
+    },
+    responses: { 200: { description: 'Resolved' }, 403: errorResponse, 404: errorResponse, 409: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/refunds',
+    summary: 'Create a refund for an order item (admin)',
+    tags: ['Disputes & Refunds'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: RefundCreateSchema } } } },
+    responses: { 201: { description: 'Created' }, 404: errorResponse, 409: errorResponse, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/refunds/order-item/{id}',
+    summary: 'List refunds for an order item (admin)',
+    tags: ['Disputes & Refunds'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Refunds' }, 403: errorResponse },
+  });
 
   const generator = new OpenApiGeneratorV31(registry.definitions);
   return generator.generateDocument({

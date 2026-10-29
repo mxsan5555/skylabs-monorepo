@@ -1,40 +1,19 @@
-<md-admin-page
-  title="Dashboard"
-  [subtitle]="userName() ? 'Welcome back, ' + userName() + '.' : 'An overview of your account activity.'"
->
-  @if (loading()) {
-    <div class="flex items-center gap-3 py-6" role="status" aria-live="polite">
-      <md-circular-progress indeterminate></md-circular-progress>
-      <span>Loading your dashboard…</span>
+<md-admin-page title="Dashboard" [subtitle]="userName() ? 'Welcome back, ' + userName() + '.' : 'Your account activity.'">
+  <md-outlined-button page-actions (click)="refresh()" [disabled]="loading()">Refresh</md-outlined-button>
+  @if(loading()) {<div class="flex items-center gap-3 py-6" role="status"><md-circular-progress indeterminate></md-circular-progress>Loading your dashboard?</div>}
+  @else if(error()) {<div role="alert" class="py-6"><p>{{error()}}</p><md-outlined-button page-actions (click)="refresh()">Retry</md-outlined-button></div>}
+  @else if(summary(); as data) {
+    <p class="text-sm py-2">{{data.role}}</p>
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 " [class.lg:grid-cols-3]="data.cards.length > 4" [class.lg:grid-cols-4]="data.cards.length <= 4">
+      @for(card of data.cards;track card.key) {<a [routerLink]="destination(card.path)" class="block no-underline text-inherit"><sky-card><h3 class="text-sm font-semibold">{{card.title}}</h3><p class="text-2xl font-bold">{{value(card)}}</p><p class="text-xs">{{card.hint}}</p></sky-card></a>}
     </div>
-  } @else if (widgets().length === 0) {
-    <sky-info-card
-      icon="widgets"
-      heading="No widgets assigned"
-      subheading="Your role doesn't have any dashboard widgets configured yet."
-    ></sky-info-card>
-  } @else {
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      @for (widget of widgets(); track widget.key) {
-        <sky-card>
-          <article class="flex items-start gap-3 p-1">
-            <span
-              class="grid h-11 w-11 flex-none place-items-center rounded-xl bg-[var(--md-sys-color-primary-container,#cee5ff)] text-[var(--md-sys-color-on-primary-container,#001d33)]"
-            >
-              <md-icon aria-hidden="true">{{ widget.icon }}</md-icon>
-            </span>
-            <div class="min-w-0">
-              <h3 class="m-0 text-sm font-semibold text-[var(--md-sys-color-on-surface-variant)]">
-                {{ widget.title }}
-              </h3>
-              <p class="m-0 text-2xl font-bold text-[var(--md-sys-color-on-surface)]">
-                {{ widget.value }}
-              </p>
-              <p class="m-0 text-xs text-[var(--md-sys-color-on-surface-variant)]">{{ widget.hint }}</p>
-            </div>
-          </article>
-        </sky-card>
-      }
-    </div>
+    <sky-card class="block my-4"><h2 class="text-lg font-semibold">Needs Attention</h2>
+      @if(data.attention.length) {<ul class="space-y-2">@for(item of data.attention;track item.path){<li><a class="underline" [routerLink]="destination(item.path)">{{item.label}}</a></li>}</ul>}
+      @else {<p>{{data.cards.length ? 'No pending work in the available summaries.' : 'No operational summary is available for your role.'}}</p>}
+    </sky-card>
+    <div class="flex flex-wrap gap-3 my-4">@for(action of data.actions;track action.path){<a class="underline p-3 rounded-lg border" [routerLink]="destination(action.path)">{{action.label}}</a>}</div>
+    @if(data.records.length) {<sky-card class="block my-4"><h2 class="text-lg font-semibold">Recent Records / Assigned Work</h2><ul class="divide-y">@for(record of data.records;track record.path){<li class="py-3"><a class="underline font-medium" [routerLink]="destination(record.path)">{{record.label}}</a><p class="text-sm">{{record.detail}}</p></li>}</ul></sky-card>}
+    @else {<p class="py-4">No recent records available.</p>}
+    @for(gap of data.gaps;track gap){<p class="text-sm py-2">{{gap}}</p>}
   }
 </md-admin-page>

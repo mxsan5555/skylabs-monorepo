@@ -1,0 +1,231 @@
+{
+  "full": {
+    "data": {
+      "name": "Resume Full Fixture",
+      "title": "Car Driver",
+      "location": "Pune, Maharashtra",
+      "phone": "9876543210",
+      "email": "resume-fixture@example.org",
+      "summary": "Car driver based in Pune with saved sedan and SUV experience. Available for local and outstation assignments.",
+      "experienceDescription": "5+ Years",
+      "licence": {
+        "number": "DL1420110012345",
+        "classes": [
+          "LMV"
+        ],
+        "issueDate": "1 Jan 2011",
+        "expiryDate": "1 Jan 2099",
+        "validity": "Expiry date is current",
+        "verification": "API verification not confirmed"
+      },
+      "vehicleTypes": [
+        "Sedan",
+        "SUV"
+      ],
+      "transmissionSkills": [
+        "Manual",
+        "Automatic"
+      ],
+      "workExperience": [
+        {
+          "jobTitle": "Company Driver",
+          "employer": "Fixture Transit",
+          "location": "Pune",
+          "startDate": "2018-01",
+          "endDate": "2020-12",
+          "current": false,
+          "responsibilities": [
+            "Transported staff on scheduled local routes.",
+            "Maintained saved vehicle inspection records."
+          ],
+          "period": "Jan 2018 – Dec 2020"
+        },
+        {
+          "jobTitle": "Fleet Driver",
+          "employer": "Fixture Fleet",
+          "location": "Pune",
+          "startDate": "2021-01",
+          "endDate": "2023-12",
+          "current": false,
+          "responsibilities": [
+            "Completed assigned intercity journeys.",
+            "Recorded journey schedules and vehicle checks."
+          ],
+          "period": "Jan 2021 – Dec 2023"
+        },
+        {
+          "jobTitle": "Family Driver",
+          "employer": "Fixture Family",
+          "location": "Pune",
+          "startDate": "2024-01",
+          "endDate": "",
+          "current": true,
+          "responsibilities": [
+            "Handled saved family travel assignments.",
+            "Planned agreed local and outstation routes."
+          ],
+          "period": "Jan 2024 – Present"
+        }
+      ],
+      "keySkills": [
+        "Car Driver",
+        "Sedan",
+        "SUV",
+        "Manual",
+        "Automatic",
+        "Route planning",
+        "Vehicle care",
+        "Passenger safety"
+      ],
+      "education": {
+        "qualification": "Graduate",
+        "institution": "Fixture College",
+        "location": "Pune",
+        "year": "2017"
+      },
+      "trainingStatus": "",
+      "languages": [
+        "English",
+        "Hindi"
+      ],
+      "workingCity": "Pune",
+      "availability": "Weekdays and weekends by arrangement",
+      "servicePreferences": [
+        "Local",
+        "Outstation"
+      ]
+    },
+    "profile": {
+      "summary": "Car driver based in Pune with saved sedan and SUV experience. Available for local and outstation assignments.",
+      "workExperience": [
+        {
+          "jobTitle": "Company Driver",
+          "employer": "Fixture Transit",
+          "location": "Pune",
+          "startDate": "2018-01",
+          "endDate": "2020-12",
+          "current": false,
+          "responsibilities": [
+            "Transported staff on scheduled local routes.",
+            "Maintained saved vehicle inspection records."
+          ]
+        },
+        {
+          "jobTitle": "Fleet Driver",
+          "employer": "Fixture Fleet",
+          "location": "Pune",
+          "startDate": "2021-01",
+          "endDate": "2023-12",
+          "current": false,
+          "responsibilities": [
+            "Completed assigned intercity journeys.",
+            "Recorded journey schedules and vehicle checks."
+          ]
+        },
+        {
+          "jobTitle": "Family Driver",
+          "employer": "Fixture Family",
+          "location": "Pune",
+          "startDate": "2024-01",
+          "endDate": "",
+          "current": true,
+          "responsibilities": [
+            "Handled saved family travel assignments.",
+            "Planned agreed local and outstation routes."
+          ]
+        }
+      ],
+      "keySkills": [
+        "Route planning",
+        "Vehicle care",
+        "Passenger safety"
+      ],
+      "transmissionSkills": [
+        "Manual",
+        "Automatic"
+      ],
+      "education": {
+        "institution": "Fixture College",
+        "location": "Pune",
+        "year": "2017"
+      },
+      "availability": "Weekdays and weekends by arrangement",
+      "servicePreferences": [
+        "Local",
+        "Outstation"
+      ],
+      "sharePhone": true,
+      "shareEmail": true
+    },
+    "missing": [],
+    "revision": "830410011fdfa7c0bc1373a448b9b14f50e1d63e5efdb5bd54988bb942705256",
+    "filename": "Resume_Full_Fixture_Driver_Resume.pdf",
+    "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Resume Full Fixture Driver Resume</title><style>\n  *{box-sizing:border-box}body{font:10.5pt Arial,Helvetica,sans-serif;line-height:1.4;color:#21313b;background:white;margin:0;padding:24px;max-width:794px}header{border-bottom:3px solid #116864;padding-bottom:14px;margin-bottom:18px}h1{font-size:26pt;line-height:1.1;margin:0 0 6px;color:#163c44;overflow-wrap:anywhere}.title{font-size:12pt;font-weight:600;color:#116864;margin:0 0 8px}h2{text-transform:uppercase;font-size:10.5pt;letter-spacing:1px;color:#116864;margin:17px 0 7px;border-bottom:1px solid #d8e3e5;padding-bottom:5px;break-after:avoid}h3{font-size:10.5pt;margin:0 0 3px}.contact,.muted{font-size:9.5pt;color:#54646d}p{margin:4px 0;overflow-wrap:anywhere}ul{padding-left:18px;margin:5px 0}li{margin:3px 0;overflow-wrap:anywhere}.entry{margin:11px 0;break-inside:avoid;page-break-inside:avoid}.skills{display:flex;flex-wrap:wrap;gap:6px}.skill{font-size:9.5pt;padding:3px 8px;background:#edf4f4;border-radius:4px}.strong{font-weight:600}.demo{background:#fff0c4;color:#6a4900;padding:8px;font-weight:bold}section{break-inside:auto}@media print{body{padding:0;max-width:none}header{break-inside:avoid}p,li{orphans:2;widows:2}}\n  </style></head><body><header><h1>Resume Full Fixture</h1><p class=\"title\">Car Driver</p><p class=\"contact\">Pune, Maharashtra</p><p class=\"contact\">9876543210</p><p class=\"contact\">resume-fixture@example.org</p></header>\n  <section><h2>Professional Summary</h2><p>Car driver based in Pune with saved sedan and SUV experience. Available for local and outstation assignments.</p></section>\n  <section><h2>Driving Licence and Vehicle Skills</h2><p><strong>DL number:</strong> DL1420110012345</p><p><strong>Licence classes:</strong> LMV</p><p><strong>Issued:</strong> 1 Jan 2011</p><p><strong>Valid until:</strong> 1 Jan 2099</p><p><strong>Validity:</strong> Expiry date is current</p><p><strong>Verification:</strong> API verification not confirmed</p><p><strong>Vehicle types:</strong> Sedan, SUV</p><p><strong>Transmission skills:</strong> Manual, Automatic</p></section>\n  <section><h2>Work Experience</h2><article class=\"entry\"><h3>Company Driver · Fixture Transit</h3><p class=\"muted\">Pune</p><p class=\"muted\">Jan 2018 – Dec 2020</p><ul><li>Transported staff on scheduled local routes.</li><li>Maintained saved vehicle inspection records.</li></ul></article><article class=\"entry\"><h3>Fleet Driver · Fixture Fleet</h3><p class=\"muted\">Pune</p><p class=\"muted\">Jan 2021 – Dec 2023</p><ul><li>Completed assigned intercity journeys.</li><li>Recorded journey schedules and vehicle checks.</li></ul></article><article class=\"entry\"><h3>Family Driver · Fixture Family</h3><p class=\"muted\">Pune</p><p class=\"muted\">Jan 2024 – Present</p><ul><li>Handled saved family travel assignments.</li><li>Planned agreed local and outstation routes.</li></ul></article></section>\n  <section><h2>Key Skills</h2><div class=\"skills\"><span class=\"skill\">Car Driver</span><span class=\"skill\">Sedan</span><span class=\"skill\">SUV</span><span class=\"skill\">Manual</span><span class=\"skill\">Automatic</span><span class=\"skill\">Route planning</span><span class=\"skill\">Vehicle care</span><span class=\"skill\">Passenger safety</span></div></section>\n  <section><h2>Education</h2><p class=\"strong\">Graduate</p><p><strong>Institution:</strong> Fixture College</p><p><strong>Location:</strong> Pune</p><p><strong>Year:</strong> 2017</p></section>\n  <section><h2>Languages and Availability</h2><p><strong>Languages:</strong> English, Hindi</p><p><strong>Working city:</strong> Pune</p><p><strong>Availability:</strong> Weekdays and weekends by arrangement</p><p><strong>Service preferences:</strong> Local, Outstation</p></section></body></html>"
+  },
+  "partial": {
+    "data": {
+      "name": "Resume Partial Fixture",
+      "title": "Professional Driver",
+      "location": "",
+      "phone": "",
+      "email": "",
+      "summary": "",
+      "experienceDescription": "",
+      "licence": {
+        "number": "",
+        "classes": [],
+        "issueDate": "",
+        "expiryDate": "",
+        "validity": "",
+        "verification": "API verification not confirmed"
+      },
+      "vehicleTypes": [],
+      "transmissionSkills": [],
+      "workExperience": [],
+      "keySkills": [],
+      "education": {
+        "qualification": "",
+        "institution": "",
+        "location": "",
+        "year": ""
+      },
+      "trainingStatus": "",
+      "languages": [],
+      "workingCity": "",
+      "availability": "",
+      "servicePreferences": []
+    },
+    "profile": {
+      "summary": "",
+      "workExperience": [],
+      "keySkills": [],
+      "transmissionSkills": [],
+      "education": {
+        "institution": "",
+        "location": "",
+        "year": ""
+      },
+      "availability": "",
+      "servicePreferences": [],
+      "sharePhone": true,
+      "shareEmail": true
+    },
+    "missing": [
+      "Professional summary",
+      "DL number",
+      "Licence classes",
+      "Valid licence expiry",
+      "Employment records (employer, dates and responsibilities)",
+      "Manual / automatic skills",
+      "Education qualification",
+      "Education institution",
+      "Education year",
+      "Languages",
+      "Work availability",
+      "Service preferences"
+    ],
+    "revision": "5fd3f2432530e662554ec0643549f0cce6b3bfe53ba4a8e024dcc8e5ee76d148",
+    "filename": "Resume_Partial_Fixture_Driver_Resume.pdf",
+    "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Resume Partial Fixture Driver Resume</title><style>\n  *{box-sizing:border-box}body{font:10.5pt Arial,Helvetica,sans-serif;line-height:1.4;color:#21313b;background:white;margin:0;padding:24px;max-width:794px}header{border-bottom:3px solid #116864;padding-bottom:14px;margin-bottom:18px}h1{font-size:26pt;line-height:1.1;margin:0 0 6px;color:#163c44;overflow-wrap:anywhere}.title{font-size:12pt;font-weight:600;color:#116864;margin:0 0 8px}h2{text-transform:uppercase;font-size:10.5pt;letter-spacing:1px;color:#116864;margin:17px 0 7px;border-bottom:1px solid #d8e3e5;padding-bottom:5px;break-after:avoid}h3{font-size:10.5pt;margin:0 0 3px}.contact,.muted{font-size:9.5pt;color:#54646d}p{margin:4px 0;overflow-wrap:anywhere}ul{padding-left:18px;margin:5px 0}li{margin:3px 0;overflow-wrap:anywhere}.entry{margin:11px 0;break-inside:avoid;page-break-inside:avoid}.skills{display:flex;flex-wrap:wrap;gap:6px}.skill{font-size:9.5pt;padding:3px 8px;background:#edf4f4;border-radius:4px}.strong{font-weight:600}.demo{background:#fff0c4;color:#6a4900;padding:8px;font-weight:bold}section{break-inside:auto}@media print{body{padding:0;max-width:none}header{break-inside:avoid}p,li{orphans:2;widows:2}}\n  </style></head><body><header><h1>Resume Partial Fixture</h1><p class=\"title\">Professional Driver</p></header>\n  \n  \n  \n  \n  \n  </body></html>"
+  }
+}

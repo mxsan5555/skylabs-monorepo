@@ -1,0 +1,422 @@
+{
+  "base": "http://localhost:4200",
+  "mode": "real browser, intercepted API fixtures; not live authenticated verification",
+  "checks": [
+    "direct Articles URL, populated DataTable, only Articles active, parents expanded",
+    "browser refresh retains Articles listing",
+    "sidebar Pages and Articles navigation",
+    "article detail, Back to Articles, selected-row edit dialog and new article dialog",
+    "article DataTable search reaches Articles list API",
+    "existing Pages detail route preserved",
+    "invalid article identifier shows Not Found without API request",
+    "nonexistent valid article identifier preserves API Not Found",
+    "Pages permissions do not grant Articles route access"
+  ],
+  "errors": [],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/cart"
+    },
+    {
+      "method": "GET",
+      "path": "/wishlist"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/categories"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/locations"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/social-links"
+    },
+    {
+      "method": "GET",
+      "path": "/rbac/bootstrap"
+    },
+    {
+      "method": "GET",
+      "path": "/cart"
+    },
+    {
+      "method": "GET",
+      "path": "/wishlist"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/categories"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/locations"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/social-links"
+    },
+    {
+      "method": "GET",
+      "path": "/notifications?pageSize=8"
+    },
+    {
+      "method": "GET",
+      "path": "/blog-categories?pageSize=100"
+    },
+    {
+      "method": "GET",
+      "path": "/blog-articles?page=1&pageSize=10"
+    },
+    {
+      "method": "GET",
+      "path": "/notifications?pageSize=8"
+    },
+    {
+      "method": "GET",
+      "path": "/blog-categories?pageSize=100"
+    },
+    {
+      "method": "GET",
+      "path": "/blog-articles?page=1&pageSize=10"
+    },
+    {
+      "method": "GET",
+      "path": "/cart"
+    },
+    {
+      "method": "GET",
+      "path": "/wishlist"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/categories"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/locations"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/social-links"
+    },
+    {
+      "method": "GET",
+      "path": "/rbac/bootstrap"
+    },
+    {
+      "method": "GET",
+      "path": "/cart"
+    },
+    {
+      "method": "GET",
+      "path": "/wishlist"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/categories"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/locations"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/social-links"
+    },
+    {
+      "method": "GET",
+      "path": "/notifications?pageSize=8"
+    },
+    {
+      "method": "GET",
+      "path": "/blog-categories?pageSize=100"
+    },
+    {
+      "method": "GET",
+      "path": "/blog-articles?page=1&pageSize=10"
+    },
+    {
+      "method": "GET",
+      "path": "/notifications?pageSize=8"
+    },
+    {
+      "method": "GET",
+      "path": "/blog-categories?pageSize=100"
+    },
+    {
+      "method": "GET",
+      "path": "/blog-articles?page=1&pageSize=10"
+    },
+    {
+      "method": "GET",
+      "path": "/blog-posts?page=1&pageSize=10"
+    },
+    {
+      "method": "GET",
+      "path": "/blog-articles?page=1&pageSize=10"
+    },
+    {
+      "method": "GET",
+      "path": "/blog-articles/f0f0f0f0-0000-4000-8000-000000000010"
+    },
+    {
+      "method": "GET",
+      "path": "/blog-articles/f0f0f0f0-0000-4000-8000-000000000010"
+    },
+    {
+      "method": "GET",
+      "path": "/blog-categories?pageSize=100"
+    },
+    {
+      "method": "GET",
+      "path": "/blog-articles?page=1&pageSize=10"
+    },
+    {
+      "method": "GET",
+      "path": "/blog-categories?pageSize=100"
+    },
+    {
+      "method": "GET",
+      "path": "/blog-articles?page=1&pageSize=10"
+    },
+    {
+      "method": "GET",
+      "path": "/blog-articles?page=1&pageSize=10&search=routing"
+    },
+    {
+      "method": "GET",
+      "path": "/cart"
+    },
+    {
+      "method": "GET",
+      "path": "/wishlist"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/categories"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/locations"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/social-links"
+    },
+    {
+      "method": "GET",
+      "path": "/rbac/bootstrap"
+    },
+    {
+      "method": "GET",
+      "path": "/cart"
+    },
+    {
+      "method": "GET",
+      "path": "/wishlist"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/categories"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/locations"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/social-links"
+    },
+    {
+      "method": "GET",
+      "path": "/notifications?pageSize=8"
+    },
+    {
+      "method": "GET",
+      "path": "/blog-posts/f0f0f0f0-0000-4000-8000-000000000010"
+    },
+    {
+      "method": "GET",
+      "path": "/notifications?pageSize=8"
+    },
+    {
+      "method": "GET",
+      "path": "/blog-posts/f0f0f0f0-0000-4000-8000-000000000010"
+    },
+    {
+      "method": "GET",
+      "path": "/cart"
+    },
+    {
+      "method": "GET",
+      "path": "/wishlist"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/categories"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/locations"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/social-links"
+    },
+    {
+      "method": "GET",
+      "path": "/rbac/bootstrap"
+    },
+    {
+      "method": "GET",
+      "path": "/cart"
+    },
+    {
+      "method": "GET",
+      "path": "/wishlist"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/categories"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/locations"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/social-links"
+    },
+    {
+      "method": "GET",
+      "path": "/notifications?pageSize=8"
+    },
+    {
+      "method": "GET",
+      "path": "/notifications?pageSize=8"
+    },
+    {
+      "method": "GET",
+      "path": "/cart"
+    },
+    {
+      "method": "GET",
+      "path": "/wishlist"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/categories"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/locations"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/social-links"
+    },
+    {
+      "method": "GET",
+      "path": "/rbac/bootstrap"
+    },
+    {
+      "method": "GET",
+      "path": "/cart"
+    },
+    {
+      "method": "GET",
+      "path": "/wishlist"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/categories"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/locations"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/social-links"
+    },
+    {
+      "method": "GET",
+      "path": "/notifications?pageSize=8"
+    },
+    {
+      "method": "GET",
+      "path": "/blog-articles/f0f0f0f0-0000-4000-8000-000000000099"
+    },
+    {
+      "method": "GET",
+      "path": "/notifications?pageSize=8"
+    },
+    {
+      "method": "GET",
+      "path": "/blog-articles/f0f0f0f0-0000-4000-8000-000000000099"
+    },
+    {
+      "method": "GET",
+      "path": "/cart"
+    },
+    {
+      "method": "GET",
+      "path": "/wishlist"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/categories"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/locations"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/social-links"
+    },
+    {
+      "method": "GET",
+      "path": "/rbac/bootstrap"
+    },
+    {
+      "method": "GET",
+      "path": "/cart"
+    },
+    {
+      "method": "GET",
+      "path": "/wishlist"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/categories"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/locations"
+    },
+    {
+      "method": "GET",
+      "path": "/catalog/social-links"
+    },
+    {
+      "method": "GET",
+      "path": "/notifications?pageSize=8"
+    },
+    {
+      "method": "GET",
+      "path": "/notifications?pageSize=8"
+    },
+    {
+      "method": "GET",
+      "path": "/rbac/users/me"
+    },
+    {
+      "method": "GET",
+      "path": "/rbac/users/me"
+    }
+  ]
+}

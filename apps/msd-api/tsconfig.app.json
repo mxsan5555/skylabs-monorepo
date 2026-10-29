@@ -4,7 +4,8 @@
     "outDir": "../../dist/out-tsc",
     "module": "commonjs",
     "resolveJsonModule": true,
-    "types": ["node", "express"]
+    "types": ["node", "express"],
+    "ignoreDeprecations": "6.0"
   },
   "exclude": [
     "src/**/*.spec.ts",

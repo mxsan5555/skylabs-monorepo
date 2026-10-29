@@ -18,6 +18,7 @@ import { extractBlogPostFieldErrors, type BlogPostFieldKey } from './field-error
  *  `extractBlogPostFieldErrors`. */
 export function BlogFormDialog({
   dialogRef,
+  scope = 'pages',
   post,
   token,
   categories,
@@ -25,7 +26,8 @@ export function BlogFormDialog({
   onSave,
   onClose,
 }: {
-  dialogRef: RefObject<MdDialog>;
+  dialogRef: RefObject<MdDialog | null>;
+  scope?: 'pages' | 'articles';
   post?: BlogPost;
   token: string | null;
   /** Populated once by `blog-list.tsx` (fetch-once-on-list-mount, shared by both the add and
@@ -211,7 +213,7 @@ export function BlogFormDialog({
         </fieldset>
 
         <MediaUploader
-          entityType="blog"
+          entityType={scope === 'articles' ? 'blog-article' : 'blog'}
           entityId={savedPost?.id ?? null}
           existingImages={savedPost?.mediaImages ?? []}
           existingVideo={null}

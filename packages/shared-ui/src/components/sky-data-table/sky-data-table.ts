@@ -34,6 +34,10 @@ export interface SkyDataTableColumn {
   statusStyle?: 'filled' | 'tonal';
   /** Starts the column as hidden in the selector */
   hidden?: boolean;
+  /** Renders `row[secondaryKey]` as a smaller, muted line under the primary value — for a
+   *  column that packs a heading plus supporting detail (e.g. business name with owner/mobile/
+   *  city underneath) into one cell without a bespoke column type per consumer. */
+  secondaryKey?: string;
 }
 
 /** One filter select option. Consecutive options sharing a `group` get a heading and a divider. */
@@ -476,7 +480,10 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
       : html`<md-icon class="sort-icon sort-icon--on" aria-hidden="true">arrow_downward</md-icon>`;
   }
 
-  private _cellContent(value: unknown, col: SkyDataTableColumn) {
+  private _cellContent(value: unknown, col: SkyDataTableColumn, row: Record<string, unknown>) {
+    const secondary = col.secondaryKey ? String(row[col.secondaryKey] ?? '') : '';
+    const secondaryLine = secondary ? html`<div class="cell-secondary">${secondary}</div>` : nothing;
+
     if (col.status || col.type === 'status') {
       const str = String(value ?? '');
       const tone = col.statusMap?.[str] ?? (this._isTone(str) ? str : 'info');
@@ -491,7 +498,8 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
       }
       return html`<md-icon class="cell-avatar cell-avatar--empty" aria-hidden="true">account_circle</md-icon>`;
     }
-    return html`${value ?? ''}`;
+    if (!secondary) return html`${value ?? ''}`;
+    return html`<div class="cell-main"><span>${value ?? ''}</span>${secondaryLine}</div>`;
   }
 
   private _skeletonRows() {
@@ -770,6 +778,21 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
     .cell-avatar--empty {
       --md-icon-size: 32px;
       color: var(--md-sys-color-outline);
+    }
+    .cell-main {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+    }
+    .cell-secondary {
+      font-size: var(--md-sys-typescale-label-small-size);
+      color: var(--md-sys-color-on-surface-variant);
+    }
+    @media (min-width: 600px) {
+      .cell-main {
+        align-items: flex-start;
+      }
     }
     .col-cb {
       inline-size: 52px;
@@ -1230,7 +1253,7 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
                           ` : nothing}
 
                           ${cols.map(col => html`
-                            <td data-label=${col.label}>${this._cellContent(row[col.key], col)}</td>
+                            <td data-label=${col.label}>${this._cellContent(row[col.key], col, row)}</td>
                           `)}
 
                           ${actionDefs.length ? html`

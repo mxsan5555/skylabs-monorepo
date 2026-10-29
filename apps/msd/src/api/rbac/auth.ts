@@ -10,9 +10,11 @@ export interface AuthUser {
   roles: string[];
 }
 
+/** The refresh token itself never reaches this app's JS — the server sets it as an HttpOnly
+ *  cookie directly on this response (see apps/msd-api/src/lib/auth-cookies.ts), so it can't end
+ *  up in localStorage. */
 export interface AuthTokensResponse {
   accessToken: string;
-  refreshToken: string;
   user: AuthUser;
 }
 
@@ -21,7 +23,8 @@ export function requestOtp(identifier: string, purpose: OtpPurpose = 'login') {
   return apiPost<{ message: string }>('/auth/otp/request', null, { identifier, purpose });
 }
 
-/** `POST /auth/otp/verify` — verifies the code and logs in, returning a fresh access/refresh token pair. */
+/** `POST /auth/otp/verify` — verifies the code and logs in, returning a fresh access token (the
+ *  paired refresh token arrives as an HttpOnly cookie, not in this body). */
 export function verifyOtp(identifier: string, otp: string) {
   return apiPost<AuthTokensResponse>('/auth/otp/verify', null, { identifier, otp });
 }

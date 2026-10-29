@@ -12,7 +12,10 @@ import '../../blog-detail/blog-detail.css';
 /** Read-only admin preview of a single Blog Post at `/account/cms/blog/:id` — reached from the
  *  Blog list's "View" row action. Renders the same block content the public post page would,
  *  plus the admin-only status/author/date/SEO-meta strip. */
-export function BlogDetailAdmin() {
+export function BlogDetailAdmin({ scope = 'pages' }: { scope?: 'pages' | 'articles' }) {
+  const baseRoute = scope === 'articles' ? '/account/cms/blog/articles' : '/account/cms/blog';
+  const backLabel = scope === 'articles' ? 'Back to Articles' : 'Back to Blog';
+  const loadPost = scope === 'articles' ? blogArticlesApi.getBlogPost : getBlogPost;
   const { id } = useParams<{ id: string }>();
   const { token } = useAuth();
   const [post, setPost] = useState<BlogPost | null>(null);
@@ -20,14 +23,22 @@ export function BlogDetailAdmin() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      setPost(null);
+      setError('Blog post not found.');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError('');
-    getBlogPost(token, id)
-      .then(({ data }) => setPost(data))
-      .catch((err) => setError(err instanceof ApiRequestError ? err.message : 'Could not load blog post.'))
-      .finally(() => setLoading(false));
-  }, [id, token]);
+    setPost(null);
+    let current = true;
+    loadPost(token, id)
+      .then(({ data }) => { if (current) setPost(data); })
+      .catch((err) => { if (current) setError(err instanceof ApiRequestError ? err.message : 'Could not load blog post.'); })
+      .finally(() => { if (current) setLoading(false); });
+    return () => { current = false; };
+  }, [id, token, loadPost]);
 
   if (loading) {
     return (
@@ -45,9 +56,9 @@ export function BlogDetailAdmin() {
         <title>Blog post · MSD</title>
         <meta name="robots" content="noindex" />
         <p className="error-state" role="alert">{error || 'Blog post not found.'}</p>
-        <Link to="/account/cms/blog">
+        <Link to={baseRoute}>
           <Icon aria-hidden="true">arrow_back</Icon>
-          Back to Blog
+          {backLabel}
         </Link>
       </div>
     );
@@ -60,9 +71,9 @@ export function BlogDetailAdmin() {
       <title>{post.title} · MSD</title>
       <meta name="robots" content="noindex" />
       <nav className="post__crumb" aria-label="Breadcrumb">
-        <Link to="/account/cms/blog">
+        <Link to={baseRoute}>
           <Icon aria-hidden="true">arrow_back</Icon>
-          Back to Blog
+          {backLabel}
         </Link>
       </nav>
       <header className="page-head">

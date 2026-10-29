@@ -25,17 +25,70 @@ apps/msd-api/src/               routes, services, middleware, schemas, lib, open
 ## 1. Admin and staff
 
 - **Authorization (built):** `authenticate` verifies the JWT; `requirePermission(menuKey, action)`
-  resolves `UserRole → RolePermission → Permission` with a short cache and is the only gate.
-  Super Admin resolves to every key derived from the live menu tree.
-- **Authorization (planned, tasks P1-04, P2-01, P2-02):** `requirePermission` resolves
-  `{key, scope}` across all roles (highest scope wins) and sets
-  `req.access = { scope: 'ALL' | 'OWN', memberId? }`; `lib/scope.ts` `scopedWhere(req, resource)`
-  builds every ownership filter (`vendorId` for branches, deals, therapists, products;
-  `OrderItem.vendorId` for orders and payments; `ownerUserId` for members; `userId` for logs and
-  profile). Roles are re-read from the DB (30 s cache) instead of trusted from the token.
-  Bootstrap adds `scopes`. Today `RolePermission.scope` is stored but **not enforced** (F2).
+  resolves `UserRole → RolePermission → Permission` with a short cache and is the only gate
+  (boolean check only — it does not itself read scope). Super Admin resolves to every key
+  derived from the live menu tree.
+- **Scope resolution (built, 2026-10-23, P1-04/P1-09/P8-08):**
+  `permission-resolver.service.ts#resolveGrantedPermissions` returns `{ keys, scopes }` —
+  `scopes` is `Record<permissionKey, 'ALL'|'OWN'>`, highest-scope-wins across every role the
+  caller holds (`resolveGrantedPermissionKeys` is a thin wrapper over this for callers that only
+  need the boolean keys). `GET /rbac/bootstrap` returns this as `scopes`; `shared-permissions`
+  exposes `scopeFor(scopes, menuKey, action)` for the frontend. **Scope is only a real security
+  boundary where a route actually reads it** — `role.service.ts#SCOPE_ENFORCED_PERMISSION_KEYS`
+  is the single allowlist of keys with real enforcement code, and `setRolePermissions` rejects
+  `scope: 'OWN'` for anything outside it (422) so the Role Permission Matrix can never silently
+  promise a restriction that isn't real. Today that allowlist holds exactly one key —
+  `rbac.audit-logs:view` (`GET /rbac/audit-logs` filters to `actorUserId` when the caller's scope
+  is `OWN`; Super Admin keeps `ALL` via its existing blanket bypass).
+- **Permission-change propagation to already-signed-in sessions (built, 2026-10-26):** the
+  resolver's cache is keyed by sorted role-key set, cleared by `invalidatePermissionCache()` on
+  every mutation that can change what a role-key combination resolves to — role delete, role
+  status change, and `PUT /rbac/roles/:id/permissions` (the Role Permission Matrix save; this one
+  was missing until 2026-10-26 — found by tracing Matrix save → resolver cache → bootstrap end to
+  end, see TASKS.md P2-05). On the frontend, `AuthProvider`'s existing proactive access-token
+  refresh (fires ~60s before each 15-minute token expires) now also calls
+  `loadBootstrap(token, { silent: true })` on every renewal, so an already-open tab's sidebar and
+  every `can()` check pick up a saved Matrix change within one token lifetime instead of staying
+  frozen at last-sign-in state for the rest of the session. `silent` skips the `loading` state
+  flip so this background refresh never triggers `RequireAuth`'s full-page loading placeholder
+  (which replaces `children` for as long as `loading` is true — correct for the initial session
+  restore, wrong for a refresh the user shouldn't notice). This is a bounded-delay mechanism
+  (≤ ~15 minutes), not an instant push — the smallest change compatible with the existing
+  short-TTL-cache + token-refresh architecture, not a new real-time channel.
+- **Authorization (planned, tasks P2-01, P2-02, P1-10):** extend real `OWN`-scope enforcement
+  (adding each resource's key to `SCOPE_ENFORCED_PERMISSION_KEYS` alongside its route change) via
+  `lib/scope.ts` `scopedWhere(req, resource)` building every ownership filter (`vendorId` for
+  branches, deals, therapists, products; `OrderItem.vendorId` for orders and payments;
+  `ownerUserId` for members; `userId` for logs and profile) — most of Member's own-scope today is
+  achieved by routing through the separate `vendor-portal.*` namespace instead, see F4. Roles are
+  re-read from the DB (30 s cache) instead of trusted from the token.
 - **Console screens:** `pages/account/{roles,users,audit-logs,settings,profile}`; sidebar
   `app/admin/sidebar.tsx` renders `bootstrap.menu` (group rows are one disclosure button).
+- **Role Permission Matrix UI vs. real enforcement — two key spaces, reconciled 2026-10-27
+  (P10-08):** `requirePermission()` and `filterMenuByPermissions` (and therefore the sidebar)
+  read permission keys from `shared-menu`'s nested tree (`vendors.branches`, `vendors.deals`,
+  `rbac.users`, `system-settings`, `rbac.audit-logs`, `settings`, `cms.*`, …) — the exact keys
+  `permission-matrix.ts`/`seed.ts` already govern for the 5 non-SuperAdmin roles. The Role
+  Permission Matrix *screen* used to be driven by a separate, flat 14-key catalog
+  (`members`, `branches`, `deals`, ... `my_profile`) built only for `GET /permissions/catalog`/
+  `PUT /roles/:id/permissions`, with only `members`/`orders`/`customers`/`reports` spelled
+  identically in both — every other row (Branches, Deals, Therapists, Products, Content, Staff
+  Users, System Settings, Logs, My Profile) edited a `RolePermission` row no route or the
+  sidebar ever read (confirmed by grepping every `requirePermission(` call site). Fixed by
+  rewiring `RBAC_RESOURCE_CATALOG` (`msd-api/src/modules/rbac/permission-catalog.ts`) onto the
+  real tree: each resource now declares `menuKeys: string[]` (the real governing key(s), not a
+  UI-only label) instead of a single synthetic `key`; `getPermissionCatalog()` upserts/returns a
+  `Permission` row per real `(menuKey, action)` pair and reports `permissionIds: string[]` per
+  UI action (was a singular nullable `permissionId`). `content` is the one resource with several
+  real keys — it aggregates the ~10 real `cms.*` leaves `permission-matrix.ts`'s `CONTENT_GROUP`
+  already grants together (minus `create`/`delete` for the 3 singleton CMS pages, via
+  `unsupportedFor`); the frontend's `allGranted()` only shows a resource's checkbox as checked
+  once every one of its real keys is granted, and toggling it calls `onPermissionToggle` once
+  per real id so the whole group always moves atomically — never a partial grant. `setRolePermissions`
+  needed no change (it already validated a flat `{permissionId, scope}[]`). This is an
+  API-contract change to `GET /permissions/catalog`/`PUT /roles/:id/permissions`'s response/
+  request shape — done with explicit sign-off per CLAUDE.md's stop-before-API-change rule. See
+  TASKS.md P10-08 and `role.service.test.ts` for the regression coverage.
 - **Notifications:** `Notification` rows per recipient user; `notifyPermissionHolders()` targets
   everyone whose roles grant a given permission (never a role name).
 
@@ -66,6 +119,15 @@ notices go out after commit and never undo the change.
 - Storefront visibility: `publicVisibleWhere()` in `services/catalog-visibility.ts` (member
   ACTIVE, branch active, deal ACTIVE and in its date window; therapist and product active) is used
   by every `/catalog` query. The deal approval check is still read until P3-15.
+- **Console-side action gating (`pages/account/members/member-detail-page.tsx`):** each catalog
+  tab computes its own `canEdit`/`canDelete` from that resource's own matrix key —
+  `vendors.branches`, `vendors.deals`, `vendors.therapists`, `vendors.products` — never the
+  Profile/Documents tabs' `members:edit`/`members:delete`. Bug fixed 2026-10-26 (P4-19): the page
+  used to pass the blanket `members:edit`/`members:delete` booleans to every tab, which only
+  produced the right buttons by coincidence (the 5 fixed roles always grant the `members:*` and
+  matching `vendors.*` actions together) — a future per-resource grant edit via the Role
+  Permission Matrix would otherwise have no visible effect. The backend routes were never
+  affected; `vendors.branches.routes.ts` et al. already gate on the correct per-resource key.
 
 ### 2.3 Notices and reminders
 
@@ -236,6 +298,41 @@ category page, explore, deal detail and product detail.
 - **Storefront** (`pages/home/home-hero.tsx`): h1 and search left; right side a Swiper carousel of
   `HeroItemCard` (deal or product) for the visitor's state.
 
+### 7.1 Home tag sections (built 2026-10-28, PLANNING.md §7.1)
+
+`HomeTagSection` (state x tag, `isEnabled`) + `HomeTagSectionItem` (ordered deals, manually picked
+by the admin — never computed); service `home-tag-section.service.ts`; console
+`pages/account/masters/home-tag-sections{,-state,-builder}.tsx`; public
+`GET /catalog/home-tag-sections`.
+
+- **Three admin screens**, deliberately one level deeper than the hero's two: overview (states +
+  Global, `GET /home-tag-sections/overview`) → state page (always all 4 fixed tag rows — New,
+  Deal, Hot Deal, Expire soon — each an Enabled switch upserting `PUT /home-tag-sections/sections`
+  on toggle) → one tag's builder (`home-tag-sections-builder.tsx`, the Home Hero builder's exact
+  ordered-list-plus-`StateItemPicker` layout and CSS, `dealsOnly` so the picker hides the
+  All/Deals/Products filter and shows each candidate's status/discount/`endDate` instead — the tag
+  is the admin's own judgement call, the picker never computes it). Opening a tag that was never
+  enabled lazily creates its (disabled) `HomeTagSection` row so deals can be curated before
+  switching it on.
+- **Eligibility** (`ineligibleReason`) mirrors the hero's deal checks exactly (member active,
+  branch active, deal `ACTIVE`, `approvalStatus APPROVED`), plus one Expire-soon-only rule: the
+  deal needs a future `endDate` — no end date at all is ineligible there too (2026-10-28 decision,
+  no arbitrary day-window). `MIN_ELIGIBLE_ITEMS_PER_TAG_SECTION = 1`, not the hero's 5 — each tag
+  rail is useful with a single deal, and the admin's manual curation is already the quality gate.
+- **Public resolution is per-tag, not per-state** (the hero's one all-or-nothing swap does not
+  apply here): each of the 4 tags is decided on its own — the visitor's state's own row for that
+  tag if one is configured at all (enabled or not, eligible or not — a configured state row never
+  falls back to Global for that tag); otherwise Global/Default's row for the same tag. A tag with
+  nothing eligible anywhere is simply absent.
+- **Storefront** (`pages/home/home-tag-sections.tsx`, placed right after Deals Near You): up to 4
+  independent `PageSection` + `CardRail` rails of `OfferCard`s (no hero-style carousel, every item
+  is a deal), in a fixed order — New, Hot Deal, Deal, Expire soon — deliberately different from the
+  admin screen's row order (New, Deal, Hot Deal, Expire soon).
+- **Shared, additive-only changes**: `state-catalog.service.ts`'s `StateItem`/`searchStateItems`
+  gained optional `status`/`discountPercent`/`endDate` on deal results (Home Hero and Promotions
+  ignore the extra fields, unchanged); `state-item-picker.tsx` gained the `dealsOnly` prop (unset
+  for Home Hero/Promotions, so their rendering is byte-for-byte unchanged).
+
 ## 8. Masters
 
 Categories (`Category`, `CategoryImage`, types `SERVICE | PRODUCT | THERAPY`), popular tags and
@@ -266,8 +363,8 @@ No code yet (no GA4, GTM or `dataLayer` in `apps/msd`).
 | # | Fact | Status |
 |---|---|---|
 | F1 | `PermissionScope {ALL, OWN}` and `RolePermission.scope` exist | done |
-| F2 | Nothing enforces scope (`requirePermission`, resolver, bootstrap have no scope code) | open (P1-04, P2-01, P2-02) |
-| F3 | Seed had 6 roles, no `support`, `'vendor'` hardcoded | done: 7 roles, `lib/role-keys.ts`; `'customer'` literals remain (P1-03) |
+| F2 | Nothing enforces scope (`requirePermission`, resolver, bootstrap have no scope code) | partly (2026-10-23, P1-04/P1-09/P8-08): resolver returns `{key, scope}` (highest-scope-wins), bootstrap returns `scopes`, and `role.service.ts#setRolePermissions` rejects `OWN` for any key without real enforcement code (422) rather than accepting it silently inert. Exactly one key is actually enforced so far — `rbac.audit-logs:view` (`GET /rbac/audit-logs` filters to `actorUserId` when scope is `OWN`). Found 2026-10-26: that enforcement had no effect in practice — nobody but Super Admin had ever been granted `rbac.audit-logs:view` at all, so Admin/Marketing/Sales/Support couldn't reach the Logs screen regardless of scope. Fixed: `seed.ts#LOGS_OWN_SCOPE_ROLES` + `grantOwnScope` now grant it to all four with `scope: 'OWN'` (needs a reseed, see DATABASE.md §1). `requirePermission` itself still does a plain boolean check; per-route `scopedWhere` for the rest of the matrix stays open (P2-01, P2-02, P1-10) |
+| F3 | Seed had 6 roles, no `support`, `'vendor'` hardcoded | done: 7 roles, `lib/role-keys.ts`; `'customer'` literals remain (P1-03). Found 2026-10-23: a stray duplicate entry in seed.ts's `ROLES` array was recreating an empty `Role{key:'vendor'}` on every seed run while `vendor.service.ts#createMember` assigns new Members to `Role{key:'member'}` — meaning every real `member`-keyed grant (`vendor-portal.*`, `vendors:custom`, dashboard widget) was being applied to the wrong, unused role, so a newly created Member had zero permissions. Fixed: duplicate entry removed, `permission-matrix.ts`/`grantStarterPermissions` retargeted to `member`, `user.service.ts`'s staff-exclusion filter and the frontend's `create-user-dialog.tsx#eligibleStaffRoles` / `auth/role-routing.ts#isVendorUser` now check `MEMBER_ROLE_KEYS` (`['member','vendor']`) instead of a bare `'vendor'` literal, and migration `20261023100000_consolidate_member_role` merges any already-created stray `vendor` row's links back onto `member` |
 | F4 | Menu has 36 keys incl. `vendors.*` and `vendor-portal.*` | partly: `vendors` → `members` only (P1-05) |
 | F6 | Member can delete own product | open (C-01) |
 | F7 | Member deals need Super Admin approval | open (C-02, P3-15) |
@@ -278,6 +375,7 @@ No code yet (no GA4, GTM or `dataLayer` in `apps/msd`).
 | F13 | OpenAPI coverage gap | 347 routes, 255 documented, 92 undocumented on 2026-10-17 (`API.md` §0) |
 | F14 | `SupportRequest` (customer contact message) is unrelated to the `support` role | never reuse it for refunds |
 | F15 | Prisma generate, OpenAPI build and unit tests need no Postgres | true |
+| F16 | Admin's matrix cell drifted from PLANNING.md §1.2 on four points; Admin's and Marketing's Masters grants drifted past their `VCE`/`V` cells | fixed 2026-10-26 (`permission-matrix.ts`, `seed.ts` — see DATABASE.md §1 for the reseed step); open findings reported, not fixed: `vendors.deals:approve`/`reject` are vestigial grants from the removed deal-approval gate (D6), tracked separately as P3-15; the refund workflow (`disputes.routes.ts` + `refunds.routes.ts`) doesn't implement PLANNING.md §3's "Support raises a refund request; Admin/Super Admin approves or rejects" two-actor flow at all — see TASKS.md's new row for the exact mismatch |
 
 ### 12.2 Hardening plan
 

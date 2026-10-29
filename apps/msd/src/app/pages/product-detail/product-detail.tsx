@@ -15,6 +15,8 @@ import { Breadcrumb } from '../../components/breadcrumb';
 import { PageSection } from '../../components/page-section/page-section';
 import { formatINR } from '../../../utils/format';
 import { resolveProductMedia, primaryImage } from '../../../utils/media';
+import { htmlToPlainText } from '../../../utils/rich-text';
+import { productPath } from '../../seo/public-urls';
 import content from '../../../content.json';
 import './product-detail.css';
 import { BannerSlot } from '../../components/banner-slot/banner-slot';
@@ -30,7 +32,7 @@ const SITE_URL = (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
  * in a location/hours panel here.
  */
 export function ProductDetail() {
-  const { id = '' } = useParams<{ id: string }>();
+  const { slug: id = '' } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const { token, isAuthenticated } = useAuth();
@@ -41,9 +43,16 @@ export function ProductDetail() {
   const [activeImg, setActiveImg] = useState(0);
   const [qty, setQty] = useState(1);
   const [addError, setAddError] = useState('');
+  const [addedToCart, setAddedToCart] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [addedToCart, setAddedToCart] = useState(false)
+  
   useEffect(() => {
+    // Guards against a slower, now-stale request (a quick back-to-back navigation between two
+    // products, or React StrictMode's dev-only double-invoke) landing after a newer one and
+    // overwriting fresh state with old data — the visible symptom of that race is exactly the
+    // reported "blinking" (content → stale refetch flips loading back on → content again).
+    let cancelled = false;
+
     if (!id) {
       setProduct(null);
       setError(products.detail.errors.invalidProduct);
@@ -54,29 +63,48 @@ export function ProductDetail() {
     setError('');
     setActiveImg(0);
     getCatalogProduct(id)
-      .then(({ data }) => { setProduct(data); })
+      .then(({ data }) => { if (!cancelled) setProduct(data); })
       .catch((err: unknown) => {
+        if (cancelled) return;
+
         if (err instanceof ApiRequestError && err.status === 404) {
           setProduct(null);
           return;
         }
         setError(err instanceof ApiRequestError ? err.message : products.detail.errors.loadProduct,);
       })
-      .finally(() => { setLoading(false); });
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
   useEffect(() => {
+    if (!product) return;
+    const canonical = productPath(product);
+    if (canonical !== location.pathname) navigate(canonical, { replace: true });
+  }, [product, location.pathname, navigate]);
+
+  useEffect(() => {
+    let cancelled = false;
+
     if (!product?.category?.id) {
       setRelated([]);
       return;
     }
     listCatalogProducts({ categoryId: product.category.id, pageSize: 7, })
       .then(({ data }) => {
+        if (cancelled) return;
         setRelated(data
           .filter((item) => item.id !== product.id)
           .slice(0, 6),
         );
       })
-      .catch(() => { setRelated([]); });
+      .catch(() => { if (!cancelled) setRelated([]); });
+
+    return () => {
+      cancelled = true;
+    };
   }, [product]);
   if (loading) {
     return (<p className="loading-state"> {products.detail.loading}</p>);

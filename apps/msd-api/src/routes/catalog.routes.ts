@@ -8,6 +8,8 @@ import * as catalogService from '../services/catalog.service';
 // on why Home Hero's public read is the one deliberate exception to this file's usual pattern.
 import { getPublicHomeHero } from '../services/home-hero.service';
 import { PublicHomeHeroQuerySchema } from '../schemas/home-hero.schema';
+import { getPublicHomeTagSections } from '../services/home-tag-section.service';
+import { PublicHomeTagSectionsQuerySchema } from '../schemas/home-tag-section.schema';
 import { PublicBannerQuerySchema } from '../schemas/promotion.schema';
 import { getPublicBanners } from '../services/promotion.service';
 import { sendData } from '../lib/http';
@@ -62,6 +64,17 @@ router.get('/home-hero', validateQuery(PublicHomeHeroQuerySchema), async (req, r
   try {
     const { state } = req.validatedQuery as ReturnType<typeof PublicHomeHeroQuerySchema.parse>;
     sendData(res, await getPublicHomeHero(state));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** The New/Deal/Hot Deal/Expire soon rails for the visitor's state, each falling back to
+ *  Global/Default independently (PLANNING.md §7.1). */
+router.get('/home-tag-sections', validateQuery(PublicHomeTagSectionsQuerySchema), async (req, res, next) => {
+  try {
+    const { state } = req.validatedQuery as ReturnType<typeof PublicHomeTagSectionsQuerySchema.parse>;
+    sendData(res, await getPublicHomeTagSections(state));
   } catch (err) {
     next(err);
   }
@@ -166,7 +179,7 @@ router.get('/products/facets', validateQuery(CatalogProductFacetQuerySchema), as
 });
 
 
-router.get('/products/:id', validateParams(z.object({ id: z.string().uuid() })), async (req, res, next) => {
+router.get('/products/:id', validateParams(z.object({ id: z.string().min(1) })), async (req, res, next) => {
   try {
     sendData(res, await catalogService.getPublicProductOrThrow(req.params.id));
   } catch (err) {
@@ -212,7 +225,7 @@ router.get('/therapists/facets', validateQuery(CatalogTherapistFacetQuerySchema)
   }
 });
 
-router.get('/therapists/:id', validateParams(z.object({ id: z.string().uuid() })), async (req, res, next) => {
+router.get('/therapists/:id', validateParams(z.object({ id: z.string().min(1) })), async (req, res, next) => {
   try {
     sendData(res, await catalogService.getPublicTherapistOrThrow(req.params.id));
   } catch (err) {

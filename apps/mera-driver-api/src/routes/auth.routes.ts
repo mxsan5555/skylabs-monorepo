@@ -1,3 +1,4 @@
+import { selectPortalContext } from '../services/portal-context';
 import { Router } from 'express';
 import type { Request } from 'express';
 import { authenticate } from '../middleware/authenticate';
@@ -18,6 +19,7 @@ import {
   upsertUserByIdentifier,
   upsertUserFromGoogle,
   getRoleKeysForUser,
+  ensureCustomerProfile,
   recordLoginHistory,
   touchLastLogin,
   loginMethodForIdentifier,
@@ -65,11 +67,15 @@ router.post('/otp/verify', validateBody(OtpVerifySchema), async (req, res, next)
 
   try {
     await verifyOtp(identifier, purpose, otp);
-    const user = await upsertUserByIdentifier(identifier);
+    const requestedPortal = req.body?.portalContext;
+    const user = requestedPortal === 'driver' || requestedPortal === 'staff' ? await findUserWithPasswordByIdentifier(identifier) : await upsertUserByIdentifier(identifier);
+    if (!user) throw new HttpError(403, 'PORTAL_NOT_ACTIVATED', 'Your portal login has not been activated. Contact the team.');
+    if (user.status && user.status !== 'active') throw new HttpError(403, 'ACCOUNT_INACTIVE', 'Your login account is inactive. Contact support.');
     await assertDriverAccountActive(user.id);
     await assertCustomerAccountActive(user.id);
     const roles = await getRoleKeysForUser(user.id);
-    const tokens = await issueTokenPair(user.id, roles, requestMeta(req));
+    if (selectPortalContext(roles, req.body?.portalContext) === 'customer') await ensureCustomerProfile(user);
+    const tokens = await issueTokenPair(user.id, roles, requestMeta(req), req.body?.portalContext);
 
     await touchLastLogin(user.id);
     await recordLoginHistory(user.id, method, true, requestMeta(req));
@@ -77,7 +83,7 @@ router.post('/otp/verify', validateBody(OtpVerifySchema), async (req, res, next)
     res.json({ data: { ...tokens, user: toPublicUser(user, roles) }, error: null });
   } catch (err) {
     if (err instanceof HttpError) {
-      const existing = await upsertUserByIdentifier(identifier).catch(() => null);
+      const existing = await findUserWithPasswordByIdentifier(identifier).catch(() => null);
       if (existing) {
         await recordLoginHistory(existing.id, method, false, requestMeta(req)).catch(() => undefined);
       }
@@ -109,7 +115,8 @@ router.get(
       await assertDriverAccountActive(user.id);
       await assertCustomerAccountActive(user.id);
       const roles = await getRoleKeysForUser(user.id);
-      const tokens = await issueTokenPair(user.id, roles, requestMeta(req));
+      if (selectPortalContext(roles, req.body?.portalContext) === 'customer') await ensureCustomerProfile(user);
+      const tokens = await issueTokenPair(user.id, roles, requestMeta(req), req.body?.portalContext);
 
       await touchLastLogin(user.id);
       await recordLoginHistory(user.id, 'google', true, requestMeta(req));
@@ -188,7 +195,8 @@ router.post('/password/login', validateBody(PasswordLoginSchema), async (req, re
     }
 
     const roles = await getRoleKeysForUser(user.id);
-    const tokens = await issueTokenPair(user.id, roles, requestMeta(req));
+    if (selectPortalContext(roles, req.body?.portalContext) === 'customer') await ensureCustomerProfile(user);
+    const tokens = await issueTokenPair(user.id, roles, requestMeta(req), req.body?.portalContext);
 
     await touchLastLogin(user.id);
     await recordLoginHistory(user.id, 'password', true, requestMeta(req));

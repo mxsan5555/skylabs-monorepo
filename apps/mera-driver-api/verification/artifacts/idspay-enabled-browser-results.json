@@ -1,0 +1,11 @@
+{
+  "requestContractEnabled": true,
+  "reviewerButtonBlockedBeforeConsent": true,
+  "selectedDriverId": "a08a1605-4bd1-4962-a4c6-d9e6e89edfca",
+  "loginLinked": false,
+  "applicationHttpStatus": 412,
+  "errorCode": "DL_CONSENT_REQUIRED",
+  "providerRequestSent": false,
+  "existingRecordUnchanged": true,
+  "liveVerification": "blocked by absent consent on selected saved driver; owner login and genuine consent required"
+}

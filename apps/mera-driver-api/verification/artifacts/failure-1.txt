@@ -1,0 +1,83 @@
+directions_car
+mera-driver
+Driver console
+dashboard
+Dashboard
+fact_check
+KYC Assignments
+L
+Local UI verification fixture
+person
+logout
+dock_to_right
+Account
+KYC Assignments
+Review KYC — Corrected Driver undefined
+
+Review each submitted field and document in its onboarding pill.
+
+arrow_back
+Back to Assigned KYC Queue
+
+In review · 0/47 checked · 0 issues
+
+Driving License Details
+
+Pill incomplete · 0/5 checked
+
+License Details
+
+Not provided
+
+Pending
+
+Pass
+Issue
+Vehicle Type
+
+Not provided
+
+Pending
+
+Pass
+Issue
+Dl No
+
+DL1420110012345
+
+Pending
+
+Pass
+Issue
+Dl Issue Date
+
+Not provided
+
+Pending
+
+Pass
+Issue
+Dl Expiry Date
+
+2099-01-01
+
+Pending
+
+Pass
+Issue
+Licence API verification · Manual review required
+
+Live IDSPay verification is disabled: exact srv2 response samples and their provenance, HTTP method, required headers and token expiry/refresh behavior must be confirmed. Parsing remains fail-closed and separate from final human KYC approval.
+
+DOB: 1990-02-01 · Consent: Recorded for this saved licence and DOB 2026-10-01T08:04:07.227Z
+
+Verify DL · unavailable
+
+2026-10-01T08:04:07.339Z · driver.dl.preflight · Initiator 3509d3ff-35d4-4b3f-9dcf-83d38ae55cc7
+Manual review required ? IDSPAY_CONTRACT_UNCONFIRMED ? No provider call
+
+2026-10-01T08:04:07.227Z · driver.dl.consent · Initiator e9f906b1-f5e6-4ab4-8626-dafdc5997a55
+Consent recorded
+
+All documents & previous versions (1)
+Review history (1)

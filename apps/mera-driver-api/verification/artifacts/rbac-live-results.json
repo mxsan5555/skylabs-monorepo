@@ -1,0 +1,32 @@
+{
+  "mode": "Running UI and isolated production API, real database, real password login for newly created fixture only; existing Super Admin signed fixture",
+  "results": [
+    "Existing direct-grant conflicts inspected: 1",
+    "Super Admin selected and highlighted on initial entry",
+    "Add Role creates, selects and loads a zero-grant custom role",
+    "Duplicate validation works in the form and API",
+    "Real password login and scoped customer creation use the assigned custom role",
+    "View-only save persists; Create/Edit/Delete APIs return 403 and preserve records",
+    "Customer View-only UI retains the list and hides all mutation controls",
+    "Edit alone restores the already-open UI and same-token update API",
+    "Edit revocation removes controls in an open session and immediately denies its API",
+    "Revoked checkboxes remain revoked after reload and a fresh password login",
+    "Edit Role preserves stable key, permission IDs and user assignments",
+    "New roles appear in the single-role dropdown; switching removes previous access with an old token and redirects an open page",
+    "A direct unauthorized page URL is denied",
+    "All built-in roles, grants and user links remain unchanged"
+  ],
+  "fixtures": {
+    "roles": [
+      "1fc32302-ac1d-4d54-a594-f710a8ea517e",
+      "1fef8863-11da-4f07-96ad-0e3ae04a02ac"
+    ],
+    "users": [
+      "932f3aa2-d132-44ff-a52f-5468885af3e5"
+    ],
+    "customers": [
+      "359f79c8-c590-4991-a4cc-85ad09f2590d"
+    ]
+  },
+  "cleanup": "Verification roles/users/customers retained inactive; no records deleted and no built-in grants changed"
+}

@@ -133,8 +133,9 @@ describe('createVendor — double-submit guard scoping (regression: two differen
   const ROLE_FIXTURE = { id: VENDOR_ROLE_ID, key: 'member' };
 
   /** Arms every downstream call `createVendor` makes once its own double-submit guard clears —
-   *  `createVendorOwner`'s email/phone availability check, the new User insert, `assignRole`'s
-   *  own `getUserOrThrow` + role grant, and `buildAndInsertVendor`'s slug-uniqueness check +
+   *  `createVendorOwner`'s email/phone availability check, the new User insert,
+   *  `ensureVendorRoleAssigned`'s own `replaceUserRole` transaction (deleteMany + create + the
+   *  user update that clears `roleConflict`), and `buildAndInsertVendor`'s slug-uniqueness check +
    *  insert. Keyed off `where.id` (only `getUserOrThrow` queries by id) so the same
    *  `user.findFirst` mock correctly serves both callers regardless of call order. */
   function armDownstreamSuccess(newUserId: string, vendorRow: { id: string; ownerEmail?: string }) {
@@ -256,6 +257,7 @@ describe('createTherapist — no category grants (D10)', () => {
   it('creates the therapist on a branch with no category mapping at all', async () => {
     prismaMock.branch.findUnique.mockResolvedValue(branchFixture());
     prismaMock.therapist.findFirst.mockResolvedValue(null);
+    prismaMock.therapist.findUnique.mockResolvedValue(null as never); // slug uniqueness check
     prismaMock.therapist.create.mockResolvedValue({ id: 'th-1' });
 
     const result = await createTherapist(VENDOR_ID, BRANCH_ID, { therapistType: 'Physio', personName: 'Alex' });

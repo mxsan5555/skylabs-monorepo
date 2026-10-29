@@ -193,6 +193,11 @@ input[type='checkbox'] {
   margin-bottom: 24px;
 }
 
+.member-avatar {
+  width: 56px;
+  flex-shrink: 0;
+}
+
 .page-head h1 {
   margin: 0;
   font-size: 1.5rem;
@@ -380,6 +385,12 @@ a.dashboard-stat:focus-visible {
   grid-template-columns: 7fr 3fr;
   gap: 20px;
   align-items: start;
+}
+
+/* Order Details' Customer | Payment Summary row — same grid/stacking mechanism as
+   `.summary-layout` above, just equal-width columns instead of 7:3. */
+.summary-layout--balanced {
+  grid-template-columns: 1fr 1fr;
 }
 
 .panel {
@@ -675,6 +686,19 @@ a.dashboard-stat:focus-visible {
   white-space: nowrap;
 }
 
+/* Role Permission Matrix (roles/permission-matrix.tsx): a cell whose checkbox/scope differs
+   from the role's last-persisted grant, so an edit is visible before Save is clicked. */
+.perm-matrix__cell--dirty {
+  background-color: var(--md-sys-color-tertiary-container, #ffd8c2);
+  border-radius: 8px;
+}
+
+/* An action this resource does not define at all (e.g. Orders has no Create) — distinct from
+   an unchecked but grantable action. */
+.perm-matrix__cell--na {
+  color: var(--md-sys-color-outline, #767a7c);
+}
+
 .widget-assign-row {
   display: flex;
   align-items: center;
@@ -901,12 +925,40 @@ a.dashboard-stat:focus-visible {
   font-size: 0.7rem;
 }
 
+/* The checkmark rendered inside `.wizard-steps__num` for a completed step (Voucher Verification
+   page) — sized to fit the 22px circle, same way the step number itself fits. */
+.wizard-steps__num md-icon {
+  --md-icon-size: 16px;
+}
+
 .wizard-steps__item[aria-current='step'] .wizard-steps__num {
   background-color: var(--md-sys-color-primary);
   color: var(--md-sys-color-on-primary);
 }
 
-/* Checkbox grid for the console forms (e.g. the deal form's therapist picker). */
+.wizard-steps__item--done .wizard-steps__num {
+  background-color: var(--md-sys-color-primary-container, #cee5ff);
+}
+
+/* Voucher Code lookup row (Member Orders page, Verify & Complete tab) — a text field that grows
+   plus a content-sized button that never stretches full-width, same "label above, field + button
+   in one row" shape as the old Verify Purchase panel, just not forced into `.form-grid`'s
+   even-column grid (which would stretch the button too). */
+.voucher-lookup-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.voucher-lookup-row md-outlined-text-field {
+  flex: 1;
+  min-width: 220px;
+}
+
+/* Category Access grant grid (vendor-wizard-modules.tsx) — one checkbox list per enabled
+   business module. */
 .category-grant-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

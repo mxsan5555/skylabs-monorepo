@@ -30,7 +30,7 @@ const d = content.detailPage;
  * `therapistId` + `therapistPackageId`), never through a Deal.
  */
 export function TherapistDetail() {
-  const { id = '' } = useParams<{ id: string }>();
+  const { slug: id = '' } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { token } = useAuth();
   const requireSignIn = useRequireSignIn();
@@ -42,13 +42,17 @@ export function TherapistDetail() {
   const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
+    // Guards against a slower, now-stale request landing after a newer one and overwriting
+    // fresh state with old data (see ProductDetail's/DealDetail's identical comment).
+    let cancelled = false;
+
     if (!id) {
       setTherapist(null);
       setError(t.errors.invalid);
       setLoading(false);
       return;
     }
-    let cancelled = false;
+  
     setLoading(true);
     setError('');
     getCatalogTherapist(id)

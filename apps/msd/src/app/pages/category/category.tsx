@@ -34,6 +34,7 @@ import { CATEGORY_PAGE_SIZE, type CategoryData } from '../../../prerender-data/l
 import { Seo } from '../../seo/seo';
 import { breadcrumbJsonLd } from '../../seo/jsonld';
 import { SITE_URL } from '../../seo/site-url';
+import { dealPath, productPath, therapistPath } from '../../seo/public-urls';
 import content from '../../../content.json';
 import { BannerSlot } from '../../components/banner-slot/banner-slot';
 const t = content.category;

@@ -166,6 +166,66 @@
     "order": 7
   },
   {
+    "id": "business-payment",
+    "title": "Payments",
+    "icon": "payments",
+    "route": "/account/vendor-payments",
+    "permissionKey": "vendor-portal.payments",
+    "parent": "business",
+    "order": 8
+  },
+  {
+    "id": "business-report",
+    "title": "Reports",
+    "icon": "assessment",
+    "route": "/account/vendor-reports",
+    "permissionKey": "vendor-portal.reports",
+    "parent": "business",
+    "order": 9
+  },
+  {
+    "id": "accounts",
+    "title": "Accounts",
+    "icon": "account_balance_wallet",
+    "permissionKey": "accounts.group",
+    "parent": null,
+    "order": 5,
+    "children": [
+      {
+        "id": "accounts-overview",
+        "title": "Overview",
+        "route": "/account/accounts/overview",
+        "permissionKey": "accounts.overview",
+        "parent": "accounts",
+        "order": 1
+      },
+      {
+        "id": "accounts-customer-payments",
+        "title": "Customer Payments",
+        "route": "/account/accounts/customer-payments",
+        "permissionKey": "accounts.customer-payments",
+        "parent": "accounts",
+        "order": 2
+      },
+      {
+        "id": "accounts-member-settlements",
+        "title": "Member Settlements",
+        "route": "/account/accounts/member-settlements",
+        "permissionKey": "accounts.member-settlements",
+        "parent": "accounts",
+        "order": 3
+      },
+      {
+        "id": "accounts-refunds-disputes",
+        "title": "Refunds & Disputes",
+        "route": "/account/accounts/refunds-disputes",
+        "permissionKey": "accounts.refunds-disputes",
+        "parent": "accounts",
+        "order": 4
+      }
+    ]
+  },
+  {
     "id": "customers",
     "title": "Customers",
     "icon": "group",
@@ -183,7 +243,7 @@
       },
       {
         "id": "customer-orders",
-        "title": "Order Hitory",
+        "title": "Order History",
         "route": "/account/orders",
         "permissionKey": "orders",
         "parent": "customers",
@@ -384,6 +444,14 @@
         "permissionKey": "masters.home-hero",
         "parent": "masters",
         "order": 5
+      },
+      {
+        "id": "masters-home-tag-sections",
+        "title": "Home Tag Sections",
+        "route": "/account/masters/home-tag-sections",
+        "permissionKey": "masters.home-tag-sections",
+        "parent": "masters",
+        "order": 6
       }
     ]
   },
@@ -402,6 +470,14 @@
         "permissionKey": "settings",
         "parent": "settings",
         "order": 1
+      },
+      {
+        "id": "settings-system",
+        "title": "System Settings",
+        "route": "/account/system-settings",
+        "permissionKey": "system-settings",
+        "parent": "settings",
+        "order": 2
       }
     ]
   }

@@ -48,11 +48,58 @@ PostgreSQL database `msd`, schema `apps/msd-api/prisma/schema.prisma` (68 models
 | LoginHistory | 8 | user -> User | index(userId) |
 | ImpersonationSession | 7 | superAdmin -> User; target -> User | index(superAdminUserId); index(targetUserId) |
 
-- `RolePermission.scope` (`ALL` | `OWN`, default `ALL`) is stored but not enforced yet (F2).
+- `RolePermission.scope` (`ALL` | `OWN`, default `ALL`) is resolved end to end since 2026-10-23
+  (`permission-resolver.service.ts`, `GET /rbac/bootstrap`) but only actually enforced by a route
+  for one key so far, `rbac.audit-logs:view` (F2); `setRolePermissions` rejects `scope: 'OWN'`
+  for every other key (422) rather than letting it sit silently inert.
+- Migration `20261023100000_consolidate_member_role` (2026-10-23, data-only, no column/table
+  change): merges a stray duplicate `Role{key:'vendor'}` row — recreated on every seed run by a
+  since-removed duplicate entry in `seed.ts`'s `ROLES` array — back onto the canonical
+  `Role{key:'member'}` row (`UserRole`/`RolePermission` links moved, `ON CONFLICT DO NOTHING`;
+  no-op if no `vendor` row exists). See F3. **Confirmed still unapplied on the local dev DB as of
+  2026-10-27** (`npx prisma migrate status`: "have not yet been applied"); not run this session
+  (no explicit confirmation to mutate the dev database) — run `npx prisma migrate deploy` (or
+  `migrate dev`) before relying on this cleanup locally. The same status check also reported one
+  migration present in the database's `_prisma_migrations` table but absent from this repo's
+  `prisma/migrations/` folder, `20260824092433_add_cms_module` — not investigated further this
+  session; worth confirming it's an intentional squash/rename and not a dropped migration file
+  before the next deploy.
+- **2026-10-26, seed data only — no schema change, no migration — needs a reseed to reach any
+  already-provisioned database.** Audited every `RolePermission` cell the matrix governs against
+  PLANNING.md §1.2 and fixed four discrepancies: Admin was missing `orders:status_change`,
+  `customers:status_change` and `reports:export` (each an Extra Actions table grant with a real
+  backing route — Admin genuinely could not cancel an order, block a customer, or export a report)
+  and held `system-settings:edit`, which §1.3 rule 3 reserves for Super Admin only (the row is
+  `V A`). Separately, Admin's and Marketing's Masters grants (an ungoverned, additive-only
+  `grant()` call that can only ever add permissions, never retract a drifted one) had grown past
+  what the `VCE`/`V` cells allow — Admin held delete on every Masters sub-resource, Marketing held
+  create/edit on some and full CRUD on others. Fixed by converting those roles' starter grants to
+  the same exact-state `resetGrant` `member` already used, and by granting `rbac.audit-logs:view`
+  (`scope: 'OWN'`) to Admin/Marketing/Sales/Support for the first time — the own-scope
+  *enforcement* code has existed since 2026-10-23, but nobody but Super Admin had ever actually
+  been granted the permission, so the Logs screen was unreachable for every other staff role
+  regardless. **Run `npm run msd-api:prisma:seed` against each environment to apply** (idempotent,
+  additive where safe, exact-reset only for the specific roles/keys named above — no destructive
+  operation, not run as part of this change).
+  **Re-verified 2026-10-26, still not applied**: a read-only query against the live dev database
+  (admin/marketing/sales/support `RolePermission` rows, deleted after use) confirmed all four
+  discrepancies above are still present exactly as seeded before the 2026-10-23 fix — `admin` still
+  holds `system-settings:edit` and full Masters delete, still missing `orders:status_change`/
+  `customers:status_change`/`reports:export`; no role holds `rbac.audit-logs:view` at all. The
+  reseed is still outstanding; this pass did not and must not run it (sandbox policy treats
+  `prisma db seed` against this DB as a shared-database operation requiring the user to run it).
+  Separately (code-only, no seed data involved): `PUT /rbac/roles/:id/permissions` was found not
+  calling `invalidatePermissionCache()`, unlike the role delete/status-change routes — so even
+  *after* a reseed (or any future Role Permission Matrix save), an already-signed-in holder of the
+  edited role could keep resolving the pre-save grants for up to `CACHE_TTL_MS` (30s). Fixed — see
+  TASKS.md P2-05.
 - `Notification.recipientType` is `SUPERADMIN | VENDOR`; staff notifications use `SUPERADMIN` until
   P4-09 renames it to `ADMIN | MEMBER`.
 - `AuditLog.actorUserId` is a required foreign key to `User`, so only actions by a person are
   audited.
+- `RefreshSession` stores only the refresh-token hash plus user, creation, expiry and revocation
+  metadata. Rotation carries the original `createdAt` forward to enforce the 90-day absolute
+  lifetime; no schema migration is required.
 
 ## 2. Members
 
@@ -210,6 +257,32 @@ Migration `20261018100000_state_sliders_banners` (with `down.sql`):
 Same migration: `dealId` becomes nullable; `productId` text null FK -> Product (cascade); CHECK
 `home_hero_slide_one_item`: exactly one of `dealId`, `productId` is set. Duplicate items in one
 slider are refused by the service (409), not a unique index, because `state` is nullable.
+
+### 7.1 Home tag sections (migration `20261028100000_home_tag_sections`, built)
+
+| Model (table) | Columns | Relations | Unique / indexes |
+|---|---|---|---|
+| HomeTagSection | 6 | items -> HomeTagSectionItem[] | `@@unique([state, tag])`; index(state); index(tag) |
+| HomeTagSectionItem | 5 | section -> HomeTagSection (cascade); deal -> Deal (cascade) | `@@unique([homeTagSectionId, dealId])`; index(homeTagSectionId); index(dealId); index(sortOrder) |
+
+`HomeTagSectionTag` enum: `NEW`, `DEAL`, `HOT_DEAL`, `EXPIRE_SOON`. `Deal` gained a sibling
+`homeTagSectionItems -> HomeTagSectionItem[]` relation (same migration, no new column on `Deal`
+itself — only the join table's `dealId` FK).
+
+Postgres treats every NULL as distinct, so `@@unique([state, tag])` alone would silently allow
+several Global (`state: null`) rows for the same tag. The migration additionally hand-writes two
+partial unique indexes that are the real NULL-safe constraint (the plain index above is kept only
+for Prisma Client's own typed `upsert`/`findUnique` ergonomics):
+
+```sql
+CREATE UNIQUE INDEX "home_tag_section_global_tag_unique" ON "HomeTagSection"("tag") WHERE "state" IS NULL;
+CREATE UNIQUE INDEX "home_tag_section_state_tag_unique" ON "HomeTagSection"("state", "tag") WHERE "state" IS NOT NULL;
+```
+
+`down.sql` provided and rehearsed this session (ran once, re-applied the corrected migration —
+see TASKS.md). Seed (`masters.home-tag-sections` added to `MASTERS_SUB_KEYS`/
+`EXTRA_ACTIONS_BY_MENU_KEY`) re-run locally; idempotent, additive only (255 Permission rows, was
+251).
 
 ## 8. Masters
 

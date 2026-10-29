@@ -138,7 +138,7 @@ export function DealsListPage({ token, vendorId, canEdit, canDelete }: DealsList
         </p>
       ) : !loading && deals.length === 0 ? (
         <p className="empty-state">No deals yet. Add one for a branch.</p>
-      ) : (
+      ) : !loading && error ? null : (
         <sky-data-table
           ref={tableRef as RefObject<HTMLElement>}
           caption="Deals"

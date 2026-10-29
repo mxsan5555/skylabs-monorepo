@@ -38,7 +38,7 @@ silently ships the bare SPA); preview and local builds fall back to the SPA. Red
 | `OTP_IDENTIFIER_RATE_LIMIT_PER_HOUR` | `10` (OTP sends per phone or email per hour, any IP) | |
 | `TRUST_PROXY_HOPS` | `1` on Railway (one proxy); leave unset locally | |
 | `API_DOCS` | unset (Swagger `/docs` off in production); `true` only to open it temporarily | |
-| `CORS_ORIGIN` | exact Vercel origins, comma-separated | |
+| `CORS_ORIGIN` | exact trusted frontend origins, comma-separated; no wildcards | |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth client id / secret | 🔒 (secret) |
 | `GOOGLE_CALLBACK_URL` | `https://<msd-api-railway-domain>/api/v1/auth/google/callback` | |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` | e.g. `smtp.gmail.com` / `587` / `false` / Gmail address | |
@@ -60,6 +60,14 @@ silently ships the bare SPA); preview and local builds fall back to the SPA. Red
 `SUPERADMIN_PHONE` (or `SUPERADMIN_EMAIL`) is read only by the seed script, from `.env.local`.
 SMTP, SMS, Razorpay and R2 are checked on first use, so the API boots without them; that feature
 just fails until its group is filled.
+
+The auth API contract and frontend must be deployed as one coordinated release. Users with only
+the previous localStorage refresh token will need to sign in once; refresh tokens are not migrated
+from JavaScript storage. In production, the refresh cookie is `Secure; HttpOnly; SameSite=None`
+and credentialed requests require the exact `CORS_ORIGIN`. Browsers may block third-party cookies
+when the API remains on a Railway hostname; use a same-site custom API host (for example,
+`api.myspadeal.in` alongside the frontend domain) or a same-origin proxy in that case. No schema
+migration or new environment variable is required; configure the existing `CORS_ORIGIN` values.
 
 ## 3. Scheduled job: member document reminders
 

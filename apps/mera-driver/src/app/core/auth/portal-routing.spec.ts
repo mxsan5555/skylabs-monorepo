@@ -1,0 +1,11 @@
+import {describe,it,expect} from 'vitest';
+import type {BootstrapResponse} from '@skylabs-monorepo/shared-types';
+import {authorizedReturn,portalContext,portalDashboard} from './portal-routing';
+const profile=(context:string,extra:object={})=>({roles:[{key:context}],permissions:[],menu:[],customer:context==='customer'?{id:'own'}:null,driver:context==='driver'?{id:'own'}:null,portalContext:context,...extra} as unknown as BootstrapResponse);
+it.each(['customer','driver'])('returns %s dashboard from authenticated context',context=>{expect(portalDashboard(profile(context))).toBe('/'+context);});
+it('uses signed customer context on a multi-role account',()=>{const p=profile('customer',{roles:[{key:'super_admin'},{key:'customer'},{key:'driver'}],driver:{id:'d'}});expect(portalContext(p)).toBe('customer');expect(authorizedReturn(p,'/account/accounts/overview')).toBe('/customer');});
+it.each(['https://example.com','//example.com','/\\example.com','/%2f%2fevil','/customer/../account/dashboard','/%ZZ','/customer/%00','/account/dispatch','/driver','/customer/not-a-real-page'])('rejects unsafe or unauthorized customer return %s',url=>{expect(authorizedReturn(profile('customer'),url)).toBe('/customer');});
+it('preserves an existing customer booking return URL with query',()=>{expect(authorizedReturn(profile('customer'),'/customer/bookings?booking=owned')).toBe('/customer/bookings?booking=owned');});
+it('preserves an existing driver onboarding pill return',()=>{expect(authorizedReturn(profile('driver'),'/driver/profile?tab=2&pill=1')).toBe('/driver/profile?tab=2&pill=1');});
+it('preserves staff returns only under authorized menu routes',()=>{const p=profile('staff',{roles:[{key:'staff'}],permissions:['drivers:view'],menu:[{route:'/drivers'}]});expect(authorizedReturn(p,'/account/drivers/owned')).toBe('/account/drivers/owned');expect(authorizedReturn(p,'/account/administration/roles')).not.toBe('/account/administration/roles');});
+it('does not fall back to admin for an absent role/profile link or failed bootstrap',()=>{expect(portalDashboard(profile('driver',{driver:null}))).toBe('/unauthorized');expect(portalDashboard(profile('customer',{customer:null}))).toBe('/unauthorized');expect(portalDashboard(null)).toBe('/unauthorized');});

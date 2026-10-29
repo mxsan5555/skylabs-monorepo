@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { PaginationQuerySchema } from './common.schema';
+import { PaginationQuerySchema, richTextField } from './common.schema';
 import { normalizeIdentifier } from '../lib/normalizeIdentifier';
 import { isIndiaLocation } from '@skylabs-monorepo/shared-utils';
 
@@ -39,6 +39,12 @@ export const VendorIdParamSchema = z.object({
   vendorId: z.string().uuid(),
 });
 
+/** Route param for the member-scoped `/me/customers/:customerId` lookup — same shape as
+ *  `UuidParamSchema`, just keyed `customerId` to match the param name. */
+export const VendorCustomerIdParamSchema = z.object({
+  customerId: z.string().uuid(),
+});
+
 /** Route param for the real KYC file-upload endpoints — `:documentType` must be one of the
  *  three real `VendorDocumentType` enum values (see schema.prisma), never a free-text label
  *  like the deprecated `kycDocuments` JSON blob's `type` field. */
@@ -75,6 +81,9 @@ const slugString = z
   .min(2)
   .max(160)
   .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'slug must be lower-kebab-case');
+
+const plainItems = (maxItems: number, maxLength: number) =>
+  z.array(z.string().trim().min(1).max(maxLength)).max(maxItems);
 
 const kycDocumentSchema = z.object({
   type: z.string().min(1).max(80),
@@ -221,6 +230,31 @@ export const MemberCreateSchema = z
   .strict()
   .openapi('MemberCreate');
 
+export const VendorApplicationCreateSchema = z
+  .object({
+    businessName: z.string().trim().min(1).max(200),
+    businessEmail: z.string().trim().email().max(254),
+    businessPhone: z
+      .string()
+      .max(30)
+      .transform((v) => normalizeIdentifier(v))
+      .refine((v) => INDIA_MOBILE_REGEX.test(v), { message: 'Enter a valid 10-digit mobile number' }),
+    ownerFirstName: z.string().trim().min(1).max(75),
+    ownerLastName: z.string().trim().min(1).max(75),
+    ownerEmail: z.string().trim().email().max(254),
+    ownerMobile: z
+      .string()
+      .max(30)
+      .transform((v) => normalizeIdentifier(v))
+      .refine((v) => INDIA_MOBILE_REGEX.test(v), { message: 'Enter a valid 10-digit mobile number' }),
+    address: z.string().trim().min(1).max(500),
+    city: z.string().trim().min(1).max(100),
+    state: z.string().trim().min(1).max(100),
+    pincode: z.string().trim().refine((v) => PINCODE_REGEX.test(v), { message: 'Enter a valid 6-digit pincode' }),
+  })
+  .strict()
+  .openapi('VendorApplicationCreate');
+
 export const MemberStatusChangeSchema = z
   .object({
     status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']),
@@ -334,7 +368,7 @@ const TherapistFieldsSchema = z.object({
    *  subcategories) that this vendor has been granted access to; validated in
    *  vendor.service.ts via assertVendorHasCategoryAccess. */
   specializationCategoryId: z.string().uuid().optional(),
-  bio: z.string().max(2000).optional(),
+  bio: richTextField(2000),
   experienceYears: z.number().int().min(0).max(60).optional(),
   /** URL only — matches Vendor.logoUrl/Deal.images' existing validation in this file; no
    *  upload pipeline exists yet. */
@@ -376,8 +410,6 @@ export const TherapistPackageUpdateSchema = TherapistPackageFieldsSchema
 // ─── Deal (docs/msd/PLANNING.md §2.7, API.md §2.1) ──────────────────────────
 // Prices, discount and duration are never accepted: the server derives them from the cheapest
 // active package. `.strict()` turns any other key (status, notes, policy, salePrice, ...) into 422.
-
-const plainItems = (maxItems: number, maxLength: number) => z.array(z.string().trim().min(1).max(maxLength)).max(maxItems);
 
 const DealFaqInputSchema = z
   .object({

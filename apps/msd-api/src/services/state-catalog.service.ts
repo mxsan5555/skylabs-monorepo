@@ -20,6 +20,12 @@ export interface StateItem {
   image: string | null;
   /** Visible to customers right now (same bar as the storefront). */
   eligible: boolean;
+  /** Deals only — lets a picker that needs to judge a candidate itself (Home Tag Sections'
+   *  Expire soon section) show status/discount/expiry without a second lookup. Always undefined
+   *  for a product. */
+  status?: string;
+  discountPercent?: number | null;
+  endDate?: string | null;
 }
 
 export function dealInStateWhere(state: string | null): Prisma.DealWhereInput {
@@ -65,6 +71,9 @@ export async function searchStateItems(opts: {
             title: true,
             salePrice: true,
             status: true,
+            approvalStatus: true,
+            discountPercent: true,
+            endDate: true,
             vendor: { select: { businessName: true, status: true } },
             branch: { select: { name: true, isActive: true } },
             mediaImages: PRIMARY_IMAGE,
@@ -99,11 +108,15 @@ export async function searchStateItems(opts: {
         type: 'deal',
         id: d.id,
         title: d.title,
-        memberName: d.vendor.businessName,
+        memberName: d.vendor.businessName ?? '',
         branchName: d.branch.name,
         price: String(d.salePrice),
         image: d.mediaImages[0]?.storageKey ?? null,
-        eligible: d.status === 'ACTIVE' && d.vendor.status === 'ACTIVE' && d.branch.isActive,
+        eligible:
+          d.status === 'ACTIVE' && d.approvalStatus === 'APPROVED' && d.vendor.status === 'ACTIVE' && d.branch.isActive,
+        status: d.status,
+        discountPercent: d.discountPercent,
+        endDate: d.endDate?.toISOString() ?? null,
       }),
     ),
     ...products.map(
@@ -111,7 +124,7 @@ export async function searchStateItems(opts: {
         type: 'product',
         id: p.id,
         title: p.name,
-        memberName: p.vendor.businessName,
+        memberName: p.vendor.businessName ?? '',
         branchName: null,
         price: String(p.price),
         image: p.mediaImages[0]?.storageKey ?? p.image ?? null,

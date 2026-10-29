@@ -333,6 +333,8 @@ export function VendorProfileForm({
   const show = (section: VendorFormSection) =>
     sections.includes(section);
 
+  const ownerMobileStripped = stripIndiaPrefix(form.ownerMobile ?? '');
+
   const showKyc = show('kyc');
   const vendorId = vendor?.id ?? null;
 
@@ -609,6 +611,20 @@ export function VendorProfileForm({
                 </p>
               )}
             </div>
+
+            {ownerMobileStripped && (
+              <label className="category-grant-grid__option">
+                <input
+                  type="checkbox"
+                  checked={form.businessPhone === ownerMobileStripped}
+                  disabled={!canEdit}
+                  onChange={(e) => {
+                    if (e.target.checked) set('businessPhone', ownerMobileStripped as never);
+                  }}
+                />
+                Business phone same as owner mobile
+              </label>
+            )}
           </div>
         </sky-tile-card>
       )}

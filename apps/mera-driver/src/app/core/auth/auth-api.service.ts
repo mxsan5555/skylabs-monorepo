@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import type { ApiEnvelope } from '@skylabs-monorepo/shared-types';
+import type { PortalContext } from './portal-routing';
 import { environment } from '../../../environments/environment';
 
 export type OtpPurpose = 'login' | 'signup' | 'change_phone' | 'change_email';
@@ -32,9 +33,9 @@ export class AuthApiService {
       .pipe(map(unwrap));
   }
 
-  verifyOtp(identifier: string, otp: string, purpose: OtpPurpose = 'login'): Observable<OtpVerifyResult> {
+  verifyOtp(identifier: string, otp: string, purpose: OtpPurpose = 'login', portalContext?: PortalContext): Observable<OtpVerifyResult> {
     return this.http
-      .post<ApiEnvelope<OtpVerifyResult>>(`${this.base}/otp/verify`, { identifier, otp, purpose })
+      .post<ApiEnvelope<OtpVerifyResult>>(`${this.base}/otp/verify`, { identifier, otp, purpose, portalContext })
       .pipe(map(unwrap));
   }
 
@@ -47,9 +48,9 @@ export class AuthApiService {
   // Password auth — additive alongside OTP/Google, same token/user response shape.
   // -------------------------------------------------------------------------
 
-  loginWithPassword(identifier: string, password: string): Observable<OtpVerifyResult> {
+  loginWithPassword(identifier: string, password: string, portalContext?: PortalContext): Observable<OtpVerifyResult> {
     return this.http
-      .post<ApiEnvelope<OtpVerifyResult>>(`${this.base}/password/login`, { identifier, password })
+      .post<ApiEnvelope<OtpVerifyResult>>(`${this.base}/password/login`, { identifier, password, portalContext })
       .pipe(map(unwrap));
   }
 

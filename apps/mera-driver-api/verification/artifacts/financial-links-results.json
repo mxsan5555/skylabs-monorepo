@@ -1,0 +1,16 @@
+{
+  "results": [
+    "payments/payments uses real Accounts data",
+    "payments/driver-payouts uses real Accounts data",
+    "accounts/overview uses real Accounts data",
+    "accounts/booking-payments uses real Accounts data",
+    "accounts/commissions uses real Accounts data",
+    "accounts/driver-payouts uses real Accounts data",
+    "accounts/registration-fees uses real Accounts data",
+    "accounts/refunds-adjustments uses real Accounts data",
+    "accounts/reports uses real Accounts data"
+  ],
+  "limitations": [
+    "Read-only local admin signed token; no money transferred"
+  ]
+}

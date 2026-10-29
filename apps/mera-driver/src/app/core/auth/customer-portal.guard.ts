@@ -1,3 +1,4 @@
+import { portalContext } from './portal-routing';
 import { inject } from '@angular/core';
 import { Router, type CanActivateFn } from '@angular/router';
 import { AuthService } from '@skylabs-monorepo/shared-auth/angular';
@@ -14,5 +15,5 @@ export const customerPortalGuard: CanActivateFn = async () => {
 
   await auth.whenReady();
 
-  return auth.bootstrap()?.customer != null ? true : router.createUrlTree(['/unauthorized']);
+  return portalContext(auth.bootstrap()) === 'customer' && auth.bootstrap()?.customer != null ? true : router.createUrlTree(['/unauthorized']);
 };

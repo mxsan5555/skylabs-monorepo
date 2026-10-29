@@ -6,6 +6,7 @@ import { showCartAdded, useAddProductToCart } from '../../../hooks/use-add-produ
 import { useRequireSignIn } from '../../../hooks/use-require-sign-in';
 import { useWishlistToggle } from '../../../hooks/use-wishlist-toggle';
 import { fillTemplate, formatINR } from '../../../utils/format';
+import { dealPath, productPath } from '../../seo/public-urls';
 import { toDealCardDeal, toProductCardDeal } from '../../pages/home/home-data';
 import { DealAddToCartDialog } from '../deal-add-to-cart-dialog';
 import { ProductCardGallery } from '../product-card-gallery';

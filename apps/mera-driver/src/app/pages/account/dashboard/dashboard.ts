@@ -1,48 +1,22 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA, computed, inject } from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, computed, effect, inject, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '@skylabs-monorepo/shared-auth/angular';
-import type { WidgetConfig } from '@skylabs-monorepo/shared-types';
 import { AdminPage } from '../../../admin/admin-page/admin-page';
-
-/**
- * Maps a `WidgetConfig.key` (from `authService.bootstrap()?.dashboardWidgets`,
- * already resolved server-side for the caller's roles) to what this app knows
- * how to render. Unknown keys render nothing rather than throwing — a role
- * granted a widget this build doesn't recognise yet shouldn't break the page.
- * Values here are presentational placeholders; wire real metrics endpoints
- * (drivers/trips/payments) when those modules exist.
- */
-interface WidgetDef {
-  icon: string;
-  value: string;
-  hint: string;
-}
-
-const WIDGET_REGISTRY: Record<string, WidgetDef> = {
-  'drivers-active': { icon: 'sports_motorsports', value: '—', hint: 'Drivers currently online' },
-  'trips-today': { icon: 'route', value: '—', hint: 'Trips started or completed today' },
-  'payments-summary': { icon: 'payments', value: '—', hint: 'Revenue collected this period' },
-};
-
-@Component({
-  selector: 'md-account-dashboard',
-  imports: [AdminPage],
-  templateUrl: './dashboard.html',
-  schemas: [CUSTOM_ELEMENTS_SCHEMA],
-})
+import { environment } from '../../../../environments/environment';
+import { httpErrorMessage } from '../../../core/http-error';
+interface Link {label:string;path:string}
+interface Summary {userName:string;role:string;cards:{key:string;title:string;value:number;money?:boolean;hint:string;path:string}[];actions:Link[];attention:Link[];records:{label:string;detail:string;path:string}[];gaps:string[]}
+@Component({selector:'md-account-dashboard',imports:[AdminPage,RouterLink],templateUrl:'./dashboard.html',schemas:[CUSTOM_ELEMENTS_SCHEMA]})
 export class Dashboard {
-  private readonly auth = inject(AuthService);
-
-  protected readonly loading = this.auth.loading;
-
-  protected readonly widgets = computed<(WidgetConfig & WidgetDef)[]>(() => {
-    const configs = this.auth.bootstrap()?.dashboardWidgets ?? [];
-    return [...configs]
-      .sort((a, b) => a.order - b.order)
-      .flatMap((cfg) => {
-        const def = WIDGET_REGISTRY[cfg.key];
-        return def ? [{ ...cfg, ...def }] : [];
-      });
-  });
-
-  protected readonly userName = computed(() => this.auth.bootstrap()?.user?.name);
+  private readonly auth=inject(AuthService);private readonly http=inject(HttpClient);private readonly router=inject(Router);
+  protected readonly summary=signal<Summary|null>(null);protected readonly loading=signal(true);protected readonly error=signal('');
+  protected readonly userName=computed(()=>this.auth.bootstrap()?.user.name??'');
+  private sequence=0;
+  constructor(){effect(()=>{const userId=this.auth.bootstrap()?.user.id;this.sequence++;this.summary.set(null);if(userId)this.refresh();});}
+  protected refresh(){const sequence=++this.sequence;this.loading.set(true);this.error.set('');this.summary.set(null);
+    this.http.get<{data:Summary}>(`${environment.apiUrl}/dashboard`).subscribe({next:r=>{if(sequence!==this.sequence)return;this.summary.set(r.data);this.loading.set(false);},error:async e=>{const message=await httpErrorMessage(e);if(sequence!==this.sequence)return;this.error.set(message);this.loading.set(false);}});
+  }
+  protected value(card:Summary['cards'][number]){return card.money?new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR'}).format(card.value/100):card.value.toLocaleString('en-IN');}
+  protected destination(path:string){return this.router.parseUrl(path);}
 }

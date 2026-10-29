@@ -62,6 +62,7 @@ export function toProductCardDeal(product: CatalogProduct): DealCardDeal {
 
   return {
     id: product.id,
+    slug: product.slug,
     title: product.name,
     image: media.images[0] ?? '',
     imageAlt: product.imageAlt ?? product.name,

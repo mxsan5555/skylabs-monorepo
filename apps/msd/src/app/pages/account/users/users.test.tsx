@@ -1,11 +1,15 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const navigateMock = vi.fn();
-const loginAsUserMock = vi.fn().mockResolvedValue(undefined);
+let searchParamsValue = new URLSearchParams();
+const setSearchParamsMock = vi.fn((updater: (prev: URLSearchParams) => URLSearchParams) => {
+  searchParamsValue = updater(searchParamsValue);
+});
 
 vi.mock('react-router-dom', () => ({
   useNavigate: () => navigateMock,
+  useSearchParams: () => [searchParamsValue, setSearchParamsMock],
 }));
 
 let grantedPermissions: Set<string>;
@@ -14,24 +18,13 @@ vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
   useAuth: () => ({
     token: 'test-token',
     can: (menuKey: string, action = 'view') => grantedPermissions.has(`${menuKey}:${action}`),
-    loginAsUser: loginAsUserMock,
   }),
 }));
 
 const listUsersMock = vi.fn();
-const getLoginHistoryMock = vi.fn();
-const getSessionsMock = vi.fn();
-
 vi.mock('../../../../api/rbac/users', () => ({
   listUsers: (...args: unknown[]) => listUsersMock(...args),
-  updateUser: vi.fn(),
-  setUserStatus: vi.fn(),
-  assignRole: vi.fn(),
-  unassignRole: vi.fn(),
-  revokeAllSessions: vi.fn(),
-  resetOtp: vi.fn(),
-  getLoginHistory: (...args: unknown[]) => getLoginHistoryMock(...args),
-  getSessions: (...args: unknown[]) => getSessionsMock(...args),
+  createUser: vi.fn(),
 }));
 
 const listRolesMock = vi.fn();
@@ -55,64 +48,15 @@ const sampleUser = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  loginAsUserMock.mockResolvedValue(undefined);
-  getLoginHistoryMock.mockResolvedValue({ data: [] });
-  getSessionsMock.mockResolvedValue({ data: [] });
+  searchParamsValue = new URLSearchParams();
   listRolesMock.mockResolvedValue({ data: [] });
 });
 
-async function selectSampleUser() {
-  fireEvent.click(await screen.findByRole('button', { name: /Ada Lovelace/ }));
-  // Login history / sessions panels resolve after selection.
-  await waitFor(() => expect(getLoginHistoryMock).toHaveBeenCalled());
+function table(): HTMLElement {
+  const el = document.querySelector('sky-data-table');
+  if (!el) throw new Error('sky-data-table not found');
+  return el as HTMLElement;
 }
-
-/**
- * "Login as" renders as `<md-outlined-button>` (a Material Web custom element) —
- * jsdom's accessibility tree doesn't understand its internals-assigned role, so
- * `getByRole('button', ...)` can't find it. Query the custom element directly instead.
- */
-function findLoginAsButton(): HTMLElement | undefined {
-  return Array.from(document.querySelectorAll('md-outlined-button')).find((el) =>
-    (el.textContent ?? '').includes('Login as'),
-  ) as HTMLElement | undefined;
-}
-
-describe('UserManagement — "Login as" (impersonation) gating', () => {
-  it('shows the "Login as" action for a caller with rbac.users:custom', async () => {
-    grantedPermissions = new Set(['rbac.users:custom']);
-    listUsersMock.mockResolvedValue({ data: [sampleUser], meta: { total: 1 } });
-    render(<UserManagement />);
-
-    await selectSampleUser();
-
-    expect(findLoginAsButton()).toBeTruthy();
-  });
-
-  it('hides the "Login as" action for a caller without rbac.users:custom', async () => {
-    grantedPermissions = new Set(); // no rbac.users:custom
-    listUsersMock.mockResolvedValue({ data: [sampleUser], meta: { total: 1 } });
-    render(<UserManagement />);
-
-    await selectSampleUser();
-
-    expect(findLoginAsButton()).toBeUndefined();
-  });
-
-  it('calls loginAsUser(id) and navigates to the dashboard when "Login as" is clicked', async () => {
-    grantedPermissions = new Set(['rbac.users:custom']);
-    listUsersMock.mockResolvedValue({ data: [sampleUser], meta: { total: 1 } });
-    render(<UserManagement />);
-
-    await selectSampleUser();
-    const loginAsButton = findLoginAsButton();
-    expect(loginAsButton).toBeTruthy();
-    fireEvent.click(loginAsButton!);
-
-    await waitFor(() => expect(loginAsUserMock).toHaveBeenCalledExactlyOnceWith('user-1'));
-    await waitFor(() => expect(navigateMock).toHaveBeenCalledExactlyOnceWith('/account/dashboard'));
-  });
-});
 
 /**
  * Feature: User Management role filter (Vendor Validation/Permissions audit, Phase 6)
@@ -151,13 +95,31 @@ describe('UserManagement — role filter', () => {
 });
 
 describe('UserManagement — list loading states', () => {
+  it('passes page/pageSize/search/roleKey through to listUsers', async () => {
+    grantedPermissions = new Set();
+    listUsersMock.mockResolvedValue({ data: [sampleUser], meta: { total: 1 } });
+    render(<UserManagement />);
+
+    await waitFor(() =>
+      expect(listUsersMock).toHaveBeenCalledWith('test-token', {
+        page: 1,
+        pageSize: 20,
+        search: undefined,
+        roleKey: undefined,
+      }),
+    );
+  });
+
   // Edge case: empty state
   it('shows the empty-state message when no users are returned', async () => {
     grantedPermissions = new Set();
     listUsersMock.mockResolvedValue({ data: [], meta: { total: 0 } });
     render(<UserManagement />);
 
-    expect(await screen.findByText('No users match.')).toBeTruthy();
+    await waitFor(() => {
+      const rows = JSON.parse(table().getAttribute('rows') ?? '[]');
+      expect(rows).toEqual([]);
+    });
   });
 
   // Edge case: error/network failure state
@@ -166,6 +128,23 @@ describe('UserManagement — list loading states', () => {
     listUsersMock.mockRejectedValue(new Error('network down'));
     render(<UserManagement />);
 
-    expect(await screen.findByText('Could not load users.')).toBeTruthy();
+    expect(await screen.findByText('Could not load staff users.')).toBeTruthy();
+  });
+});
+
+describe('UserManagement — create user gating', () => {
+  it('hides "New user" without rbac.users:create', async () => {
+    grantedPermissions = new Set();
+    listUsersMock.mockResolvedValue({ data: [], meta: { total: 0 } });
+    render(<UserManagement />);
+    await waitFor(() => expect(listUsersMock).toHaveBeenCalled());
+    expect(screen.queryByText('New user')).toBeNull();
+  });
+
+  it('shows "New user" with rbac.users:create', async () => {
+    grantedPermissions = new Set(['rbac.users:create']);
+    listUsersMock.mockResolvedValue({ data: [], meta: { total: 0 } });
+    render(<UserManagement />);
+    expect(await screen.findByText('New user')).toBeTruthy();
   });
 });

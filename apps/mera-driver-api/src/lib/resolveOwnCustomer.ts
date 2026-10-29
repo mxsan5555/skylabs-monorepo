@@ -18,6 +18,10 @@ export async function resolveOwnCustomer(req: Request, res: Response, next: Next
     return;
   }
 
+  if (req.user.portalContext === 'driver') {
+    res.status(403).json({data:null,error:{code:'PORTAL_ACCESS_DENIED',message:'Switch to the appropriate authorized portal to access this record.'}});
+    return;
+  }
   try {
     const customer = await prisma.customer.findUnique({
       where: { userId: req.user.sub },
@@ -35,7 +39,7 @@ export async function resolveOwnCustomer(req: Request, res: Response, next: Next
     // waiting out the token's remaining lifetime. Same restriction enforced at login time
     // (`assertCustomerAccountActive`) for the not-yet-authenticated case. Mirrors the exact
     // Driver `accountStatus` enforcement pattern.
-    if (customer.accountStatus === 'Inactive') {
+    if (['Inactive','Blocked'].includes(customer.accountStatus)) {
       res.status(403).json({
         data: null,
         error: { code: 'CUSTOMER_DEACTIVATED', message: 'Your account has been deactivated. Please contact support.' },

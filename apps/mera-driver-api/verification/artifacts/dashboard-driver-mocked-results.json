@@ -1,0 +1,82 @@
+{
+  "mode": "mocked APIs; no database changes",
+  "results": [
+    {
+      "role": "super_admin",
+      "desktop": true,
+      "mobile": true,
+      "providerCalls": 0
+    },
+    {
+      "role": "admin",
+      "desktop": true,
+      "mobile": true,
+      "providerCalls": 0
+    },
+    {
+      "role": "vendor",
+      "desktop": true,
+      "mobile": true,
+      "providerCalls": 0
+    },
+    {
+      "role": "marketing",
+      "desktop": true,
+      "mobile": true,
+      "providerCalls": 0
+    },
+    {
+      "role": "sales",
+      "desktop": true,
+      "mobile": true,
+      "providerCalls": 0
+    },
+    {
+      "role": "company",
+      "desktop": true,
+      "mobile": true,
+      "providerCalls": 0
+    },
+    {
+      "role": "data_operator",
+      "desktop": true,
+      "mobile": true,
+      "providerCalls": 0
+    },
+    {
+      "role": "support",
+      "desktop": true,
+      "mobile": true,
+      "providerCalls": 0
+    },
+    {
+      "role": "kyc_verification",
+      "desktop": true,
+      "mobile": true,
+      "providerCalls": 0
+    },
+    {
+      "role": "driver",
+      "desktop": true,
+      "mobile": true,
+      "providerCalls": 0
+    },
+    {
+      "role": "customer",
+      "desktop": true,
+      "mobile": true,
+      "providerCalls": 0
+    },
+    {
+      "registryIdentity": true,
+      "registryMobile": true,
+      "feeMobile": true,
+      "oldAvailabilityIgnored": true,
+      "currentVerifierSelected": true,
+      "feeVisibility": true,
+      "readOnlyKyc": true,
+      "errorRetry": true,
+      "providerCalls": 0
+    }
+  ]
+}

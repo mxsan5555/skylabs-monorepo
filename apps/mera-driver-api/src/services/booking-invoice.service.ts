@@ -1,0 +1,11 @@
+import { prisma } from '../lib/prisma';
+import { customerTrip } from './trip-workflow.service';
+import { renderBackendPdf } from './driver-pdf.service';
+function esc(value:unknown){return String(value??'Not provided').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));}
+export async function bookingInvoice(customerId:string,bookingId:string){
+  const booking=await customerTrip(customerId,bookingId);
+  const movements=await prisma.moneyMovement.findMany({where:{bookingId,kind:{in:['booking_payment','booking_refund','driver_cod_collection','driver_cod_refund']}},orderBy:{createdAt:'asc'}});
+  const money=(amount:number)=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR'}).format(amount/100);
+  const rows=movements.map(m=>`<tr><td>${esc(m.createdAt.toISOString())}</td><td>${esc(m.kind)}</td><td>${esc(m.reference)}</td><td>${esc(money(m.amountPaise))}</td></tr>`).join('');
+  return renderBackendPdf(`<!doctype html><html><head><meta charset="utf-8"><style>body{font:14px Arial;color:#172033}h1{color:#116864}table{width:100%;border-collapse:collapse}td,th{padding:8px;text-align:left;border-bottom:1px solid #ddd;overflow-wrap:anywhere}tr{break-inside:avoid}td:last-child,th:last-child{white-space:nowrap}td:nth-child(1),th:nth-child(1){width:22%}td:nth-child(2),th:nth-child(2){width:20%}</style></head><body><h1>Mera Driver · Booking Invoice</h1><p>Booking ${esc(booking.bookingCode)} · Generated ${esc(new Date().toISOString())}</p><p>Customer: ${esc(booking.customerName)}</p><p>${esc(booking.tripTypeName)} · ${esc(booking.scheduledAt)}</p><p>${esc(booking.pickupAddress)} → ${esc(booking.dropAddress)}</p><h2>Booking amount ${esc(money(booking.farePaise??Math.round((booking.finalFare??booking.estimatedFare??0)*100)))}</h2><p>Trip status: ${esc(booking.status)} · Payment method: ${esc(booking.paymentMode==='cash'?'Cash on Delivery (COD)':booking.paymentMode==='razorpay'?'Razorpay':booking.paymentMode)} · Payment status: ${esc(booking.paymentStatus)}</p><h2>Payments & refunds</h2><table><tr><th>Date</th><th>Type</th><th>Reference</th><th>Amount</th></tr>${rows||'<tr><td colspan="4">No payments received</td></tr>'}</table></body></html>`);
+}
