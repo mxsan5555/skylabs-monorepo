@@ -388,6 +388,8 @@ rollback rehearsal (P11).
 - [ ] No OTP, secret, token or unneeded private field in any response.
 - [ ] Public catalog: only intended records and fields; maximum page size enforced; validated input.
 - [ ] Errors expose no stack traces or database details.
+- [ ] Production boots only with a strong `JWT_SECRET`, exact `CORS_ORIGIN` origins and the four
+      document and job secrets (P2-09, `config/env-checks.test.ts`, including a boot test).
 - [ ] Sensitive admin actions are audited.
 
 API docs prove that a route is registered, not that its runtime checks are right; this checklist

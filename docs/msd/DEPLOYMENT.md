@@ -61,6 +61,12 @@ silently ships the bare SPA); preview and local builds fall back to the SPA. Red
 SMTP, SMS, Razorpay and R2 are checked on first use, so the API boots without them; that feature
 just fails until its group is filled.
 
+**Production boot check (P2-09).** With `NODE_ENV=production` the API refuses to start, naming
+each problem (never a value), when `JWT_SECRET` is under 32 characters, `CORS_ORIGIN` is empty or
+contains `*`, `FIELD_ENCRYPTION_KEY` is missing or not 32 bytes of base64, or `R2_PRIVATE_BUCKET`,
+`DOC_HASH_PEPPER` or `CRON_SECRET` is missing (`src/config/env-checks.ts`). Set all six on
+Railway **before** deploying a build that contains this check, or the deploy will not boot.
+
 ## 3. Scheduled job: member document reminders
 
 Daily at **10:00 IST (04:30 UTC)** a Railway cron service calls the API, which sends due

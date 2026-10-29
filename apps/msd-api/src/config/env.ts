@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
+import { productionEnvProblems } from './env-checks';
 
 // Loaded once, first thing, before any other module reads process.env.
 // apps/msd-api/.env.local is never committed (see .gitignore); .env.example documents the shape.
@@ -111,3 +112,10 @@ export const env = {
   r2PrivateBucket: process.env.R2_PRIVATE_BUCKET ?? '',
   r2PublicUrl: process.env.R2_PUBLIC_URL ?? '',
 };
+
+// P2-09: production fails fast on weak or missing security settings instead of starting with
+// them. The message names the variables only, never their values.
+if (env.nodeEnv === 'production') {
+  const problems = productionEnvProblems(process.env);
+  if (problems.length > 0) throw new Error(`Unsafe production environment: ${problems.join('; ')}`);
+}
