@@ -8,8 +8,9 @@ import * as dotenv from 'dotenv';
 // This intentionally does NOT rely on `__dirname` alone: under the Nx/webpack production
 // build everything is bundled into a single dist/apps/msd-api/main.js, which changes
 // __dirname's depth relative to the source tree. Try a couple of likely locations instead,
-// and never override already-set process.env vars (real deploys inject secrets via the
-// platform/CI, not this file — see .env.example).
+// In local development the selected env file is authoritative, so an inherited DATABASE_URL
+// cannot silently point the API at another database. Production skips these files and uses
+// platform-injected secrets.
 if (process.env.NODE_ENV !== 'production') {
   const candidates = [
     path.join(__dirname, '../../.env.local'), // unbundled dev (src/config -> apps/msd-api)
@@ -20,7 +21,7 @@ if (process.env.NODE_ENV !== 'production') {
     path.join(process.cwd(), '.env'), // run from apps/msd-api itself with fallback file
   ];
   const envFile = candidates.find((p) => fs.existsSync(p));
-  if (envFile) dotenv.config({ path: envFile });
+  if (envFile) dotenv.config({ path: envFile, override: true });
 }
 
 function required(name: string, fallback?: string): string {

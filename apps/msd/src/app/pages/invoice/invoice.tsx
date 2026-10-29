@@ -7,7 +7,7 @@ import { ApiRequestError } from '../../../api/rbac/client';
 import { InvoiceDocument } from '../../components/invoice-document';
 import content from '../../../content.json';
 import './invoice.css';
-
+import { Seo } from '../../seo/seo';
 /**
  * Real, printable/downloadable invoice for a customer's own order — `GET /orders/me/:id`
  * (already ownership-scoped: 404s for another customer's order, same as every other `/me/*`

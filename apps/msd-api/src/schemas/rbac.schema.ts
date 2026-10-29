@@ -49,6 +49,13 @@ export const RoleCreateSchema = z
 
 export const RoleUpdateSchema = RoleCreateSchema.omit({ key: true }).partial().openapi('RoleUpdate');
 
+export const RoleCloneSchema = z
+  .object({
+    key: RoleCreateSchema.shape.key,
+    name: RoleCreateSchema.shape.name,
+  })
+  .openapi('RoleClone');
+
 export const RoleStatusUpdateSchema = z
   .object({
     isActive: z.boolean(),

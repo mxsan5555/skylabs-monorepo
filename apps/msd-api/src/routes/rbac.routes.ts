@@ -18,6 +18,7 @@ import {
   UserRoleSetSchema,
   RoleConflictResolveSchema,
   ImpersonateRequestSchema,
+  RoleCloneSchema,
 } from '../schemas/rbac.schema';
 import * as roleService from '../services/role.service';
 import * as widgetService from '../services/dashboard-widget.service';
@@ -35,8 +36,9 @@ import { prisma } from '../lib/prisma';
 import { sendData, ApiError } from '../lib/http';
 import { invalidatePermissionCache, isSuperAdminRoleSet, resolveGrantedPermissions } from '../services/permission-resolver.service';
 import { scopeFor } from '@skylabs-monorepo/shared-permissions';
+import { RoleCreateSchema } from '../schemas/rbac.schema';
 
-const UserRoleParamsSchema = z.object({ id: z.string().uuid(), roleId: z.string().uuid() });
+const UserRoleParamsSchema = UuidParamSchema;
 
 const router = Router();
 router.use(authenticate);
@@ -470,20 +472,23 @@ router.put(
   '/users/:id/role',
   requirePermission('rbac.users', 'assign'),
   validateParams(UserRoleParamsSchema),
+  validateBody(UserRoleSetSchema),
   async (req, res, next) => {
     try {
       await assertCanManageUser(req.user!.sub, req.params.id);
-      await assertCanAssignRole(req.user!.sub, req.params.roleId);
-      await userService.assignRole(req.params.id, req.params.roleId);
+      await assertCanAssignRole(req.user!.sub, req.body.roleId);
+      const before = await userService.getUserOrThrow(req.params.id);
+      const user = await userService.setStaffUserRole(req.params.id, req.body.roleId);
       await writeAuditLog({
         actorUserId: req.user!.sub,
         action: 'user.role.set',
         targetType: 'User',
         targetId: req.params.id,
-        before: { roleIds: before.roles.map((r) => r.role.id) },
+        before: { roleIds: before.roles.map((r: { role: { id: string } }) => r.role.id) },
         after: { roleId: req.body.roleId },
         ...requestMeta(req),
       });
+      invalidatePermissionCache();
       sendData(res, user);
     } catch (err) {
       next(err);
@@ -508,20 +513,24 @@ router.put(
   '/role-conflicts/:id',
   requirePermission('rbac.users', 'assign'),
   validateParams(UserRoleParamsSchema),
+  validateBody(RoleConflictResolveSchema),
   async (req, res, next) => {
     try {
       await assertCanManageUser(req.user!.sub, req.params.id);
-      if (await assertCanAssignRole(req.user!.sub, req.params.roleId)) await assertNotLastSuperAdmin(req.params.id);
-      await userService.unassignRole(req.params.id, req.params.roleId);
+      await assertCanAssignRole(req.user!.sub, req.body.roleId);
+      await assertNotLastSuperAdmin(req.params.id);
+      const before = await userService.getUserOrThrow(req.params.id);
+      const user = await userService.resolveAccountRoleConflict(req.params.id, req.body.roleId);
       await writeAuditLog({
         actorUserId: req.user!.sub,
         action: 'user.role_conflict.resolve',
         targetType: 'User',
         targetId: req.params.id,
-        before: { roleIds: before.roles.map((r) => r.role.id) },
+        before: { roleIds: before.roles.map((r: { role: { id: string } }) => r.role.id) },
         after: { roleId: req.body.roleId },
         ...requestMeta(req),
       });
+      invalidatePermissionCache();
       sendData(res, user);
     } catch (err) {
       next(err);

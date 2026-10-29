@@ -1867,6 +1867,254 @@ model Payment {
   @@index([providerPaymentId])
 }
 
+/// One voucher or product-fulfilment record per purchased unit. Finance and fulfilment state
+/// lives here so order snapshots remain immutable.
+model PurchaseEntitlement {
+  id                       String                 @id @default(uuid())
+  orderItemId              String
+  sequenceNo               Int
+  voucherCode              String                 @unique
+  customerId               String
+  vendorId                 String
+  branchId                 String?
+  fulfilmentKind           FulfilmentKind
+  entitlementStatus        EntitlementStatus      @default(ACTIVE)
+  serviceStartedAt         DateTime?
+  completedAt              DateTime?
+  carrier                  String?
+  trackingNumber           String?
+  shippedAt                DateTime?
+  deliveryEvidenceStorageKey String?
+  deliveryEvidenceNote     String?
+  recordedByUserId         String?
+  grossAmount              Decimal                @db.Decimal(10, 2)
+  commissionRatePercent    Decimal                @db.Decimal(5, 2)
+  commissionAmount         Decimal                @db.Decimal(10, 2)
+  memberShareAmount        Decimal                @db.Decimal(10, 2)
+  settlementStatus         SettlementStatus       @default(PENDING_FULFILMENT)
+  preDisputeStatus         SettlementStatus?
+  holdUntil                DateTime?
+  payoutItemId             String?
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  orderItem                OrderItem              @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  customer                 User                   @relation("EntitlementCustomer", fields: [customerId], references: [id], onDelete: Cascade)
+  vendor                   Member                 @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  branch                   Branch?                @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  adjustments              SettlementAdjustment[]
+  completionOtpChallenges  CompletionOtpChallenge[]
+  disputes                 PurchaseDispute[]
+  payoutItem               MemberPayoutItem?
+
+  @@unique([orderItemId, sequenceNo])
+  @@index([vendorId, settlementStatus])
+  @@index([voucherCode])
+  @@index([customerId])
+  @@index([orderItemId])
+}
+
+model SettlementAdjustment {
+  id            String                   @id @default(uuid())
+  entitlementId String
+  type          SettlementAdjustmentType
+  amount        Decimal                  @db.Decimal(10, 2)
+  reason        String?
+  refundId      String?
+  createdByUserId String
+  createdAt     DateTime                 @default(now())
+  entitlement   PurchaseEntitlement      @relation(fields: [entitlementId], references: [id], onDelete: Cascade)
+
+  @@index([entitlementId])
+}
+
+model CompletionOtpChallenge {
+  id                String                @id @default(uuid())
+  entitlementId     String
+  purpose           CompletionOtpPurpose
+  hashedOtp         String
+  attempts          Int                   @default(0)
+  expiresAt         DateTime
+  verifiedAt        DateTime?
+  resendCount       Int                   @default(0)
+  lastSentAt        DateTime              @default(now())
+  requestedByUserId String
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  entitlement       PurchaseEntitlement   @relation(fields: [entitlementId], references: [id], onDelete: Cascade)
+
+  @@index([entitlementId])
+}
+
+model PurchaseDispute {
+  id                 String                  @id @default(uuid())
+  orderItemId        String
+  entitlementId      String?
+  customerId         String
+  status             DisputeStatus           @default(OPEN)
+  reason             String
+  description        String?
+  evidenceStorageKey String?
+  resolvedAt         DateTime?
+  resolvedByUserId   String?
+  resolutionNotes    String?
+  resolutionType    DisputeResolutionType?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  orderItem          OrderItem               @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  entitlement        PurchaseEntitlement?    @relation(fields: [entitlementId], references: [id], onDelete: SetNull)
+  customer           User                    @relation("DisputeCustomer", fields: [customerId], references: [id], onDelete: Cascade)
+  refunds            Refund[]
+
+  @@index([orderItemId])
+  @@index([entitlementId])
+  @@index([customerId])
+  @@index([status])
+}
+
+model Refund {
+  id               String       @id @default(uuid())
+  orderItemId      String
+  paymentId        String
+  amount           Decimal      @db.Decimal(10, 2)
+  type             RefundType
+  reason           String?
+  disputeId        String?
+  status           RefundStatus @default(REQUESTED)
+  providerRefundId String?      @unique
+  processedByUserId String?
+  processedAt      DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  orderItem        OrderItem    @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  payment          Payment      @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  dispute          PurchaseDispute? @relation(fields: [disputeId], references: [id], onDelete: SetNull)
+
+  @@index([orderItemId])
+  @@index([paymentId])
+  @@index([disputeId])
+  @@index([status])
+}
+
+model MemberPayout {
+  id                         String       @id @default(uuid())
+  vendorId                   String
+  amount                     Decimal      @db.Decimal(10, 2)
+  method                     PayoutMethod @default(MANUAL_BANK_TRANSFER)
+  status                     PayoutStatus @default(PENDING)
+  bankAccountHolderSnapshot  String
+  bankNameSnapshot           String?
+  bankAccountNumberSnapshot  String
+  bankIfscSnapshot           String
+  upiIdSnapshot              String?
+  reference                  String?
+  transferDate               DateTime?
+  proofStorageKey             String?
+  idempotencyKey             String       @unique
+  recordedByUserId            String
+  createdAt                  DateTime     @default(now())
+  updatedAt                  DateTime     @updatedAt
+  vendor                     Member       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  items                      MemberPayoutItem[]
+
+  @@index([vendorId])
+  @@index([status])
+}
+
+model MemberPayoutItem {
+  id            String              @id @default(uuid())
+  payoutId      String
+  entitlementId String              @unique
+  amount        Decimal             @db.Decimal(10, 2)
+  createdAt     DateTime            @default(now())
+  payout        MemberPayout        @relation(fields: [payoutId], references: [id], onDelete: Cascade)
+  entitlement   PurchaseEntitlement @relation(fields: [entitlementId], references: [id], onDelete: Restrict)
+
+  @@index([payoutId])
+}
+
+model FinanceSettings {
+  id                               String   @id @default("singleton")
+  defaultCommissionRatePercent     Decimal  @default(10) @db.Decimal(5, 2)
+  serviceHoldHours                 Int      @default(24)
+  productReturnHoldHours           Int      @default(168)
+  completionOtpExpiryMinutes       Int      @default(10)
+  completionOtpMaxAttempts         Int      @default(5)
+  completionOtpResendCooldownSeconds Int     @default(60)
+  updatedByUserId                  String?
+  updatedAt                        DateTime @updatedAt
+}
+
+enum FulfilmentKind {
+  SERVICE_SESSION
+  PRODUCT_PICKUP
+  PRODUCT_SHIPPED
+}
+
+enum EntitlementStatus {
+  ACTIVE
+  STARTED
+  OTP_REQUESTED
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum SettlementStatus {
+  PENDING_FULFILMENT
+  ON_HOLD
+  DISPUTED_BLOCKED
+  PROCESSING
+  PAID
+  FAILED
+  VOID
+}
+
+enum SettlementAdjustmentType {
+  REFUND
+  MANUAL_ADJUSTMENT
+  RECOVERY
+}
+
+enum CompletionOtpPurpose {
+  SERVICE_COMPLETION
+  PRODUCT_PICKUP
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+}
+
+enum DisputeResolutionType {
+  NO_ACTION
+  REFUNDED
+  OTHER
+}
+
+enum RefundType {
+  FULL
+  PARTIAL
+}
+
+enum RefundStatus {
+  REQUESTED
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+enum PayoutMethod {
+  MANUAL_BANK_TRANSFER
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+}
+
 enum UserStatus {
   active
   inactive

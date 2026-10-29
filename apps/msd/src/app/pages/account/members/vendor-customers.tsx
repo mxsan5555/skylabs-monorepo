@@ -46,13 +46,13 @@ interface TableParams {
 }
 
 const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 20 };
-const navigate = useNavigate();
 /** Vendor self-service "Customers" page — everyone who has ordered from the logged-in vendor,
  *  resolved server-side from the JWT (`GET /vendors/me/customers`, gated
  *  `vendors:custom` — the same permission every other vendor self-service route already
  *  uses). The backend doesn't support a search param on this endpoint, so `searchable` is
  *  intentionally omitted rather than inventing a new query param. */
 export function VendorCustomers({ vendorId }: { vendorId?: string } = {}) {
+  const navigate = useNavigate();
   const { token } = useAuth();
   /** Staff on a member's page (P10-49): the staff route, full contact details (D12), no page header. */
   const staffView = Boolean(vendorId);

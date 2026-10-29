@@ -110,7 +110,7 @@ describe('Role create, clone and delete are locked (R1, P2-15)', () => {
     const res = await request(app)
       .post('/api/v1/rbac/roles')
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
-      .send(validBody);
+      .send({ key: 'hr', name: 'HR' }));
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe('ROLE_MANAGEMENT_LOCKED');
     expect(prismaMock.role.create).not.toHaveBeenCalled();
@@ -436,7 +436,7 @@ describe('POST /api/v1/rbac/users', () => {
     const res = await request(app)
       .post('/api/v1/rbac/users')
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
-      .send(validBody);
+      .send({ key: 'hr', name: 'HR' }););
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('CONFLICT');
   });
@@ -451,7 +451,7 @@ describe('POST /api/v1/rbac/users', () => {
     const res = await request(app)
       .post('/api/v1/rbac/users')
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
-      .send(validBody);
+      .send({ key: 'hr', name: 'HR' }););
     expect(res.status).toBe(201);
     expect(res.body.data.id).toBe(TARGET_USER_ID);
   });
@@ -495,7 +495,7 @@ describe('POST /api/v1/rbac/users', () => {
     const res = await request(app)
       .post('/api/v1/rbac/users')
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
-      .send(validBody);
+      .send({ key: 'hr', name: 'HR' }););
     expect(res.status).toBe(422);
     expect(prismaMock.user.create).not.toHaveBeenCalled();
   });

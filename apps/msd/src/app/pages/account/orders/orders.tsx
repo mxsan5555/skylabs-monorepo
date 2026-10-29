@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
-import { Link, useSearchParams } from 'react-router-dom';
-import { Dialog, FilledButton, OutlinedSelect, SelectOption, TextButton } from '@skylabs-monorepo/shared-ui/react';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { Dialog, FilledButton, OutlinedSelect, SelectOption, TextButton, OutlinedButton, Icon, OutlinedTextField} from '@skylabs-monorepo/shared-ui/react';
 import type { SkyDataTableParamsDetail } from '@skylabs-monorepo/shared-ui';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import {
@@ -9,6 +9,7 @@ import {
   getOrderCounts,
   setOrderStatus,
   shortOrderNumber,
+  getOrder,
   type Order,
   type OrderCounts,
   type OrderStatus,
@@ -18,6 +19,9 @@ import { listVendors, type Vendor } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { formatStreetAddress } from '../../../../utils/format';
 
+import {formatINR} from '../../../../utils/format';
+import { useLocation } from 'react-router-dom';
+import { CardGrid } from '../../../components/card-grid/card-grid';
 const ALLOWED_NEXT: Record<OrderStatus, OrderStatus[]> = {
   PENDING_PAYMENT: ['CONFIRMED', 'CANCELLED'],
   CONFIRMED: ['COMPLETED', 'CANCELLED'],
@@ -93,11 +97,15 @@ function toOrderRow(order: Order): Record<string, string | number> {
     : '—';
   const memberLabel =
     vendorIds.size > 1 ? `${vendorIds.size} members` : firstItem?.vendorNameSnapshot ?? order.vendorNameSnapshot;
+  const customerName =
+    order.customer.name && order.customer.name !== order.customer.phone && order.customer.name !== order.customer.email
+      ? order.customer.name
+      : 'Name not added';
 
   return {
     Order: shortOrderNumber(order.id),
     'Order Date': new Date(order.createdAt).toLocaleString(),
-    Customer: customerDisplayName(order.customer),
+    Customer: customerName,
     'Customer Phone': order.customer.phone ?? '—',
     Purchase: purchasePrimary,
     'Purchase Detail': `${describeOrderComposition(order)} · ${memberLabel}`,
@@ -105,7 +113,6 @@ function toOrderRow(order: Order): Record<string, string | number> {
     'Payment Status': latestPayment?.status ?? '—',
     'Order Status': order.status,
     'Created At': new Date(order.createdAt).toLocaleString(),
-    'Customer Phone': order.customer.phone ?? '—',
     'Customer Email': order.customer.email ?? '—',
     // order.branch is null for a Product-only order (Product is vendor-level, not branch-level —
     // see Order.branchId's schema doc comment in msd-api) — never read .address off it unguarded.
@@ -251,7 +258,7 @@ export function OrderManagement({ scope = 'admin', refreshKey = 0 }: { scope?: '
   // — `sky-data-table`'s own row-detail drawer has no public API to open it programmatically, so
   // this fetches the same order via the existing GET /orders/:id and shows it in its own small
   // read-only Dialog (same key/value shape as the table's own drawer, via toOrderRow below).
-  const [searchParams] = useSearchParams();
+
   const orderIdParam = searchParams.get('orderId');
   // P10-49: "N orders" on a member page opens this list filtered to that member.
   const vendorIdParam = searchParams.get('vendorId');
