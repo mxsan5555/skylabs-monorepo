@@ -14,7 +14,7 @@ export interface PageSectionProps {
   children: ReactNode;
 }
 
-/** Full-bleed page band with the site's 1280px content column. Every msd page section uses it. */
+/** Full-bleed page band with the site's content column (`--sky-content-max`, 1280px). Every msd page section uses it. */
 export function PageSection({ tone = 'surface', flush = false, stack = false, className, children, ...aria }: PageSectionProps) {
   const classes = ['page-section', `page-section--${tone}`, flush && 'page-section--flush', className]
     .filter(Boolean)

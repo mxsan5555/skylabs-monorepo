@@ -81,6 +81,20 @@ describe('sanitizeReturnUrl', () => {
     expect(sanitizeReturnUrl('//evil.example.com')).toBeNull();
   });
 
+  it('rejects backslash and control-character tricks browsers read as another host (P10-38)', () => {
+    expect(sanitizeReturnUrl('/\\evil.example.com')).toBeNull();
+    expect(sanitizeReturnUrl('/\\/evil.example.com')).toBeNull();
+    expect(sanitizeReturnUrl('/\t/evil.example.com')).toBeNull();
+    expect(sanitizeReturnUrl('/\n/evil.example.com')).toBeNull();
+    expect(sanitizeReturnUrl('/%2F%2Fevil.example.com')).toBeNull();
+    expect(sanitizeReturnUrl('/%5Cevil.example.com')).toBeNull();
+  });
+
+  it('only returns paths that stay on this site', () => {
+    expect(sanitizeReturnUrl('/deal/spa-day?x=1#faq')).toBe('/deal/spa-day?x=1#faq');
+    expect(sanitizeReturnUrl('/./evil')).toBe('/./evil');
+  });
+
   it('rejects a path back into /sign-in or /otp', () => {
     expect(sanitizeReturnUrl('/sign-in')).toBeNull();
     expect(sanitizeReturnUrl('/otp')).toBeNull();

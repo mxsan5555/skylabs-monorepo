@@ -1,7 +1,8 @@
-import { render, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Order } from '../../../../api/rbac/orders';
+import { OrderManagement } from './orders';
 
 let grantedPermissions: Set<string>;
 
@@ -25,8 +26,6 @@ vi.mock('../../../../api/rbac/orders', async () => {
     setOrderStatus: (...args: unknown[]) => setOrderStatusMock(...args),
   };
 });
-
-import { OrderManagement } from './orders';
 
 const BASE_ORDER: Order = {
   id: 'order-1',
@@ -69,9 +68,9 @@ const BASE_ORDER: Order = {
   ],
 };
 
-function renderPage() {
+function renderPage(url = '/account/orders') {
   return render(
-    <MemoryRouter initialEntries={['/account/orders']}>
+    <MemoryRouter initialEntries={[url]}>
       <OrderManagement />
     </MemoryRouter>,
   );
@@ -210,5 +209,31 @@ describe('OrderManagement — members never change order status (D27)', () => {
     renderPage();
     await waitFor(() => expect(listOrdersMock).toHaveBeenCalled());
     expect(tableActions()).not.toContain('change-status');
+  });
+});
+
+/**
+ * P10-49: the member page links "N orders" to `/account/orders?vendorId=<member>`. The list sends
+ * that filter to the API and says it is filtered, with a way back to every order.
+ */
+describe('OrderManagement — member filter from the address', () => {
+  it('sends vendorId to the API and shows the filter with a clear button', async () => {
+    listOrdersMock.mockResolvedValue({ data: [BASE_ORDER], meta: { total: 1 } });
+    renderPage('/account/orders?vendorId=vendor-1');
+    await waitForTableLoaded(1);
+    expect(listOrdersMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ vendorId: 'vendor-1' }));
+    expect(screen.getByText("Showing one member's orders.")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('link', { name: 'Show all orders' }));
+    await waitFor(() => expect(listOrdersMock).toHaveBeenLastCalledWith(expect.anything(), expect.not.objectContaining({ vendorId: 'vendor-1' })));
+    expect(screen.queryByText("Showing one member's orders.")).toBeNull();
+  });
+
+  it('sends no vendorId and shows no filter note without the parameter', async () => {
+    listOrdersMock.mockResolvedValue({ data: [BASE_ORDER], meta: { total: 1 } });
+    renderPage();
+    await waitForTableLoaded(1);
+    expect(listOrdersMock).toHaveBeenCalledWith(expect.anything(), expect.not.objectContaining({ vendorId: expect.anything() }));
+    expect(screen.queryByText("Showing one member's orders.")).toBeNull();
   });
 });

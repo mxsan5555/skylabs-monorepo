@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Dialog, FilledButton, OutlinedSelect, SelectOption, TextButton } from '@skylabs-monorepo/shared-ui/react';
 import type { SkyDataTableParamsDetail } from '@skylabs-monorepo/shared-ui';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { listOrders, getOrder, setOrderStatus, type Order, type OrderStatus } from '../../../../api/rbac/orders';
 import { ApiRequestError } from '../../../../api/rbac/client';
+import { formatStreetAddress } from '../../../../utils/format';
 
 const ALLOWED_NEXT: Record<OrderStatus, OrderStatus[]> = {
   PENDING_PAYMENT: ['CONFIRMED', 'CANCELLED'],
@@ -88,7 +89,7 @@ function toOrderRow(order: Order): Record<string, string | number> {
     'Customer Email': order.customer.email ?? '—',
     // order.branch is null for a Product-only order (Product is vendor-level, not branch-level —
     // see Order.branchId's schema doc comment in msd-api) — never read .address off it unguarded.
-    'Branch Address': order.branch ? [order.branch.address, order.branch.city].filter(Boolean).join(', ') || '—' : '—',
+    'Branch Address': (order.branch && formatStreetAddress([order.branch.address, order.branch.city])) || '—',
     Subtotal: `₹${order.subtotal}`,
     Quantity: order.items.reduce((n, i) => n + i.quantity, 0),
     'Payment Provider': latestPayment?.provider ?? '—',
@@ -134,6 +135,8 @@ export function OrderManagement() {
   // read-only Dialog (same key/value shape as the table's own drawer, via toOrderRow below).
   const [searchParams] = useSearchParams();
   const orderIdParam = searchParams.get('orderId');
+  // P10-49: "N orders" on a member page opens this list filtered to that member.
+  const vendorIdParam = searchParams.get('vendorId');
   const [deepLinkOrder, setDeepLinkOrder] = useState<Order | null>(null);
   const [deepLinkError, setDeepLinkError] = useState('');
   const deepLinkDialogRef = useRef<MdDialog>(null);
@@ -158,6 +161,7 @@ export function OrderManagement() {
         pageSize: params.pageSize,
         status: (params.filter || undefined) as OrderStatus | undefined,
         search: params.search || undefined,
+        ...(vendorIdParam ? { vendorId: vendorIdParam } : {}),
       });
       setOrders(data);
       setTotal(meta?.total ?? data.length);
@@ -166,7 +170,7 @@ export function OrderManagement() {
     } finally {
       setLoading(false);
     }
-  }, [token, params]);
+  }, [token, params, vendorIdParam]);
 
   useEffect(() => {
     load();
@@ -243,6 +247,15 @@ export function OrderManagement() {
           <p>Every order from the marketplace catalogue — Deal, Product, and Therapist alike.</p>
         </div>
       </header>
+
+      {vendorIdParam && (
+        <p className="field-hint">
+          Showing one member's orders.{' '}
+          <Link className="text-link" to="/account/orders">
+            Show all orders
+          </Link>
+        </p>
+      )}
 
       {error && <p className="error-state" role="alert">{error}</p>}
 

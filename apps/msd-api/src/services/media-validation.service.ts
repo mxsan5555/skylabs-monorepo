@@ -1,3 +1,4 @@
+import { DOCUMENT_MAX_BYTES } from '@skylabs-monorepo/shared-utils';
 import { ApiError } from '../lib/http';
 import {
   IMAGE_MIME_TYPES,
@@ -13,8 +14,9 @@ export const IMAGE_MAX_BYTES = 80 * 1024;
 export const VIDEO_MAX_BYTES = 1 * 1024 * 1024;
 export const MAX_IMAGES_PER_ENTITY = 8;
 /** A KYC document is a scanned/photographed real document, not a compressed web image — no
- *  minimum size, and a much larger ceiling than the 30-80KB product-image window. */
-export const DOCUMENT_MAX_BYTES = 5 * 1024 * 1024;
+ *  minimum size, and a much larger ceiling than the 30-80KB product-image window. One value,
+ *  shared with the msd console's pre-upload check (P10-37). */
+export { DOCUMENT_MAX_BYTES };
 
 export interface ValidatedMediaFile {
   sniffedType: SniffedMediaType;

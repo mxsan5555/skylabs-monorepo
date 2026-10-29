@@ -14,6 +14,7 @@ import {
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
+import { memberTrail } from './member-crumbs';
 import { resolveCategoryTiers } from '../../../../utils/category-tree';
 
 interface ProductFormPageProps {
@@ -178,9 +179,7 @@ export function ProductFormPage({ token }: ProductFormPageProps) {
 
   const name = product?.name || (isEdit ? 'Product' : 'New product');
   useSetBreadcrumbs([
-    { label: 'Members' },
-    { label: 'All Member', to: '/account/members' },
-    { label: vendorName ?? 'Member', to: `/account/members/${vendorId}` },
+    ...memberTrail(vendorId, vendorName),
     { label: 'Products', to: `/account/members/${vendorId}/products` },
     { label: isEdit ? name : 'Add product' },
   ]);

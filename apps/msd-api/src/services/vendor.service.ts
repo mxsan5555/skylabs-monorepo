@@ -948,6 +948,18 @@ export async function deleteTherapistVideo(vendorId: string, therapistId: string
 
 // ─── Customers (derived from Order — no dedicated table) ─────────────────────
 
+/** Distinct orders and distinct customers with at least one order line from this member, for the
+ *  member page header (P10-49). Same rows as `listMyCustomers`, so the numbers match that list.
+ *  Two COUNT queries: no rows are loaded, whatever the member's order history. */
+export async function getMemberSalesCounts(vendorId: string): Promise<{ orderCount: number; customerCount: number }> {
+  const hasMemberLine = { items: { some: { vendorId } } };
+  const [orderCount, customerCount] = await Promise.all([
+    prisma.order.count({ where: hasMemberLine }),
+    prisma.user.count({ where: { orders: { some: hasMemberLine } } }),
+  ]);
+  return { orderCount, customerCount };
+}
+
 /** Order statuses that make a member's customer "open" (D19): paid and not yet completed. */
 const OPEN_ORDER_STATUSES: ReadonlySet<string> = new Set(['CONFIRMED']);
 

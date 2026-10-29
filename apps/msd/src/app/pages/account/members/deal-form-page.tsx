@@ -28,6 +28,7 @@ import { MediaUploader } from '../../../components/media-uploader';
 import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { showSnackbar } from '../../../../snackbar/snackbar';
 import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
+import { memberTrail } from './member-crumbs';
 import { renderCheckbox, renderSelect, renderTextField } from './form-controls';
 import { StringListField } from './string-list-field';
 import { DealPackageCards, packageError, type PackageCard } from './deal-package-cards';
@@ -271,9 +272,7 @@ export function DealFormPage({ token, surface = 'staff' }: DealFormPageProps) {
   useSetBreadcrumbs(
     isStaff
       ? [
-          { label: 'Members' },
-          { label: 'All members', to: '/account/members' },
-          { label: vendorName ?? 'Member', to: `/account/members/${vendorId}` },
+          ...memberTrail(vendorId, vendorName),
           { label: 'Deals', to: listPath },
           { label: isEdit ? title : 'Add deal' },
         ]

@@ -65,6 +65,37 @@ describe('member activity', () => {
     expect(items.find((i) => i.kind === 'reminder')?.summary).toBe('Manual reminder by Admin One sent by email and SMS');
   });
 
+  it('status items carry from, to and the actor as fields (P3-24)', async () => {
+    const items = await getMemberActivity('m1');
+    expect(items.find((i) => i.kind === 'status')).toMatchObject({
+      fromStatus: 'ACTIVE',
+      toStatus: 'SUSPENDED',
+      actorId: 'a1',
+      actorName: 'Admin One',
+      detail: 'Documents not completed',
+    });
+  });
+
+  it('document items carry the type, the event and whether staff uploaded it (P3-24)', async () => {
+    const items = await getMemberActivity('m1');
+    const docs = items.filter((i) => i.kind === 'document');
+    expect(docs).toEqual([
+      expect.objectContaining({ documentType: 'PAN', event: 'rejected', byStaff: true, detail: 'Blurry scan' }),
+      expect.objectContaining({ documentType: 'PAN', event: 'uploaded', byStaff: true, detail: null }),
+    ]);
+  });
+
+  it('reminder items carry the sequence, the channels that delivered and the sender (P3-24)', async () => {
+    prismaMock.memberDocumentReminder.findMany.mockResolvedValue([
+      REMINDER,
+      { ...REMINDER, sequence: null, smsStatus: 'SENT', sentByUserId: 'a1', sentAt: new Date('2026-10-13T04:30:00Z') },
+    ] as never);
+    const items = await getMemberActivity('m1');
+    const [manual, scheduled] = items.filter((i) => i.kind === 'reminder');
+    expect(manual).toMatchObject({ sequence: null, channels: ['email', 'sms'], actorId: 'a1', actorName: 'Admin One' });
+    expect(scheduled).toMatchObject({ sequence: 2, channels: ['email'], actorId: null, actorName: null });
+  });
+
   it('shows the review flag when it is set', async () => {
     const flaggedAt = new Date('2026-11-05T04:30:00Z');
     prismaMock.member.findUnique.mockResolvedValue({ reviewFlaggedAt: flaggedAt } as never);

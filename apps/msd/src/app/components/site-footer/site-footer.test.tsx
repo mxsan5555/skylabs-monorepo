@@ -58,6 +58,15 @@ describe('SiteFooter', () => {
     expect(within(discover).getByRole('link', { name: 'Therapists' })).toBeTruthy();
   });
 
+  it('links only to pages that exist: Help & Info has Help Center and Wishlist, no Gifting (ST-07)', () => {
+    renderFooter();
+    const help = within(screen.getByRole('navigation', { name: 'Help & Info' }));
+    expect(help.getByRole('link', { name: 'Help Center' }).getAttribute('href')).toBe('/help-center');
+    expect(help.getByRole('link', { name: 'Wishlist' }).getAttribute('href')).toBe('/wishlist');
+    expect(screen.queryByRole('link', { name: 'Gifting' })).toBeNull();
+    expect(document.querySelector('a[href="/gifting"], a[href="/help"]')).toBeNull();
+  });
+
   it('lists popular searches with the visitor city first', () => {
     renderFooter();
     const links = within(screen.getByRole('navigation', { name: 'Popular searches' })).getAllByRole('link');

@@ -255,9 +255,9 @@
 }
 
 .product-detail__related-inner {
-  max-width: 1280px;
+  max-width: var(--sky-content-max);
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0 var(--sky-content-gutter);
   display: flex;
   flex-direction: column;
   gap: 20px;

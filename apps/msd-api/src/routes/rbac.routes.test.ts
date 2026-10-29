@@ -70,56 +70,43 @@ describe('GET /api/v1/rbac/roles', () => {
   });
 });
 
-describe('POST /api/v1/rbac/roles', () => {
-  const validBody = { key: 'marketing_lead', name: 'Marketing Lead' };
+/**
+ * R1 / P2-15: the seven roles are fixed. Create, clone and delete keep their permission check
+ * (FORBIDDEN without it) and are otherwise refused with ROLE_MANAGEMENT_LOCKED; nothing is written.
+ * Editing a role and its grants still works (see the PATCH tests).
+ */
+describe('Role create, clone and delete are locked (R1, P2-15)', () => {
+  const ALL = ['rbac.roles:create', 'rbac.roles:delete'];
+  const auth = () => bearerFor({ sub: USER_ID, roles: ['super_admin'] });
 
   it('returns 401 with no token', async () => {
-    const res = await request(app).post('/api/v1/rbac/roles').send(validBody);
+    const res = await request(app).post('/api/v1/rbac/roles').send({ key: 'hr', name: 'HR' });
     expect(res.status).toBe(401);
   });
 
-  it('returns 422 for an invalid body (bad key slug, missing name)', async () => {
-    resolveMock.mockResolvedValue(['rbac.roles:create']);
-    const res = await request(app)
-      .post('/api/v1/rbac/roles')
-      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
-      .send({ key: 'Not A Slug!' });
-    expect(res.status).toBe(422);
-    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  it('still returns FORBIDDEN without the permission', async () => {
+    resolveMock.mockResolvedValue([]);
+    const res = await request(app).post('/api/v1/rbac/roles').set('Authorization', auth()).send({ key: 'hr', name: 'HR' });
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('FORBIDDEN');
   });
 
-  it('returns 201 with the created role for a valid body + permission', async () => {
-    resolveMock.mockResolvedValue(['rbac.roles:create']);
-    prismaMock.role.findUnique.mockResolvedValue(null);
-    prismaMock.role.create.mockResolvedValue({ ...roleFixture, ...validBody });
-    prismaMock.auditLog.create.mockResolvedValue({});
-    const res = await request(app)
-      .post('/api/v1/rbac/roles')
-      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
-      .send(validBody);
-    expect(res.status).toBe(201);
-    expect(res.body.data.key).toBe('marketing_lead');
-    expect(prismaMock.auditLog.create).toHaveBeenCalledOnce();
-  });
-
-  it('returns 409 when the role key already exists', async () => {
-    resolveMock.mockResolvedValue(['rbac.roles:create']);
+  it.each([
+    ['post', '/api/v1/rbac/roles', { key: 'hr', name: 'HR' }],
+    ['post', `/api/v1/rbac/roles/${ROLE_ID}/clone`, { key: 'hr', name: 'HR' }],
+    ['delete', `/api/v1/rbac/roles/${ROLE_ID}`, undefined],
+  ] as const)('%s %s returns 403 ROLE_MANAGEMENT_LOCKED and writes nothing', async (method, url, body) => {
+    resolveMock.mockResolvedValue(ALL);
     prismaMock.role.findUnique.mockResolvedValue(roleFixture);
-    const res = await request(app)
-      .post('/api/v1/rbac/roles')
-      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
-      .send(validBody);
-    expect(res.status).toBe(409);
-    expect(res.body.error.code).toBe('CONFLICT');
+    const req = request(app)[method](url).set('Authorization', auth());
+    const res = body ? await req.send(body) : await req;
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('ROLE_MANAGEMENT_LOCKED');
+    expect(prismaMock.role.create).not.toHaveBeenCalled();
+    expect(prismaMock.role.delete).not.toHaveBeenCalled();
+    expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
   });
 });
-
-/**
- * Feature: User Management role filter + Superadmin exclusion (Vendor Validation/Permissions
- * audit, Phase 6). `listUsers` joins through `UserRole -> Role.key` for the `roleKey` filter and
- * excludes any Superadmin-flagged role's users from every call by default — Superadmin manages
- * their own profile via the separate `/rbac/users/me` surface (Phase 7), not as a row here.
- */
 describe('GET /api/v1/rbac/users', () => {
   const nonSuperadminUser = {
     id: TARGET_USER_ID,
@@ -300,46 +287,6 @@ describe('PATCH /api/v1/rbac/roles/:id', () => {
       .send({ name: 'New name' });
     expect(res.status).toBe(200);
     expect(res.body.data.name).toBe('New name');
-  });
-});
-
-describe('DELETE /api/v1/rbac/roles/:id', () => {
-  it('returns 401 with no token', async () => {
-    const res = await request(app).delete(`/api/v1/rbac/roles/${ROLE_ID}`);
-    expect(res.status).toBe(401);
-  });
-
-  it('returns 403 without rbac.roles:delete', async () => {
-    resolveMock.mockResolvedValue([]);
-    const res = await request(app)
-      .delete(`/api/v1/rbac/roles/${ROLE_ID}`)
-      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }));
-    expect(res.status).toBe(403);
-  });
-
-  it('returns 200 and null data on a successful delete', async () => {
-    resolveMock.mockResolvedValue(['rbac.roles:delete']);
-    prismaMock.role.findUnique.mockResolvedValue(roleFixture);
-    prismaMock.userRole.count.mockResolvedValue(0);
-    prismaMock.rolePermission.deleteMany.mockResolvedValue({});
-    prismaMock.roleDashboardWidget.deleteMany.mockResolvedValue({});
-    prismaMock.role.delete.mockResolvedValue(roleFixture);
-    prismaMock.auditLog.create.mockResolvedValue({});
-    const res = await request(app)
-      .delete(`/api/v1/rbac/roles/${ROLE_ID}`)
-      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }));
-    expect(res.status).toBe(200);
-    expect(res.body.data).toBeNull();
-  });
-
-  it('returns 403 (FORBIDDEN) when deleting a system role', async () => {
-    resolveMock.mockResolvedValue(['rbac.roles:delete']);
-    prismaMock.role.findUnique.mockResolvedValue({ ...roleFixture, isSystem: true });
-    const res = await request(app)
-      .delete(`/api/v1/rbac/roles/${ROLE_ID}`)
-      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }));
-    expect(res.status).toBe(403);
-    expect(res.body.error.code).toBe('FORBIDDEN');
   });
 });
 

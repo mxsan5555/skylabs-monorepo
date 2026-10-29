@@ -118,6 +118,10 @@ export interface Vendor extends Omit<VendorFields, 'businessName'> {
   offersTherapy: boolean;
   /** Every row, including drafts and inactive items. */
   _count?: { branches: number; deals: number; products: number; therapists: number };
+  /** Distinct customers and orders with an order line from this member. Only on the member detail
+   *  (`GET /members/:id`), same rows as the Customers list (P10-49). */
+  customerCount?: number;
+  orderCount?: number;
   /** Active branches/products/therapists and ACTIVE + APPROVED deals. Only on `GET /vendors` and
    *  `GET /vendors/:id`. Show it as "live of total" next to `_count`. */
   liveCounts?: { branches: number; deals: number; products: number; therapists: number };
