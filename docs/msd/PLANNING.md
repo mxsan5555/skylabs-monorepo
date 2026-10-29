@@ -349,6 +349,11 @@ A member who opens another member's deal, branch, package or therapist gets 404.
   (`PurchaseLineCard`, built by `utils/cart-items.ts` from a cart item or an order item): type tag,
   title, the member's name and branch inside the card, duration, quantity and price. Title and
   image open the detail page in a new tab, and the title says so to screen readers.
+- **Cart actions (item 2.1):** each cart card has a select checkbox, the quantity stepper, Move
+  to wishlist (deals and products; therapists have no wishlist) and Remove. Select all plus
+  Remove selected removes several lines at once (one clear call when every line is selected,
+  otherwise one call per line); Move to wishlist adds the item first and only then removes it
+  from the cart, so a failed add keeps the line.
 - Staff block or unblock a customer with a reason (`customers:status_change`); customers are never
   deleted.
 - **Refunds (D11):** Support raises a refund request; Admin or Super Admin approves or rejects

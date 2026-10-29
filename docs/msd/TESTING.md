@@ -237,6 +237,11 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
   detail page with `target="_blank"`, `rel="noopener noreferrer"` and "(opens in a new tab)"; no
   link or image when the line has none; the cart slots (select, quantity, actions) render and hide
   "× qty"; the checkout summary lists every cart line as a card with the total.
+- Cart page (item 2.1, `cart.test.tsx`): cards carry the member and a new-tab detail link, no
+  vendor group headings; Move to wishlist shows for deals and products only, adds the product
+  then removes the line, and keeps the line with an alert when the add fails; Remove selected is
+  disabled with nothing selected and removes only the chosen lines; Select all (n) selects every
+  line and clears the cart in one call.
 
 - A customer never reads or changes another customer's cart, wishlist or order by changing an id.
 - A member never changes an order's status (403), for a deal or a product order (D27).

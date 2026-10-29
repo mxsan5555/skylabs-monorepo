@@ -903,6 +903,7 @@
     "total": "Total",
     "giftCardPlaceholder": "Enter coupon code",
     "itemsAriaLabel": "Cart items",
+    "quantity": "Quantity",
     "quantityLabel": "Quantity for",
     "decreaseQuantity": "Decrease quantity",
     "increaseQuantity": "Increase quantity",
@@ -911,6 +912,15 @@
     "fromCart": "from cart",
     "clearCart": "Clear cart",
     "allItemsFrom": "All items from",
+    "selectAll": "Select all ({count})",
+    "selectItem": "Select {title}",
+    "removeSelected": "Remove selected",
+    "removeSelectedCount": "Remove selected ({count})",
+    "removedItems": "{count} {items} removed from your cart.",
+    "moveToWishlist": "Move to wishlist",
+    "moveToWishlistLabel": "Move {title} to your wishlist",
+    "movedToWishlist": "Moved to your wishlist.",
+    "viewWishlist": "View wishlist",
     "serverPriceNote": "Price is recalculated server-side at checkout, before payment.",
     "links": {
       "bookings": "View your bookings →",
@@ -919,7 +929,9 @@
     "error": {
       "load": "Could not load your cart.",
       "updateQuantity": "Could not update quantity.",
-      "removeItem": "Could not remove item."
+      "removeItem": "Could not remove item.",
+      "removeSelected": "Could not remove the selected items. Your cart is refreshed.",
+      "moveToWishlist": "Could not move this item to your wishlist."
     }
   },
   "wishlist": {
