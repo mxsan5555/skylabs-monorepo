@@ -255,6 +255,12 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
   (`/help-center`) and Wishlist, and no Gifting link until a gift-card feature exists.
 - One `<main>` per page (ST-04, `one-main-landmark.test.ts`): only the layouts render `<main>`; no
   file under `app/pages` does, so the skip link keeps a single target.
+- Facet selections and price bounds (ST-25, `checkbox-facet.test.tsx`, `price-range-field.test.tsx`):
+  a checked option past the limit shows while collapsed after the first rows, and Show more
+  hides when only checked options are left past the limit; checked options stay during a
+  search that does not match them; a checked option the facet stops listing stays with its last
+  label, a 0 count and an enabled checkbox that clears it; URL prices outside the bounds show
+  clamped in both fields and the slider, with min never above max.
 - Use my current location (ST-05, `city-picker.test.tsx`, `location-context.test.tsx`): located
   near a partner city closes the picker; a refused or failed lookup and a location more than
   75 km from every partner city each keep it open with their own alert (the button points at it

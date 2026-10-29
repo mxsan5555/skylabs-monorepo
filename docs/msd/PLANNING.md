@@ -418,6 +418,10 @@ A member who opens another member's deal, branch, package or therapist gets 404.
     | Therapists (`/therapists`, THERAPY category) | Your location, Distance, Price ("From" price), Business, Branches | Relevance, Price low-high / high-low, Distance (with coordinates) |
     | Explore | the selected kind's sections; "All" shows Your location, Distance, Price | the selected kind's sorts |
     No Reviews filter until a review system exists (ST-22).
+  - **Selections stay visible** (ST-25): a checked facet option is always shown, past "Show
+    more" or outside the facet search (after the list, in its order), and one the facet stops
+    listing keeps its last label with a 0 count so it can be cleared. A URL price outside the
+    facet price range shows clamped into the slider range; the next change sends that range.
   - **Tags** (New, Deal, Hot, Expire soon; one per card on the image, theme role via
     `badge-color` / `badge-tone` as in the showcase): a Tags checkbox facet with counts on deal,
     product, category and explore pages, `?tag=new,hot`. They replace the popular-tag label on
