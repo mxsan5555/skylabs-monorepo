@@ -39,6 +39,7 @@ silently ships the bare SPA); preview and local builds fall back to the SPA. Red
 | `TRUST_PROXY_HOPS` | `1` on Railway (one proxy); leave unset locally | |
 | `API_DOCS` | unset (Swagger `/docs` off in production); `true` only to open it temporarily | |
 | `REQUEST_LOGGING` | unset (one JSON line per request, with `X-Request-Id`); `false` to silence | |
+| `DEV_OTP_IDENTIFIERS` | **never set** on Railway (local test accounts only; production refuses to boot with it) | |
 | `CORS_ORIGIN` | exact Vercel origins, comma-separated | |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth client id / secret | 🔒 (secret) |
 | `GOOGLE_CALLBACK_URL` | `https://<msd-api-railway-domain>/api/v1/auth/google/callback` | |

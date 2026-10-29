@@ -14,6 +14,21 @@ npx vitest run <path> --config apps/msd/vite.config.mts     # one folder or file
 npx vitest run <path> --config apps/msd-api/vite.config.ts  # one folder or file (msd-api)
 ```
 
+### Local test accounts
+
+`npm run msd-api:prisma:seed-dev-users` creates (or updates) these accounts in the local database.
+Their phones and emails are made up, so `DEV_OTP_IDENTIFIERS` in `apps/msd-api/.env.local` lists
+them: signing in with one prints the OTP in the `nx serve msd-api` console (a JSON line with
+`"event":"otp.dev_console"` and the 6-digit `code`) instead of sending an SMS or email. Every other
+phone or email still gets a real OTP, and production refuses to boot with the list set.
+
+| Role | Name | Phone (sign in with) | Email | Business / city |
+|---|---|---|---|---|
+| Member | Alok Kumar | 9112312391 | test@test.com | Alok Kumar Wellness, New Delhi |
+| Member | Ravi Singh | 9122558891 | hello@hello.com | Ravi Singh Spa, Mumbai |
+| Customer | Neeraj Singh | 9177889991 | neeraj@test.com | New Delhi |
+| Customer | Sudhir Vishwa | 9144556610 | suddhir@test.com | Bengaluru |
+
 Needs Postgres (local, never Neon production): `prisma migrate dev`, seed twice, the role × resource
 × action × own/other matrix test, IDOR tests, migration row-count rehearsal.
 

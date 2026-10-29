@@ -68,6 +68,12 @@ export const env = {
   supportPhone: process.env.SUPPORT_PHONE ?? '',
   /** 32 bytes, base64. Encrypts full Aadhaar and PAN numbers at rest. Optional in development. */
   fieldEncryptionKey: process.env.FIELD_ENCRYPTION_KEY ?? '',
+  /** Local test accounts (comma-separated phones or emails) whose OTP prints in the API console
+   *  instead of being sent. Development only: production refuses to boot with it set. */
+  devOtpIdentifiers: (process.env.DEV_OTP_IDENTIFIERS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
   /** Shared with the Railway cron service; guards `/internal/jobs/*`. Unset disables the jobs (503). */
   cronSecret: process.env.CRON_SECRET ?? '',
   /** Secret mixed into the document number hash used for the duplicate check. */

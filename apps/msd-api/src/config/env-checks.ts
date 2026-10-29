@@ -35,6 +35,10 @@ export function productionEnvProblems(source: EnvSource): string[] {
     if (!value(source, name)) problems.push(`${name} is required`);
   }
 
+  if (value(source, 'DEV_OTP_IDENTIFIERS')) {
+    problems.push('DEV_OTP_IDENTIFIERS must be unset in production');
+  }
+
   const fieldKey = value(source, 'FIELD_ENCRYPTION_KEY');
   if (fieldKey && Buffer.from(fieldKey, 'base64').length !== FIELD_KEY_BYTES) {
     problems.push(`FIELD_ENCRYPTION_KEY must be ${FIELD_KEY_BYTES} bytes, base64`);

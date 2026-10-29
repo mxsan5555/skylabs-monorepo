@@ -46,6 +46,12 @@ describe('productionEnvProblems', () => {
     expect(problems.join(' ')).not.toContain(Buffer.alloc(16).toString('base64'));
   });
 
+  it('refuses the dev OTP list in production', () => {
+    expect(productionEnvProblems({ ...GOOD, DEV_OTP_IDENTIFIERS: '9112312391' })).toEqual([
+      'DEV_OTP_IDENTIFIERS must be unset in production',
+    ]);
+  });
+
   it('treats blank values as missing', () => {
     expect(productionEnvProblems({ ...GOOD, CRON_SECRET: '   ' })).toEqual(['CRON_SECRET is required']);
   });

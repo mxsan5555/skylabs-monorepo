@@ -8,6 +8,8 @@ import { sendOtp as sendSmsOtp } from '../providers/sms/connectExpress.provider'
 import { sendOtpEmail } from '../providers/email/smtp.provider';
 import { suspendedMessage } from '../lib/member-messages';
 import { readMemberAccessState } from './member-access.service';
+import { isDevOtpIdentifier } from '../lib/dev-otp';
+import { logger } from '../lib/logger';
 
 const OTP_HASH_ROUNDS = 10;
 
@@ -44,6 +46,12 @@ export async function requestOtp(identifier: string, purpose: OtpPurpose): Promi
   await prisma.otpChallenge.create({
     data: { identifier, purpose, hashedOtp, expiresAt },
   });
+
+  // Local test accounts (DEV_OTP_IDENTIFIERS, never in production): print instead of sending.
+  if (isDevOtpIdentifier(identifier)) {
+    logger.warn('otp.dev_console', { identifier, code: otp, purpose });
+    return;
+  }
 
   if (isPhoneIdentifier(identifier)) {
     const delivered = await sendSmsOtp(identifier, otp);
