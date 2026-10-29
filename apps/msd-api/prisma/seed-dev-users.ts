@@ -128,7 +128,9 @@ async function main() {
     await upsertUser(c.name, c.phone, c.email, [customerRole]);
   }
 
-  const identifiers = [...DEV_MEMBERS, ...DEV_CUSTOMERS].map((u) => u.phone.replace('+91', ''));
+  // Phones and emails both: a sign-in with either must print its OTP, never send it.
+  const users = [...DEV_MEMBERS, ...DEV_CUSTOMERS];
+  const identifiers = [...users.map((u) => u.phone.replace('+91', '')), ...users.map((u) => u.email)];
   console.log(`Seeded ${DEV_MEMBERS.length} members and ${DEV_CUSTOMERS.length} customers.`);
   console.log(`Add to apps/msd-api/.env.local, then restart nx serve msd-api:\nDEV_OTP_IDENTIFIERS=${identifiers.join(',')}`);
 }

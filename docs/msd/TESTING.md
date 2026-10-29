@@ -18,7 +18,8 @@ npx vitest run <path> --config apps/msd-api/vite.config.ts  # one folder or file
 
 `npm run msd-api:prisma:seed-dev-users` creates (or updates) these accounts in the local database.
 Their phones and emails are made up, so `DEV_OTP_IDENTIFIERS` in `apps/msd-api/.env.local` lists
-them: signing in with one prints the OTP in the `nx serve msd-api` console (a JSON line with
+both the phones and the emails (an email left off the list gets a real email, and `test.com` is a
+real domain): signing in with one prints the OTP in the `nx serve msd-api` console (a JSON line with
 `"event":"otp.dev_console"` and the 6-digit `code`) instead of sending an SMS or email. Every other
 phone or email still gets a real OTP, and production refuses to boot with the list set.
 
