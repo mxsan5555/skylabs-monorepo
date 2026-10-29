@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { createElement, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { MdFilledButton } from '@material/web/button/filled-button.js';
 import { FilledButton, OutlinedTextField } from '@skylabs-monorepo/shared-ui/react';
 import {
@@ -13,6 +13,8 @@ import { ApiRequestError } from '../../../../api/rbac/client';
 import { MEMBER_STATUS_LABEL } from './member-status';
 import { EMAIL_REGEX, MOBILE_REGEX } from '../../../../utils/format';
 import { VendorDocumentUpload } from '../../../components/vendor-document-upload';
+import { STATES, citiesForState } from '@skylabs-monorepo/shared-utils';
+import { asOptions, renderSelect } from './form-controls';
 
 const EMPTY_FORM: VendorFields = {
   businessName: '',
@@ -139,6 +141,27 @@ const SECTION_FIELDS: Record<VendorFormSection, (keyof VendorFields)[]> = {
 /** Required (non-empty) fields per section — everything else in `SECTION_FIELDS` is optional.
  *  Drives both the inline "this field is required" messages and the Save/Create-Vendor button's
  *  enablement (see `canSubmit` below). `kyc`/`bank` have no required scalar fields. */
+/** Names for the fields a save can stop on, in form order (the item 8 summary alert). */
+const FIELD_LABELS: Partial<Record<keyof VendorFields, string>> = {
+  businessName: 'Business name',
+  businessEmail: 'Business email',
+  businessPhone: 'Business phone',
+  ownerFirstName: 'First name',
+  ownerLastName: 'Last name',
+  ownerEmail: 'Email',
+  ownerMobile: 'Phone number',
+  address: 'Address 1',
+  state: 'State',
+  city: 'City',
+  pincode: 'PIN code',
+  mapLocationUrl: 'Map location',
+  bankIfsc: 'IFSC',
+  bankAccountNumber: 'Account number',
+  upiId: 'UPI ID',
+};
+
+const KYC_REQUIRED = 'Upload at least one KYC document.';
+
 const REQUIRED_FIELDS: Record<VendorFormSection, (keyof VendorFields)[]> = {
   business: ['businessName', 'businessEmail', 'businessPhone'],
   owner: ['ownerFirstName', 'ownerLastName', 'ownerEmail', 'ownerMobile'],
@@ -314,6 +337,11 @@ export function VendorProfileForm({
 }: VendorProfileFormProps) {
   const [form, setForm] = useState<VendorFields>(() => toFormFields(vendor));
   const [errors, setErrors] = useState<VendorFieldErrors>({});
+  // What a save stopped on (item 8): named in one alert above the save bar, never a silently
+  // disabled button.
+  const [summary, setSummary] = useState<string[]>([]);
+  const formId = useId();
+  const saved = useMemo(() => toFormFields(vendor), [vendor]);
 
   // Whether each of the 3 KYC slots currently has a file — staged (pre-creation) or really
   // uploaded — reported up by each VendorDocumentUpload. Drives "at least one KYC document"
@@ -370,6 +398,7 @@ export function VendorProfileForm({
   useEffect(() => {
     setForm(toFormFields(vendor));
     setErrors({});
+    setSummary([]);
   }, [vendor]);
 
   useEffect(() => {
@@ -397,6 +426,7 @@ export function VendorProfileForm({
     setForm((f) => ({
       ...f,
       [key]: value,
+      ...(key === 'state' && value !== f.state ? { city: '' } : {}),
     }));
 
     // Clear a field's inline error as soon as the user edits it — the next Save click
@@ -454,11 +484,26 @@ export function VendorProfileForm({
           nextErrors[key] = message;
         }
       }
+      for (const key of REQUIRED_FIELDS[section]) {
+        if (!nextErrors[key] && String(form[key] ?? '').trim() === '') {
+          nextErrors[key] = `Enter the ${(FIELD_LABELS[key] ?? key).toLowerCase()}.`;
+        }
+      }
     }
 
     setErrors(nextErrors);
+    const missing = (Object.keys(FIELD_LABELS) as (keyof VendorFields)[])
+      .filter((key) => nextErrors[key])
+      .map((key) => FIELD_LABELS[key] as string);
+    const kycMissing = show('kyc') && !Object.values(kycSlotHasFile).some(Boolean);
+    setSummary(kycMissing ? [...missing, KYC_REQUIRED] : missing);
+    const first = (Object.keys(FIELD_LABELS) as (keyof VendorFields)[]).find((key) => nextErrors[key]);
+    if (first) {
+      const field = document.querySelector<HTMLElement>(`[data-field="${formId}-${first}"] md-outlined-text-field, [data-field="${formId}-${first}"] md-outlined-select`);
+      field?.focus();
+    }
 
-    return Object.keys(nextErrors).length === 0;
+    return Object.keys(nextErrors).length === 0 && !kycMissing;
   };
 
   /** Required-field-non-empty AND no active inline error, across every currently-shown
@@ -501,12 +546,20 @@ export function VendorProfileForm({
     noActiveErrors &&
     kycSatisfied;
 
+  const visibleFields = sections.flatMap((s) => SECTION_FIELDS[s]);
+  const dirty = visibleFields.some((key) => String(form[key] ?? '') !== String(saved[key] ?? ''));
+
+  /** Puts the saved values back (item 8). */
+  const discard = () => {
+    setForm(toFormFields(vendor));
+    setErrors({});
+    setSummary([]);
+  };
+
   const handleSave = () => {
     if (submittingRef.current) return;
 
     if (!validateVisibleFields()) return;
-
-    if (!canSubmit) return;
 
     submittingRef.current = true;
 
@@ -542,14 +595,11 @@ export function VendorProfileForm({
         )}
 
       {show('business') && (
-        <sky-tile-card
-          className="vendor-section-card"
-          headline="Business Details"
-          text="Basic information about the vendor business."
-          color="none"
-        >
+        <section className="vendor-section" aria-labelledby={`${formId}-business-title`}>
+          <h3 id={`${formId}-business-title`} className="vendor-section__title title-small">Business details</h3>
+          <p className="vendor-section__hint body-small">Basic information about the business.</p>
           <div className="vendor-fields-grid">
-            <div className="vendor-field">
+            <div className="vendor-field" data-field={`${formId}-businessName`}>
               <OutlinedTextField
                 label="Business name"
                 value={form.businessName ?? ''}
@@ -565,7 +615,7 @@ export function VendorProfileForm({
               )}
             </div>
 
-            <div className="vendor-field">
+            <div className="vendor-field" data-field={`${formId}-businessDescription`}>
               <OutlinedTextField
                 label="Description"
                 value={form.businessDescription ?? ''}
@@ -574,7 +624,7 @@ export function VendorProfileForm({
               />
             </div>
 
-            <div className="vendor-field">
+            <div className="vendor-field" data-field={`${formId}-businessEmail`}>
               <OutlinedTextField
                 label="Business email"
                 type="email"
@@ -591,7 +641,7 @@ export function VendorProfileForm({
               )}
             </div>
 
-            <div className="vendor-field">
+            <div className="vendor-field" data-field={`${formId}-businessPhone`}>
               <OutlinedTextField
                 label="Business phone"
                 type="tel"
@@ -610,17 +660,14 @@ export function VendorProfileForm({
               )}
             </div>
           </div>
-        </sky-tile-card>
+        </section>
       )}
       {show('owner') && (
-        <sky-tile-card
-          className="vendor-section-card"
-          headline="Personal Information"
-          text="Owner and primary contact information."
-          color="none"
-        >
+        <section className="vendor-section" aria-labelledby={`${formId}-owner-title`}>
+          <h3 id={`${formId}-owner-title`} className="vendor-section__title title-small">Owner</h3>
+          <p className="vendor-section__hint body-small">Owner and primary contact information.</p>
           <div className="vendor-fields-grid">
-            <div className="vendor-field">
+            <div className="vendor-field" data-field={`${formId}-ownerFirstName`}>
               <OutlinedTextField
                 label="First Name"
                 value={form.ownerFirstName ?? ''}
@@ -629,7 +676,7 @@ export function VendorProfileForm({
               />
             </div>
 
-            <div className="vendor-field">
+            <div className="vendor-field" data-field={`${formId}-ownerLastName`}>
               <OutlinedTextField
                 label="Last Name"
                 value={form.ownerLastName ?? ''}
@@ -638,7 +685,7 @@ export function VendorProfileForm({
               />
             </div>
 
-            <div className="vendor-field">
+            <div className="vendor-field" data-field={`${formId}-ownerMobile`}>
               <OutlinedTextField
                 label="Phone Number"
                 type="tel"
@@ -656,7 +703,7 @@ export function VendorProfileForm({
               )}
             </div>
 
-            <div className="vendor-field">
+            <div className="vendor-field" data-field={`${formId}-ownerEmail`}>
               <OutlinedTextField
                 label="Email"
                 type="email"
@@ -672,26 +719,29 @@ export function VendorProfileForm({
               )}
             </div>
           </div>
-        </sky-tile-card>
+        </section>
       )}
       {show('address') && (
-        <sky-tile-card
-          className="vendor-section-card"
-          headline="Registered Address"
-          text="Business address and map location."
-          color="none"
-        >
+        <section className="vendor-section" aria-labelledby={`${formId}-address-title`}>
+          <h3 id={`${formId}-address-title`} className="vendor-section__title title-small">Registered address</h3>
+          <p className="vendor-section__hint body-small">Business address and map location.</p>
           <div className="vendor-fields-grid">
-            <div className="vendor-field">
+            <div className="vendor-field" data-field={`${formId}-address`}>
               <OutlinedTextField
                 label="Address 1"
                 value={form.address ?? ''}
                 disabled={!canEdit}
                 onInput={text('address')}
+                error={Boolean(errors.address)}
               />
+              {errors.address && (
+                <p className="error-state" role="alert">
+                  {errors.address}
+                </p>
+              )}
             </div>
 
-            <div className="vendor-field">
+            <div className="vendor-field" data-field={`${formId}-addressLine2`}>
               <OutlinedTextField
                 label="Address 2"
                 value={form.addressLine2 ?? ''}
@@ -700,25 +750,35 @@ export function VendorProfileForm({
               />
             </div>
 
-            <div className="vendor-field">
-              <OutlinedTextField
-                label="City"
-                value={form.city ?? ''}
-                disabled={!canEdit}
-                onInput={text('city')}
-              />
+            <div className="vendor-field" data-field={`${formId}-state`}>
+              {renderSelect({
+                label: 'State',
+                value: form.state ?? '',
+                disabled: !canEdit,
+                placeholder: 'Select a state',
+                options: asOptions(STATES),
+                // A saved state outside the list stays selectable instead of being cleared.
+                extraOption: form.state && !STATES.includes(form.state) ? { value: form.state, label: form.state } : undefined,
+                onChange: (value) => set('state', value),
+              })}
+              {errors.state && <p className="error-state" role="alert">{errors.state}</p>}
             </div>
 
-            <div className="vendor-field">
-              <OutlinedTextField
-                label="State"
-                value={form.state ?? ''}
-                disabled={!canEdit}
-                onInput={text('state')}
-              />
+            <div className="vendor-field" data-field={`${formId}-city`}>
+              {renderSelect({
+                label: 'City',
+                value: form.city ?? '',
+                disabled: !canEdit || !form.state,
+                placeholder: form.state ? 'Select a city' : 'Select a state first',
+                options: asOptions(citiesForState(form.state ?? '')),
+                extraOption:
+                  form.city && !citiesForState(form.state ?? '').includes(form.city) ? { value: form.city, label: form.city } : undefined,
+                onChange: (value) => set('city', value),
+              })}
+              {errors.city && <p className="error-state" role="alert">{errors.city}</p>}
             </div>
 
-            <div className="vendor-field">
+            <div className="vendor-field" data-field={`${formId}-pincode`}>
               <OutlinedTextField
                 label="PIN Code"
                 value={form.pincode ?? ''}
@@ -733,7 +793,7 @@ export function VendorProfileForm({
               )}
             </div>
 
-            <div className="vendor-field">
+            <div className="vendor-field" data-field={`${formId}-mapLocationUrl`}>
               <OutlinedTextField
                 label="Map Location"
                 type="url"
@@ -750,15 +810,12 @@ export function VendorProfileForm({
               )}
             </div>
           </div>
-        </sky-tile-card>
+        </section>
       )}
       {show('kyc') && (
-        <sky-tile-card
-          className="vendor-section-card"
-          headline="KYC Documents"
-          text="Upload one document for vendor verification."
-          color="none"
-        >
+        <section className="vendor-section" aria-labelledby={`${formId}-kyc-title`}>
+          <h3 id={`${formId}-kyc-title`} className="vendor-section__title title-small">KYC documents</h3>
+          <p className="vendor-section__hint body-small">Upload one document for vendor verification.</p>
           <div className="vendor-section-content">
             {canEdit && (
               <p className="field-hint">
@@ -807,17 +864,14 @@ export function VendorProfileForm({
             </div>
 
           </div>
-        </sky-tile-card>
+        </section>
       )}
       {show('bank') && (
-        <sky-tile-card
-          className="vendor-section-card"
-          headline="Bank Details"
-          text="Payment and settlement account information."
-          color="none"
-        >
+        <section className="vendor-section" aria-labelledby={`${formId}-bank-title`}>
+          <h3 id={`${formId}-bank-title`} className="vendor-section__title title-small">Bank details</h3>
+          <p className="vendor-section__hint body-small">Payment and settlement account information.</p>
           <div className="vendor-fields-grid">
-            <div className="vendor-field">
+            <div className="vendor-field" data-field={`${formId}-bankAccountHolder`}>
               <OutlinedTextField
                 label="Account holder"
                 value={form.bankAccountHolder ?? ''}
@@ -826,7 +880,7 @@ export function VendorProfileForm({
               />
             </div>
 
-            <div className="vendor-field">
+            <div className="vendor-field" data-field={`${formId}-bankName`}>
               <OutlinedTextField
                 label="Bank name"
                 value={form.bankName ?? ''}
@@ -835,7 +889,7 @@ export function VendorProfileForm({
               />
             </div>
 
-            <div className="vendor-field">
+            <div className="vendor-field" data-field={`${formId}-bankAccountNumber`}>
               <OutlinedTextField
                 label="Account number"
                 value={form.bankAccountNumber ?? ''}
@@ -844,7 +898,7 @@ export function VendorProfileForm({
               />
             </div>
 
-            <div className="vendor-field">
+            <div className="vendor-field" data-field={`${formId}-bankIfsc`}>
               <OutlinedTextField
                 label="IFSC"
                 value={form.bankIfsc ?? ''}
@@ -853,7 +907,7 @@ export function VendorProfileForm({
               />
             </div>
 
-            <div className="vendor-field">
+            <div className="vendor-field" data-field={`${formId}-upiId`}>
               <OutlinedTextField
                 label="UPI ID"
                 value={form.upiId ?? ''}
@@ -862,22 +916,30 @@ export function VendorProfileForm({
               />
             </div>
           </div>
-        </sky-tile-card>
+        </section>
+      )}
+
+      {canEdit && summary.length > 0 && (
+        <div className="vendor-form__summary" role="alert" aria-labelledby={`${formId}-summary`}>
+          <p id={`${formId}-summary`} className="title-small">Fix these fields to save</p>
+          <ul className="body-medium">
+            {summary.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {canEdit && (
-        <div className="form-actions">
-          <FilledButton
-            ref={saveButtonRef}
-            onClick={handleSave}
-            disabled={saving || !canSubmit}
-          >
-            {saving
-              ? 'Saving…'
-              : (saveLabel ??
-                (vendor
-                  ? 'Save profile'
-                  : 'Create vendor'))}
+        <div className="form-actions vendor-form__actions">
+          {vendor && dirty && (
+            <>
+              <p className="vendor-form__dirty body-medium" role="status">You have unsaved changes.</p>
+              {createElement('md-text-button', { onClick: discard, disabled: saving || undefined }, 'Discard')}
+            </>
+          )}
+          <FilledButton ref={saveButtonRef} onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving…' : (saveLabel ?? (vendor ? 'Save changes' : 'Create vendor'))}
           </FilledButton>
         </div>
       )}

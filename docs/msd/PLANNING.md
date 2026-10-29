@@ -113,6 +113,10 @@ only and never change an order's status, for deals or products (D27).
   back: Inactive and Suspended reactivate to Active, Archived restores to Inactive. The console
   shows the next blocked step disabled with its reason, and only the action whose panel is open is
   filled.
+- **Profile form (item 8):** one clean form, plain titled sections (Business details, Owner,
+  Registered address, KYC documents, Bank details), two columns up to 960px and one on phones,
+  State and City from the India location list. Save is never disabled without a reason: it
+  validates on click and names what to fix; the save bar stays at the bottom with Discard.
 - **Notices:** every change sends the member an email and an SMS (inactive, suspended, active
   again, archived, restored) and emails every staff user holding `members:status_change`.
 - Status can change at any time, even with no branches or deals.

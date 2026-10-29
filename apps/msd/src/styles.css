@@ -1025,23 +1025,42 @@ a.dashboard-stat:focus-visible {
   margin: 4px 0 0;
   padding-inline-start: 20px;
 }
-/* ── Vendor Profile Form ─────────────────────────────────────────────── */
-.vendor-fields-grid md-outlined-text-field {
-  width: 100%;
-  min-width: 0;
-}
-.form-grid > sky-tile-card {
+/* ── Member profile form (vendor-profile-form.tsx, item 8) ───────────────
+   Plain titled sections separated by space and a hairline (no card inside a card), a two
+   column grid capped in width so fields stay readable, one column on phones, and a save bar
+   that stays at the bottom while the form scrolls. */
+.vendor-section {
   grid-column: 1 / -1;
-  width: 100%;
-  display: block;
-  box-sizing: border-box;
+  display: grid;
+  gap: 16px;
+  padding-block: 24px;
+  border-top: 1px solid var(--md-sys-color-outline-variant);
 }
+
+.vendor-section:first-of-type {
+  border-top: 0;
+  padding-top: 8px;
+}
+
+.vendor-section__title,
+.vendor-section__hint {
+  margin: 0;
+}
+
+.vendor-section__title {
+  color: var(--md-sys-color-on-surface);
+}
+
+.vendor-section__hint {
+  margin-top: -12px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
 .vendor-fields-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: 28px;
-  row-gap: 24px;
-  width: 100%;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 20px 24px;
+  max-inline-size: 960px;
 }
 
 .vendor-field {
@@ -1049,10 +1068,10 @@ a.dashboard-stat:focus-visible {
   flex-direction: column;
   gap: 6px;
   min-width: 0;
-  width: 100%;
 }
 
-.vendor-field md-outlined-text-field {
+.vendor-field md-outlined-text-field,
+.vendor-field md-outlined-select {
   width: 100%;
   min-width: 0;
 }
@@ -1060,15 +1079,43 @@ a.dashboard-stat:focus-visible {
 .vendor-field .error-state {
   margin: 0;
   padding: 0;
-  text-align: left;
+  text-align: start;
   font-size: 0.75rem;
 }
 
-.form-grid > sky-tile-card {
+/* What a save stopped on: named, never a silently disabled button. */
+.vendor-form__summary {
   grid-column: 1 / -1;
-  width: 100%;
-  box-sizing: border-box;
+  max-inline-size: 960px;
+  padding: 12px 16px;
+  border-radius: var(--md-sys-shape-corner-medium, 12px);
+  background-color: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
 }
+
+.vendor-form__summary p,
+.vendor-form__summary ul {
+  margin: 0;
+}
+
+.vendor-form__summary ul {
+  margin-top: 4px;
+  padding-inline-start: 20px;
+}
+
+.vendor-form__actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  padding-bottom: 16px;
+  background-color: var(--md-sys-color-surface);
+}
+
+.vendor-form__dirty {
+  margin: 0 auto 0 0;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
 .vendor-section-content {
   display: flex;
   flex-direction: column;

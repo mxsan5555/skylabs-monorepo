@@ -106,6 +106,13 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
 
 ### 4.2 Members
 
+- Member profile form (item 8, `vendor-profile-form.test.tsx`): Save ("Save changes") is enabled
+  whenever the viewer can edit; a click with missing or invalid fields saves nothing, marks each
+  field and lists them in one "Fix these fields to save" alert (focus moves to the first); State
+  and City are lists from the India location list, City unlocks after State and resets when State
+  changes; "You have unsaved changes." with Discard appears after an edit; sections are titled
+  regions, never bordered cards.
+
 - Status journey (item 6, `member-status-machine.test.ts`, `member-status.service.test.ts`,
   `member-header-actions.test.tsx`, `member-status.test.ts`): Active → Suspended is 409 "Make the
   member inactive first"; Active → Inactive → Suspended works; Suspended and Inactive reactivate;

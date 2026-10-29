@@ -10,6 +10,9 @@ import { createElement, type ChangeEvent } from 'react';
 
 type DrivenChangeEvent = ChangeEvent<HTMLElement & { value: string }>;
 
+/** Select options from plain strings, each its own value and label (state, city lists). */
+export const asOptions = (values: readonly string[]) => values.map((value) => ({ value, label: value }));
+
 function defined<T extends Record<string, unknown>>(props: T): Partial<T> {
   return Object.fromEntries(Object.entries(props).filter(([, v]) => v !== undefined && v !== false)) as Partial<T>;
 }
