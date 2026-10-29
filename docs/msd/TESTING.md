@@ -242,6 +242,13 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
   then removes the line, and keeps the line with an alert when the add fails; Remove selected is
   disabled with nothing selected and removes only the chosen lines; Select all (n) selects every
   line and clears the cart in one call.
+- Order notices (item 3, `order-notice.service.test.ts`, `payment.routes.test.ts`): confirmation
+  email to the checkout contact (account email as fallback) with every line, member, total and
+  order link; payment-failed email with the pay-again link; SMS only with the DLT template id
+  set; test accounts print to the console; a combined checkout sends one email; provider or
+  database errors never throw. Sent after COD, verified payment and webhook capture; failure
+  notice after a bad signature and `payment.failed`; nothing on a refused COD or a duplicate
+  webhook.
 
 - A customer never reads or changes another customer's cart, wishlist or order by changing an id.
 - A member never changes an order's status (403), for a deal or a product order (D27).

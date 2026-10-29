@@ -54,7 +54,9 @@ silently ships the bare SPA); preview and local builds fall back to the SPA. Red
 | `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | R2 token | 🔒 |
 | `R2_PUBLIC_URL` | optional public URL of the bucket | |
 | `R2_PRIVATE_BUCKET` | `msd-private` (public access off); member documents. Uploads return 503 until set | |
-| `SUPPORT_EMAIL` / `SUPPORT_PHONE` | support contact printed in member notices | |
+| `SUPPORT_EMAIL` / `SUPPORT_PHONE` | support contact printed in member and order notices | |
+| `PUBLIC_SITE_URL` | storefront origin for links in customer emails (default: the first `CORS_ORIGIN`) | |
+| `SMS_DLT_TEMPLATE_ORDER_CONFIRMED` / `SMS_DLT_TEMPLATE_PAYMENT_FAILED` | DLT template ids; an order SMS goes out only when its id is set (D38), email always goes | |
 | `FIELD_ENCRYPTION_KEY` | 32 random bytes, base64; encrypts full Aadhaar and PAN numbers | 🔒 |
 | `DOC_HASH_PEPPER` | secret for the document number duplicate hash | 🔒 |
 | `CRON_SECRET` | 64-char hex; the same value goes on the cron service | 🔒 |

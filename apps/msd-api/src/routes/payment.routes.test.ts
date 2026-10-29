@@ -7,6 +7,10 @@ vi.mock('../lib/prisma', async () => {
   return { prisma: createPrismaMock() };
 });
 
+// Item 3: the customer notice is its own service (order-notice.service.test.ts); here only who calls it.
+const { sendOrderNotice } = vi.hoisted(() => ({ sendOrderNotice: vi.fn() }));
+vi.mock('../services/order-notice.service', () => ({ sendOrderNotice: (...a: unknown[]) => sendOrderNotice(...a) }));
+
 vi.mock('../lib/razorpay', () => ({
   razorpay: { orders: { create: vi.fn() } },
 }));
@@ -192,6 +196,7 @@ describe('POST /api/v1/orders/me/:id/pay-cod', () => {
     expect(prismaMock.payment.create).not.toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'PAID' }) }),
     );
+    expect(sendOrderNotice).toHaveBeenCalledWith('CONFIRMED', [ORDER_ID]);
   });
 
   it('rejects COD confirmation for an order that is not PENDING_PAYMENT', async () => {
@@ -201,6 +206,7 @@ describe('POST /api/v1/orders/me/:id/pay-cod', () => {
       .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
     expect(res.status).toBe(409);
     expect(prismaMock.payment.create).not.toHaveBeenCalled();
+    expect(sendOrderNotice).not.toHaveBeenCalled();
   });
 
   describe('order-confirmed notifications', () => {
@@ -276,6 +282,7 @@ describe('POST /api/v1/orders/me/:id/verify-payment', () => {
     expect(prismaMock.payment.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'PAID', providerPaymentId: 'pay_test123', signatureVerified: true }) }),
     );
+    expect(sendOrderNotice).toHaveBeenCalledWith('CONFIRMED', [ORDER_ID]);
   });
 
   it('5/11. rejects an invalid signature — Payment marked FAILED, Order untouched', async () => {
@@ -289,6 +296,7 @@ describe('POST /api/v1/orders/me/:id/verify-payment', () => {
     expect(res.status).toBe(422);
     expect(prismaMock.payment.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'FAILED' }) }));
     expect(prismaMock.order.update).not.toHaveBeenCalled();
+    expect(sendOrderNotice).toHaveBeenCalledWith('PAYMENT_FAILED', [ORDER_ID]);
   });
 
   it('rejects a same-length-but-wrong hex signature (exercises the crypto.timingSafeEqual code path, not just the length-mismatch fallback)', async () => {
@@ -552,6 +560,7 @@ describe('POST /api/v1/payments/webhook/razorpay', () => {
       expect.objectContaining({ data: expect.objectContaining({ status: 'PAID', providerPaymentId: 'pay_test123' }) }),
     );
     expect(prismaMock.order.updateMany).toHaveBeenCalledWith({ where: { id: { in: [ORDER_ID] } }, data: { status: 'CONFIRMED' } });
+    expect(sendOrderNotice).toHaveBeenCalledWith('CONFIRMED', [ORDER_ID]);
   });
 
   it('6. processes a valid payment.failed event — Payment FAILED with the provider reason, Order untouched', async () => {
@@ -564,6 +573,7 @@ describe('POST /api/v1/payments/webhook/razorpay', () => {
       expect.objectContaining({ data: expect.objectContaining({ status: 'FAILED', failureReason: 'Card declined' }) }),
     );
     expect(prismaMock.order.updateMany).not.toHaveBeenCalled();
+    expect(sendOrderNotice).toHaveBeenCalledWith('PAYMENT_FAILED', [ORDER_ID]);
   });
 
   it('9. a duplicate delivery of the same event is a no-op (idempotent)', async () => {
@@ -576,6 +586,7 @@ describe('POST /api/v1/payments/webhook/razorpay', () => {
     // Already-terminal (PAID) is filtered out before any write — a retry must never create a
     // second notification for the same real confirmation event.
     expect(prismaMock.notification.create).not.toHaveBeenCalled();
+    expect(sendOrderNotice).not.toHaveBeenCalled();
   });
 
   it('a real payment.captured event notifies the order\'s vendor(s) + Superadmin exactly once', async () => {

@@ -2,7 +2,8 @@ import { env } from '../config/env';
 import { documentTypeList, type DocumentTypeKey } from './document-number';
 import { BUSINESS_TIME_ZONE, REMINDER_COUNT } from '../services/member-reminder-policy';
 
-function contactLine(): string {
+/** "Please email … or call …", from the support settings; shared by member and order notices. */
+export function contactLine(): string {
   const parts: string[] = [];
   if (env.supportEmail) parts.push(`email ${env.supportEmail}`);
   if (env.supportPhone) parts.push(`call ${env.supportPhone}`);

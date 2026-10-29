@@ -354,6 +354,14 @@ A member who opens another member's deal, branch, package or therapist gets 404.
   Remove selected removes several lines at once (one clear call when every line is selected,
   otherwise one call per line); Move to wishlist adds the item first and only then removes it
   from the cart, so a failed add keeps the line.
+- **Order notices (item 3, D38):** the customer gets an email when an order is confirmed (online
+  payment verified, webhook captured, or cash on delivery) and when an online payment fails
+  (signature check failed or the `payment.failed` webhook), at the checkout contact email, else
+  the account email. One email covers every order of a combined checkout and lists each line with
+  its member, the total, the order links and the support contact. SMS goes out only when that
+  notice's DLT template id is set. Local test accounts (`DEV_OTP_IDENTIFIERS`) see the notice in
+  the API console. Sends run after the commit and never undo a payment. Payments settled by
+  another attempt (`already settled`) send nothing.
 - Staff block or unblock a customer with a reason (`customers:status_change`); customers are never
   deleted.
 - **Refunds (D11):** Support raises a refund request; Admin or Super Admin approves or rejects
