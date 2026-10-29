@@ -255,6 +255,9 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
   (`/help-center`) and Wishlist, and no Gifting link until a gift-card feature exists.
 - One `<main>` per page (ST-04, `one-main-landmark.test.ts`): only the layouts render `<main>`; no
   file under `app/pages` does, so the skip link keeps a single target.
+- Popular searches in the prerender (ST-18, `hydration.test.tsx`): the server-rendered home page
+  lists every "{Category} in {City}" footer link in catalog order; with a saved city the client
+  moves that city first after hydration, with no hydration error.
 - Facet selections and price bounds (ST-25, `checkbox-facet.test.tsx`, `price-range-field.test.tsx`):
   a checked option past the limit shows while collapsed after the first rows, and Show more
   hides when only checked options are left past the limit; checked options stay during a

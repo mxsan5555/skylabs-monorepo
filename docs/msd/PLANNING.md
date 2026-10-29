@@ -343,8 +343,9 @@ A member who opens another member's deal, branch, package or therapist gets 404.
 - **Shell:** desktop two-row header (logo, city chip, search, wishlist, cart, account; then
   category links and an "All categories" panel); phone header plus a bottom tab bar (Home,
   Categories, Wishlist, Cart, Account), no hamburger. Footer: trust strip, newsletter band (UI
-  only until task ST-28), link columns, popular searches ("{Category} in {City}"), legal bar,
-  theme switch.
+  only until task ST-28), link columns, popular searches ("{Category} in {City}", built from the
+  prerendered shell so every prerendered page carries the links; the visitor's city moves first
+  after hydration), legal bar, theme switch.
 - **Trust claims:** verified spas and therapists, secure payments via Razorpay, instant booking
   confirmation. No rating badge until reviews exist (task ST-22).
 - **Location:** saved choice, then browser location (only if already granted or on user action),
