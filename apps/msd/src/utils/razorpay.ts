@@ -19,6 +19,8 @@ export interface RazorpayCheckoutOptions {
 
 interface RazorpayInstance {
   open: () => void;
+  /** Razorpay keeps its window open after a failed attempt so the customer can retry. */
+  on: (event: 'payment.failed', handler: (response: unknown) => void) => void;
 }
 
 declare global {

@@ -70,6 +70,7 @@ import WebsitePage from './pages/website-page/website-page';
 import { Orders } from './pages/orders/orders';
 import { OrderDetail } from './pages/orders/order-detail';
 import { Invoice } from './pages/invoice/invoice';
+import { OrderResult } from './pages/order-result/order-result';
 import DealDetail from './pages/deal-detail/deal-detail';
 import { Cart } from './pages/cart/cart';
 import Wishlist from './pages/wishlist/wishlist';
@@ -248,6 +249,16 @@ export function AppRoutes() {
             element={
               <RequireAuth>
                 <OrderDetail />
+              </RequireAuth>
+            }
+          />
+
+          {/* Order result after checkout (item 3): thank you, payment failed, waiting, error. */}
+          <Route
+            path="/orders/:id/confirmation"
+            element={
+              <RequireAuth>
+                <OrderResult />
               </RequireAuth>
             }
           />

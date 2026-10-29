@@ -249,6 +249,15 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
   database errors never throw. Sent after COD, verified payment and webhook capture; failure
   notice after a bad signature and `payment.failed`; nothing on a refused COD or a duplicate
   webhook.
+- Order result page (item 3, `order-result.test.tsx`, `section-head.test.tsx`): the result comes
+  from the order state, not the URL (`outcomeOf`: confirmed/completed, cancelled, waiting, failed
+  by latest payment or by `?payment=failed`, error); the thank-you page names the email, the
+  order number, each line with its member and the total, and focuses the h1; Pay now reopens
+  checkout; a load error shows Try again and the Contact link and recovers; the page is
+  `noindex`; the heading icon is decorative and takes the outcome's colour role.
+- Checkout payment result (item 3, `checkout.test.tsx`): a verified payment and a failed
+  verification both open `/orders/:id/confirmation`; closing Razorpay after `payment.failed`
+  opens it with `?payment=failed`; closing it with no failed attempt stays on checkout.
 
 - A customer never reads or changes another customer's cart, wishlist or order by changing an id.
 - A member never changes an order's status (403), for a deal or a product order (D27).

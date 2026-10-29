@@ -18,7 +18,7 @@ import { ApiRequestError } from '../../../api/rbac/client';
 import { getMyProfile } from '../../../api/rbac/me';
 import { getCart } from '../../../api/cart';
 import { lineFromCartItem, lineFromOrderItem, type PurchaseLine } from '../../../utils/cart-items';
-import { PurchaseLineCard } from '../../components/purchase-line-card/purchase-line-card';
+import { PurchaseLineCard, PurchaseLineList } from '../../components/purchase-line-card/purchase-line-card';
 import { STATES, citiesForState } from '@skylabs-monorepo/shared-utils';
 import { asOptions, renderSelect } from '../../components/form-controls/form-controls';
 import { loadRazorpayScript, RAZORPAY_THEME_COLOR } from '../../../utils/razorpay';
@@ -256,6 +256,7 @@ export function Checkout() {
         );
       }
 
+      let paymentFailed = false;
       const rzp = new window.Razorpay({
         key: paymentIntent.keyId,
 
@@ -281,6 +282,8 @@ export function Checkout() {
           ondismiss: () => {
             payingRef.current = false;
             setPaying(false);
+            // Closed after a failed attempt: show the payment-failed page (item 3).
+            if (paymentFailed) navigate(`/orders/${order.id}/confirmation?payment=failed`);
           },
         },
         handler: (response) => {
@@ -290,18 +293,16 @@ export function Checkout() {
             response,
           )
             .then(({ data }) => {
-              navigate(`/orders/${data.id}`);
+              navigate(`/orders/${data.id}/confirmation`);
             })
-            .catch((err) => {
-              setError(
-                err instanceof ApiRequestError
-                  ? err.message
-                  : checkoutContent.errors.verificationFailed,
-              );
-              payingRef.current = false;
-              setPaying(false);
+            .catch(() => {
+              // The result page reads the order's real state (failed, or confirmed by the webhook).
+              navigate(`/orders/${order.id}/confirmation`);
             });
         },
+      });
+      rzp.on('payment.failed', () => {
+        paymentFailed = true;
       });
       rzp.open();
     } catch (err) {
@@ -327,7 +328,7 @@ export function Checkout() {
       const { data } =
         await payCod(token, order.id);
 
-      navigate(`/orders/${data.id}`);
+      navigate(`/orders/${data.id}/confirmation`);
     } catch (err) {
       setError(
         err instanceof ApiRequestError
@@ -597,11 +598,11 @@ export function Checkout() {
                       <Icon> shopping_bag </Icon>
                     </div>
                   </div>
-                  <ul className="checkout-summary__lines">
+                  <PurchaseLineList className="checkout-summary__lines">
                     {cartLines.map((line) => (
                       <PurchaseLineCard key={line.id} line={line} />
                     ))}
-                  </ul>
+                  </PurchaseLineList>
                   <Divider />
                   <div className="checkout-summary__total">
                     <span> {content.cart.total} </span>
@@ -805,11 +806,11 @@ export function Checkout() {
                       <Icon> shopping_bag </Icon>
                     </div>
                   </div>
-                  <ul className="checkout-summary__lines">
+                  <PurchaseLineList className="checkout-summary__lines">
                     {(order?.items ?? []).map((item) => (
                       <PurchaseLineCard key={item.id} line={lineFromOrderItem(item)} />
                     ))}
-                  </ul>
+                  </PurchaseLineList>
                   <Divider />
                   <div className="checkout-summary__total">
                     <span> {content.cart.total} </span>

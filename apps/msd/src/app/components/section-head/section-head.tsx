@@ -19,17 +19,26 @@ export interface SectionHeadProps {
   actions?: ReactNode;
   /** Decorative media in the row's right column (e.g. the brand logo); hidden under 600px. */
   media?: ReactNode;
+  /** Decorative Material Symbol above the heading (e.g. an order result). */
+  icon?: string;
+  /** Colour role of `icon`: `primary` (default), `error`, or `muted` (on-surface-variant). */
+  iconTone?: 'primary' | 'error' | 'muted';
 }
 
 const seeAllLabel = (seeAll: string, heading: string) =>
   content.cardRail.seeAllLabel.replace('{seeAll}', seeAll).replace('{heading}', heading);
 
 /** Section header row: h2 (or h1 via `as`) + optional subheading, See all link and actions. */
-export function SectionHead({ id, as: Heading = 'h2', heading, titleClassName = 'headline-small', subheading, seeAll, seeAllTo, actions, media }: SectionHeadProps) {
+export function SectionHead({ id, as: Heading = 'h2', heading, titleClassName = 'headline-small', subheading, seeAll, seeAllTo, actions, media, icon, iconTone = 'primary' }: SectionHeadProps) {
   const link = seeAll && seeAllTo;
   return (
     <div className="section-head">
       <div className="section-head__text">
+        {icon && (
+          <Icon aria-hidden="true" className={`section-head__icon section-head__icon--${iconTone}`}>
+            {icon}
+          </Icon>
+        )}
         <Heading id={id} className={`section-head__title ${titleClassName}`}>{heading}</Heading>
         {typeof subheading === 'string' ? <p className="section-head__sub body-large">{subheading}</p> : subheading}
       </div>

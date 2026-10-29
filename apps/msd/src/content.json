@@ -1029,7 +1029,6 @@
       "startCheckout": "Could not start checkout.",
       "preparePayment": "Could not prepare payment.",
       "gatewayUnavailable": "Payment gateway unavailable.",
-      "verificationFailed": "Payment verification failed — if an amount was deducted, contact support with your order id.",
       "openGateway": "Could not open the payment gateway.",
       "placeOrder": "Could not place your order. Please try again."
     },
@@ -1966,6 +1965,41 @@
       "ariaLabel": "Therapist results",
       "loading": "Loading therapists…",
       "loadError": "Could not load therapists."
+    }
+  },
+  "orderResult": {
+    "loading": "Loading your order…",
+    "metaDescription": "The result of your MSD order and what to do next.",
+    "orderNumber": "Order {number}",
+    "itemsHeading": "What you ordered",
+    "nextSteps": "Next steps",
+    "total": "Total",
+    "viewOrder": "View order",
+    "payAgain": "Pay now",
+    "tryAgain": "Try again",
+    "myOrders": "My orders",
+    "continueShopping": "Continue shopping",
+    "help": "Need help with this order? Contact us",
+    "success": {
+      "heading": "Thank you, your order is confirmed",
+      "text": "We emailed the confirmation to {email}. Your voucher and invoice are on the order page.",
+      "textNoEmail": "Your voucher and invoice are on the order page."
+    },
+    "failed": {
+      "heading": "Your payment did not go through",
+      "text": "Order {number} is saved but not paid. Pay again, or choose cash on delivery. If money left your account, your bank returns it."
+    },
+    "pending": {
+      "heading": "Your order is waiting for payment",
+      "text": "Order {number} is not paid yet. If you just paid, refresh this page in a minute; otherwise pay now."
+    },
+    "cancelled": {
+      "heading": "This order is cancelled",
+      "text": "Order {number} is cancelled. There is nothing to pay."
+    },
+    "error": {
+      "heading": "We could not load your order",
+      "text": "Check your connection and try again. If you paid, we still confirm the payment and email you."
     }
   }
 }

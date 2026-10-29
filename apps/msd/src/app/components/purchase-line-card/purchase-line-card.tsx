@@ -82,3 +82,26 @@ export function PurchaseLineCard({ line, select, quantity, actions }: PurchaseLi
 }
 
 export default PurchaseLineCard;
+
+export interface PurchaseLineListProps {
+  /** `PurchaseLineCard`s. */
+  children: ReactNode;
+  /** Optional total row under the list: label and amount. */
+  total?: { label: string; amount: number };
+  className?: string;
+}
+
+/** A list of `PurchaseLineCard`s with an optional total row (order result). */
+export function PurchaseLineList({ children, total, className }: PurchaseLineListProps) {
+  return (
+    <>
+      <ul className={['purchase-lines', className].filter(Boolean).join(' ')}>{children}</ul>
+      {total && (
+        <p className="purchase-lines__total title-medium">
+          <span>{total.label}</span>
+          <strong>{formatINR(total.amount)}</strong>
+        </p>
+      )}
+    </>
+  );
+}

@@ -362,6 +362,15 @@ A member who opens another member's deal, branch, package or therapist gets 404.
   notice's DLT template id is set. Local test accounts (`DEV_OTP_IDENTIFIERS`) see the notice in
   the API console. Sends run after the commit and never undo a payment. Payments settled by
   another attempt (`already settled`) send nothing.
+- **Order result page (item 3):** checkout always lands on `/orders/:id/confirmation` (signed in,
+  `noindex`): after cash on delivery, a verified payment, a failed verification, or closing the
+  Razorpay window after a failed attempt (`?payment=failed`). The page reads the order from the
+  server, so the URL never decides the result: confirmed or completed shows the thank-you page
+  (contact email, lines with their member, total, View order); unpaid with a failed latest
+  payment, or reported failed, shows payment failed with Pay now (back to checkout for the same
+  order); unpaid otherwise shows waiting for payment; cancelled says so; a load error offers Try
+  again. Focus moves to the h1. Composed from `SectionHead` (`icon` + `iconTone`),
+  `PurchaseLineList` and `ListingToolbar`; no page CSS.
 - Staff block or unblock a customer with a reason (`customers:status_change`); customers are never
   deleted.
 - **Refunds (D11):** Support raises a refund request; Admin or Super Admin approves or rejects

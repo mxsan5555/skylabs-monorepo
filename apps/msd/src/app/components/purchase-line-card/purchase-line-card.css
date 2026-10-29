@@ -124,6 +124,23 @@
   gap: 4px;
 }
 
+/* A list of line cards and its total row. */
+.purchase-lines {
+  display: grid;
+  gap: 8px;
+  max-inline-size: 720px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.purchase-lines__total {
+  display: flex;
+  justify-content: space-between;
+  max-inline-size: 720px;
+  margin: 0;
+}
+
 /* Phones: a smaller image so the text keeps its width. */
 @media (max-width: 480px) {
   .purchase-line__media {

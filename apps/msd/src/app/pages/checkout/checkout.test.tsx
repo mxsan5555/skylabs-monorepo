@@ -1,9 +1,15 @@
-import { fireEvent, render, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Checkout } from './checkout';
 
-const { checkoutMock, getMyProfileMock, getCartMock } = vi.hoisted(() => ({ checkoutMock: vi.fn(), getMyProfileMock: vi.fn(), getCartMock: vi.fn() }));
+const { checkoutMock, getMyProfileMock, getCartMock, getMyOrderMock, verifyPaymentMock } = vi.hoisted(() => ({
+  checkoutMock: vi.fn(),
+  getMyProfileMock: vi.fn(),
+  getCartMock: vi.fn(),
+  getMyOrderMock: vi.fn(),
+  verifyPaymentMock: vi.fn(),
+}));
 
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
   useAuth: () => ({ token: 'test-token', isAuthenticated: true, bootstrap: { user: { name: 'Session Name', email: null, phone: null } } }),
@@ -11,8 +17,13 @@ vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
 vi.mock('../../../api/orders', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../api/orders')>()),
   checkout: (...a: unknown[]) => checkoutMock(...a),
-  getMyOrder: vi.fn(),
-  pay: vi.fn().mockResolvedValue({ data: null }),
+  getMyOrder: (...a: unknown[]) => getMyOrderMock(...a),
+  verifyPayment: (...a: unknown[]) => verifyPaymentMock(...a),
+  pay: vi.fn().mockResolvedValue({ data: { keyId: 'rzp_test', providerOrderId: 'order_rzp1', amount: '3080.00', currency: 'INR' } }),
+}));
+vi.mock('../../../utils/razorpay', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../utils/razorpay')>()),
+  loadRazorpayScript: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../../../api/rbac/me', () => ({ getMyProfile: (...a: unknown[]) => getMyProfileMock(...a) }));
 vi.mock('../../../api/cart', () => ({ getCart: (...a: unknown[]) => getCartMock(...a) }));
@@ -123,5 +134,75 @@ describe('Checkout summary', () => {
     expect(cards[1].textContent).toContain('× 2');
     expect(document.querySelector('.checkout-page__summary')?.textContent).toContain('₹4,478');
     expect(document.body.textContent).not.toContain('Your order summary will appear');
+  });
+});
+
+type RzpOptions = { handler: (r: unknown) => void; modal: { ondismiss: () => void } };
+const PENDING_ORDER = {
+  id: 'o1', status: 'PENDING_PAYMENT', vendorNameSnapshot: 'UrbanGlow Beauty & Care', branchNameSnapshot: 'Andheri',
+  subtotal: '3080.00', total: '3080.00', payments: [], items: [],
+};
+
+/** Shows where checkout navigated: path plus query. */
+function Landed() {
+  const { pathname, search } = useLocation();
+  return <p data-testid="landed">{pathname + search}</p>;
+}
+
+/** Item 3: every payment result lands on the order result page, which reads the order's real state. */
+describe('Checkout payment result', () => {
+  let rzpOptions: RzpOptions;
+  let rzpEvents: Record<string, () => void>;
+
+  beforeEach(() => {
+    rzpEvents = {};
+    getMyOrderMock.mockReset().mockResolvedValue({ data: PENDING_ORDER });
+    verifyPaymentMock.mockReset();
+    window.Razorpay = vi.fn(function (this: unknown, options: RzpOptions) {
+      rzpOptions = options;
+      return { open: vi.fn(), on: (event: string, fn: () => void) => (rzpEvents[event] = fn) };
+    }) as unknown as typeof window.Razorpay;
+  });
+
+  async function openPayment() {
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/checkout', state: { orderId: 'o1' } }]}>
+        <Routes>
+          <Route path="/checkout" element={<Checkout />} />
+          <Route path="/orders/:id/confirmation" element={<Landed />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    // Pay stays inert until the payment intent loads; click until checkout opens Razorpay.
+    await waitFor(() => {
+      const payButton = Array.from(document.querySelectorAll('md-filled-button')).find((el) => el.textContent?.includes('Pay ₹'));
+      if (payButton) fireEvent.click(payButton);
+      expect(window.Razorpay).toHaveBeenCalled();
+    });
+  }
+
+  const landed = () => screen.findByTestId('landed');
+
+  it('opens the result page after a verified payment', async () => {
+    verifyPaymentMock.mockResolvedValue({ data: { id: 'o1' } });
+    await openPayment();
+    rzpOptions.handler({ razorpay_payment_id: 'pay_1' });
+    expect((await landed()).textContent).toBe('/orders/o1/confirmation');
+  });
+
+  it('still opens the result page when verification fails, so the page reads the real state', async () => {
+    verifyPaymentMock.mockRejectedValue(new Error('signature'));
+    await openPayment();
+    rzpOptions.handler({ razorpay_payment_id: 'pay_1' });
+    expect((await landed()).textContent).toBe('/orders/o1/confirmation');
+  });
+
+  it('opens the payment-failed page when the window closes after a failed attempt, and stays on checkout otherwise', async () => {
+    await openPayment();
+    act(() => rzpOptions.modal.ondismiss());
+    expect(screen.queryByTestId('landed')).toBeNull();
+    rzpEvents['payment.failed']();
+    act(() => rzpOptions.modal.ondismiss());
+    expect((await landed()).textContent).toBe('/orders/o1/confirmation?payment=failed');
   });
 });

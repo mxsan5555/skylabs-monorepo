@@ -362,14 +362,6 @@
    SUMMARY LINES (one PurchaseLineCard per item, item 2.3)
    ========================================================================== */
 
-.checkout-summary__lines {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
 /* The summary column is narrow: a smaller image keeps the title readable. */
 .checkout-summary__lines .purchase-line__media {
   inline-size: 64px;
