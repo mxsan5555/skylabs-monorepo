@@ -255,6 +255,9 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
   (`/help-center`) and Wishlist, and no Gifting link until a gift-card feature exists.
 - One `<main>` per page (ST-04, `one-main-landmark.test.ts`): only the layouts render `<main>`; no
   file under `app/pages` does, so the skip link keeps a single target.
+- Theme colours only (ST-16, `theme-colours.test.ts`): no CSS file outside `assets/theme` holds a
+  hex, `rgb()`/`hsl()` or `white`/`black` value (no light fallback inside `var()` either), and no
+  TypeScript file holds a hex colour string, so the dark and contrast themes reach every screen.
 - Sign-in landing and account links (ST-06, `role-routing.test.ts`, `shell-labels.test.tsx`):
   staff (super admin, admin, sales, marketing, support) and members land on `/account/dashboard`;
   a customer who is also a member lands on `/choose-experience`; a customer on `/`. The account

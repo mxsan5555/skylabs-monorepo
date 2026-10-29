@@ -72,8 +72,7 @@
   margin: 0;
   padding: 8px;
   border-radius: 16px;
-  background-color: var(--md-sys-color-surface-container,
-      #eef1f6);
+  background-color: var(--md-sys-color-surface-container);
 }
 
 .my-account-nav__link {

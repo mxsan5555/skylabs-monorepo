@@ -170,8 +170,8 @@ input[type='checkbox'] {
   align-items: center;
   gap: 12px;
   padding: 10px 20px;
-  background-color: var(--md-sys-color-tertiary-container, #ffdbcb);
-  color: var(--md-sys-color-on-tertiary-container, #331200);
+  background-color: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
   font-size: 0.9rem;
 }
 
@@ -384,7 +384,7 @@ a.dashboard-stat:focus-visible {
 
 .panel {
   border-radius: 16px;
-  background-color: var(--md-sys-color-surface-container, #eef1f6);
+  background-color: var(--md-sys-color-surface-container);
   padding: 16px;
 }
 
@@ -407,7 +407,7 @@ a.dashboard-stat:focus-visible {
    rendered below the shared header actions, instead of stacking every section vertically. */
 .admin-tabs-wrap {
   margin: 4px 0 16px;
-  border-bottom: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -548,7 +548,7 @@ a.dashboard-stat:focus-visible {
 }
 
 .entity-list__item:hover {
-  background-color: var(--md-sys-color-surface-container-high, #e7e8ee);
+  background-color: var(--md-sys-color-surface-container-high);
 }
 
 .role-list__name {
@@ -559,15 +559,15 @@ a.dashboard-stat:focus-visible {
 }
 
 .entity-list__item.active {
-  background-color: var(--md-sys-color-secondary-container, #d7e3ff);
-  color: var(--md-sys-color-on-secondary-container, #101c2b);
+  background-color: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
   font-weight: 600;
 }
 
 .entity-list__item--highlighted {
   outline: 2px solid var(--md-sys-color-primary);
   outline-offset: -2px;
-  background-color: var(--md-sys-color-primary-container, #d7e3ff);
+  background-color: var(--md-sys-color-primary-container);
 }
 
 .status-pill {
@@ -581,18 +581,18 @@ a.dashboard-stat:focus-visible {
 }
 
 .status-pill--active {
-  background-color: var(--md-sys-color-primary-container, #cee5ff);
-  color: var(--md-sys-color-on-primary-container, #001d33);
+  background-color: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
 }
 
 .status-pill--inactive {
-  background-color: var(--md-sys-color-surface-container-highest, #e2e2e2);
-  color: var(--md-sys-color-on-surface-variant, #43483e);
+  background-color: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface-variant);
 }
 
 .status-pill--blocked {
-  background-color: var(--md-sys-color-error-container, #ffdad6);
-  color: var(--md-sys-color-on-error-container, #410002);
+  background-color: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
 }
 
 /* Reports — simple CSS-width bar next to a revenue figure in a data-table cell (no chart
@@ -601,7 +601,7 @@ a.dashboard-stat:focus-visible {
   margin-top: 4px;
   height: 6px;
   border-radius: 3px;
-  background-color: var(--md-sys-color-surface-container-highest, #e2e2e2);
+  background-color: var(--md-sys-color-surface-container-highest);
   overflow: hidden;
 }
 
@@ -625,7 +625,7 @@ a.dashboard-stat:focus-visible {
 .data-table td {
   padding: 10px 12px;
   text-align: left;
-  border-bottom: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
   color: var(--md-sys-color-on-surface);
 }
 
@@ -656,7 +656,7 @@ a.dashboard-stat:focus-visible {
 .perm-matrix th,
 .perm-matrix td {
   padding: 8px 10px;
-  border-bottom: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
   text-align: center;
 }
 
@@ -702,7 +702,7 @@ a.dashboard-stat:focus-visible {
   width: 56px;
   padding: 4px 6px;
   border-radius: 6px;
-  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  border: 1px solid var(--md-sys-color-outline-variant);
 }
 
 .section-title {
@@ -768,7 +768,7 @@ a.dashboard-stat:focus-visible {
   gap: 12px;
   margin-top: 8px;
   padding-top: 20px;
-  border-top: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  border-top: 1px solid var(--md-sys-color-outline-variant);
 }
 .empty-state,
 .error-state,
@@ -779,7 +779,7 @@ a.dashboard-stat:focus-visible {
 }
 
 .error-state {
-  color: var(--md-sys-color-error, #ba1a1a);
+  color: var(--md-sys-color-error);
 }
 
 .field-hint {
@@ -809,8 +809,8 @@ a.dashboard-stat:focus-visible {
   min-height: 44px;
   padding: 4px 8px;
   border-radius: 8px;
-  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
-  background: var(--md-sys-color-surface, #fff);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-surface);
   color: var(--md-sys-color-on-surface);
   font: inherit;
 }
@@ -832,7 +832,7 @@ a.dashboard-stat:focus-visible {
   flex-direction: column;
   gap: 8px;
   padding: 12px;
-  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  border: 1px solid var(--md-sys-color-outline-variant);
   border-radius: 12px;
 }
 
@@ -868,7 +868,7 @@ a.dashboard-stat:focus-visible {
   padding: 8px 16px;
   min-height: 44px;
   border-radius: 999px;
-  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  border: 1px solid var(--md-sys-color-outline-variant);
   background: transparent;
   color: var(--md-sys-color-on-surface-variant);
   font: inherit;
@@ -877,12 +877,12 @@ a.dashboard-stat:focus-visible {
 }
 
 .wizard-steps__item:hover {
-  background-color: var(--md-sys-color-surface-container-high, #e7e8ee);
+  background-color: var(--md-sys-color-surface-container-high);
 }
 
 .wizard-steps__item[aria-current='step'] {
-  background-color: var(--md-sys-color-primary-container, #cee5ff);
-  color: var(--md-sys-color-on-primary-container, #001d33);
+  background-color: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
   border-color: transparent;
 }
 
@@ -897,7 +897,7 @@ a.dashboard-stat:focus-visible {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background-color: var(--md-sys-color-surface-container-high, #e7e8ee);
+  background-color: var(--md-sys-color-surface-container-high);
   font-size: 0.7rem;
 }
 

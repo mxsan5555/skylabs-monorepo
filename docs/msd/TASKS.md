@@ -40,7 +40,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 1 | Admin and staff | 4 | 31 | 13 |
 | 2 | Members | 54 | 101 | 53 |
 | 3 | Customers and orders | 2 | 12 | 17 |
-| 4 | Storefront | 24 | 42 | 57 |
+| 4 | Storefront | 25 | 42 | 60 |
 | 5 | Static content | 0 | 5 | 0 |
 | 6 | CTA banners | 4 | 5 | 80 |
 | 7 | Home slider | 7 | 8 | 88 |
@@ -49,7 +49,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
 | 12 | Platform, security and release | 9 | 69 | 13 |
-| | **Total** | **104** | **289** | **36** |
+| | **Total** | **105** | **289** | **36** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -239,7 +239,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [x] | ST-13 | BIZ | Decide whether `/category/product` and `/category/therapy` are indexable or redirect to `/products` and `/therapists` | S | - | Done 2026-10-24: D31, both indexable; chips link listing and category pages |
 | [x] | ST-14 | FE | Add `prerender/` to a tsconfig so it is type-checked | S | - | `tsc` covers prerender; done 2026-10-28: `apps/msd/tsconfig.prerender.json` (bundler resolution for Vite 8 types, app element typings included); `nx run msd:typecheck` runs it beside the app config; 0 errors in `prerender/` |
 | [x] | ST-15 | FE | `showcase.tsx` and unused `product-card.tsx` pass camelCase props to raw custom elements; fix, and delete `product-card.tsx` if unused | S | - | Done 2026-10-24: 80 props in 9 files moved to kebab-case (incl. `OfferCard` `price-first`, `image-alt`, `badge-color`/`badge-tone`, `original-price`, header `clear-label`), `product-card.tsx`/`.css` deleted, `SkyProductCardWC` writes `favorite`/`favorite-active` as attributes; guard `src/sky-element-props.test.ts`, hydration case in `offer-card.test.tsx` |
-| [ ] | ST-16 | FE | Audit app-level CSS in the dark theme (the footer theme switch exposes it) | S | - | No hardcoded light colours |
+| [x] | ST-16 | FE | Audit app-level CSS in the dark theme (the footer theme switch exposes it) | S | - | Done: removed light hex fallbacks from `var()` (styles, blog, blog post, my account, not found), video backgrounds use `scrim`, checkout card uses `--sky-elevation-1`, Razorpay colour comes from the theme seed; `theme-colours.test.ts` guards it |
 | [ ] | ST-18 | FE | Popular searches render only on the client until the catalog is seeded into the prerender | S | - | Present in prerendered HTML |
 | [x] | ST-19 | FE | Shared `--sky-content-max` token for the 1280px / 16px containers (header, footer, home) | S | - | One token, no repeated values; done 2026-10-28: `--sky-content-max` and `--sky-content-gutter` on `:root` in `styles.css`, used by page sections, header, footer, breadcrumb and the product "related" band; `content-width.test.ts` fails on any other 1280px |
 | [x] | ST-20 | FE | Move the remaining `useCurrentLocation` callers (category, search, therapists, vendor) to `useVisitorLocation` | S | - | `useCurrentLocation` deleted (category, search and therapists move with ST-41 to ST-43); done 2026-10-28: the member page was the last caller; it reads `useVisitorLocation()` and `hooks/useCurrentLocation.ts` is deleted; `resolveBranch` tested (`vendor.test.tsx`) |
