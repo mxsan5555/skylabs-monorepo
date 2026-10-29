@@ -13,6 +13,7 @@ import {
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
+import { memberTrail } from './member-crumbs';
 import { STATES, citiesForState } from '@skylabs-monorepo/shared-utils';
 import { normalizeOpeningHours, OpeningHoursEditor, validateBranchPincode, validateMapLocationUrl } from './vendor-branches';
 import { renderSelect, renderTextField } from './form-controls';
@@ -89,9 +90,7 @@ export function BranchFormPage({ token }: BranchFormPageProps) {
 
   const name = branch?.name || (isEdit ? 'Branch' : 'New branch');
   useSetBreadcrumbs([
-    { label: 'Members' },
-    { label: 'All Member', to: '/account/members' },
-    { label: vendorName ?? 'Member', to: `/account/members/${vendorId}` },
+    ...memberTrail(vendorId, vendorName),
     { label: 'Branches', to: `/account/members/${vendorId}/branches` },
     { label: isEdit ? name : 'Add branch' },
   ]);

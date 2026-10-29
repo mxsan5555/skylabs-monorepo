@@ -6,6 +6,7 @@ import { getMember, changeMemberStatus, deleteMember, sendMemberReminder } from 
 import { updateVendor, type Vendor } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
+import { MEMBERS_TRAIL } from './member-crumbs';
 import { showSnackbar } from '../../../../snackbar/snackbar';
 import { BranchesListPage } from './branches-list-page';
 import { DealsListPage } from './deals-list-page';
@@ -105,7 +106,7 @@ export function MemberDetailPage() {
   }, [canView, load]);
 
   const name = member ? member.businessName || member.owner?.name || 'New member' : 'Member';
-  useSetBreadcrumbs([{ label: 'Members' }, { label: 'All members', to: '/account/members' }, { label: name }]);
+  useSetBreadcrumbs([...MEMBERS_TRAIL, { label: name }]);
 
   if (!canView) return <p className="empty-state">You do not have access to Member Management.</p>;
   if (loading) {

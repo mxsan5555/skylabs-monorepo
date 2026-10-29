@@ -133,6 +133,9 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
   (`PENDING_PAYMENT`, `COMPLETED`, `CANCELLED` keep them hidden); city is the shipping city of the
   latest order that has one; order count counts distinct orders; the staff route always returns
   contact details; the console shows City and "Hidden until an order is open".
+- Breadcrumbs (P10-47; `member-crumbs.test.ts`, `branch-form-page.test.tsx`): every member page starts
+  with Members > All members (linked to the list), then the member ("Member" until the name loads);
+  the sidebar title reads "All members".
 - Members list: the Filter menu sends exactly one filter per option; status and documents columns
   use their tonal colours.
 - Own scope (after P4): member A reading member B's branch, deal, therapist or product gets 404.
