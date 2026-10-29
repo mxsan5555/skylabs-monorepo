@@ -6,7 +6,7 @@ import * as mediaService from './media.service';
 import type { MediaFile } from './media.service';
 import { Prisma } from '../generated/prisma-client';
 import type { ProductCreateSchema, ProductUpdateSchema } from '../schemas/product.schema';
-
+import { sanitizeRichText } from '../lib/rich-text';
 type ProductCreateInput = z.infer<typeof ProductCreateSchema>;
 type ProductUpdateInput = z.infer<typeof ProductUpdateSchema>;
 

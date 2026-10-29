@@ -251,7 +251,7 @@ export function OrderManagement({ scope = 'admin', refreshKey = 0 }: { scope?: '
   // — `sky-data-table`'s own row-detail drawer has no public API to open it programmatically, so
   // this fetches the same order via the existing GET /orders/:id and shows it in its own small
   // read-only Dialog (same key/value shape as the table's own drawer, via toOrderRow below).
-  const [searchParams] = useSearchParams();
+ 
   const orderIdParam = searchParams.get('orderId');
   // P10-49: "N orders" on a member page opens this list filtered to that member.
   const vendorIdParam = searchParams.get('vendorId');

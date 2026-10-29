@@ -320,7 +320,7 @@ export function AppRoutes() {
           <Route path="/terms" element={<WebsitePage page="terms" />} />
           <Route path="/accessibility" element={<WebsitePage page="accessibility" />} />
           <Route path="/cookies" element={<WebsitePage page="cookies" />} />
-          <Route path="/products/:slug" element={<ProductDetail />} />
+          {/* <Route path="/products/:slug" element={<ProductDetail />} /> */}
           <Route path="/showcase" element={<Showcase />} />
           {/* ── Catch-all 404, inside the shell so it keeps header/footer. ── */}
           <Route path="*" element={<NotFound />} />

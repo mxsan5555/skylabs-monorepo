@@ -6,6 +6,8 @@ import { validateBody, validateParams, validateQuery } from '../middleware/valid
 import { z } from 'zod';
 import { UuidParamSchema, PaginationQuerySchema } from '../schemas/common.schema';
 import {
+  RoleCreateSchema,
+  RoleCloneSchema,
   RoleUpdateSchema,
   RoleStatusUpdateSchema,
   RolePermissionsUpdateSchema,

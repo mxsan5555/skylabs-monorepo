@@ -5,7 +5,40 @@
 
 /* Page content width and side gutter (ST-19): every full-width container (header, footer, page
    sections, breadcrumb) centres its content with these, so the width can't drift. */
-:root {
+/* Prevent intrinsic sizing from expanding the viewport. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+
+img,
+video,
+iframe,
+canvas {
+  max-width: 100%;
+}
+
+.admin-layout,
+.admin-content,
+.admin-page,
+.page-head,
+.two-pane,
+.summary-layout,
+.dashboard-page,
+.form-grid {
+  min-width: 0;
+}
+   :root {
   --sky-content-max: 1280px;
   --sky-content-gutter: 16px;
 }
