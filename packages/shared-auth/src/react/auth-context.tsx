@@ -17,7 +17,6 @@ import {
   isJwtExpired,
   isPreviewToken,
   msUntilJwtExpiry,
-  readSessionValue,
   readStorageValue,
   refreshAccessToken,
   resolveInitialToken,
