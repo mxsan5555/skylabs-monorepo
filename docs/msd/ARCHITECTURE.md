@@ -285,7 +285,9 @@ No code yet (no GA4, GTM or `dataLayer` in `apps/msd`).
 global rate limit plus limiters for upload, status change, payout, refund, export, download;
 production boot fails on a short `JWT_SECRET`, `*` in CORS, or missing `R2_PRIVATE_BUCKET`,
 `DOC_HASH_PEPPER`, `FIELD_ENCRYPTION_KEY`, `CRON_SECRET`; request logger with request id and PII
-redaction; idempotency keys for money; transactional audit; private R2 bucket with 5-minute signed
+redaction; idempotency keys for money; transactional audit, every action from the one list in
+`lib/audit.ts` (`AUDIT_ACTIONS`, typed into `writeAuditLog` and `auditLogData`, P2-11; stored
+names never change, new ones are dotted like `member.status.changed`); private R2 bucket with 5-minute signed
 downloads for documents; malware scan decision; gitleaks and `npm audit` in CI.
 
 ### 12.3 File storage (decided 2026-10-17)

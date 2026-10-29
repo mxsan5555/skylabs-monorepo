@@ -48,8 +48,8 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 9 | Payments, payouts and reports | 0 | 11 | 0 |
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
-| 12 | Platform, security and release | 10 | 69 | 14 |
-| | **Total** | **112** | **289** | **39** |
+| 12 | Platform, security and release | 11 | 69 | 16 |
+| | **Total** | **113** | **289** | **39** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -357,7 +357,7 @@ Removed 2026-10-24: ST-17 (therapist city filter is in ST-40; products are not l
 | [ ] | P2-08 | SEC | Global rate limit plus limiters for upload, status change, payout, refund, export, document download | M | P2-07 | Limit tests return 429 with `RATE_LIMITED` |
 | [x] | P2-09 | SEC | `env.ts`: production fails on JWT secret under 32 chars, `*` in CORS, missing `R2_PRIVATE_BUCKET`, `DOC_HASH_PEPPER`, `FIELD_ENCRYPTION_KEY`, `CRON_SECRET` | S | - | Done: `config/env-checks.ts` (`productionEnvProblems`), thrown from `env.ts` in production; `env-checks.test.ts` incl. boot test; DEPLOYMENT §2 says set them before deploying |
 | [ ] | P2-10 | SEC | Request logger with request id and PII redaction (`documentNumber`, `bankAccountNumber`, `otp`, `authorization`); no stack traces in production responses | M | - | Log snapshot test has no PII |
-| [ ] | P2-11 | BE | `lib/audit.ts` helper with dotted action constants (`member.status.changed`) | S | - | Used by every mutation in later tasks |
+| [x] | P2-11 | BE | `lib/audit.ts` helper with dotted action constants (`member.status.changed`) | S | - | Done: `AUDIT_ACTIONS` (132 stored names kept as they are) and `AuditAction`, required by `writeAuditLog`/`auditLogData` so an unknown action fails to compile; `isAuditAction` for P8-05 filters; `lib/audit.test.ts` |
 | [ ] | P2-12 | BE | Idempotency-Key middleware and table (24 h TTL, replay returns stored response) | M | - | Replay and conflict tests |
 | [ ] | P2-13 | SEC | AES-256-GCM field encryption util with key id prefix for rotation | M | P2-09 | Round-trip and tamper tests |
 | [ ] | P2-14 | BE | Shared Zod primitives: pagination, sort allowlist, reason, date range, money, phone, email; lint rule or test that every body schema is `.strict()` | M | - | Test scans schemas |

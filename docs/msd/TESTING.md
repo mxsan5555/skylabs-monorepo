@@ -388,6 +388,8 @@ rollback rehearsal (P11).
 - [ ] No OTP, secret, token or unneeded private field in any response.
 - [ ] Public catalog: only intended records and fields; maximum page size enforced; validated input.
 - [ ] Errors expose no stack traces or database details.
+- [ ] Every audit row uses an action from `lib/audit.ts` (P2-11: enforced by the type,
+      `lib/audit.test.ts` checks the list is unique and dotted).
 - [ ] Production boots only with a strong `JWT_SECRET`, exact `CORS_ORIGIN` origins and the four
       document and job secrets (P2-09, `config/env-checks.test.ts`, including a boot test).
 - [ ] Sensitive admin actions are audited.

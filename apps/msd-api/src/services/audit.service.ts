@@ -1,8 +1,9 @@
 import { prisma } from '../lib/prisma';
+import type { AuditAction } from '../lib/audit';
 
 export interface AuditLogInput {
   actorUserId: string;
-  action: string;
+  action: AuditAction;
   targetType: string;
   targetId: string;
   before?: unknown;
