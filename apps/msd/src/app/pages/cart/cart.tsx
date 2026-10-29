@@ -8,6 +8,7 @@ import { formatINR, pluralize } from '../../../utils/format';
 import { resolveDealMedia, resolveProductMedia, primaryImage } from '../../../utils/media';
 import './cart.css';
 import content from '../../../content.json';
+import { Seo } from '../../seo/seo';
 import { Breadcrumb } from '../../components/breadcrumb';
 /**
  * Real, backend-driven cart. Deal/Product/Therapist are purchasable together in ONE cart, ONE
@@ -102,8 +103,7 @@ export function Cart() {
   if (loading) return <p className="loading-state"> {content.cart.loading}</p>;
   return (
     <div className="cart-page">
-      <title>{content.meta.cart.title}</title>
-      <meta name="robots" content="noindex" />
+      <Seo title={content.meta.cart.title} description={content.meta.cart.description} path={content.meta.cart.path} noindex="follow" />
       <div className="cart-page__inner">
         {/* <h1 className="cart-page__title">
           {content.cart.title}

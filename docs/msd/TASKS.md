@@ -40,7 +40,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 1 | Admin and staff | 4 | 31 | 13 |
 | 2 | Members | 54 | 101 | 53 |
 | 3 | Customers and orders | 2 | 12 | 17 |
-| 4 | Storefront | 18 | 42 | 43 |
+| 4 | Storefront | 19 | 42 | 45 |
 | 5 | Static content | 0 | 5 | 0 |
 | 6 | CTA banners | 4 | 5 | 80 |
 | 7 | Home slider | 7 | 8 | 88 |
@@ -49,7 +49,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
 | 12 | Platform, security and release | 9 | 69 | 13 |
-| | **Total** | **98** | **289** | **34** |
+| | **Total** | **99** | **289** | **34** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -231,7 +231,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | ST-05 | FE | Tell the visitor when "Use my current location" fails or is more than 75 km from any partner city | S | - | Message shown, test |
 | [ ] | ST-06 | QA | Header and tab bar tests: search submit, signed-in account menu, `useAccountLinks` role branches | S | - | Tests green; partly: account menu Profile link and `/my-dashboard` redirect per role done (staff to `/account/dashboard`, customers to `/my-dashboard`) |
 | [x] | ST-07 | FE | `/help` and `/gifting` footer links have no routes (404) | S | - | Routes exist or links removed; done 2026-10-28: `/help` already pointed to `/help-center`; the "Gifting" link removed until a gift-card feature exists (owner decision) |
-| [ ] | ST-08 | FE | Public pages without a meta description (cart, sign-in, otp, orders, invoice, choose-experience) move to `Seo` | S | - | Every public route has a description |
+| [x] | ST-08 | FE | Public pages without a meta description (cart, sign-in, otp, orders, invoice, choose-experience) move to `Seo` | S | - | Every public route has a description; done 2026-10-28: cart, sign in, OTP, orders, invoice (and its not-found view, now noindex too) and choose experience render `Seo` with a `content.meta` description |
 | [ ] | ST-09 | BIZ | Owner supplies footer brand contact details (phone, email) | S | - | Copy in `content.json` |
 | [ ] | ST-10 | OPS | When the custom domain goes live, set `VITE_SITE_URL` (website origin, not the API) for Vercel Production and redeploy; until then canonicals, OG, most JSON-LD and sitemap/robots/llms are omitted. The Vercel build must reach the Railway msd-api (prerender data) | S | X-01 | Canonical tags and sitemap present on production |
 | [ ] | ST-11 | OPS | On the first Vercel preview, verify `/api/geo`, that `/category/x/` and `/spa.html` 308 to `/category/x` and `/spa`, and that non-prerendered routes get the SPA shell | S | - | Checklist ticked |

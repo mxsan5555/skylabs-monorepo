@@ -236,6 +236,9 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
 - Therapist detail (`therapist-detail.test.tsx`): type as h1, person and experience, Details and
   the location aside, the rail leaves out the current therapist; the price follows the chosen
   package; signed-out Add to cart goes to sign in; a 404 shows the not-found state.
+- Meta descriptions (ST-08; `seo/private-page-meta.test.ts`, `otp.test.tsx`): cart, sign in, OTP,
+  orders, invoice and choose experience each have a 50 to 160 character description and stay
+  noindex (sign in, OTP and choose experience also nofollow); the invoice not-found view is noindex.
 - Footer (ST-07, `site-footer.test.tsx`): every footer link has a page; Help & Info lists Help Center
   (`/help-center`) and Wishlist, and no Gifting link until a gift-card feature exists.
 - One `<h1>` per page; prerendered `/` contains the hero `<h1>`, category links and JSON-LD; no

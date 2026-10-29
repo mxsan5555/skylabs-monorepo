@@ -6,6 +6,7 @@ import { getMyOrder, type Order } from '../../../api/orders';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { formatINR } from '../../../utils/format';
 import content from '../../../content.json';
+import { Seo } from '../../seo/seo';
 import { groupOrderItemsByVendor } from '../../../utils/order-items';
 import './invoice.css';
 
@@ -55,7 +56,7 @@ export function Invoice() {
   if (error || !order) {
     return (
       <div className="invoice-page invoice-page--empty">
-        <title>{invoice.notFound.metaTitle}</title>
+        <Seo title={invoice.notFound.metaTitle} description={content.meta.invoice.description} path={content.meta.invoice.pathTemplate.replace('{id}', id)} noindex="follow" />
         <sky-info-card
           icon="receipt_long"
           heading={invoice.notFound.heading}
@@ -71,8 +72,12 @@ export function Invoice() {
   const isMultiVendor = vendorGroups.length > 1;
   return (
     <div className="invoice-page">
-      <title>{invoice.metaTitleTemplate.replace('{id}', order.id)}</title>
-      <meta name="robots" content="noindex" />
+      <Seo
+        title={invoice.metaTitleTemplate.replace('{id}', order.id)}
+        description={content.meta.invoice.description}
+        path={content.meta.invoice.pathTemplate.replace('{id}', order.id)}
+        noindex="follow"
+      />
       <div className="invoice-page__actions">
         <OutlinedButton onClick={() => navigate(`/orders/${order.id}`)}>
           <Icon slot="icon" aria-hidden="true">arrow_back</Icon>{invoice.backToOrder}

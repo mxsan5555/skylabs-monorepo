@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FilledButton, OutlinedButton, OutlinedTextField, Tabs, PrimaryTab, Icon, } from '@skylabs-monorepo/shared-ui/react';
 import content from '../../../content.json';
+import { Seo } from '../../seo/seo';
 import { googleSignInUrl, requestOtp } from '../../../api/rbac/auth';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { extractReturnUrl } from '../../../auth/role-routing';
@@ -67,8 +68,7 @@ export function SignIn() {
 
   return (
     <div className="auth-screen">
-      <title>{auth.pageTitle}</title>
-      <meta name="robots" content="noindex, nofollow" />
+      <Seo title={auth.pageTitle} description={content.meta.signIn.description} path={content.meta.signIn.path} noindex />
       <div className="auth-brand">
         <div className="auth-brand__logo">
           <img
