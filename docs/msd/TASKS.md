@@ -40,7 +40,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 1 | Admin and staff | 4 | 31 | 13 |
 | 2 | Members | 54 | 101 | 53 |
 | 3 | Customers and orders | 2 | 12 | 17 |
-| 4 | Storefront | 19 | 42 | 45 |
+| 4 | Storefront | 20 | 42 | 48 |
 | 5 | Static content | 0 | 5 | 0 |
 | 6 | CTA banners | 4 | 5 | 80 |
 | 7 | Home slider | 7 | 8 | 88 |
@@ -49,7 +49,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
 | 12 | Platform, security and release | 9 | 69 | 13 |
-| | **Total** | **99** | **289** | **34** |
+| | **Total** | **100** | **289** | **35** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -237,7 +237,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | ST-11 | OPS | On the first Vercel preview, verify `/api/geo`, that `/category/x/` and `/spa.html` 308 to `/category/x` and `/spa`, and that non-prerendered routes get the SPA shell | S | - | Checklist ticked |
 | [ ] | ST-12 | OPS | Vercel deploy hook (cron or on catalog change) so prerendered pages rebuild when deals change | S | - | Hook fires, pages refresh |
 | [x] | ST-13 | BIZ | Decide whether `/category/product` and `/category/therapy` are indexable or redirect to `/products` and `/therapists` | S | - | Done 2026-10-24: D31, both indexable; chips link listing and category pages |
-| [ ] | ST-14 | FE | Add `prerender/` to a tsconfig so it is type-checked | S | - | `tsc` covers prerender |
+| [x] | ST-14 | FE | Add `prerender/` to a tsconfig so it is type-checked | S | - | `tsc` covers prerender; done 2026-10-28: `apps/msd/tsconfig.prerender.json` (bundler resolution for Vite 8 types, app element typings included); `nx run msd:typecheck` runs it beside the app config; 0 errors in `prerender/` |
 | [x] | ST-15 | FE | `showcase.tsx` and unused `product-card.tsx` pass camelCase props to raw custom elements; fix, and delete `product-card.tsx` if unused | S | - | Done 2026-10-24: 80 props in 9 files moved to kebab-case (incl. `OfferCard` `price-first`, `image-alt`, `badge-color`/`badge-tone`, `original-price`, header `clear-label`), `product-card.tsx`/`.css` deleted, `SkyProductCardWC` writes `favorite`/`favorite-active` as attributes; guard `src/sky-element-props.test.ts`, hydration case in `offer-card.test.tsx` |
 | [ ] | ST-16 | FE | Audit app-level CSS in the dark theme (the footer theme switch exposes it) | S | - | No hardcoded light colours |
 | [ ] | ST-18 | FE | Popular searches render only on the client until the catalog is seeded into the prerender | S | - | Present in prerendered HTML |

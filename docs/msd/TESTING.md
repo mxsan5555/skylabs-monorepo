@@ -48,6 +48,9 @@ Known failures at 2026-10-18 (msd recounted 2026-10-27: `india-locations` moved 
 | msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; recounted 2026-10-28: 1,260 pass) |
 | shared-menu | 5 | `index.test.ts` |
 
+Type check: `npx nx run msd:typecheck` runs `tsconfig.app.json` and `tsconfig.prerender.json` (ST-14,
+`prerender/` has 0 errors; both report the same known `src/` errors until P10-46).
+
 Lint and type drift: 30 msd lint errors (`import/first` and `no-empty-function` in older tests), an ESLint ignore error in the shared packages, and
 `apps/msd-api/src/routes/members.routes.test.ts` type errors in its setup code (P10-46). ESLint
 ignores every file under `apps/msd-api/src` today. Flaky under load: `deals-list-page.test.tsx`
