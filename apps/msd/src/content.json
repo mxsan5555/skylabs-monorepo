@@ -849,7 +849,7 @@
     "actionsLabel": "{title} actions",
     "distance": "{km} km",
     "discount": "-{percent}%",
-    "serviceTag": "Service",
+    "serviceTag": "Deal",
     "productTag": "Product",
     "tags": {
       "expire_soon": "Expire soon",
