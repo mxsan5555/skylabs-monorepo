@@ -290,6 +290,17 @@ redaction; idempotency keys for money; transactional audit, every action from th
 names never change, new ones are dotted like `member.status.changed`); private R2 bucket with 5-minute signed
 downloads for documents; malware scan decision; gitleaks and `npm audit` in CI.
 
+**Token transport (P2-16, decided 2026-10-29): bearer only.** The access token goes in
+`Authorization: Bearer`; the refresh token is sent in the `/auth/refresh` body. The API sets no
+cookie (no `res.cookie`, cookie parser or session; Passport runs with `session: false`), so a
+browser never attaches credentials on its own and CSRF does not apply. The apps keep the real
+tokens in `localStorage` (keyed per app) and a "Login As" preview in `sessionStorage`
+(`shared-auth`), so XSS is the risk to guard: React escapes text, no CMS HTML is set raw, the rich
+text editor parses values through Quill (P10-36). Any future cookie must be `HttpOnly`, `Secure`,
+`SameSite=Lax` or stricter, with CSRF protection; `lib/token-transport.test.ts` fails on cookie
+code until then. Known gap: the Google callback returns the tokens as JSON on the API domain, so
+the app never receives them (P2-22).
+
 ### 12.3 File storage (decided 2026-10-17)
 
 Two Cloudflare R2 buckets per environment, one folder per owner. Layout in

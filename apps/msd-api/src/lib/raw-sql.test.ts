@@ -1,6 +1,6 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { filesMatching } from '../test-utils/source-files';
 
 /**
  * P11-03: raw SQL only through Prisma's tagged `$queryRaw` / `$executeRaw` (values become bind
@@ -8,24 +8,10 @@ import { describe, expect, it } from 'vitest';
  * concatenated into SQL; they are not allowed anywhere in the API or its Prisma scripts.
  */
 const API_ROOT = join(__dirname, '../..');
-const SCANNED = ['src', 'prisma'];
 const UNSAFE_SQL = /\$(?:queryRawUnsafe|executeRawUnsafe)\b|Prisma\.raw\(/;
-
-const isScript = (name: string) => /\.ts$/.test(name) && !/\.test\.ts$/.test(name);
-
-function listScripts(dir: string): string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    if (entry.name === 'generated' || entry.name === 'node_modules') return [];
-    const path = join(dir, entry.name);
-    return entry.isDirectory() ? listScripts(path) : isScript(entry.name) ? [path] : [];
-  });
-}
 
 describe('raw SQL (P11-03)', () => {
   it('never uses a string-built raw query', () => {
-    const offenders = SCANNED.flatMap((dir) => listScripts(join(API_ROOT, dir)))
-      .filter((file) => UNSAFE_SQL.test(readFileSync(file, 'utf8')))
-      .map((file) => relative(API_ROOT, file));
-    expect(offenders).toEqual([]);
+    expect(filesMatching(API_ROOT, ['src', 'prisma'], UNSAFE_SQL)).toEqual([]);
   });
 });

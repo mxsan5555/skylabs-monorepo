@@ -388,6 +388,7 @@ rollback rehearsal (P11).
 - [ ] No OTP, secret, token or unneeded private field in any response.
 - [ ] Public catalog: only intended records and fields; maximum page size enforced; validated input.
 - [ ] Errors expose no stack traces or database details.
+- [ ] Tokens only as bearer headers; the API sets no cookie (P2-16, `lib/token-transport.test.ts`).
 - [ ] Raw SQL only as tagged `$queryRaw` / `$executeRaw` (P11-03, `lib/raw-sql.test.ts`).
 - [ ] Every audit row uses an action from `lib/audit.ts` (P2-11: enforced by the type,
       `lib/audit.test.ts` checks the list is unique and dotted).

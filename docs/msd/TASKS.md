@@ -48,8 +48,8 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 9 | Payments, payouts and reports | 0 | 11 | 0 |
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
-| 12 | Platform, security and release | 12 | 69 | 17 |
-| | **Total** | **114** | **289** | **39** |
+| 12 | Platform, security and release | 13 | 70 | 19 |
+| | **Total** | **115** | **290** | **40** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -361,10 +361,11 @@ Removed 2026-10-24: ST-17 (therapist city filter is in ST-40; products are not l
 | [ ] | P2-12 | BE | Idempotency-Key middleware and table (24 h TTL, replay returns stored response) | M | - | Replay and conflict tests |
 | [ ] | P2-13 | SEC | AES-256-GCM field encryption util with key id prefix for rotation | M | P2-09 | Round-trip and tamper tests |
 | [ ] | P2-14 | BE | Shared Zod primitives: pagination, sort allowlist, reason, date range, money, phone, email; lint rule or test that every body schema is `.strict()` | M | - | Test scans schemas |
-| [ ] | P2-16 | SEC | Confirm token transport (bearer only or cookie); if any cookie is used set `HttpOnly`, `Secure`, `SameSite` and add CSRF protection; document decision | S | - | Written note in spec |
+| [x] | P2-16 | SEC | Confirm token transport (bearer only or cookie); if any cookie is used set `HttpOnly`, `Secure`, `SameSite` and add CSRF protection; document decision | S | - | Done: bearer only, no cookies (ARCHITECTURE §12.2); `lib/token-transport.test.ts` fails on any cookie code |
 | [ ] | P2-17 | SEC | `npm audit` gate and Dependabot for api and shared packages | S | - | CI step exists |
 | [x] | P2-18 | SEC | OTP request limit per identifier from any IP (`OTP_IDENTIFIER_RATE_LIMIT_PER_HOUR`, default 10), on top of the per IP + identifier limit | S | - | Merged: `otpIdentifierRateLimiter` |
 | [x] | P2-19 | SEC | Access tokens verified with `algorithms: ['HS256']` only | S | - | Merged: test refuses an HS512 token |
+| [ ] | P2-22 | BE | Google sign-in ends on the API domain: `/auth/google/callback` sends the tokens as JSON, so the app never gets them. Redirect to the app with a one-time code it exchanges for tokens (never tokens in the URL) | M | - | Sign in with Google lands signed in; code single-use and short-lived (tests). Public API change: review first |
 | [x] | P2-21 | BE | Storage layout: one folder per owner (`members/<id>/{profile,deals,therapists,products,documents}`, `customers/`, `home-slider/`, `cta-banners/`, `static-content/`, `masters/`), `bucketForKey`; ARCHITECTURE.md §12.3 | M | P5-03 | Merged: `lib/storage-layout.ts` tests, media service folder tests |
 | [x] | P2-20 | SEC | `vendors` routes reject a non-UUID id with 422 (`router.param` hook `uuidParam`); role-assign routes validate both ids | S | - | Merged: test returns 422 with the field name |
 | [ ] | P4-12 | QA | Route inventory test: every route has `requirePermission` or is on a documented public allowlist | M | P4-01 | CI fails on an unguarded route |
