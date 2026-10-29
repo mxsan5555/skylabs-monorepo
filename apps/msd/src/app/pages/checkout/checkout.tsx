@@ -16,6 +16,9 @@ import {
 
 import { ApiRequestError } from '../../../api/rbac/client';
 import { getMyProfile } from '../../../api/rbac/me';
+import { getCart } from '../../../api/cart';
+import { lineFromCartItem, lineFromOrderItem, type PurchaseLine } from '../../../utils/cart-items';
+import { PurchaseLineCard } from '../../components/purchase-line-card/purchase-line-card';
 import { STATES, citiesForState } from '@skylabs-monorepo/shared-utils';
 import { asOptions, renderSelect } from '../../components/form-controls/form-controls';
 import { loadRazorpayScript, RAZORPAY_THEME_COLOR } from '../../../utils/razorpay';
@@ -74,6 +77,8 @@ export function Checkout() {
   const [shippingState, setShippingState] = useState('');
   const [shippingPincode, setShippingPincode] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  // Item 2.3: the cart lines shown as cards in the summary before the order exists.
+  const [cartLines, setCartLines] = useState<PurchaseLine[]>([]);
   const [detailsSubmitting, setDetailsSubmitting] = useState(false);
   // Item 2.2 (D37): the signed-in customer's saved details fill the form; checkout saves them
   // again, so the next order starts filled. Session details stand in if the profile fails to load.
@@ -104,6 +109,21 @@ export function Checkout() {
       live = false;
     };
   }, [token, bootstrap]);
+
+  useEffect(() => {
+    if (isRetryPayment || !token) return;
+    let live = true;
+    getCart(token)
+      .then(({ data }) => {
+        if (live) setCartLines(data.items.map(lineFromCartItem));
+      })
+      .catch(() => {
+        // The summary stays empty; checkout itself still works from the server's cart.
+      });
+    return () => {
+      live = false;
+    };
+  }, [isRetryPayment, token]);
 
   /** A new state clears the city, which belonged to the old one. */
   const chooseState = (value: string) => {
@@ -577,11 +597,15 @@ export function Checkout() {
                       <Icon> shopping_bag </Icon>
                     </div>
                   </div>
-                  <div className="checkout-summary__empty">
-                    <Icon> shopping_cart </Icon>
-                    <p> Your order summary will appear
-                      after checkout.
-                    </p>
+                  <ul className="checkout-summary__lines">
+                    {cartLines.map((line) => (
+                      <PurchaseLineCard key={line.id} line={line} />
+                    ))}
+                  </ul>
+                  <Divider />
+                  <div className="checkout-summary__total">
+                    <span> {content.cart.total} </span>
+                    <strong>{formatINR(cartLines.reduce((sum, line) => sum + line.total, 0))}</strong>
                   </div>
                   <Divider />
                   <div className="checkout-summary__secure">
@@ -781,29 +805,11 @@ export function Checkout() {
                       <Icon> shopping_bag </Icon>
                     </div>
                   </div>
-                  {vendorGroups.map((group) => (
-                    <div key={group.vendorId} className="checkout-summary__vendor-group">
-                      {vendorGroups.length > 1 && (
-                        <p className="checkout-summary__vendor-heading">
-                          <Icon aria-hidden="true">storefront</Icon>
-                          {group.vendorName}
-                        </p>
-                      )}
-                      <ul className="checkout-summary__items">
-                        {group.items.map(
-                          (item) => (
-                            <li key={item.id} className="checkout-summary__item">
-                              <div className="checkout-summary__item-main">
-                                <p className="checkout-summary__item-title">{item.itemName} </p>
-                                <p className="checkout-summary__item-qty">  × {item.quantity} {item.durationMinutes && ` · ${item.durationMinutes} min`} </p>
-                              </div>
-                              <p className="checkout-summary__item-price">{formatINR(Number(item.lineTotal,),)} </p>
-                            </li>
-                          ),
-                        )}
-                      </ul>
-                    </div>
-                  ))}
+                  <ul className="checkout-summary__lines">
+                    {(order?.items ?? []).map((item) => (
+                      <PurchaseLineCard key={item.id} line={lineFromOrderItem(item)} />
+                    ))}
+                  </ul>
                   <Divider />
                   <div className="checkout-summary__total">
                     <span> {content.cart.total} </span>

@@ -359,133 +359,21 @@
 
 
 /* ==========================================================================
-   EMPTY SUMMARY
+   SUMMARY LINES (one PurchaseLineCard per item, item 2.3)
    ========================================================================== */
 
-.checkout-summary__empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-
-  gap: 10px;
-
-  min-height: 120px;
-
-  padding: 20px;
-
-  border-radius: 12px;
-
-  background: var(--md-sys-color-surface-container);
-
-  text-align: center;
-}
-
-.checkout-summary__empty Icon,
-.checkout-summary__empty svg {
-  font-size: 28px;
-
-  color: var(--md-sys-color-on-surface-variant);
-}
-
-.checkout-summary__empty p {
-  max-width: 230px;
-
-  margin: 0;
-
-  font-size: 0.78rem;
-  line-height: 1.5;
-
-  color: var(--md-sys-color-on-surface-variant);
-}
-
-
-/* ==========================================================================
-   SUMMARY ITEMS
-   ========================================================================== */
-
-.checkout-summary__vendor-group + .checkout-summary__vendor-group {
-  margin-top: 16px;
-}
-
-.checkout-summary__vendor-heading {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-
-  margin: 0 0 8px;
-
-  font-size: 0.78rem;
-  font-weight: 600;
-
-  color: var(--md-sys-color-on-surface-variant);
-}
-
-.checkout-summary__items {
-  display: flex;
-  flex-direction: column;
-
-  gap: 14px;
-
-  list-style: none;
-
+.checkout-summary__lines {
+  display: grid;
+  gap: 8px;
   margin: 0;
   padding: 0;
+  list-style: none;
 }
 
-.checkout-summary__item {
-  display: flex;
-  align-items: flex-start;
-
-  gap: 12px;
-
-  padding-bottom: 14px;
-
-  border-bottom: 1px solid
-    var(--md-sys-color-outline-variant);
-}
-
-.checkout-summary__item:last-child {
-  padding-bottom: 0;
-
-  border-bottom: 0;
-}
-
-.checkout-summary__item-main {
-  min-width: 0;
-
-  flex: 1;
-}
-
-.checkout-summary__item-title {
-  margin: 0;
-
-  font-size: 0.84rem;
-  line-height: 1.4;
-  font-weight: 600;
-
-  color: var(--md-sys-color-on-surface);
-
-  word-break: break-word;
-}
-
-.checkout-summary__item-qty {
-  margin: 4px 0 0;
-
-  font-size: 0.74rem;
-
-  color: var(--md-sys-color-on-surface-variant);
-}
-
-.checkout-summary__item-price {
-  margin: 0;
-
-  font-size: 0.85rem;
-  font-weight: 700;
-
-  color: var(--md-sys-color-primary);
-
-  white-space: nowrap;
+/* The summary column is narrow: a smaller image keeps the title readable. */
+.checkout-summary__lines .purchase-line__media {
+  inline-size: 64px;
+  block-size: 64px;
 }
 
 

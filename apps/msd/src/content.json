@@ -1,4 +1,7 @@
 {
+  "purchaseLine": {
+    "opensInNewTab": "(opens in a new tab)"
+  },
   "profileSettings": {
     "saved": "Profile saved.",
     "nameRequired": "Please enter your name.",

@@ -3,7 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Checkout } from './checkout';
 
-const { checkoutMock, getMyProfileMock } = vi.hoisted(() => ({ checkoutMock: vi.fn(), getMyProfileMock: vi.fn() }));
+const { checkoutMock, getMyProfileMock, getCartMock } = vi.hoisted(() => ({ checkoutMock: vi.fn(), getMyProfileMock: vi.fn(), getCartMock: vi.fn() }));
 
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
   useAuth: () => ({ token: 'test-token', isAuthenticated: true, bootstrap: { user: { name: 'Session Name', email: null, phone: null } } }),
@@ -15,7 +15,26 @@ vi.mock('../../../api/orders', async (importOriginal) => ({
   pay: vi.fn().mockResolvedValue({ data: null }),
 }));
 vi.mock('../../../api/rbac/me', () => ({ getMyProfile: (...a: unknown[]) => getMyProfileMock(...a) }));
+vi.mock('../../../api/cart', () => ({ getCart: (...a: unknown[]) => getCartMock(...a) }));
 
+
+const CART = {
+  id: 'c1',
+  customerId: 'u1',
+  items: [
+    {
+      id: 'ci1', cartId: 'c1', dealId: 'd1', dealPackageId: 'p1', therapistId: null, therapistPackageId: null, productId: null,
+      quantity: 1, unitPrice: '3080.00',
+      deal: { id: 'd1', title: 'Repair Hair Treatment', slug: 'repair-hair', salePrice: '3080', originalPrice: '4000', durationMinutes: 90, images: null, vendorId: 'm1', branchId: 'b1', vendor: { id: 'm1', businessName: 'UrbanGlow Beauty & Care' }, branch: { id: 'b1', name: 'Andheri' } },
+      dealPackage: { id: 'p1', durationMinutes: 90, sellingPrice: '3080' }, therapist: null, therapistPackage: null, product: null,
+    },
+    {
+      id: 'ci2', cartId: 'c1', dealId: null, dealPackageId: null, therapistId: null, therapistPackageId: null, productId: 'pr1',
+      quantity: 2, unitPrice: '699.00', deal: null, dealPackage: null, therapist: null, therapistPackage: null,
+      product: { id: 'pr1', name: 'Daily Hair Care Shampoo', image: null, imageAlt: null, price: '699', originalPrice: null, vendorId: 'm2', vendor: { id: 'm2', businessName: 'Vitality Wellness & Beauty' } },
+    },
+  ],
+};
 
 const NEERAJ = {
   id: 'u1',
@@ -45,6 +64,7 @@ function renderCheckout() {
 beforeEach(() => {
   checkoutMock.mockReset().mockReturnValue(new Promise(vi.fn()));
   getMyProfileMock.mockReset().mockResolvedValue({ data: NEERAJ });
+  getCartMock.mockReset().mockResolvedValue({ data: CART });
 });
 
 /** Item 2.2: the signed-in customer's saved details fill the form; State then City are lists. */
@@ -85,5 +105,23 @@ describe('Checkout details', () => {
     fireEvent.click(continueButton());
     await waitFor(() => expect(document.body.textContent).toContain('State is required.'));
     expect(checkoutMock).not.toHaveBeenCalled();
+  });
+});
+
+/** Item 2.3: the summary is one card per line, from the first step on. */
+describe('Checkout summary', () => {
+  it('lists every cart line as its own card with its member, and the total, before payment', async () => {
+    renderCheckout();
+    const cards = await waitFor(() => {
+      const items = Array.from(document.querySelectorAll('.checkout-page__summary li.purchase-line'));
+      if (items.length !== 2) throw new Error('summary cards not ready');
+      return items;
+    });
+    expect(cards[0].textContent).toContain('Repair Hair Treatment');
+    expect(cards[0].textContent).toContain('UrbanGlow Beauty & Care');
+    expect(cards[1].textContent).toContain('Vitality Wellness & Beauty');
+    expect(cards[1].textContent).toContain('× 2');
+    expect(document.querySelector('.checkout-page__summary')?.textContent).toContain('₹4,478');
+    expect(document.body.textContent).not.toContain('Your order summary will appear');
   });
 });

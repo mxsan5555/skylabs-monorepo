@@ -232,6 +232,11 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
   and refuses a city outside the state, a bad PIN, an unknown key and no token; checkout with all
   four delivery fields saves them on the customer, with partial fields leaves the saved one alone,
   refuses a state/city off the list, and needs a signed-in customer (401).
+- Line cards (item 2.3, `purchase-line-card.test.tsx`, `checkout.test.tsx`): one card per line
+  with type, title, member, branch, duration, quantity and price; title and image link to the
+  detail page with `target="_blank"`, `rel="noopener noreferrer"` and "(opens in a new tab)"; no
+  link or image when the line has none; the cart slots (select, quantity, actions) render and hide
+  "× qty"; the checkout summary lists every cart line as a card with the total.
 
 - A customer never reads or changes another customer's cart, wishlist or order by changing an id.
 - A member never changes an order's status (403), for a deal or a product order (D27).

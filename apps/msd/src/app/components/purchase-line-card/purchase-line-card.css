@@ -1,0 +1,133 @@
+/* One cart or checkout line as a card (item 2). M3 roles only. */
+.purchase-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-large);
+  background-color: var(--md-sys-color-surface);
+  list-style: none;
+}
+
+.purchase-line__select {
+  align-self: center;
+}
+
+.purchase-line__media {
+  flex: none;
+  display: block;
+  inline-size: 96px;
+  block-size: 96px;
+  overflow: hidden;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background-color: var(--md-sys-color-surface-container);
+}
+
+.purchase-line__media img {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+.purchase-line__body {
+  flex: 1;
+  min-inline-size: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.purchase-line__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.purchase-line__details {
+  min-inline-size: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.purchase-line__kind {
+  justify-self: start;
+  padding: 2px 8px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background-color: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+.purchase-line__title,
+.purchase-line__member,
+.purchase-line__meta,
+.purchase-line__price {
+  margin: 0;
+}
+
+.purchase-line__title a {
+  color: var(--md-sys-color-on-surface);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.purchase-line__title a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.purchase-line__title a:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+  border-radius: var(--md-sys-shape-corner-extra-small);
+}
+
+.purchase-line__external {
+  --md-icon-size: 16px;
+  margin-inline-start: 4px;
+  vertical-align: middle;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.purchase-line__member {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.purchase-line__member md-icon {
+  --md-icon-size: 16px;
+}
+
+.purchase-line__meta {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.purchase-line__price {
+  flex: none;
+  color: var(--md-sys-color-primary);
+}
+
+.purchase-line__bottom {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.purchase-line__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Phones: a smaller image so the text keeps its width. */
+@media (max-width: 480px) {
+  .purchase-line__media {
+    inline-size: 64px;
+    block-size: 64px;
+  }
+}

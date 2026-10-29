@@ -345,6 +345,10 @@ A member who opens another member's deal, branch, package or therapist gets 404.
   India location list and City lists that state's cities (City locked until a state is chosen,
   cleared when the state changes). Every field is required; Continue saves the address on the
   account, so the next checkout starts filled.
+- **Line cards (item 2.3):** the cart and both checkout steps show each line as its own card
+  (`PurchaseLineCard`, built by `utils/cart-items.ts` from a cart item or an order item): type tag,
+  title, the member's name and branch inside the card, duration, quantity and price. Title and
+  image open the detail page in a new tab, and the title says so to screen readers.
 - Staff block or unblock a customer with a reason (`customers:status_change`); customers are never
   deleted.
 - **Refunds (D11):** Support raises a refund request; Admin or Super Admin approves or rejects
