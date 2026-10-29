@@ -314,18 +314,13 @@ export async function createOrderFromCart(customerId: string, contactDetails: Or
   });
 }
 
-//HELPER FUNCTION
-
+/** An order item image: full URLs (legacy images) as they are; an R2 storage key prefixed with
+ *  `R2_PUBLIC_URL` when set, else the bare key, which the frontend resolves with
+ *  `VITE_MEDIA_BASE_URL` (never `/<key>`, which would point at the frontend's own origin). */
 function getPublicImageUrl(storageKey: string | null | undefined): string | null {
   if (!storageKey) return null;
-
-  // Agar already full URL hai toh waisa hi return kar do
-  if (storageKey.startsWith('http://') || storageKey.startsWith('https://')) {
-    return storageKey;
-  }
-
-  // R2 storage key hai → public URL banao
-  return `${env.r2PublicUrl}/${storageKey}`;
+  if (storageKey.startsWith('http://') || storageKey.startsWith('https://')) return storageKey;
+  return env.r2PublicUrl ? `${env.r2PublicUrl}/${storageKey}` : storageKey;
 }
 // ─── Customer self-service ────────────────────────────────────────────────────
 

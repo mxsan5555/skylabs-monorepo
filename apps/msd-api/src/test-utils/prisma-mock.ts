@@ -47,6 +47,7 @@ export function createPrismaMock() {
       findUnique: vi.fn(),
       count: vi.fn(),
       deleteMany: vi.fn(),
+      upsert: vi.fn(),
     },
     rolePermission: {
       findMany: vi.fn(),

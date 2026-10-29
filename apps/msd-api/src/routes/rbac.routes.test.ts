@@ -296,15 +296,18 @@ describe('GET /api/v1/rbac/permissions/catalog', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns 200 with the full msd menu x action catalog', async () => {
+  it('returns 200 with the resource x action catalog and the permission id of each action', async () => {
     resolveMock.mockResolvedValue(['rbac.roles:view']);
-    prismaMock.permission.findMany.mockResolvedValue([]);
+    prismaMock.permission.upsert.mockResolvedValue({});
+    prismaMock.permission.findMany.mockResolvedValue([{ id: PERMISSION_ID, key: 'members:view', label: 'Members: view' }]);
     const res = await request(app)
       .get('/api/v1/rbac/permissions/catalog')
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }));
     expect(res.status).toBe(200);
-    expect(Array.isArray(res.body.data)).toBe(true);
-    expect(res.body.data.find((m: { menuKey: string }) => m.menuKey === 'rbac.roles')).toBeDefined();
+    const members = res.body.data.find((m: { menuKey: string }) => m.menuKey === 'members');
+    expect(members.actions).toEqual(
+      expect.arrayContaining([expect.objectContaining({ action: 'view', key: 'members:view', permissionId: PERMISSION_ID })]),
+    );
   });
 });
 
@@ -322,15 +325,15 @@ describe('GET /api/v1/rbac/roles/:id/permissions', () => {
     expect(res.status).toBe(422);
   });
 
-  it('returns 200 with { permissionIds }', async () => {
+  it('returns 200 with the granted permissions and their scope', async () => {
     resolveMock.mockResolvedValue(['rbac.roles:view']);
     prismaMock.role.findUnique.mockResolvedValue(roleFixture);
-    prismaMock.rolePermission.findMany.mockResolvedValue([{ permissionId: PERMISSION_ID }]);
+    prismaMock.rolePermission.findMany.mockResolvedValue([{ roleId: ROLE_ID, permissionId: PERMISSION_ID, scope: 'OWN' }]);
     const res = await request(app)
       .get(`/api/v1/rbac/roles/${ROLE_ID}/permissions`)
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }));
     expect(res.status).toBe(200);
-    expect(res.body.data).toEqual({ permissionIds: [PERMISSION_ID] });
+    expect(res.body.data).toEqual([expect.objectContaining({ permissionId: PERMISSION_ID, scope: 'OWN' })]);
   });
 
   it('returns 404 when the role does not exist', async () => {
@@ -347,16 +350,16 @@ describe('PUT /api/v1/rbac/roles/:id/permissions', () => {
   it('returns 401 with no token', async () => {
     const res = await request(app)
       .put(`/api/v1/rbac/roles/${ROLE_ID}/permissions`)
-      .send({ permissionIds: [PERMISSION_ID] });
+      .send({ permissions: [{ permissionId: PERMISSION_ID, scope: 'ALL' }] });
     expect(res.status).toBe(401);
   });
 
-  it('returns 422 when permissionIds contains a non-uuid entry', async () => {
+  it('returns 422 when a permission id is not a uuid', async () => {
     resolveMock.mockResolvedValue(['rbac.roles:edit']);
     const res = await request(app)
       .put(`/api/v1/rbac/roles/${ROLE_ID}/permissions`)
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
-      .send({ permissionIds: ['not-a-uuid'] });
+      .send({ permissions: [{ permissionId: 'not-a-uuid', scope: 'ALL' }] });
     expect(res.status).toBe(422);
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
   });
@@ -374,7 +377,7 @@ describe('PUT /api/v1/rbac/roles/:id/permissions', () => {
     const res = await request(app)
       .put(`/api/v1/rbac/roles/${ROLE_ID}/permissions`)
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
-      .send({ permissionIds: [PERMISSION_ID] });
+      .send({ permissions: [{ permissionId: PERMISSION_ID, scope: 'ALL' }] });
     expect(res.status).toBe(200);
     expect(res.body.data[0].permissionId).toBe(PERMISSION_ID);
   });
@@ -386,7 +389,7 @@ describe('PUT /api/v1/rbac/roles/:id/permissions', () => {
     const res = await request(app)
       .put(`/api/v1/rbac/roles/${ROLE_ID}/permissions`)
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
-      .send({ permissionIds: [PERMISSION_ID] });
+      .send({ permissions: [{ permissionId: PERMISSION_ID, scope: 'ALL' }] });
     expect(res.status).toBe(422);
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
   });

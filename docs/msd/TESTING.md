@@ -45,7 +45,7 @@ Known failures at 2026-10-18 (msd recounted 2026-10-27: `india-locations` moved 
 | Project | Failing | Where |
 |---|---|---|
 | msd | 19 tests in 11 files | `permission-matrix` 9, `contact-us` 2, and 1 each in `app.spec`, `widget-registry`, `deal-card`, `media-uploader`, `site-footer`, `wishlist`, `roles`, `settings`; `entry-server.test.tsx` fails to load (`sky-product-card-wc` fixed 2026-10-24). Regressions since commit e756759 (NewOfferCard), not yet fixed: `home` 4 (FAQ section no longer rendered, deal favourite), `category` 1 (product wishlist heart) |
-| msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; recounted 2026-10-28: 1,260 pass) |
+| msd-api | 0 | Fixed 2026-10-29 (P10-46): 1,299 pass. `rbac.routes` tests moved to the scoped permission contract, `GET /roles/:id/permissions` validates its id again, order item images keep the bare key when `R2_PUBLIC_URL` is unset |
 | shared-menu | 5 | `index.test.ts` |
 
 Type check: `npx nx run msd:typecheck` runs `tsconfig.app.json` and `tsconfig.prerender.json` (ST-14,

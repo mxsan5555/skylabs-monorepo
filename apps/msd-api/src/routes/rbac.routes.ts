@@ -138,6 +138,7 @@ router.get('/permissions/catalog', requirePermission('rbac.roles', 'view'), asyn
 router.get(
   '/roles/:id/permissions',
   requirePermission('rbac.roles', 'view'),
+  validateParams(UuidParamSchema),
   async (req, res, next) => {
     try {
       const data =
