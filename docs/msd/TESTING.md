@@ -242,6 +242,9 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
 - Meta descriptions (ST-08; `seo/private-page-meta.test.ts`, `otp.test.tsx`): cart, sign in, OTP,
   orders, invoice and choose experience each have a 50 to 160 character description and stay
   noindex (sign in, OTP and choose experience also nofollow); the invoice not-found view is noindex.
+- Member page branch (ST-20, `vendor.test.tsx`): the page shows the branch nearest the visitor's
+  location from `useVisitorLocation()`, the first branch without a location or mapped branches,
+  and nothing for a member with no branches; `useCurrentLocation` no longer exists.
 - Content width (ST-19, `content-width.test.ts`): `--sky-content-max` (1280px) and
   `--sky-content-gutter` (16px) are defined once on `:root`; no stylesheet repeats 1280px; header,
   footer and sections resolve to 1280px with 16px gutters and no sideways scroll at phone width.

@@ -40,7 +40,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 1 | Admin and staff | 4 | 31 | 13 |
 | 2 | Members | 54 | 101 | 53 |
 | 3 | Customers and orders | 2 | 12 | 17 |
-| 4 | Storefront | 21 | 42 | 50 |
+| 4 | Storefront | 22 | 42 | 52 |
 | 5 | Static content | 0 | 5 | 0 |
 | 6 | CTA banners | 4 | 5 | 80 |
 | 7 | Home slider | 7 | 8 | 88 |
@@ -49,7 +49,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
 | 12 | Platform, security and release | 9 | 69 | 13 |
-| | **Total** | **101** | **289** | **35** |
+| | **Total** | **102** | **289** | **35** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -242,7 +242,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | ST-16 | FE | Audit app-level CSS in the dark theme (the footer theme switch exposes it) | S | - | No hardcoded light colours |
 | [ ] | ST-18 | FE | Popular searches render only on the client until the catalog is seeded into the prerender | S | - | Present in prerendered HTML |
 | [x] | ST-19 | FE | Shared `--sky-content-max` token for the 1280px / 16px containers (header, footer, home) | S | - | One token, no repeated values; done 2026-10-28: `--sky-content-max` and `--sky-content-gutter` on `:root` in `styles.css`, used by page sections, header, footer, breadcrumb and the product "related" band; `content-width.test.ts` fails on any other 1280px |
-| [ ] | ST-20 | FE | Move the remaining `useCurrentLocation` callers (category, search, therapists, vendor) to `useVisitorLocation` | S | - | `useCurrentLocation` deleted (category, search and therapists move with ST-41 to ST-43) |
+| [x] | ST-20 | FE | Move the remaining `useCurrentLocation` callers (category, search, therapists, vendor) to `useVisitorLocation` | S | - | `useCurrentLocation` deleted (category, search and therapists move with ST-41 to ST-43); done 2026-10-28: the member page was the last caller; it reads `useVisitorLocation()` and `hooks/useCurrentLocation.ts` is deleted; `resolveBranch` tested (`vendor.test.tsx`) |
 | [x] | ST-21 | FE | Move `/categories`, therapists, orders, invoices and payments off `category.css` onto `PageSection`/`CardGrid`, then delete `category.css` | M | - | Done 2026-10-22: pages migrated, `category.css` deleted |
 | [ ] | ST-22 | BIZ | Reviews system (customers rate completed orders) so the category page can add a rating sort, rating filter and card ratings | L | - | Module rules written in PLANNING.md |
 | [ ] | ST-25 | FE | Filter panel polish: keep selected Business/Branch options visible outside the facet list or past "Show more"; clamp URL min/max into the slider bounds when facets narrow | S | - | Tests |

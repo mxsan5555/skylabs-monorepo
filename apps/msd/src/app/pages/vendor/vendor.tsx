@@ -8,7 +8,8 @@ import { getCatalogVendor, listCatalogDeals, listCatalogProducts, type CatalogVe
 import { ApiRequestError } from '../../../api/rbac/client';
 import { addCartItem } from '../../../api/cart';
 import { useWishlist } from '../../../wishlist/wishlist-context';
-import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
+import { useVisitorLocation } from '../../../location/location-context';
+import { haversineKm, type Coordinates } from '../../../location/geo';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { lowestPackagePrice } from '../../components/therapist-card/therapist-card';
 import { Breadcrumb } from '../../components/breadcrumb';
@@ -103,31 +104,18 @@ function dealFromPrice(deal: CatalogDeal): number {
 
 type VendorSection = 'deals' | 'products' | 'therapies';
 
-/** Great-circle distance in kilometers — mirrors msd-api's own `haversineKm` (catalog.service.ts).
- *  Kept as an independent client-side copy rather than a shared package, per this app's "app-local
- *  logic, never shared between frontend and backend" convention. */
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const earthRadiusKm = 6371;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return earthRadiusKm * 2 * Math.asin(Math.sqrt(a));
-}
-
-/** The customer's "serviceable branch" — always the nearest branch to their browser-geolocation
- *  coordinates (no radius cutoff), falling back to the vendor's first active branch when
- *  coordinates are unavailable (denied/unsupported) or no branch has coordinates set yet. The
+/** The customer's "serviceable branch" — always the nearest branch to the visitor's location
+ *  (`useVisitorLocation`: saved, browser or IP; no radius cutoff), falling back to the vendor's
+ *  first active branch when there is no location or no branch has coordinates set yet. The
  *  customer never picks a branch manually — see this page's removed branch-tabs selector. */
-function resolveBranch(branches: CatalogVendorBranch[], coords: { latitude: number; longitude: number } | null): CatalogVendorBranch | null {
+export function resolveBranch(branches: CatalogVendorBranch[], coords: Coordinates | null): CatalogVendorBranch | null {
   if (branches.length === 0) return null;
   if (!coords) return branches[0];
   let nearest: CatalogVendorBranch | null = null;
   let nearestDistance = Infinity;
   for (const branch of branches) {
     if (branch.latitude == null || branch.longitude == null) continue;
-    const distance = haversineKm(coords.latitude, coords.longitude, Number(branch.latitude), Number(branch.longitude));
+    const distance = haversineKm(coords, { latitude: Number(branch.latitude), longitude: Number(branch.longitude) });
     if (distance < nearestDistance) {
       nearestDistance = distance;
       nearest = branch;
@@ -145,7 +133,7 @@ export function VendorPage() {
   const { isAuthenticated } = useAuth();
   const { has: isWishlisted, toggle: toggleWishlist, isPending: wishlistPending } = useWishlist();
 
-  const { coords } = useCurrentLocation();
+  const { coords } = useVisitorLocation();
 
   const [vendor, setVendor] = useState<CatalogVendorDetail | null>(null);
   const [vendorLoading, setVendorLoading] = useState(true);
