@@ -270,6 +270,7 @@ export function MediaUploader({
       <legend>Media</legend>
 
       <div className="media-uploader__section">
+        <p className="field-hint">Images</p>
         {busy && <LinearProgress indeterminate />}
         <div className="media-uploader__grid">
           {images.map((img, i) => (

@@ -44,7 +44,7 @@ Known failures at 2026-10-18 (msd recounted 2026-10-27: `india-locations` moved 
 
 | Project | Failing | Where |
 |---|---|---|
-| msd | 9 tests in 7 files (2026-10-29) | 1 each in `deal-card`, `media-uploader`, `site-footer`, `wishlist` (P10-46 fixed `permission-matrix`, `roles`, `contact-us`, `settings`, `widget-registry`, `app.spec`); `entry-server.test.tsx` fails to load (`sky-product-card-wc` fixed 2026-10-24). Regressions since commit e756759 (NewOfferCard), not yet fixed: `home` 4 (FAQ section no longer rendered, deal favourite), `category` 1 (product wishlist heart) |
+| msd | 5 tests in 3 files (2026-10-29) | (P10-46 fixed `permission-matrix`, `roles`, `contact-us`, `settings`, `widget-registry`, `app.spec`, `deal-card`, `media-uploader`, `site-footer`, `wishlist`); `entry-server.test.tsx` fails to load (`sky-product-card-wc` fixed 2026-10-24). Regressions since commit e756759 (NewOfferCard), not yet fixed: `home` 4 (FAQ section no longer rendered, deal favourite), `category` 1 (product wishlist heart) |
 | msd-api | 0 | Fixed 2026-10-29 (P10-46): 1,299 pass. `rbac.routes` tests moved to the scoped permission contract, `GET /roles/:id/permissions` validates its id again, order item images keep the bare key when `R2_PUBLIC_URL` is unset |
 | shared-* | 0 | Fixed 2026-10-29 (P10-46): `shared-menu` tests follow the `/account/*` menu; every shared package has an `.eslintrc.json` (the root config ignores all files until a project opts in), so `nx run-many -t lint test` passes for all six |
 
