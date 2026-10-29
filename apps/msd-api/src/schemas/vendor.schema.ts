@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { PaginationQuerySchema } from './common.schema';
+import { PaginationQuerySchema, ReasonSchema } from './common.schema';
 import { normalizeIdentifier } from '../lib/normalizeIdentifier';
 import { isIndiaLocation } from '@skylabs-monorepo/shared-utils';
 
@@ -224,13 +224,13 @@ export const MemberCreateSchema = z
 export const MemberStatusChangeSchema = z
   .object({
     status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']),
-    reason: z.string().trim().min(10).max(500),
+    reason: ReasonSchema,
   })
   .strict()
   .openapi('MemberStatusChange');
 
 export const MemberDeleteSchema = z
-  .object({ reason: z.string().trim().min(10).max(500) })
+  .object({ reason: ReasonSchema })
   .strict()
   .openapi('MemberDelete');
 
