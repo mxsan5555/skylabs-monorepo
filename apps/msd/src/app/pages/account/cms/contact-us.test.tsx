@@ -30,7 +30,7 @@ vi.mock('../../../../api/rbac/site-content', async () => {
 const SAVED: ContactUsContent = {
   id: 'singleton',
   address: '123 Main St',
-  phone: '555-0100',
+  phone: '9876543210',
   email: 'hello@skylabs.dev',
   mapEmbedUrl: 'https://maps.example.com/embed',
   socialLinks: [{ platform: 'Instagram', url: 'https://instagram.com/skylabs' }],

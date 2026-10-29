@@ -1,4 +1,11 @@
 {
+  "profileSettings": {
+    "saved": "Profile saved.",
+    "nameRequired": "Please enter your name.",
+    "fixFields": "Fix the highlighted fields and try again.",
+    "loadFailed": "Could not load your profile.",
+    "saveFailed": "Could not save your profile."
+  },
   "notFound": {
     "metaTitle": "Page not found · MSD",
     "title": "Page not found",
