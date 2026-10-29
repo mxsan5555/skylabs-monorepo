@@ -242,6 +242,9 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
 - Meta descriptions (ST-08; `seo/private-page-meta.test.ts`, `otp.test.tsx`): cart, sign in, OTP,
   orders, invoice and choose experience each have a 50 to 160 character description and stay
   noindex (sign in, OTP and choose experience also nofollow); the invoice not-found view is noindex.
+- Content width (ST-19, `content-width.test.ts`): `--sky-content-max` (1280px) and
+  `--sky-content-gutter` (16px) are defined once on `:root`; no stylesheet repeats 1280px; header,
+  footer and sections resolve to 1280px with 16px gutters and no sideways scroll at phone width.
 - Footer (ST-07, `site-footer.test.tsx`): every footer link has a page; Help & Info lists Help Center
   (`/help-center`) and Wishlist, and no Gifting link until a gift-card feature exists.
 - One `<h1>` per page; prerendered `/` contains the hero `<h1>`, category links and JSON-LD; no
