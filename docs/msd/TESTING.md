@@ -242,6 +242,9 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
 - Meta descriptions (ST-08; `seo/private-page-meta.test.ts`, `otp.test.tsx`): cart, sign in, OTP,
   orders, invoice and choose experience each have a 50 to 160 character description and stay
   noindex (sign in, OTP and choose experience also nofollow); the invoice not-found view is noindex.
+- Branch address line (`utils/format.test.ts` "formatStreetAddress", `deal-detail.test.tsx`): the deal
+  and member pages print the city once when the stored address already ends with it, and keep a
+  state that only shares its last word ("Vasant Kunj, New Delhi, Delhi").
 - Member page branch (ST-20, `vendor.test.tsx`): the page shows the branch nearest the visitor's
   location from `useVisitorLocation()`, the first branch without a location or mapped branches,
   and nothing for a member with no branches; `useCurrentLocation` no longer exists.

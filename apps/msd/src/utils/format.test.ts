@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fillTemplate, formatINR, pluralize, inputValue, formatTime12h } from './format';
+import { fillTemplate, formatINR, formatStreetAddress, pluralize, inputValue, formatTime12h } from './format';
 
 describe('formatINR', () => {
   it('formats a number as INR', () => {
@@ -91,5 +91,23 @@ describe('fillTemplate', () => {
   it('fills every {key} it has a value for and leaves the rest', () => {
     expect(fillTemplate('Add {title} to cart', { title: 'Massage Oil' })).toBe('Add Massage Oil to cart');
     expect(fillTemplate('{a} and {a}, not {b}', { a: 'x' })).toBe('x and x, not {b}');
+  });
+});
+
+describe('formatStreetAddress', () => {
+  it('joins the parts with commas and skips empty ones', () => {
+    expect(formatStreetAddress(['Karve Road', null, 'Pune', 'Maharashtra'])).toBe('Karve Road, Pune, Maharashtra');
+    expect(formatStreetAddress([undefined, '', 'Pune'])).toBe('Pune');
+    expect(formatStreetAddress([])).toBe('');
+  });
+
+  it('does not repeat a city the address already ends with (any case)', () => {
+    expect(formatStreetAddress(['Vasant Kunj, New Delhi', 'New Delhi', 'Delhi'])).toBe('Vasant Kunj, New Delhi, Delhi');
+    expect(formatStreetAddress(['Indiranagar, bengaluru', 'Bengaluru'])).toBe('Indiranagar, bengaluru');
+    expect(formatStreetAddress(['Pune', 'Pune'])).toBe('Pune');
+  });
+
+  it('keeps a part that only shares the last word (New Delhi, then the state Delhi)', () => {
+    expect(formatStreetAddress(['Vasant Kunj, New Delhi', 'Delhi'])).toBe('Vasant Kunj, New Delhi, Delhi');
   });
 });

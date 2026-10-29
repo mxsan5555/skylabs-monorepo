@@ -6,6 +6,7 @@ import type { SkyDataTableParamsDetail } from '@skylabs-monorepo/shared-ui';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { listOrders, getOrder, setOrderStatus, type Order, type OrderStatus } from '../../../../api/rbac/orders';
 import { ApiRequestError } from '../../../../api/rbac/client';
+import { formatStreetAddress } from '../../../../utils/format';
 
 const ALLOWED_NEXT: Record<OrderStatus, OrderStatus[]> = {
   PENDING_PAYMENT: ['CONFIRMED', 'CANCELLED'],
@@ -88,7 +89,7 @@ function toOrderRow(order: Order): Record<string, string | number> {
     'Customer Email': order.customer.email ?? '—',
     // order.branch is null for a Product-only order (Product is vendor-level, not branch-level —
     // see Order.branchId's schema doc comment in msd-api) — never read .address off it unguarded.
-    'Branch Address': order.branch ? [order.branch.address, order.branch.city].filter(Boolean).join(', ') || '—' : '—',
+    'Branch Address': (order.branch && formatStreetAddress([order.branch.address, order.branch.city])) || '—',
     Subtotal: `₹${order.subtotal}`,
     Quantity: order.items.reduce((n, i) => n + i.quantity, 0),
     'Payment Provider': latestPayment?.provider ?? '—',

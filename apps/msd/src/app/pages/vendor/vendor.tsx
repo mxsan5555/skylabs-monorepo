@@ -16,7 +16,7 @@ import { Breadcrumb } from '../../components/breadcrumb';
 import { DurationPackageSelector } from '../../components/duration-package-selector';
 import { useDealPurchaseSelection } from '../../../hooks/use-deal-purchase-selection';
 import { useTherapistPurchaseSelection } from '../../../hooks/use-therapist-purchase-selection';
-import { formatINR, pluralize, formatTime12h } from '../../../utils/format';
+import { formatINR, pluralize, formatTime12h, formatStreetAddress } from '../../../utils/format';
 import { resolveDealMedia, resolveProductMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
 import { showSnackbar } from '../../../snackbar/snackbar';
 import './vendor.css';
@@ -378,9 +378,7 @@ export function VendorPage() {
                 {(selectedBranch?.address || selectedBranch?.city || vendor.city) && (
                   <span className="vendor-page__location-row">
                     <Icon aria-hidden="true" className="vendor-page__meta-icon">location_on</Icon>
-                    {[selectedBranch?.address, selectedBranch?.city ?? vendor.city, selectedBranch?.state ?? vendor.state]
-                      .filter(Boolean)
-                      .join(', ')}
+                    {formatStreetAddress([selectedBranch?.address, selectedBranch?.city ?? vendor.city, selectedBranch?.state ?? vendor.state])}
                   </span>
                 )}
               </div>

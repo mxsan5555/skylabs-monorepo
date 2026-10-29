@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerE
 import { useNavigate } from 'react-router-dom';
 import { FilledButton, Icon, OutlinedButton, OutlinedIconButton } from '@skylabs-monorepo/shared-ui/react';
 import { getCatalogVendor, type CatalogVendorBranch } from '../../../api/catalog';
-import { fillTemplate, formatINR, formatTime12h } from '../../../utils/format';
+import { fillTemplate, formatINR, formatStreetAddress, formatTime12h } from '../../../utils/format';
 import content from '../../../content.json';
 import { useHydrated } from '../../../hooks/use-hydrated';
 import { DealMap, type DealMapPoint } from '../deal-map/deal-map';
@@ -300,7 +300,7 @@ function directionsUrl(branch: DetailBranch): string | undefined {
   if (branch.latitude != null && branch.longitude != null) {
     return `https://www.google.com/maps/dir/?api=1&destination=${branch.latitude},${branch.longitude}`;
   }
-  const query = [branch.name, branch.address, branch.city].filter(Boolean).join(', ');
+  const query = formatStreetAddress([branch.name, branch.address, branch.city]);
   return query ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(query)}` : undefined;
 }
 
@@ -349,9 +349,7 @@ export function BranchPanels({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- branch.openingHours is read through `given`
   }, [vendorSlug, branch.id, given]);
 
-  // Many addresses already end with the city ("Indiranagar, Bengaluru"): don't repeat it.
-  const cityInAddress = Boolean(branch.city && branch.address?.trim().toLowerCase().endsWith(branch.city.toLowerCase()));
-  const street = [branch.address, branch.addressLine2, cityInAddress ? null : branch.city].filter(Boolean).join(', ');
+  const street = formatStreetAddress([branch.address, branch.addressLine2, branch.city]);
   const address = [branch.name, street].filter(Boolean).join(' — ');
   const directions = directionsUrl(branch);
   return (

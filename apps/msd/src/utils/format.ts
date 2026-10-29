@@ -52,3 +52,20 @@ export function formatRelativeTime(iso: string): string {
 export function fillTemplate(template: string, values: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (match, key: string) => values[key] ?? match);
 }
+
+/** An address line from its parts ("Karve Road, Pune, Maharashtra"), skipping empty parts and any
+ *  part the line already ends with: stored addresses often include the city already
+ *  ("Indiranagar, Bengaluru"), so the city is not printed twice. A part only counts as present when
+ *  it is the whole line so far or follows a comma, so "New Delhi" does not swallow the state "Delhi". */
+export function formatStreetAddress(parts: (string | null | undefined)[]): string {
+  let line = '';
+  for (const raw of parts) {
+    const part = raw?.trim();
+    if (!part) continue;
+    const lower = line.toLowerCase();
+    const key = part.toLowerCase();
+    if (lower === key || lower.endsWith(`, ${key}`)) continue;
+    line = line ? `${line}, ${part}` : part;
+  }
+  return line;
+}
