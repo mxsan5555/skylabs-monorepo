@@ -546,7 +546,7 @@ export function Showcase() {
   // Quill reads `document` when imported, so a static import would break the server render
   // (prerender, entry-server.test.tsx); the element upgrades once the module loads.
   useEffect(() => {
-    void import('@skylabs-monorepo/shared-ui/editor');
+    void import('./register-editor');
   }, []);
   const [mode, setMode] = useState<ThemeMode>('light');
   const [menuOpen, setMenuOpen] = useState(false);
