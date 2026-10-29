@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Icon, OutlinedButton, FilledButton, FilledTonalButton, TextButton, OutlinedTextField, Radio, Checkbox, } from '@skylabs-monorepo/shared-ui/react';
 import type { BlogPost, BlogSort, ReadingBucket } from '../../../types';
 import {
@@ -12,7 +12,16 @@ import {
 } from '../../../blog/blog';
 import { listCatalogBlogCategories, type CatalogBlogCategory } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
+import { Seo } from '../../seo/seo';
+import { fillTemplate } from '../../../utils/format';
+import { NotFound } from '../not-found/not-found';
+import content from '../../../content.json';
 import './blog.css';
+
+const tc = content.blog.category;
+
+/** Path of a blog category page (CO-02). */
+export const blogCategoryHref = (slug: string) => `/blog/category/${slug}`;
 
 type Filters = {
   search: string;
@@ -54,8 +63,11 @@ const toggle = (list: string[], v: string) =>
  * state (`.loading-state`, this app's existing public-page convention — see e.g.
  * `category.tsx`) and an empty state for zero results.
  */
-export function Blog() {
-  const [filters, setFilters] = useState<Filters>(EMPTY);
+export function Blog({ categorySlug }: { categorySlug?: string } = {}) {
+  // A category page (CO-02) is this index with the category fixed: it is always in the query,
+  // never counted as a filter, and Clear keeps it.
+  const base: Filters = categorySlug ? { ...EMPTY, categories: [categorySlug] } : EMPTY;
+  const [filters, setFilters] = useState<Filters>(base);
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [params, setParams] = useSearchParams();
   const [items, setItems] = useState<BlogPost[]>([]);
@@ -63,6 +75,8 @@ export function Blog() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [categories, setCategories] = useState<CatalogBlogCategory[]>([]);
+  // True once the category list loaded; a failed load never turns a category page into a 404.
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
 
   const requestedPage = Math.max(1, Number(params.get('page')) || 1);
 
@@ -70,7 +84,9 @@ export function Blog() {
     let cancelled = false;
     listCatalogBlogCategories()
       .then(({ data }) => {
-        if (!cancelled) setCategories(data);
+        if (cancelled) return;
+        setCategories(data);
+        setCategoriesLoaded(true);
       })
       .catch(() => {
         if (!cancelled) setCategories([]);
@@ -111,7 +127,7 @@ export function Blog() {
     (filters.search ? 1 : 0) +
     (filters.sort !== 'newest' ? 1 : 0) +
     (filters.reading !== 'any' ? 1 : 0) +
-    filters.categories.length +
+    (categorySlug ? 0 : filters.categories.length) +
     filters.authors.length +
     filters.tags.length;
   const resetPage = () => {
@@ -122,7 +138,7 @@ export function Blog() {
     resetPage();
   };
   const clearAll = () => {
-    setFilters(EMPTY);
+    setFilters(base);
     resetPage();
   };
   const goTo = (n: number) => setParams(n > 1 ? { page: String(n) } : {});
@@ -136,14 +152,33 @@ export function Blog() {
       </Btn>
     );
   }
+  if (categorySlug && categoriesLoaded && !categories.some((c) => c.slug === categorySlug)) {
+    return <NotFound />;
+  }
+  const categoryTitle = categorySlug ? { category: categoryName(categorySlug) } : null;
   return (
     <div className="blog">
-      <title>Blog · MSD</title>
-      <meta
-        name="description"
-        content="Wellness tips, massage guides, and ways to get more from every session."
-      />
-      <h1 className="blog__h1">From the blog</h1>
+      {categoryTitle && categorySlug ? (
+        <Seo
+          title={fillTemplate(tc.metaTitle, categoryTitle)}
+          description={fillTemplate(tc.description, categoryTitle)}
+          path={blogCategoryHref(categorySlug)}
+        />
+      ) : (
+        <>
+          <title>Blog · MSD</title>
+          <meta
+            name="description"
+            content="Wellness tips, massage guides, and ways to get more from every session."
+          />
+        </>
+      )}
+      <h1 className="blog__h1">{categoryTitle ? fillTemplate(tc.heading, categoryTitle) : 'From the blog'}</h1>
+      {categorySlug && (
+        <p>
+          <Link to="/blog">{tc.allArticles}</Link>
+        </p>
+      )}
       <div className="blog__layout">
         <aside className="blog__filters" aria-label="Filter and sort">
           <div className="blog__filters-head">
@@ -168,21 +203,23 @@ export function Blog() {
                 ))}
               </div>
             </sky-accordion-item>
-            <sky-accordion-item header="Category" open>
-              <div className="facet" role="group" aria-label="Category">
-                {categories.map((c) => (
-                  <label className="facet__opt" key={c.slug}>
-                    <Checkbox
-                      checked={filters.categories.includes(c.slug)}
-                      onChange={() =>
-                        update({ categories: toggle(filters.categories, c.slug) })
-                      }
-                    />
-                    <span>{c.name}</span>
-                  </label>
-                ))}
-              </div>
-            </sky-accordion-item>
+            {!categorySlug && (
+              <sky-accordion-item header="Category" open>
+                <div className="facet" role="group" aria-label="Category">
+                  {categories.map((c) => (
+                    <label className="facet__opt" key={c.slug}>
+                      <Checkbox
+                        checked={filters.categories.includes(c.slug)}
+                        onChange={() =>
+                          update({ categories: toggle(filters.categories, c.slug) })
+                        }
+                      />
+                      <span>{c.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </sky-accordion-item>
+            )}
             <sky-accordion-item header="Reading time">
               <div className="facet" role="radiogroup" aria-label="Reading time">
                 {READING_OPTIONS.map((o) => (
@@ -292,7 +329,7 @@ export function Blog() {
                               )}
                               <p className="post-card__cat">
                                 <Icon aria-hidden="true">sell</Icon>
-                                {categoryName(p.categorySlug)}
+                                <Link to={blogCategoryHref(p.categorySlug)}>{categoryName(p.categorySlug)}</Link>
                               </p>
                             </div>
                           </article>
@@ -331,4 +368,11 @@ export function Blog() {
     </div>
   );
 }
+
+/** `/blog/category/:slug` (CO-02). Keyed by slug so moving between categories starts fresh. */
+export function BlogCategory() {
+  const { slug = '' } = useParams();
+  return <Blog key={slug} categorySlug={slug} />;
+}
+
 export default Blog;

@@ -822,6 +822,12 @@
     }
   },
   "blog": {
+    "category": {
+      "metaTitle": "{category} articles · MSD",
+      "heading": "{category} articles",
+      "description": "{category} articles from MySpaDeal: tips, guides and ways to get more from every session.",
+      "allArticles": "All articles"
+    },
     "detail": {
       "articleNotFoundTitle": "Article not found · MSD",
       "articleNotFoundHeading": "Article not found",

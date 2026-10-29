@@ -451,6 +451,13 @@ others), About us, Contact us, How it works, Careers (page and job listings). Ma
 and edits; Admin cannot delete (P10-31). Public pages read it from the catalog API. Rich text is
 sanitized on write and on render (D18).
 
+Blog category pages (CO-02): `/blog/category/:slug` is the blog index with that category fixed
+(always in the query, not counted as a filter, kept by Clear, Category facet hidden), with its own
+h1, title, description and canonical from `content.blog.category`, and a link back to all
+articles. Each card's category label links there. An unknown slug shows the not-found page; a
+failed category list never does. Blog pages are not prerendered and blog categories are not in
+the sitemap yet.
+
 Public static pages (About, Contact, Help Center, How it works, Careers, legal pages, Become a
 member) share `StaticPage`: breadcrumb, h1 and intro on the left, the brand logo in the header
 row's right column (`SectionHead media`, decorative, hidden under 600px because the site header

@@ -9,7 +9,7 @@ import { AdminPage } from './admin/admin-page';
 import Home from './pages/home/home';
 import NotFound from './pages/not-found/not-found';
 import Showcase from './pages/showcase/showcase';
-import Blog from './pages/blog/blog';
+import Blog, { BlogCategory } from './pages/blog/blog';
 import BlogDetail from './pages/blog-detail/blog-detail';
 import SignIn from './pages/sign-in/sign-in';
 import Otp from './pages/otp/otp';
@@ -264,6 +264,7 @@ export function AppRoutes() {
 
           {/* ── Content pages ── */}
           <Route path="/blog" element={<Blog />} />
+          <Route path="/blog/category/:slug" element={<BlogCategory />} />
           <Route path="/blog/:slug" element={<BlogDetail />} />
           <Route path="/about" element={<About />} />
           <Route path="/help-center" element={<HelpCenter />} />

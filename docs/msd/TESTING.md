@@ -56,7 +56,8 @@ Lint and type drift: 30 msd lint errors (`import/first` and `no-empty-function` 
 ignores every file under `apps/msd-api/src` today. Flaky under load: `deals-list-page.test.tsx`
 "toggle-status flips a non-ACTIVE deal" and `popular-tags.test.tsx` "mapping a category calls
 mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
-`products-list-page.test.tsx` "delete asks for confirmation" (seen 2026-10-28, pass alone).
+`products-list-page.test.tsx` "delete asks for confirmation" (seen 2026-10-28, pass alone), and
+`home-hero.test.tsx` (one test, seen 2026-10-28, passes alone).
 
 ## 4. Acceptance per module
 
@@ -255,6 +256,10 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
   (`/help-center`) and Wishlist, and no Gifting link until a gift-card feature exists.
 - One `<main>` per page (ST-04, `one-main-landmark.test.ts`): only the layouts render `<main>`; no
   file under `app/pages` does, so the skip link keeps a single target.
+- Blog category page (CO-02, `blog.test.tsx`): `/blog/category/massage` queries only that
+  category, shows "Massage articles" as h1, title and description, links back to `/blog` and
+  hides the Category facet; an unknown slug shows the not-found page; a failed category list still
+  lists the posts; index cards link their category to `/blog/category/<slug>`.
 - Contact page (CO-01, `contact.test.tsx`): defaults without a CMS row; CMS address, phone, email
   and map embed win; an empty CMS field falls back on its own (no phone row while neither has a
   phone); the CMS meta title and description override the page defaults; required fields first.
