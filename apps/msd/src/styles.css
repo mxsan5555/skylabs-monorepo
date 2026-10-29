@@ -439,8 +439,14 @@ a.dashboard-stat:focus-visible {
 }
 
 .member-actions__title,
-.member-actions__body {
+.member-actions__body,
+.member-actions__hint {
   margin: 0;
+}
+
+/* Why the next status step is not available yet (item 6). */
+.member-actions__hint {
+  color: var(--md-sys-color-on-surface-variant);
 }
 
 .member-actions__body {

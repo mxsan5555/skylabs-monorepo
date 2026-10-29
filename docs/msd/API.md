@@ -133,14 +133,14 @@ editable. Planned: `GET /rbac/bootstrap` adds `scopes`; grant edits refuse super
 | POST | `/api/v1/members` | `members:create` |
 | GET | `/api/v1/members/:id` | `members:view` |
 | PATCH | `/api/v1/members/:id` | `members:edit` |
-| DELETE | `/api/v1/members/:id` | `members:delete` |
+| DELETE | `/api/v1/members/:id` | `members:delete` (always archives, `{ outcome: 'ARCHIVED' }`, D36; the list hides Archived unless `status=ARCHIVED`) |
 | GET | `/api/v1/members/:id/activity` | `members:view` |
 | GET | `/api/v1/members/:id/documents` | `members:view` |
 | POST | `/api/v1/members/:id/documents/:documentType` | `members:edit` |
 | DELETE | `/api/v1/members/:id/documents/:documentType` | `members:edit` |
 | PATCH | `/api/v1/members/:id/documents/:documentType/review` | `members:approve|reject` |
 | POST | `/api/v1/members/:id/documents/reminders` | `members:status_change` |
-| PATCH | `/api/v1/members/:id/status` | `members:status_change` |
+| PATCH | `/api/v1/members/:id/status` | `members:status_change` (item 6: one step at a time, Active → Inactive → Suspended; Archived restores to Inactive; 409 names the step to take first) |
 | GET | `/api/v1/members/:id/status-history` | `members:view` |
 | GET | `/api/v1/products` | `products:view` |
 | GET | `/api/v1/products/:id` | `products:view` |

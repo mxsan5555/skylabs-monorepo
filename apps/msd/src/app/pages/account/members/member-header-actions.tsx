@@ -22,7 +22,7 @@ const COPY: Record<StatusAction, { button: string; confirm: string; title: strin
     button: 'Make inactive',
     confirm: 'Confirm make inactive',
     title: 'Make this member inactive',
-    body: 'The member can still log in and look at everything, but cannot change anything. Their items are hidden from the website.',
+    body: 'The member can still log in and look at everything, but cannot change anything. Their items are hidden from the website. They get an email and an SMS with this reason.',
   },
   suspend: {
     button: 'Suspend',
@@ -40,7 +40,13 @@ const COPY: Record<StatusAction, { button: string; confirm: string; title: strin
     button: 'Delete',
     confirm: 'Confirm delete',
     title: 'Delete this member',
-    body: 'A member with no orders is removed for good. A member with orders is archived: hidden everywhere, records kept.',
+    body: 'Nothing is erased: the member, their listings and files are archived and hidden everywhere. Find them under the Archived filter to restore them later. They get an email and an SMS.',
+  },
+  restore: {
+    button: 'Restore',
+    confirm: 'Confirm restore',
+    title: 'Restore this member',
+    body: 'The member comes back as Inactive: they can log in and look at everything, and nothing shows on the website until you reactivate them. They get an email and an SMS.',
   },
 };
 
@@ -48,6 +54,7 @@ const TARGET_STATUS: Record<Exclude<StatusAction, 'delete'>, 'ACTIVE' | 'INACTIV
   deactivate: 'INACTIVE',
   suspend: 'SUSPENDED',
   reactivate: 'ACTIVE',
+  restore: 'INACTIVE',
 };
 
 // These limits mirror the reason schema in msd-api.
@@ -72,6 +79,7 @@ export function MemberHeaderActions({ status, canStatusChange, canDelete, reason
   const wasOpen = useRef(false);
   const panelId = useId();
   const titleId = useId();
+  const hintId = useId();
 
   // Focus the reason field on open; return focus to the trigger (or the first action left) on close.
   useEffect(() => {
@@ -83,7 +91,10 @@ export function MemberHeaderActions({ status, canStatusChange, canDelete, reason
     if (!wasOpen.current) return;
     wasOpen.current = false;
     const back = (lastTrigger.current && triggerRefs.current[lastTrigger.current]) || Object.values(triggerRefs.current).find(Boolean);
-    back?.focus();
+    // The trigger re-renders as an outlined button when its panel closes: focus it once it has drawn.
+    const ready = (back as (HTMLElement & { updateComplete?: Promise<unknown> }) | undefined)?.updateComplete;
+    if (ready) void ready.then(() => back?.focus());
+    else back?.focus();
   }, [pending]);
 
   if (actions.length === 0) return null;
@@ -131,17 +142,22 @@ export function MemberHeaderActions({ status, canStatusChange, canDelete, reason
   return (
     <div className="member-actions">
       <div className="page-head__actions">
-        {actions.map((action) =>
+        {actions.map(({ action, blockedBy }) =>
+          // Outlined until chosen: only the action whose panel is open is filled (item 6), so the
+          // highlight always matches what is selected. A blocked step stays visible, disabled,
+          // and names what has to happen first.
           createElement(
-            action === 'delete' || action === 'suspend' ? 'md-outlined-button' : 'md-filled-button',
+            pending === action ? 'md-filled-tonal-button' : 'md-outlined-button',
             {
               key: action,
               ref: (el: HTMLElement | null) => {
                 triggerRefs.current[action] = el;
               },
+              disabled: Boolean(blockedBy) || undefined,
               'aria-expanded': pending === action ? 'true' : 'false',
               ...(pending === action ? { 'aria-controls': panelId } : {}),
-              onClick: () => open(action),
+              ...(blockedBy ? { 'aria-describedby': `${hintId}-${action}` } : {}),
+              onClick: () => !blockedBy && open(action),
             },
             COPY[action].button,
           ),
@@ -164,6 +180,13 @@ export function MemberHeaderActions({ status, canStatusChange, canDelete, reason
             REMIND_NOW_LABEL,
           )}
       </div>
+      {actions
+        .filter((option) => option.blockedBy)
+        .map(({ action, blockedBy }) => (
+          <p key={action} id={`${hintId}-${action}`} className="member-actions__hint body-small">
+            {blockedBy}
+          </p>
+        ))}
 
       {copy && pending && (
         // A labelled group with its own h2: it sits right under the page h1, so an h3 here (what a

@@ -106,9 +106,15 @@ only and never change an order's status, for deals or products (D27).
 | Active | Default at creation. A welcome message goes out by SMS and email. |
 | Inactive | Business pause. The member logs in and sees everything (orders, customers, own catalog) but cannot change anything existing or add anything new, and sees a view-only banner on every screen. Their items are hidden from the website. Admin can return them to Active at any time; everything comes back as it was. |
 | Suspended | Admin action, reason required (10 to 500 characters). The member cannot log in (open sessions end at once), everything they own and their profile disappear from the website, and they get an email and SMS with the reason, the support contact and the steps to return. A suspended member who tries to log in sees the same message. Customers who already paid are honoured by default; Admin can refund. |
-| Archived | Set by the system when a suspended member with order history is deleted: hidden everywhere, records kept. |
-| Deleted | Super Admin only, only from Suspended (journey Inactive → Suspended → Delete), only when the member never had an order. |
+| Archived | What Delete does (D36): Super Admin only, only from Suspended. Hidden everywhere (the default members list too, an Archived filter shows them), every record and file kept, owner cannot log in. Restore brings the member back as Inactive. |
 
+- **Journey (item 6, 2026-10-29):** Active → Inactive → Suspended → Delete (Archived), one step at a
+  time; Active cannot jump to Suspended ("Make the member inactive first"). Every step can come
+  back: Inactive and Suspended reactivate to Active, Archived restores to Inactive. The console
+  shows the next blocked step disabled with its reason, and only the action whose panel is open is
+  filled.
+- **Notices:** every change sends the member an email and an SMS (inactive, suspended, active
+  again, archived, restored) and emails every staff user holding `members:status_change`.
 - Status can change at any time, even with no branches or deals.
 - Branches, deals and therapists keep their own status. The storefront shows an item only when the
   member, the branch and the deal are all active, so reactivation restores everything.
@@ -620,6 +626,9 @@ expire after 5 minutes (ARCHITECTURE.md §12.3).
 | D33 | Branch before deal (2026-10-26) | Branch state and city required from the India location list; no deal without a branch; one branch per deal plus Copy to branch |
 | D34 | Deal URLs (2026-10-26) | `/deal/{title}-{member}-{city}` slug, fixed once Active; old UUID links and old slugs still open the deal |
 | D35 | Deal FAQs and reviews (2026-10-26) | Per-deal FAQs now; ratings and reviews wait for ST-22 |
+| D36 | Member delete (2026-10-29, Q2) | Delete always archives: nothing is erased, Archived restores to Inactive; the journey is Active → Inactive → Suspended → Delete |
+| D37 | Customer checkout details (2026-10-29, Q1) | Saved on the customer's account (address, state, city, pincode), pre-filled at checkout, editable, updated on each order |
+| D38 | Order and status SMS (2026-10-29, Q3) | Email for every notice now; an SMS goes out only for notice types whose DLT template id is set in env |
 | B2 | Vendor rename | Prisma `Vendor` → `Member`, `VendorDocument` → `MemberDocument` with `@@map`; FK columns stay `vendorId` |
 | B5 | Permission key | `vendors` → `members`; role `vendor` → `member`; role `support` added |
 | N1 | Reminder decisions (2026-10-17) | Clear the flag when documents complete; bell alert to `members:status_change` holders; Remind now in this release |

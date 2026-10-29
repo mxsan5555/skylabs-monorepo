@@ -105,6 +105,16 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
 
 ### 4.2 Members
 
+- Status journey (item 6, `member-status-machine.test.ts`, `member-status.service.test.ts`,
+  `member-header-actions.test.tsx`, `member-status.test.ts`): Active → Suspended is 409 "Make the
+  member inactive first"; Active → Inactive → Suspended works; Suspended and Inactive reactivate;
+  Delete from Suspended always archives (no row or file removed, outcome `ARCHIVED`), even with no
+  orders; Archived restores to Inactive (clears `archivedAt`), never straight to Active; each change
+  sends the member notice (INACTIVE, SUSPENDED, REACTIVATED, ARCHIVED, RESTORED) and the staff
+  email; a failed notice never fails the change. Console: Suspend shows disabled with its reason
+  for an Active member, Delete disabled for an Inactive one; only the open action is filled;
+  Archived shows Restore; the members list hides Archived unless that filter is chosen.
+
 - Status machine: every allowed transition, every refused one returns 409; reason 10 to 500.
 - Suspend: refresh sessions revoked; login and OTP request return 403 `MEMBER_SUSPENDED` with
   reason and steps, no OTP row; storefront hides everything; reactivation restores it and sends

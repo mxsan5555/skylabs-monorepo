@@ -152,8 +152,9 @@ export function MemberDetailPage() {
   };
 
   const onDelete = async (reason: string) => {
-    const { data } = await deleteMember(token, member.id, reason);
-    showSnackbar(data.outcome === 'ARCHIVED' ? 'Member archived. We kept their records.' : 'Member deleted.');
+    // Delete always archives (item 6): nothing is erased and the member can be restored.
+    await deleteMember(token, member.id, reason);
+    showSnackbar('Member archived. Restore them any time from the Archived filter.');
     navigate('/account/members', { replace: true });
   };
 

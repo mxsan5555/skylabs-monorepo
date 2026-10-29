@@ -1202,23 +1202,23 @@ describe('DELETE /api/v1/vendors/:id (member delete alias)', () => {
     }
   });
 
-  it('hard deletes a SUSPENDED member with no order lines', async () => {
+  it('archives a SUSPENDED member even with no order lines: delete never erases (item 6)', async () => {
     resolveMock.mockResolvedValue(['members:delete']);
     prismaMock.member.findUnique.mockResolvedValue({ ...vendorAFixture, status: 'SUSPENDED', owner: null });
     prismaMock.orderItem.count.mockResolvedValue(0);
-    prismaMock.member.deleteMany.mockResolvedValue({ count: 1 });
-    prismaMock.memberDocument.findMany.mockResolvedValue([]);
-    prismaMock.vendorImage.findMany.mockResolvedValue([]);
-    prismaMock.vendorVideo.findUnique.mockResolvedValue(null);
-    prismaMock.user.update.mockResolvedValue({});
-    prismaMock.refreshSession.updateMany.mockResolvedValue({ count: 0 });
+    prismaMock.member.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.memberStatusHistory.create.mockResolvedValue({});
+    prismaMock.user.findMany.mockResolvedValue([]);
     const res = await request(app)
       .delete(`/api/v1/vendors/${VENDOR_A_ID}`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['super_admin'] }))
       .send(REASON);
     expect(res.status).toBe(200);
-    expect(res.body.data).toEqual({ outcome: 'DELETED' });
-    expect(prismaMock.member.deleteMany).toHaveBeenCalledWith({ where: { id: VENDOR_A_ID, status: 'SUSPENDED' } });
+    expect(res.body.data).toEqual({ outcome: 'ARCHIVED' });
+    expect(prismaMock.member.deleteMany).not.toHaveBeenCalled();
+    expect(prismaMock.member.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: VENDOR_A_ID, status: 'SUSPENDED' }, data: expect.objectContaining({ status: 'ARCHIVED' }) }),
+    );
   });
 
   it('409s MEMBER_NOT_SUSPENDED for an ACTIVE member', async () => {
