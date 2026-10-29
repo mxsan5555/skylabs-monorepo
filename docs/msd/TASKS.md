@@ -48,8 +48,8 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 9 | Payments, payouts and reports | 0 | 11 | 0 |
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
-| 12 | Platform, security and release | 14 | 70 | 20 |
-| | **Total** | **116** | **290** | **40** |
+| 12 | Platform, security and release | 15 | 70 | 21 |
+| | **Total** | **117** | **290** | **40** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -356,7 +356,7 @@ Removed 2026-10-24: ST-17 (therapist city filter is in ST-40; products are not l
 | [x] | P2-07 | SEC | Add `helmet`, `trust proxy`, JSON and urlencoded body limit 100 kb | S | - | Merged: `helmet` 8, `TRUST_PROXY_HOPS`, JSON limit 100 kb with 413 `PAYLOAD_TOO_LARGE`; no urlencoded parser is mounted; `app.security.test.ts` |
 | [ ] | P2-08 | SEC | Global rate limit plus limiters for upload, status change, payout, refund, export, document download | M | P2-07 | Limit tests return 429 with `RATE_LIMITED` |
 | [x] | P2-09 | SEC | `env.ts`: production fails on JWT secret under 32 chars, `*` in CORS, missing `R2_PRIVATE_BUCKET`, `DOC_HASH_PEPPER`, `FIELD_ENCRYPTION_KEY`, `CRON_SECRET` | S | - | Done: `config/env-checks.ts` (`productionEnvProblems`), thrown from `env.ts` in production; `env-checks.test.ts` incl. boot test; DEPLOYMENT §2 says set them before deploying |
-| [ ] | P2-10 | SEC | Request logger with request id and PII redaction (`documentNumber`, `bankAccountNumber`, `otp`, `authorization`); no stack traces in production responses | M | - | Log snapshot test has no PII |
+| [x] | P2-10 | SEC | Request logger with request id and PII redaction (`documentNumber`, `bankAccountNumber`, `otp`, `authorization`); no stack traces in production responses | M | - | Done: `lib/logger.ts`, `middleware/requestLogger.ts`, error handler logs through it; `logger.test.ts`, `requestLogger.test.ts` (no token, OTP, body value or phone in any line). The ~40 older `console.*` calls in services move to `logger` as their modules are touched |
 | [x] | P2-11 | BE | `lib/audit.ts` helper with dotted action constants (`member.status.changed`) | S | - | Done: `AUDIT_ACTIONS` (132 stored names kept as they are) and `AuditAction`, required by `writeAuditLog`/`auditLogData` so an unknown action fails to compile; `isAuditAction` for P8-05 filters; `lib/audit.test.ts` |
 | [ ] | P2-12 | BE | Idempotency-Key middleware and table (24 h TTL, replay returns stored response) | M | - | Replay and conflict tests |
 | [ ] | P2-13 | SEC | AES-256-GCM field encryption util with key id prefix for rotation | M | P2-09 | Round-trip and tamper tests |

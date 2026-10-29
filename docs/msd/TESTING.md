@@ -388,6 +388,8 @@ rollback rehearsal (P11).
 - [ ] No OTP, secret, token or unneeded private field in any response.
 - [ ] Public catalog: only intended records and fields; maximum page size enforced; validated input.
 - [ ] Errors expose no stack traces or database details.
+- [ ] Logs carry a request id and no token, OTP, password, document or bank number (P2-10,
+      `lib/logger.test.ts`, `middleware/requestLogger.test.ts`).
 - [ ] No new loose body schema (P2-14, `body-schemas-strict.test.ts`; the frozen list only shrinks);
       shared field rules tested in `schemas/common.schema.test.ts`.
 - [ ] Tokens only as bearer headers; the API sets no cookie (P2-16, `lib/token-transport.test.ts`).

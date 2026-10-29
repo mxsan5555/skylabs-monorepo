@@ -38,6 +38,7 @@ silently ships the bare SPA); preview and local builds fall back to the SPA. Red
 | `OTP_IDENTIFIER_RATE_LIMIT_PER_HOUR` | `10` (OTP sends per phone or email per hour, any IP) | |
 | `TRUST_PROXY_HOPS` | `1` on Railway (one proxy); leave unset locally | |
 | `API_DOCS` | unset (Swagger `/docs` off in production); `true` only to open it temporarily | |
+| `REQUEST_LOGGING` | unset (one JSON line per request, with `X-Request-Id`); `false` to silence | |
 | `CORS_ORIGIN` | exact Vercel origins, comma-separated | |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth client id / secret | 🔒 (secret) |
 | `GOOGLE_CALLBACK_URL` | `https://<msd-api-railway-domain>/api/v1/auth/google/callback` | |

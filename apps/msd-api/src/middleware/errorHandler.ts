@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { MulterError } from 'multer';
 import { ApiError, sendError } from '../lib/http';
+import { logger } from '../lib/logger';
 import { Prisma } from '../generated/prisma-client';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -47,7 +48,7 @@ export function errorHandler(err: unknown, req: Request, res: Response, next: Ne
     }
   }
 
-  console.error({ err, path: req.path, userId: req.user?.sub });
+  logger.error('http.unhandled_error', { requestId: req.requestId, path: req.path, userId: req.user?.sub, err });
   const devDetail = process.env.NODE_ENV !== 'production' && err instanceof Error ? err.message : undefined;
   sendError(res, 'SERVER_ERROR', 'Internal server error', devDetail ? { devDetail } : undefined);
 }

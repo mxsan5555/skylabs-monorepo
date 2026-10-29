@@ -58,6 +58,8 @@ export const env = {
   trustProxyHops: optionalInt('TRUST_PROXY_HOPS', 0),
   /** Swagger UI at /docs: on outside production, off in production unless API_DOCS=true. */
   apiDocsEnabled: process.env.API_DOCS === 'true' || process.env.NODE_ENV !== 'production',
+  /** One JSON log line per request (P2-10). On outside tests unless REQUEST_LOGGING=false. */
+  requestLogging: process.env.REQUEST_LOGGING ? process.env.REQUEST_LOGGING === 'true' : process.env.NODE_ENV !== 'test',
 
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? '',
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
