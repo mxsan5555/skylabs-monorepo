@@ -271,7 +271,8 @@ export function AppRoutes() {
           <Route path="/careers" element={<Careers />} />
           {/* Public, unauthenticated Vendor self-registration ("Become a Vendor") — the storefront
             counterpart of the admin "Add Vendor" wizard, see become-vendor.tsx's own doc
-            comment. Linked from the footer's "Partner With Us" entry (content.json). */}
+            comment. Linked from the header's "Become a Member" and the footer's "Partner With Us"
+            entries (content.json). */}
           <Route path="/become-member" element={<BecomeVendor />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
           {/* One legal page component for the 4 fixed WebsitePage rows (see website-page.tsx). */}

@@ -255,6 +255,8 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
   (`/help-center`) and Wishlist, and no Gifting link until a gift-card feature exists.
 - One `<main>` per page (ST-04, `one-main-landmark.test.ts`): only the layouts render `<main>`; no
   file under `app/pages` does, so the skip link keeps a single target.
+- Become a Member (ST-01, `header-actions.test.tsx`): the header link opens `/become-member`, and
+  the route table serves the member sign-up page there.
 - Popular searches in the prerender (ST-18, `hydration.test.tsx`): the server-rendered home page
   lists every "{Category} in {City}" footer link in catalog order; with a saved city the client
   moves that city first after hydration, with no hydration error.
