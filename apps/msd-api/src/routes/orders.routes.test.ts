@@ -14,6 +14,7 @@ import app from '../app';
 import { prisma } from '../lib/prisma';
 import { resolveGrantedPermissionKeys } from '../services/permission-resolver.service';
 import { bearerFor } from '../test-utils/auth-test-utils';
+import { env } from '../config/env';
 
 const resolveMock = vi.mocked(resolveGrantedPermissionKeys);
 const prismaMock = vi.mocked(prisma, true);
@@ -136,6 +137,31 @@ describe('GET /api/v1/orders/me — item images', () => {
     expect(res.status).toBe(200);
     expect(res.body.data[0].items[0].image).toBe('deals/deal-1/primary.jpg');
     expect(res.body.data[0].items[0].deal).toBeUndefined();
+  });
+
+  it('prefixes the image key with R2_PUBLIC_URL when it is set', async () => {
+    prismaMock.order.findMany.mockResolvedValue([{
+      ...orderFixture,
+      type: 'SERVICE',
+      items: [{
+        ...orderFixture.items[0],
+        dealId: SERVICE_DEAL_ID,
+        productId: null,
+        deal: { images: [], mediaImages: [{ storageKey: 'deals/deal-1/primary.jpg', isPrimary: true, sortOrder: 0 }] },
+        product: null,
+      }],
+    }]);
+    prismaMock.order.count.mockResolvedValue(1);
+    const previous = env.r2PublicUrl;
+    env.r2PublicUrl = 'https://media.example';
+    try {
+      const res = await request(app)
+        .get('/api/v1/orders/me?pageSize=50')
+        .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
+      expect(res.body.data[0].items[0].image).toBe('https://media.example/deals/deal-1/primary.jpg');
+    } finally {
+      env.r2PublicUrl = previous;
+    }
   });
 });
 
