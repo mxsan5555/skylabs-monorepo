@@ -65,7 +65,7 @@ function withOfferTags<T extends { id: string; createdAt: Date; endDate?: Date |
   now: Date,
 ): (T & { tag: OfferTagKey | null })[] {
   const hotSet = new Set(hot);
-  return rows.map((row) => ({ ...row, tag: offerTag({ id: row.id, createdAt: row.createdAt, endDate: row.endDate, discount: discountOf(row) }, hotSet, now) }));
+  return rows.map((row) => ({ ...row, tag: offerTag({ id: row.id, createdAt: row.createdAt, endDate: row.endDate, discountPercent: discountOf(row) }, hotSet, now) }));
 }
 
 /** Great-circle distance in kilometers between two lat/lng points — the one, reused distance
