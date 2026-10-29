@@ -264,7 +264,9 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
   and map embed win; an empty CMS field falls back on its own (no phone row while neither has a
   phone); the CMS meta title and description override the page defaults; required fields first.
 - Become a Member (ST-01, `header-actions.test.tsx`): the header link opens `/become-member`, and
-  the route table serves the member sign-up page there.
+  the route table serves the member sign-up page there. The sitemap paths (`prerender/routes.test.ts`)
+  and `llms.txt` list `/become-member` and `/help-center`, and every sitemap path must be a route
+  in `routes.tsx`, so the sitemap never points at a 404.
 - Popular searches in the prerender (ST-18, `hydration.test.tsx`): the server-rendered home page
   lists every "{Category} in {City}" footer link in catalog order; with a saved city the client
   moves that city first after hydration, with no hydration error.

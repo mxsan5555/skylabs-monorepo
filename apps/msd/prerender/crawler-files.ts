@@ -51,7 +51,7 @@ const LLMS_PAGES: [string, string][] = [
   ['How it works', '/how-it-works'],
   ['About', '/about'],
   ['Contact', '/contact'],
-  ['Become a vendor', '/become-vendor'],
+  ['Become a member', '/become-member'],
 ];
 
 /** llms.txt (https://llmstxt.org): name, summary, then link lists. */

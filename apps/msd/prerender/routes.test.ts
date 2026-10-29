@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildRoutes, isEmptyCityPage, STATIC_PUBLIC_PATHS } from './routes';
 import type { ShellData } from '../src/prerender-data/loaders';
@@ -79,7 +81,13 @@ describe('STATIC_PUBLIC_PATHS', () => {
   it('lists the public pages for the sitemap', () => {
     expect(STATIC_PUBLIC_PATHS).toEqual([
       '/', '/categories', '/deals', '/products', '/therapists', '/blog', '/about', '/how-it-works',
-      '/contact', '/careers', '/become-vendor', '/privacy', '/terms', '/accessibility', '/cookies',
+      '/contact', '/help-center', '/careers', '/become-member', '/privacy', '/terms', '/accessibility', '/cookies',
     ]);
+  });
+
+  it('only lists paths the app routes serve, so the sitemap never points at a 404', () => {
+    const routes = readFileSync(join(__dirname, '../src/app/routes.tsx'), 'utf8');
+    const served = new Set([...routes.matchAll(/path="([^"]+)"/g)].map((m) => m[1]));
+    expect(STATIC_PUBLIC_PATHS.filter((p) => !served.has(p))).toEqual([]);
   });
 });
