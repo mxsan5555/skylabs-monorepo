@@ -405,6 +405,14 @@ never returned. Upload without `R2_PRIVATE_BUCKET` configured returns 503.
 | POST | `/api/v1/orders/pay-batch/cod` | signed in (own records, or checked in the handler) |
 | POST | `/api/v1/orders/pay-batch/verify` | signed in (own records, or checked in the handler) |
 | POST | `/api/v1/payments/webhook/razorpay` | public |
+
+**Member view of an order** (`GET /orders`, `GET /orders/:id` for a caller who owns a member,
+item 5, `services/order.service.ts` `scopeOrderForMember`): `items` holds only their own lines;
+`subtotal`, `total` and each `payments[].amount` are the sum of those lines; `vendorId`,
+`vendorNameSnapshot`, `vendor` and `branchId`, `branchNameSnapshot` are their own (the order's
+primary vendor and branch can be another member's), and `branch` is null unless it is their own.
+An order with none of their lines is 404. `search` matches the customer name and their own item
+names only. Staff and the ordering customer see the whole order.
 | GET | `/api/v1/wishlist` | signed in (own records, or checked in the handler) |
 | POST | `/api/v1/wishlist` | signed in (own records, or checked in the handler) |
 | DELETE | `/api/v1/wishlist/:dealId` | signed in (own records, or checked in the handler) |

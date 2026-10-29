@@ -39,7 +39,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 |---|---|---|---|---|
 | 1 | Admin and staff | 4 | 31 | 13 |
 | 2 | Members | 54 | 101 | 53 |
-| 3 | Customers and orders | 2 | 12 | 17 |
+| 3 | Customers and orders | 3 | 12 | 25 |
 | 4 | Storefront | 29 | 42 | 69 |
 | 5 | Static content | 2 | 5 | 40 |
 | 6 | CTA banners | 4 | 5 | 80 |
@@ -49,7 +49,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
 | 12 | Platform, security and release | 15 | 70 | 21 |
-| | **Total** | **117** | **290** | **40** |
+| | **Total** | **118** | **290** | **41** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -206,7 +206,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 
 | Done | ID | Area | Task | Size | Depends | Done when |
 |---|---|---|---|---|---|---|
-| [ ] | P4-06 | BE | Orders: scope on `OrderItem.vendorId`; strip other members' items | M | P2-02 | Mixed-vendor order test; partly: member scope fixed in P4-17 |
+| [x] | P4-06 | BE | Orders: scope on `OrderItem.vendorId`; strip other members' items | M | P2-02 | Done 2026-10-29 (item 5): members get their own lines, totals, payment share, vendor and branch; search limited to own items; `order-member-scope.test.ts` |
 | [ ] | P4-07 | BE | Customers: support and sales view-only, member view own (D9, PLANNING.md §1.2 matrix) | S | P1-07 | Matrix test |
 | [ ] | P7-01 | DB | `RefundRequest` table; `REFUNDED`, `PARTIALLY_REFUNDED` payment statuses | M | P0-01 | Migration tested |
 | [ ] | P7-02 | BE | `POST /orders/:id/cancel` with reason, state rules, notifications | M | P4-06 | Invalid state returns 409 |
@@ -311,7 +311,7 @@ Removed 2026-10-24: ST-17 (therapist city filter is in ST-40; products are not l
 
 | Done | ID | Area | Task | Size | Depends | Done when |
 |---|---|---|---|---|---|---|
-| [ ] | P4-08 | BE | Dashboard widgets and counts respect scope | M | P2-02 | Member sees own counts only |
+| [ ] | P4-08 | BE | Dashboard widgets and counts respect scope | M | P2-02 | Member sees own counts only (partly 2026-10-29: member revenue = own paid lines, not whole payments). Note P7-10: reports have no member scope yet, so `reports:view` must not be granted to the member role before it |
 | [ ] | P7-06 | DB | `Payout` table with unique period per member, `Decimal(12,2)` | M | P0-02 | Migration tested |
 | [ ] | P7-07 | BE | Payout generation job | L | P7-06, P6-04 | Totals reconcile with orders in test |
 | [ ] | P7-08 | BE | Payouts and payments list/get with scope | M | P7-06, P2-02 | Member sees own only |

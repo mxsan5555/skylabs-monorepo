@@ -234,31 +234,16 @@ async function getVendorDashboardStats(
     }),
 
     /*
-     * Payment belongs to an Order.
-     *
-     * We scope the payment through OrderItem.vendorId rather than
-     * Order.vendorId for the same multi-vendor reason explained above.
+     * Revenue = this member's own lines on paid orders. A payment covers the whole order, which
+     * can hold other members' lines, so summing payments would show their money (item 5).
      */
-    prisma.payment.aggregate({
-      _sum: {
-        amount: true,
-      },
-      where: {
-        status: 'PAID',
-        order: {
-          items: {
-            some: {
-              vendorId,
-            },
-          },
-        },
-      },
+    prisma.orderItem.aggregate({
+      _sum: { lineTotal: true },
+      where: { vendorId, order: { payments: { some: { status: 'PAID' } } } },
     }),
   ]);
 
-  const revenue = (
-    revenueAgg._sum.amount ?? new Prisma.Decimal(0)
-  ).toString();
+  const revenue = (revenueAgg._sum.lineTotal ?? new Prisma.Decimal(0)).toString();
 
   /*
    * Categories and subcategories this member actually uses across its deals, products and

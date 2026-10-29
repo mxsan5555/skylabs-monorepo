@@ -367,11 +367,47 @@ interface OrderListFilters {
   search?: string;
 }
 
-/** For a vendor caller, an Order's `items[]` must never include another vendor's line items —
- *  a multi-vendor order is only ever fully visible to the customer who placed it and to
- *  admin/SuperAdmin. Applied to every order returned to a vendor caller in this file. */
-function scopeOrderItemsToVendor<T extends { items: { vendorId: string }[] }>(order: T, vendorId: string): T {
-  return { ...order, items: order.items.filter((item) => item.vendorId === vendorId) };
+interface ScopableItem {
+  vendorId: string;
+  vendorNameSnapshot: string;
+  branchId: string | null;
+  branchNameSnapshot: string | null;
+  lineTotal: Prisma.Decimal;
+}
+
+interface ScopableOrder {
+  vendorId: string;
+  branchId: string | null;
+  branch: { id: string } | null;
+  items: ScopableItem[];
+  payments: { amount: Prisma.Decimal }[];
+}
+
+/**
+ * A member's view of an order (item 5). A multi-member order is whole only for the customer who
+ * placed it and for staff; a member sees their own lines and nothing that reveals another member:
+ * totals and each payment amount become the sum of their own lines, and the order's "primary"
+ * vendor and branch (the first line's, possibly another member's) are replaced by their own.
+ * Applied to every order this file returns to a member.
+ */
+function scopeOrderForMember<T extends ScopableOrder>(order: T, memberId: string): T {
+  const items = order.items.filter((item) => item.vendorId === memberId);
+  const own = items[0];
+  const ownTotal = items.reduce((sum, item) => sum.plus(item.lineTotal), new Prisma.Decimal(0));
+  const ownBranchId = own?.branchId ?? null;
+  return {
+    ...order,
+    items,
+    subtotal: ownTotal,
+    total: ownTotal,
+    vendorId: memberId,
+    vendorNameSnapshot: own?.vendorNameSnapshot ?? '',
+    vendor: { id: memberId, businessName: own?.vendorNameSnapshot ?? '' },
+    branchId: ownBranchId,
+    branchNameSnapshot: own?.branchNameSnapshot ?? null,
+    branch: order.branch && order.branch.id === ownBranchId ? order.branch : null,
+    payments: order.payments.map((payment) => ({ ...payment, amount: ownTotal })),
+  };
 }
 
 /**
@@ -386,6 +422,24 @@ function scopeOrderItemsToVendor<T extends { items: { vendorId: string }[] }>(or
  * results additionally have every returned order's `items[]` filtered down to their own items
  * only — never another vendor's line items/pricing, even for an order they're scoped to see.
  */
+/** Order search: staff match any business, branch, customer or item name; a member matches only
+ *  the customer and their own item names, so a search never reveals another member's orders. */
+function orderSearch(search: string, memberId?: string): Prisma.OrderWhereInput[] {
+  const contains = { contains: search, mode: 'insensitive' as const };
+  const ownItems = memberId ? { vendorId: memberId } : {};
+  return [
+    { customer: { is: { name: contains } } },
+    { items: { some: { ...ownItems, itemName: contains } } },
+    ...(memberId
+      ? []
+      : [
+          { vendorNameSnapshot: contains },
+          { branchNameSnapshot: contains },
+          { items: { some: { vendorNameSnapshot: contains } } },
+        ]),
+  ];
+}
+
 /** ALL = the caller holds orders:{action}; OWN = member self-service, own business only. */
 export type OrderScope = 'ALL' | 'OWN';
 
@@ -413,23 +467,13 @@ export async function listOrders(callerUserId: string, scope: OrderScope, opts: 
           },
         }
       : {}),
-    ...(opts.search
-      ? {
-          OR: [
-            { vendorNameSnapshot: { contains: opts.search, mode: 'insensitive' as const } },
-            { branchNameSnapshot: { contains: opts.search, mode: 'insensitive' as const } },
-            { customer: { is: { name: { contains: opts.search, mode: 'insensitive' as const } } } },
-            { items: { some: { itemName: { contains: opts.search, mode: 'insensitive' as const } } } },
-            { items: { some: { vendorNameSnapshot: { contains: opts.search, mode: 'insensitive' as const } } } },
-          ],
-        }
-      : {}),
+    ...(opts.search ? { OR: orderSearch(opts.search, vendor?.id) } : {}),
   };
   const [rawItems, total] = await Promise.all([
     prisma.order.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (opts.page - 1) * opts.pageSize, take: opts.pageSize, include: ORDER_INCLUDE }),
     prisma.order.count({ where }),
   ]);
-  const items = vendor ? rawItems.map((order) => scopeOrderItemsToVendor(order, vendor.id)) : rawItems;
+  const items = vendor ? rawItems.map((order) => scopeOrderForMember(order, vendor.id)) : rawItems;
   return { items, total };
 }
 
@@ -442,7 +486,7 @@ export async function getOrderOrThrow(callerUserId: string, scope: OrderScope, i
   const order = await prisma.order.findUnique({ where: { id }, include: ORDER_INCLUDE });
   if (!order) throw new ApiError('NOT_FOUND', 'Order not found');
   if (!vendor) return order;
-  const scoped = scopeOrderItemsToVendor(order, vendor.id);
+  const scoped = scopeOrderForMember(order, vendor.id);
   if (scoped.items.length === 0) throw new ApiError('NOT_FOUND', 'Order not found');
   return scoped;
 }

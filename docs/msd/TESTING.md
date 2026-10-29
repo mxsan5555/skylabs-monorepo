@@ -393,6 +393,9 @@ rollback rehearsal (P11).
 
 - [ ] Public vs signed-in access matches `API.md` for every route.
 - [ ] Ownership tested with another user's id (member, customer, order, branch): IDOR / BOLA.
+- [ ] A member never sees another member's part of a shared order: lines, totals, payment amount,
+      business or branch name, or a search hit (item 5, `services/order-member-scope.test.ts`);
+      member dashboard revenue counts only their own paid lines.
 - [ ] A normal user calling an admin endpoint directly gets 403.
 - [ ] `/rbac/impersonate` restricted, short-lived, audited.
 - [ ] OTP request and verify rate-limited, per IP + identifier and per identifier alone.

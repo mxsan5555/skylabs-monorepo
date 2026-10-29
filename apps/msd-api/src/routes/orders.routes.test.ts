@@ -88,6 +88,8 @@ const orderFixture = {
   branchNameSnapshot: null,
   subtotal: '398.00',
   total: '398.00',
+  // ORDER_INCLUDE always loads payments; a member's view rewrites each amount to their share.
+  payments: [],
   items: [{
     id: 'oi-1',
     productId: PRODUCT_ID,
