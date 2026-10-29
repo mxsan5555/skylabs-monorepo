@@ -106,6 +106,11 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
 
 ### 4.2 Members
 
+- Member page overview (item 7, `member-summary.test.tsx`, `stat-tile.test.tsx`,
+  `member-detail-page.test.tsx`): eight cards in order (status, documents with due date, branches,
+  deals, therapists, products with "N live", customer and order counts); each links to its tab or
+  the filtered orders list only when the viewer may open it; the page outline is h1, h2 Overview,
+  h2 tab, h3. The admin dashboard renders the same `StatTile`.
 - Member profile form (item 8, `vendor-profile-form.test.tsx`): Save ("Save changes") is enabled
   whenever the viewer can edit; a click with missing or invalid fields saves nothing, marks each
   field and lists them in one "Fix these fields to save" alert (focus moves to the first); State

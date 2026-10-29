@@ -113,6 +113,11 @@ only and never change an order's status, for deals or products (D27).
   back: Inactive and Suspended reactivate to Active, Archived restores to Inactive. The console
   shows the next blocked step disabled with its reason, and only the action whose panel is open is
   filled.
+- **Member page overview (item 7):** between the header and the tabs, dashboard-style cards
+  (`StatTile`, shared with the admin dashboard): Status, Documents (complete or incomplete, due
+  date), Branches, Deals, Therapists, Products (all, with how many are live), Customers, Orders.
+  Each card opens its tab, Orders the filtered orders list, when the viewer may; plain otherwise.
+  The header keeps the status and documents chips; the banners give the suspension reason.
 - **Profile form (item 8):** one clean form, plain titled sections (Business details, Owner,
   Registered address, KYC documents, Bank details), two columns up to 960px and one on phones,
   State and City from the India location list. Save is never disabled without a reason: it

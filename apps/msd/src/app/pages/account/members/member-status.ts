@@ -88,7 +88,7 @@ export const ACTIVITY_DETAIL_LABEL: Record<ActivityItem['kind'], string> = {
   review: 'Reason',
 };
 
-const documentsState = (summary: Summary | undefined) => (summary?.complete ? 'complete' : 'incomplete');
+export const documentsState = (summary: Summary | undefined) => (summary?.complete ? 'complete' : 'incomplete');
 
 export function documentsChipLabel(summary: Summary | undefined): string {
   return DOCUMENTS_LABEL[documentsState(summary)];

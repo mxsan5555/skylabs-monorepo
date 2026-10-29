@@ -138,9 +138,6 @@ const SECTION_FIELDS: Record<VendorFormSection, (keyof VendorFields)[]> = {
   ],
 };
 
-/** Required (non-empty) fields per section — everything else in `SECTION_FIELDS` is optional.
- *  Drives both the inline "this field is required" messages and the Save/Create-Vendor button's
- *  enablement (see `canSubmit` below). `kyc`/`bank` have no required scalar fields. */
 /** Names for the fields a save can stop on, in form order (the item 8 summary alert). */
 const FIELD_LABELS: Partial<Record<keyof VendorFields, string>> = {
   businessName: 'Business name',
@@ -162,6 +159,8 @@ const FIELD_LABELS: Partial<Record<keyof VendorFields, string>> = {
 
 const KYC_REQUIRED = 'Upload at least one KYC document.';
 
+/** Required (non-empty) fields per section; everything else in `SECTION_FIELDS` is optional.
+ *  A save stops on a missing one and names it (item 8). `kyc`/`bank` have no required scalar fields. */
 const REQUIRED_FIELDS: Record<VendorFormSection, (keyof VendorFields)[]> = {
   business: ['businessName', 'businessEmail', 'businessPhone'],
   owner: ['ownerFirstName', 'ownerLastName', 'ownerEmail', 'ownerMobile'],
@@ -505,46 +504,6 @@ export function VendorProfileForm({
 
     return Object.keys(nextErrors).length === 0 && !kycMissing;
   };
-
-  /** Required-field-non-empty AND no active inline error, across every currently-shown
-   *  section — plus, when `show('kyc')`, at least one of the 3 KYC slots has a file (uploaded or
-   *  staged pre-creation). This is what actually gates the Save/Create-Vendor button now,
-   *  replacing the old "businessName only" check. Also re-checked inside `handleSave` itself
-   *  (not just the button's `disabled` prop) — belt-and-suspenders against anything that could
-   *  invoke it despite the button appearing disabled (e.g. an Enter keypress). */
-  const requiredFieldsFilled = sections.every((section) =>
-    REQUIRED_FIELDS[section].every((key) => {
-      const value = form[key];
-
-      return (
-        value !== undefined &&
-        value !== null &&
-        String(value).trim() !== ''
-      );
-    }),
-  );
-
-  // Scoped to only the currently-visible sections' own fields — the actual fix for the Save
-  // button staying permanently disabled after switching away from a tab that had left a stale
-  // error behind (e.g. a section-B server/inline error, never cleared, silently poisoning
-  // section A's own otherwise-valid Save). `errors` itself isn't pruned on a tab switch (only on
-  // `vendor` identity change), so checking the whole map here would re-introduce exactly that bug.
-  const visibleErrorKeys = sections.flatMap(
-    (s) => SECTION_FIELDS[s],
-  );
-
-  const noActiveErrors = visibleErrorKeys.every(
-    (key) => !errors[key],
-  );
-
-  const kycSatisfied =
-    !show('kyc') ||
-    Object.values(kycSlotHasFile).some(Boolean);
-
-  const canSubmit =
-    requiredFieldsFilled &&
-    noActiveErrors &&
-    kycSatisfied;
 
   const visibleFields = sections.flatMap((s) => SECTION_FIELDS[s]);
   const dirty = visibleFields.some((key) => String(form[key] ?? '') !== String(saved[key] ?? ''));

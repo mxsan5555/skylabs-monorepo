@@ -157,7 +157,8 @@ describe('MemberDetailPage', () => {
     renderAt('/account/members/m1/documents');
     await waitFor(() => expect(screen.getByText('documents-tab')).toBeTruthy());
     const levels = Array.from(document.querySelectorAll('h1, h2, h3')).map((h) => Number(h.tagName[1]));
-    expect(levels).toEqual([1, 2, 3]);
+    // h1 member name, h2 Overview (item 7), h2 tab title, h3 inside the documents tab.
+    expect(levels).toEqual([1, 2, 2, 3]);
     expect(screen.getByRole('heading', { level: 2, name: 'Documents' })).toBeTruthy();
   });
 
@@ -312,18 +313,18 @@ describe('MemberDetailPage Remind now', () => {
 describe('MemberDetailPage customer and order counts', () => {
   it('links the counts to the Customers tab and the filtered Orders list', async () => {
     renderAt('/account/members/m1');
-    const orders = await screen.findByRole('link', { name: '12 orders' });
+    const orders = await screen.findByRole('link', { name: /^12 Orders/ });
     expect(orders.getAttribute('href')).toBe('/account/orders?vendorId=m1');
-    expect(screen.getByRole('link', { name: '1 customer' }).getAttribute('href')).toBe('/account/members/m1/customers');
+    expect(screen.getByRole('link', { name: /^1 Customer/ }).getAttribute('href')).toBe('/account/members/m1/customers');
   });
 
   it('shows plain numbers and no Customers tab without customers:view or orders:view', async () => {
     useAuthMock.mockReturnValue({ token: 't', can: (key: string) => key !== 'customers' && key !== 'orders' });
     renderAt('/account/members/m1');
-    expect(await screen.findByText('12 orders')).toBeTruthy();
-    expect(screen.getByText('1 customer')).toBeTruthy();
-    expect(screen.queryByRole('link', { name: '12 orders' })).toBeNull();
-    expect(screen.queryByRole('link', { name: '1 customer' })).toBeNull();
+    expect(await screen.findByText('Orders')).toBeTruthy();
+    expect(screen.getByText('Customer')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /Orders/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: /Customer/ })).toBeNull();
     expect(tabs().map((t) => t.textContent?.trim())).not.toContain('Customers');
   });
 

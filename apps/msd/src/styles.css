@@ -283,7 +283,26 @@ a.dashboard-stat:focus-visible {
 }
 
 .dashboard-stat__value,
-.dashboard-stat__label {
+.dashboard-stat__label,
+.dashboard-stat__detail {
+  display: block;
+  margin: 0;
+}
+
+/* Optional second line (StatTile `detail`): what is live, a due date, a status reason. */
+.dashboard-stat__detail {
+  color: var(--md-sys-color-on-surface-variant);
+  overflow-wrap: anywhere;
+}
+
+/* Member page overview (item 7): the cards between the header and the tabs. */
+.member-summary {
+  display: grid;
+  gap: 12px;
+  margin-block: 8px 24px;
+}
+
+.member-summary > h2 {
   margin: 0;
 }
 
