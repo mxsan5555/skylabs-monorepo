@@ -307,6 +307,54 @@ describe('POST /api/v1/orders/checkout — Product Cart -> Order', () => {
   });
 });
 
+/** Item 2.2 (D37): checkout keeps the delivery address on the account for next time. */
+describe('POST /api/v1/orders/checkout — saved address', () => {
+  const DELIVERY = {
+    contactName: 'Neeraj Singh',
+    contactPhone: '9177889991',
+    contactEmail: 'neeraj@test.com',
+    shippingAddress: '1457, D Block, Pacchim Vihar',
+    shippingState: 'Delhi',
+    shippingCity: 'New Delhi',
+    shippingPincode: '110063',
+  };
+  const checkout = (body: object) =>
+    request(app).post('/api/v1/orders/checkout').set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] })).send(body);
+
+  beforeEach(() => {
+    prismaMock.cart.findUnique.mockResolvedValue(cartWithOneItem);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.product.findFirst.mockResolvedValue(productFixture);
+    prismaMock.order.create.mockResolvedValue(orderFixture);
+    prismaMock.user.update.mockResolvedValue({});
+  });
+
+  it('saves the full delivery address to the customer as their latest one', async () => {
+    const res = await checkout(DELIVERY);
+    expect(res.status).toBe(201);
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      where: { id: CUSTOMER_ID },
+      data: { address: DELIVERY.shippingAddress, state: 'Delhi', city: 'New Delhi', pincode: '110063' },
+    });
+  });
+
+  it('leaves the saved address alone when the delivery details are partial', async () => {
+    const res = await checkout({ contactName: 'Neeraj Singh' });
+    expect(res.status).toBe(201);
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+  });
+
+  it('refuses a state and city that are not on the India list', async () => {
+    const res = await checkout({ ...DELIVERY, shippingCity: 'Mumbai' });
+    expect(res.status).toBe(422);
+    expect(prismaMock.order.create).not.toHaveBeenCalled();
+  });
+
+  it('needs a signed-in customer', async () => {
+    expect((await request(app).post('/api/v1/orders/checkout').send(DELIVERY)).status).toBe(401);
+  });
+});
+
 describe('POST /api/v1/orders/checkout — mixed cart (Deal + Product + Therapist -> ONE Order)', () => {
   it('creates ONE order with a Deal, a Product, and a Therapist line, each snapshotted from its own live price', async () => {
     const mixedCart = {

@@ -147,6 +147,15 @@ export async function createOrderFromCart(customerId: string, contactDetails: Or
       throw new ApiError('VALIDATION_ERROR', 'Your cart is empty');
     }
 
+    // Item 2.2 (D37): a complete delivery address becomes the customer's saved one for next time.
+    const { shippingAddress, shippingState, shippingCity, shippingPincode } = contactDetails;
+    if (shippingAddress && shippingState && shippingCity && shippingPincode) {
+      await tx.user.update({
+        where: { id: customerId },
+        data: { address: shippingAddress, state: shippingState, city: shippingCity, pincode: shippingPincode },
+      });
+    }
+
     // Idempotent reuse — see Cart.pendingOrderId's schema doc comment. A repeat checkout call
     // (double-click, page refresh, browser back/forward) for a cart whose Order is still in
     // flight returns that same Order instead of creating a duplicate one.

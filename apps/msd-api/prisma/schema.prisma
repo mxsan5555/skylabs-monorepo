@@ -27,6 +27,12 @@ model User {
   createdAt              DateTime               @default(now())
   updatedAt              DateTime               @updatedAt
   deletedAt              DateTime?
+  /// The customer's saved delivery address (D37, item 2.2): pre-fills checkout, editable there,
+  /// and replaced by the details of each placed order. State and city from the India list.
+  address                String?
+  city                   String?
+  state                  String?
+  pincode                String?
   auditLogsAsActor       AuditLog[]             @relation("AuditLogActor")
   cart                   Cart?
   impersonationsAsAdmin  ImpersonationSession[] @relation("ImpersonationSuperAdmin")

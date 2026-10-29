@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { PaginationQuerySchema } from './common.schema';
+import { PaginationQuerySchema, PincodeSchema } from './common.schema';
+import { isIndiaLocation } from '@skylabs-monorepo/shared-utils';
 
 extendZodWithOpenApi(z);
 
@@ -20,10 +21,17 @@ export const OrderContactDetailsSchema = z.object({
   shippingAddress: z.string().trim().min(1).max(500).optional(),
   shippingCity: z.string().trim().min(1).max(100).optional(),
   shippingState: z.string().trim().min(1).max(100).optional(),
-  shippingPincode: z.string().regex(/^\d{6}$/, 'Pincode must be 6 digits').optional(),
+  shippingPincode: PincodeSchema.optional(),
 });
 
-export const OrderCheckoutSchema = OrderContactDetailsSchema.openapi('OrderCheckout');
+/** Checkout body: the delivery state and city, when both are given, come from the India list
+ *  (item 2.2), the same list the checkout dropdowns use. */
+export const OrderDeliveryDetailsSchema = OrderContactDetailsSchema.refine(
+  (d) => !d.shippingState || !d.shippingCity || isIndiaLocation(d.shippingState, d.shippingCity),
+  { message: 'Pick the city from the list for the chosen state.', path: ['shippingCity'] },
+);
+
+export const OrderCheckoutSchema = OrderDeliveryDetailsSchema.openapi('OrderCheckout');
 
 /** Customer self-service may only ever cancel — confirm/complete is admin-only (existing
  *  `orders:status_change`). */

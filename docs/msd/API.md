@@ -406,6 +406,13 @@ never returned. Upload without `R2_PRIVATE_BUCKET` configured returns 503.
 | POST | `/api/v1/orders/pay-batch/verify` | signed in (own records, or checked in the handler) |
 | POST | `/api/v1/payments/webhook/razorpay` | public |
 
+**Saved delivery address (item 2.2, D37):** `GET /rbac/users/me` also returns `address`, `city`,
+`state`, `pincode` (staff user lists never do). `PUT /rbac/users/me/address` (signed in, own row)
+saves `{ address, state, city, pincode }`: strict body, state and city from the India list, 6-digit
+PIN, 422 otherwise. `POST /orders/checkout` refuses a `shippingState`/`shippingCity` pair outside
+the India list (422) and, when all four `shipping*` fields are given, saves them as the customer's
+address (also on a repeat checkout of the same pending order).
+
 **Member view of an order** (`GET /orders`, `GET /orders/:id` for a caller who owns a member,
 item 5, `services/order.service.ts` `scopeOrderForMember`): `items` holds only their own lines;
 `subtotal`, `total` and each `payments[].amount` are the sum of those lines; `vendorId`,

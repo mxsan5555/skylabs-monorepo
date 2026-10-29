@@ -55,6 +55,32 @@ export async function listUsers(page: number, pageSize: number, opts: { search?:
   };
 }
 
+/** The saved delivery address fields on User (item 2.2, D37). */
+export interface SavedAddress {
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  pincode: string | null;
+}
+
+/** `GET /rbac/users/me`: the caller's own row plus their saved address. Staff lists use
+ *  `serializeUser`, which never carries the address. */
+export function serializeMe(user: Parameters<typeof serializeUser>[0] & Partial<SavedAddress>) {
+  return {
+    ...serializeUser(user),
+    address: user.address ?? null,
+    city: user.city ?? null,
+    state: user.state ?? null,
+    pincode: user.pincode ?? null,
+  };
+}
+
+/** Saves the caller's own delivery address (validated by `MyAddressSchema`). */
+export async function saveMyAddress(userId: string, address: { address: string; state: string; city: string; pincode: string }) {
+  const user = await prisma.user.update({ where: { id: userId }, data: address, include: { roles: { include: { role: true } } } });
+  return serializeMe(user);
+}
+
 export function serializeUser(user: {
   id: string;
   name: string;

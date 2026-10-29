@@ -30,6 +30,8 @@ interface DevCustomer {
   address: string;
   state: string;
   city: string;
+  /** Not given with the accounts; a real PIN code for the area so checkout pre-fills (item 2.2). */
+  pincode: string;
 }
 
 export const DEV_MEMBERS: DevMember[] = [
@@ -61,6 +63,7 @@ export const DEV_CUSTOMERS: DevCustomer[] = [
     address: '1457, D Block, Pacchim Vihar',
     state: 'Delhi',
     city: 'New Delhi',
+    pincode: '110063',
   },
   {
     name: 'Sudhir Vishwa',
@@ -69,6 +72,7 @@ export const DEV_CUSTOMERS: DevCustomer[] = [
     address: '12, Raj Nagar',
     state: 'Karnataka',
     city: 'Bengaluru',
+    pincode: '560001',
   },
 ];
 
@@ -125,7 +129,9 @@ async function main() {
   }
 
   for (const c of DEV_CUSTOMERS) {
-    await upsertUser(c.name, c.phone, c.email, [customerRole]);
+    const id = await upsertUser(c.name, c.phone, c.email, [customerRole]);
+    // The saved delivery address (D37) that checkout pre-fills.
+    await prisma.user.update({ where: { id }, data: { address: c.address, state: c.state, city: c.city, pincode: c.pincode } });
   }
 
   // Phones and emails both: a sign-in with either must print its OTP, never send it.

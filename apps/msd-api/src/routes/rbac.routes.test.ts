@@ -226,6 +226,53 @@ describe('GET/PATCH /api/v1/rbac/users/me', () => {
   });
 });
 
+/** Item 2.2 (D37): the customer's saved delivery address, read and saved by the customer only. */
+describe('saved address on /api/v1/rbac/users/me', () => {
+  const me = {
+    id: USER_ID,
+    name: 'Neeraj Singh',
+    email: 'neeraj@test.com',
+    phone: '+919177889991',
+    status: 'active',
+    lastLoginAt: null,
+    createdAt: new Date('2026-01-01T00:00:00Z'),
+    updatedAt: new Date('2026-01-01T00:00:00Z'),
+    address: '1457, D Block, Pacchim Vihar',
+    city: 'New Delhi',
+    state: 'Delhi',
+    pincode: '110063',
+    roles: [{ role: { id: ROLE_ID, key: 'customer', name: 'Customer' } }],
+  };
+  const ADDRESS = { address: '12, Raj Nagar', state: 'Karnataka', city: 'Bengaluru', pincode: '560001' };
+  const asMe = () => bearerFor({ sub: USER_ID, roles: ['customer'] });
+
+  it('GET /users/me returns the saved address', async () => {
+    resolveMock.mockResolvedValue([]);
+    prismaMock.user.findFirst.mockResolvedValue(me);
+    const res = await request(app).get('/api/v1/rbac/users/me').set('Authorization', asMe());
+    expect(res.body.data).toMatchObject({ address: me.address, city: 'New Delhi', state: 'Delhi', pincode: '110063' });
+  });
+
+  it('PUT /users/me/address saves a valid India address for the caller only', async () => {
+    resolveMock.mockResolvedValue([]);
+    prismaMock.user.update.mockResolvedValue({ ...me, ...ADDRESS });
+    const res = await request(app).put('/api/v1/rbac/users/me/address').set('Authorization', asMe()).send(ADDRESS);
+    expect(res.status).toBe(200);
+    expect(prismaMock.user.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: USER_ID }, data: ADDRESS }));
+    expect(res.body.data).toMatchObject(ADDRESS);
+  });
+
+  it('refuses a city outside the chosen state, a bad PIN code, an unknown key and no token', async () => {
+    resolveMock.mockResolvedValue([]);
+    const put = (body: object) => request(app).put('/api/v1/rbac/users/me/address').set('Authorization', asMe()).send(body);
+    expect((await put({ ...ADDRESS, city: 'Mumbai' })).status).toBe(422);
+    expect((await put({ ...ADDRESS, pincode: '5600' })).status).toBe(422);
+    expect((await put({ ...ADDRESS, userId: 'someone-else' })).status).toBe(422);
+    expect((await request(app).put('/api/v1/rbac/users/me/address').send(ADDRESS)).status).toBe(401);
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+  });
+});
+
 describe('POST /api/v1/rbac/users', () => {
   const validBody = { name: 'Nikita Sharma', email: 'nikita@example.com', roleIds: [ROLE_ID] };
 

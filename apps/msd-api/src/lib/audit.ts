@@ -123,6 +123,7 @@ export const AUDIT_ACTIONS = [
   'therapist_package.update',
   'therapist_video.delete',
   'therapist_video.upsert',
+  'user.address.update',
   'user.create',
   'user.delete',
   'user.otp.reset',

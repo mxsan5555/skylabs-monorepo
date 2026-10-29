@@ -223,6 +223,12 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
 
 ### 4.3 Customers and orders
 
+- Saved delivery address (item 2.2, `rbac.routes.test.ts`, `orders.routes.test.ts`): `GET
+  /users/me` returns it; `PUT /users/me/address` saves a valid India address for the caller only
+  and refuses a city outside the state, a bad PIN, an unknown key and no token; checkout with all
+  four delivery fields saves them on the customer, with partial fields leaves the saved one alone,
+  refuses a state/city off the list, and needs a signed-in customer (401).
+
 - A customer never reads or changes another customer's cart, wishlist or order by changing an id.
 - A member never changes an order's status (403), for a deal or a product order (D27).
 - A member with no business record gets empty Orders and Customers lists and 404 on any order;
