@@ -1,4 +1,37 @@
 {
+  "purchaseLine": {
+    "opensInNewTab": "(opens in a new tab)"
+  },
+  "profileSettings": {
+    "saved": "Profile saved.",
+    "nameRequired": "Please enter your name.",
+    "fixFields": "Fix the highlighted fields and try again.",
+    "loadFailed": "Could not load your profile.",
+    "saveFailed": "Could not save your profile.",
+    "loading": "Loading your profile…",
+    "contact": {
+      "heading": "Contact details",
+      "intro": "The name and email on your account. Your phone number signs you in, so it can't change here.",
+      "name": "Name",
+      "email": "Email",
+      "phone": "Phone",
+      "save": "Save changes",
+      "saving": "Saving…",
+      "confirmHeading": "Update profile?",
+      "confirmText": "Your new name and email will be used on your next orders.",
+      "cancel": "Cancel",
+      "confirm": "Update"
+    },
+    "address": {
+      "heading": "Delivery address",
+      "hint": "Checkout fills these in for you.",
+      "save": "Save address",
+      "saving": "Saving…",
+      "saved": "Delivery address saved.",
+      "saveFailed": "Could not save your address.",
+      "incomplete": "Fill in the address, state, city and a 6-digit pincode."
+    }
+  },
   "notFound": {
     "metaTitle": "Page not found · MSD",
     "title": "Page not found",
@@ -887,6 +920,9 @@
   },
   "cart": {
     "title": "My Cart",
+    "itemCountOne": "1 item",
+    "itemCountMany": "{count} items",
+    "selectionLabel": "Cart selection",
     "emptyHeading": "Your cart is empty",
     "loading": "Loading your cart…",
     "emptySubheading": "Browse our deals and add something you love.",
@@ -899,6 +935,7 @@
     "total": "Total",
     "giftCardPlaceholder": "Enter coupon code",
     "itemsAriaLabel": "Cart items",
+    "quantity": "Quantity",
     "quantityLabel": "Quantity for",
     "decreaseQuantity": "Decrease quantity",
     "increaseQuantity": "Increase quantity",
@@ -907,6 +944,15 @@
     "fromCart": "from cart",
     "clearCart": "Clear cart",
     "allItemsFrom": "All items from",
+    "selectAll": "Select all ({count})",
+    "selectItem": "Select {title}",
+    "removeSelected": "Remove selected",
+    "removeSelectedCount": "Remove selected ({count})",
+    "removedItems": "{items} removed from your cart.",
+    "moveToWishlist": "Move to wishlist",
+    "moveToWishlistLabel": "Move {title} to your wishlist",
+    "movedToWishlist": "Moved to your wishlist.",
+    "viewWishlist": "View wishlist",
     "serverPriceNote": "Price is recalculated server-side at checkout, before payment.",
     "links": {
       "bookings": "View your bookings →",
@@ -915,7 +961,9 @@
     "error": {
       "load": "Could not load your cart.",
       "updateQuantity": "Could not update quantity.",
-      "removeItem": "Could not remove item."
+      "removeItem": "Could not remove item.",
+      "removeSelected": "Could not remove the selected items. Your cart is refreshed.",
+      "moveToWishlist": "Could not move this item to your wishlist."
     }
   },
   "wishlist": {
@@ -952,7 +1000,25 @@
       "selectDate": "Select a date",
       "selectTime": "Select a time"
     },
+    "stepsLabel": "Checkout steps",
+    "stepDone": "completed",
+    "detailsIntro": "Enter your contact and delivery information to continue.",
+    "paymentIntro": "Choose how you want to pay for this order.",
+    "editDetails": "Edit details",
+    "paymentMethod": "Payment method",
+    "methods": {
+      "online": { "title": "Online payment", "description": "Razorpay: UPI, card or net banking" },
+      "cod": { "title": "Cash on delivery", "description": "Pay when your order arrives" }
+    },
+    "payLabel": "Pay {amount}",
+    "openingPayment": "Opening payment…",
+    "placingOrder": "Placing order…",
+    "payingTo": "You're paying {amount} to {member}.",
+    "payingAcross": "You're paying {amount} across {count} members in one payment.",
+    "unavailableHeading": "Checkout unavailable",
+    "summaryNote": "Prices are checked again before you pay. Your details stay private.",
     "backLabel": "Back",
+    "backToCart": "Back to cart",
     "nextLabel": "Continue",
     "placeOrderLabel": "Place Order",
     "loadingOrder": "Preparing your order…",
@@ -960,7 +1026,7 @@
     "pleaseWait": "Please wait…",
     "orderSummaryHeading": "Order Summary",
     "orderStatusPrefix": "This order is already",
-    "securePaymentNote": "Payments are handled securely by Razorpay — card/UPI/netbanking details never touch MSD's servers.",
+    "securePaymentNote": "Razorpay handles the payment. Card, UPI and net banking details never reach MSD's servers.",
     "durationSuffix": "min",
     "deliveringTo": "Delivering to",
     "fields": {
@@ -971,6 +1037,9 @@
       "city": "City",
       "state": "State",
       "pincode": "Pincode",
+      "selectState": "Select a state",
+      "selectCity": "Select a city",
+      "selectStateFirst": "Select a state first",
       "cardNumber": "Card Number",
       "expiry": "MM / YY",
       "cvv": "CVV",
@@ -1010,7 +1079,6 @@
       "startCheckout": "Could not start checkout.",
       "preparePayment": "Could not prepare payment.",
       "gatewayUnavailable": "Payment gateway unavailable.",
-      "verificationFailed": "Payment verification failed — if an amount was deducted, contact support with your order id.",
       "openGateway": "Could not open the payment gateway.",
       "placeOrder": "Could not place your order. Please try again."
     },
@@ -1071,6 +1139,17 @@
     "errors": {
       "load": "Could not load your orders."
     },
+    "orderLabel": "Order {number}",
+    "itemCountOne": "1 item",
+    "itemCountMany": "{count} items",
+    "total": "Total",
+    "viewDetails": "View details",
+    "statuses": {
+      "PENDING_PAYMENT": "Awaiting payment",
+      "CONFIRMED": "Confirmed",
+      "COMPLETED": "Completed",
+      "CANCELLED": "Cancelled"
+    },
     "filtersLabel": "Order status filters",
     "filters": {
       "all": "All",
@@ -1106,7 +1185,44 @@
     },
     "viewInvoice": "View invoice →"
   },
+  "myAccount": {
+    "navLabel": "My account",
+    "home": "Home",
+    "fallbackPage": "My account",
+    "nav": {
+      "dashboard": "Dashboard",
+      "profile": "Profile",
+      "orders": "Orders",
+      "wishlist": "Wishlist",
+      "cart": "Cart",
+      "support": "Support"
+    },
+    "switchToMember": "Switch to member dashboard",
+    "logout": "Logout",
+    "loggedOut": "You have been logged out successfully."
+  },
+  "customerDashboard": {
+    "metaTitle": "My Dashboard · MSD",
+    "metaDescription": "Your bookings, purchases and saved items at a glance.",
+    "path": "/my-dashboard",
+    "title": "My dashboard",
+    "subtitle": "Your bookings, purchases and saved items at a glance.",
+    "statsLabel": "Your account at a glance",
+    "stats": {
+      "deals": "Booked deals",
+      "products": "Purchased products",
+      "cart": "Items in cart",
+      "wishlist": "Saved items"
+    },
+    "recentHeading": "Recent orders",
+    "seeAll": "All orders",
+    "noOrders": "No orders yet. Your bookings and purchases show up here.",
+    "loadError": "Could not load your dashboard."
+  },
   "profile": {
+    "metaTitle": "My Profile · MSD",
+    "metaDescription": "Your contact details and saved delivery address at MySpaDeal.",
+    "path": "/my-account",
     "title": "Profile Details",
     "subtitle": "Manage your contact details and saved addresses."
   },
@@ -1196,7 +1312,8 @@
     },
     "checkout": {
       "title": "Checkout | MSD – MySpaDeal",
-      "description": "Complete your booking at MySpaDeal."
+      "description": "Complete your booking at MySpaDeal.",
+      "path": "/checkout"
     }
   },
   "auth": {
@@ -1501,7 +1618,10 @@
     "sending": "Sending…",
     "required": "Enter a subject and a message.",
     "sent": "Your support request has been sent.",
-    "failed": "We could not send your request. Try again."
+    "failed": "We could not send your request. Try again.",
+    "formHeading": "New request",
+    "metaDescription": "Ask MSD support about an order, a booking or your account.",
+    "path": "/my-account/support"
   },
   "about": {
     "path": "/about",
@@ -1949,59 +2069,41 @@
       "loadError": "Could not load therapists."
     }
   },
-  "customerDashboard": {
-    "metaTitle": "My Dashboard",
-    "loading": {
-      "heading": "Loading your dashboard",
-      "subheading": "Please wait..."
+  "orderResult": {
+    "loading": "Loading your order…",
+    "metaDescription": "The result of your MSD order and what to do next.",
+    "orderNumberLabel": "Order number",
+    "placedOnLabel": "Placed on",
+    "summaryHeading": "Order summary",
+    "itemCountOne": "1 item",
+    "itemCountMany": "{count} items",
+    "total": "Total",
+    "viewOrder": "View order",
+    "payAgain": "Pay now",
+    "tryAgain": "Try again",
+    "myOrders": "My orders",
+    "continueShopping": "Continue shopping",
+    "help": "Need help with this order? Contact us",
+    "success": {
+      "heading": "Thank you, your order is confirmed",
+      "text": "We emailed the confirmation to {email}. Your voucher and invoice are on the order page.",
+      "textNoEmail": "Your voucher and invoice are on the order page."
     },
-    "errors": {
-      "load": "Could not load your dashboard.",
-      "icon": "error_outline"
+    "failed": {
+      "heading": "Your payment did not go through",
+      "text": "Order {number} is saved but not paid. Pay again, or choose cash on delivery. If money left your account, your bank returns it."
     },
-    "stats": {
-      "deals": {
-        "label": "Booked Deals",
-        "icon": "spa"
-      },
-      "products": {
-        "label": "Purchased Products",
-        "icon": "inventory_2"
-      },
-      "cart": {
-        "label": "Your Cart",
-        "icon": "shopping_cart"
-      },
-      "wishlist": {
-        "label": "Wishlist",
-        "icon": "favorite"
-      },
-      "linkIcon": "arrow_forward"
+    "pending": {
+      "heading": "Your order is waiting for payment",
+      "text": "Order {number} is not paid yet. If you just paid, refresh this page in a minute; otherwise pay now."
     },
-    "quickActions": {
-      "orders": {
-        "icon": "receipt_long",
-        "heading": "Your orders",
-        "subheading": "Track booked deals and purchased products.",
-        "button": "View Orders"
-      },
-      "profile": {
-        "icon": "person",
-        "heading": "Manage your profile",
-        "subheading": "View and update your personal account information.",
-        "button": "View Profile"
-      },
-      "logout": {
-        "icon": "logout",
-        "heading": "Sign out",
-        "subheading": "Sign out from your MySpaDeal account.",
-        "button": "Logout"
-      }
+    "cancelled": {
+      "heading": "This order is cancelled",
+      "text": "Order {number} is cancelled. There is nothing to pay."
     },
-    "icons": {
-      "error": "error_outline",
-      "arrowForward": "arrow_forward",
-      "logout": "logout"
+    "error": {
+      "heading": "We could not load your order",
+      "text": "Check your connection and try again. If you paid, we still confirm the payment and email you."
     }
   }
 }

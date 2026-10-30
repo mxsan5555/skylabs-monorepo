@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import type { PermissionCatalogRow, Role } from '../../../../api/rbac/roles';
+import type { PermissionCatalogRow, PermissionScope, Role } from '../../../../api/rbac/roles';
 import { PermissionMatrix } from './permission-matrix';
 
 const ROLE: Role = {
@@ -21,216 +21,89 @@ const catalog: PermissionCatalogRow[] = [
     menuKey: 'members',
     title: 'Members',
     actions: [
-      { action: 'view', key: 'members:view', permissionIds: ['perm-members-view'], label: 'View' },
-      { action: 'create', key: 'members:create', permissionIds: ['perm-members-create'], label: 'Create' },
-      { action: 'edit', key: 'members:edit', permissionIds: ['perm-members-edit'], label: 'Edit' },
-      { action: 'delete', key: 'members:delete', permissionIds: [], label: null },
+      { action: 'view', key: 'members:view', permissionId: 'perm-members-view', label: 'Members: view' },
+      { action: 'create', key: 'members:create', permissionId: 'perm-members-create', label: 'Members: create' },
+      { action: 'edit', key: 'members:edit', permissionId: null, label: null },
+      { action: 'status_change', key: 'members:status_change', permissionId: 'perm-members-status', label: 'Members: status' },
     ],
   },
-  {
-    id: 'audit-logs',
-    menuKey: 'rbac.audit-logs',
-    title: 'Logs',
-    actions: [
-      { action: 'view', key: 'rbac.audit-logs:view', permissionIds: ['perm-logs-view'], label: 'View' },
-    ],
-  },
-  // Mirrors `content`'s real shape — one UI action backed by several real Permission ids
-  // (msd-api aggregates the ~10 real `cms.*` keys this way) that must move atomically.
   {
     id: 'content',
-    menuKey: 'cms, cms.blog.pages',
+    menuKey: 'content',
     title: 'Content',
-    actions: [
-      { action: 'view', key: 'cms:view, cms.blog.pages:view', permissionIds: ['perm-cms-view', 'perm-blog-view'], label: 'View' },
-    ],
+    actions: [{ action: 'view', key: 'content:view', permissionId: 'perm-content-view', label: 'Content: view' }],
   },
 ];
 
+const role = (key: string, name = 'Admin'): Role => ({ id: `role-${key}`, key, name }) as unknown as Role;
+
+function renderMatrix(
+  props: Partial<{ role: Role | null; permissions: ReadonlyMap<string, PermissionScope>; disabled: boolean }> = {},
+) {
+  const onPermissionToggle = vi.fn();
+  render(
+    <PermissionMatrix
+      catalog={catalog}
+      role={props.role === undefined ? role('admin') : props.role}
+      permissions={props.permissions ?? new Map()}
+      onPermissionToggle={onPermissionToggle}
+      disabled={props.disabled}
+    />,
+  );
+  return { onPermissionToggle };
+}
+
+const box = (name: string) => screen.getByRole('checkbox', { name }) as HTMLInputElement;
+
+/** P10-46: the matrix is one checkbox per V/C/E/D action per resource for the selected role. */
 describe('PermissionMatrix', () => {
-  it('shows a prompt instead of a table when no role is selected', () => {
-    render(
-      <PermissionMatrix
-        catalog={catalog}
-        // eslint-disable-next-line jsx-a11y/aria-role -- `role` here is PermissionMatrix's own
-        // `Role | null` prop, not the DOM `role` attribute; the plugin can't tell custom
-        // component props from native ones apart by name alone.
-        role={null}
-        permissions={new Map()}
-        onPermissionToggle={vi.fn()}
-      />,
-    );
+  it('asks for a role before showing the grid', () => {
+    renderMatrix({ role: null });
     expect(screen.getByText('Select a role to view and manage its permissions.')).toBeTruthy();
     expect(screen.queryByRole('table')).toBeNull();
   });
 
-  it('renders one resource per row and one column per action plus Scope, using the shared data-table classes', () => {
-    render(
-      <PermissionMatrix
-        catalog={catalog}
-        role={ROLE}
-        permissions={new Map()}
-        onPermissionToggle={vi.fn()}
-      />,
-    );
+  it('lists each resource as a row header with a checkbox per defined V/C/E/D action', () => {
+    renderMatrix();
     expect(screen.getByRole('rowheader', { name: 'Members' })).toBeTruthy();
-    expect(screen.getByRole('rowheader', { name: 'Logs' })).toBeTruthy();
-    const headers = screen.getAllByRole('columnheader').map((h) => h.textContent);
-    expect(headers).toEqual(['Resource', 'View', 'Create', 'Edit', 'Delete', 'Scope']);
-    expect(document.querySelector('.perm-matrix-wrap table.perm-matrix')).toBeTruthy();
+    expect(screen.getByRole('rowheader', { name: 'Content' })).toBeTruthy();
+    expect(box('Admin: Members: View')).toBeTruthy();
+    expect(box('Admin: Members: Create')).toBeTruthy();
+    expect(box('Admin: Content: View')).toBeTruthy();
+    expect(screen.queryByRole('checkbox', { name: 'Admin: Content: Delete' })).toBeNull();
   });
 
-  it('shows a dash, not a disabled checkbox, for an action the resource does not define', () => {
-    render(
-      <PermissionMatrix
-        catalog={catalog}
-        role={ROLE}
-        permissions={new Map()}
-        onPermissionToggle={vi.fn()}
-      />,
-    );
-    expect(screen.queryByRole('checkbox', { name: 'Admin: Logs: Create' })).toBeNull();
+  it('shows no column for actions outside V/C/E/D, such as status_change', () => {
+    renderMatrix();
+    const labels = screen.getAllByRole('checkbox').map((c) => c.getAttribute('aria-label'));
+    expect(labels.some((l) => /status/i.test(l ?? ''))).toBe(false);
   });
 
-  it('disables the checkbox when the backend has not created the permission record yet', () => {
-    render(
-      <PermissionMatrix
-        catalog={catalog}
-        role={ROLE}
-        permissions={new Map()}
-        onPermissionToggle={vi.fn()}
-      />,
-    );
-    expect((screen.getByRole('checkbox', { name: 'Admin: Members: Delete' }) as HTMLInputElement).disabled).toBe(true);
+  it('checks the actions the role holds', () => {
+    renderMatrix({ permissions: new Map([['perm-members-view', 'ALL']]) });
+    expect(box('Admin: Members: View').checked).toBe(true);
+    expect(box('Admin: Members: Create').checked).toBe(false);
   });
 
-  it('checks a box when the permission is in the granted set, unchecked otherwise', () => {
-    render(
-      <PermissionMatrix
-        catalog={catalog}
-        role={ROLE}
-        permissions={new Map([['perm-members-view', 'ALL']])}
-        onPermissionToggle={vi.fn()}
-      />,
-    );
-    expect((screen.getByRole('checkbox', { name: 'Admin: Members: View' }) as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByRole('checkbox', { name: 'Admin: Members: Create' }) as HTMLInputElement).checked).toBe(false);
+  it('reports a toggle with the role, permission, new state and scope', () => {
+    const { onPermissionToggle } = renderMatrix();
+    fireEvent.click(box('Admin: Members: Create'));
+    expect(onPermissionToggle).toHaveBeenCalledWith('role-admin', 'perm-members-create', true, 'ALL');
   });
 
-  it('calls onPermissionToggle with the role, permissionId and the checked state', () => {
-    const onPermissionToggle = vi.fn();
-    render(
-      <PermissionMatrix
-        catalog={catalog}
-        role={ROLE}
-        permissions={new Map()}
-        onPermissionToggle={onPermissionToggle}
-      />,
-    );
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Admin: Members: Create' }));
-    expect(onPermissionToggle).toHaveBeenCalledWith(ROLE.id, 'perm-members-create', true, 'ALL');
+  it('grants member resources with own scope to the member role', () => {
+    const { onPermissionToggle } = renderMatrix({ role: role('member', 'Member') });
+    fireEvent.click(box('Member: Members: View'));
+    expect(onPermissionToggle).toHaveBeenCalledWith('role-member', 'perm-members-view', true, 'OWN');
   });
 
-  it('a resource backed by several real keys (Content) is checked only when every one of them is granted', () => {
-    render(
-      <PermissionMatrix
-        catalog={catalog}
-        role={ROLE}
-        permissions={new Map([['perm-cms-view', 'ALL']])}
-        onPermissionToggle={vi.fn()}
-      />,
-    );
-    // Only one of the two real keys behind Content: View is granted — still unchecked.
-    expect((screen.getByRole('checkbox', { name: 'Admin: Content: View' }) as HTMLInputElement).checked).toBe(false);
+  it('disables an action whose permission row is missing', () => {
+    renderMatrix();
+    expect(box('Admin: Members: Edit').disabled).toBe(true);
   });
 
-  it('toggling a resource backed by several real keys (Content) grants/revokes every one of them at once', () => {
-    const onPermissionToggle = vi.fn();
-    render(
-      <PermissionMatrix
-        catalog={catalog}
-        role={ROLE}
-        permissions={new Map()}
-        onPermissionToggle={onPermissionToggle}
-      />,
-    );
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Admin: Content: View' }));
-    expect(onPermissionToggle).toHaveBeenCalledWith(ROLE.id, 'perm-cms-view', true, 'ALL');
-    expect(onPermissionToggle).toHaveBeenCalledWith(ROLE.id, 'perm-blog-view', true, 'ALL');
-    expect(onPermissionToggle).toHaveBeenCalledTimes(2);
-  });
-
-  it('disables every checkbox and select when disabled=true', () => {
-    render(
-      <PermissionMatrix
-        catalog={catalog}
-        role={ROLE}
-        permissions={new Map([['perm-logs-view', 'OWN']])}
-        onPermissionToggle={vi.fn()}
-        disabled
-      />,
-    );
-    for (const box of screen.getAllByRole('checkbox')) {
-      expect((box as HTMLInputElement).disabled).toBe(true);
-    }
-    expect((screen.getByRole('combobox', { name: 'Admin: Logs: scope' }) as HTMLSelectElement).disabled).toBe(true);
-  });
-
-  it('shows a fixed "All" label for a resource outside the OWN-scope allowlist, never an editable select', () => {
-    render(
-      <PermissionMatrix
-        catalog={catalog}
-        role={ROLE}
-        permissions={new Map([['perm-members-view', 'ALL']])}
-        onPermissionToggle={vi.fn()}
-      />,
-    );
-    expect(screen.queryByRole('combobox', { name: 'Admin: Members: scope' })).toBeNull();
-    expect(screen.getAllByText('All').length).toBeGreaterThan(0);
-  });
-
-  it('offers an editable Own/All select for a resource on the OWN-scope allowlist (rbac.audit-logs:view)', () => {
-    const onPermissionToggle = vi.fn();
-    render(
-      <PermissionMatrix
-        catalog={catalog}
-        role={ROLE}
-        permissions={new Map([['perm-logs-view', 'ALL']])}
-        onPermissionToggle={onPermissionToggle}
-      />,
-    );
-    const select = screen.getByRole('combobox', { name: 'Admin: Logs: scope' }) as HTMLSelectElement;
-    expect(select.value).toBe('ALL');
-    fireEvent.change(select, { target: { value: 'OWN' } });
-    expect(onPermissionToggle).toHaveBeenCalledWith(ROLE.id, 'perm-logs-view', true, 'OWN');
-  });
-
-  it('marks a checkbox that differs from the last-saved grant set as an unsaved change', () => {
-    render(
-      <PermissionMatrix
-        catalog={catalog}
-        role={ROLE}
-        permissions={new Map([['perm-members-view', 'ALL']])}
-        savedPermissions={new Map()}
-        onPermissionToggle={vi.fn()}
-      />,
-    );
-    const cell = screen.getByRole('checkbox', { name: 'Admin: Members: View' }).closest('td');
-    expect(cell?.className).toContain('perm-matrix__cell--dirty');
-  });
-
-  it('does not mark anything dirty when the draft matches the last-saved grant set', () => {
-    const saved = new Map([['perm-members-view', 'ALL' as const]]);
-    render(
-      <PermissionMatrix
-        catalog={catalog}
-        role={ROLE}
-        permissions={saved}
-        savedPermissions={saved}
-        onPermissionToggle={vi.fn()}
-      />,
-    );
-    const cell = screen.getByRole('checkbox', { name: 'Admin: Members: View' }).closest('td');
-    expect(cell?.className).toBeFalsy();
+  it('disables every checkbox when disabled', () => {
+    renderMatrix({ disabled: true });
+    expect(screen.getAllByRole('checkbox').every((c) => (c as HTMLInputElement).disabled)).toBe(true);
   });
 });

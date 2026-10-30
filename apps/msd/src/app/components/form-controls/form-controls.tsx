@@ -1,7 +1,9 @@
-import { createElement, type ChangeEvent } from 'react';
+import { createElement, type ChangeEvent, type ReactNode } from 'react';
+import './form-controls.css';
 
 /**
- * Raw M3 form controls for the console forms (deal form, package cards). Raw elements, not the
+ * Raw M3 form controls for the console forms (deal form, package cards) and the checkout's state
+ * and city lists. Raw elements, not the
  * shared-ui React wrappers, so tests can drive `value` and the native `input` / `change` events
  * (the wrappers set properties in an effect that does not run under Vitest's `@lit/react`
  * resolution; see CLAUDE.md "Testing gotchas"). Optional props are skipped, never passed as
@@ -9,6 +11,9 @@ import { createElement, type ChangeEvent } from 'react';
  */
 
 type DrivenChangeEvent = ChangeEvent<HTMLElement & { value: string }>;
+
+/** Select options from plain strings, each its own value and label (state, city lists). */
+export const asOptions = (values: readonly string[]) => values.map((value) => ({ value, label: value }));
 
 function defined<T extends Record<string, unknown>>(props: T): Partial<T> {
   return Object.fromEntries(Object.entries(props).filter(([, v]) => v !== undefined && v !== false)) as Partial<T>;
@@ -23,6 +28,7 @@ export function renderSelect({
   options,
   extraOption,
   onChange,
+  selectKey,
 }: {
   label: string;
   value: string;
@@ -34,10 +40,13 @@ export function renderSelect({
   /** A stale value (e.g. a category since deactivated) kept selectable instead of being cleared. */
   extraOption?: { value: string; label: string };
   onChange: (value: string) => void;
+  /** Remounts the select when it changes (e.g. the state for a city list): md-select only shows a
+   *  value that matches an option it already had when the value was set. */
+  selectKey?: string;
 }) {
   return createElement(
     'md-outlined-select',
-    { label, value, ...defined({ disabled, required }), onChange: (e: DrivenChangeEvent) => onChange(e.currentTarget.value) },
+    { key: selectKey, label, value, ...defined({ disabled, required }), onChange: (e: DrivenChangeEvent) => onChange(e.currentTarget.value) },
     [
       ...(placeholder !== undefined
         ? [createElement('md-select-option', { key: '__placeholder__', value: '' }, createElement('div', { slot: 'headline' }, placeholder))]
@@ -66,6 +75,7 @@ export function renderTextField({
   disabled,
   placeholder,
   inputMode,
+  readOnly,
   onInput,
 }: {
   label: string;
@@ -83,6 +93,8 @@ export function renderTextField({
   disabled?: boolean;
   placeholder?: string;
   inputMode?: string;
+  /** Shown but not editable (a sign-in phone number). */
+  readOnly?: boolean;
   onInput: (value: string) => void;
 }) {
   return createElement('md-outlined-text-field', {
@@ -102,6 +114,7 @@ export function renderTextField({
       disabled,
       placeholder,
       inputmode: inputMode,
+      readonly: readOnly,
     }),
     onInput: (e: DrivenChangeEvent) => onInput(e.currentTarget.value),
   });
@@ -114,5 +127,20 @@ export function renderCheckbox({ label, checked, onChange }: { label: string; ch
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.currentTarget.checked)} />
       {label}
     </label>
+  );
+}
+
+/** One form control with its error under it as an alert; `wide` spans every column of a
+ *  `.form-grid`. */
+export function FormField({ children, error, wide = false }: { children: ReactNode; error?: string; wide?: boolean }) {
+  return (
+    <div className={wide ? 'form-field form-field--wide' : 'form-field'}>
+      {children}
+      {error && (
+        <p className="form-field__error body-small" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }

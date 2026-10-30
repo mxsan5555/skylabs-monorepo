@@ -198,6 +198,9 @@ value and hash) is not built yet (task P5-16).
 - `OrderItem.vendorId` (not `Order`'s own vendor column) says which member sold each line; own
   scope on orders and payments filters by it.
 - `SupportRequest` is a customer contact message, unrelated to the `support` role (F14).
+- `User.address`, `city`, `state`, `pincode` (nullable, S25): the customer's saved delivery address
+  (D37). Checkout pre-fills it and a placed order with a complete address replaces it; orders keep
+  their own copy in `shipping*`, so history never changes.
 
 ## 4. Storefront
 
@@ -369,6 +372,7 @@ No tables (GA4 holds the data).
 | S22 | Branch: `addressLine2`; report and fix rows whose `state` or `city` is not in the India list, then `NOT NULL` | done 2026-10-27 (DL-02): column in `20261026100000_deal_page_fields`; report script `prisma/report-branch-locations.ts` (0 bad rows locally); `NOT NULL` in `20261027100000_branch_location_required` (stops with a clear message if a row lacks state or city); Neon run with DL-01 |
 | S23 | Backfill: `policy` → `cancellationNote`; `publishedAt` = `updatedAt` for ACTIVE deals; every deal `approvalStatus = APPROVED` (D6). Existing slugs are kept; new deals get `{title}-{member}-{city}` | written (same migration) |
 | S24 | `pg_trgm` + GIN trigram indexes on `Deal.title` and `Vendor.businessName` | written (same migration; indexes declared in `schema.prisma`, extension in SQL) |
+| S25 | User: `address`, `city`, `state`, `pincode` (nullable), the saved delivery address (D37, item 2.2) | written 2026-10-29 (`20261029130000_user_saved_address`, `down.sql` drops them); apply locally, then Neon with DL-01 |
 | - | Contract: drop `kycStatus`, `kycRejectionReason`, legacy GST/PAN/`kycDocuments`, `approvalStatus`, `approvalRejectionReason`, `Deal.images`, `Deal.policy`, category-grant tables, `Member.offersService`/`offersProduct`/`offersTherapy` | after one release without readers (P3-16) |
 
 `PaymentStatus` gains `REFUNDED`, `PARTIALLY_REFUNDED` with S8.

@@ -150,14 +150,14 @@ Still planned: grant edits refuse super-admin-only actions (`ROLE_GRANT_FORBIDDE
 | POST | `/api/v1/members` | `members:create` |
 | GET | `/api/v1/members/:id` | `members:view` |
 | PATCH | `/api/v1/members/:id` | `members:edit` |
-| DELETE | `/api/v1/members/:id` | `members:delete` |
+| DELETE | `/api/v1/members/:id` | `members:delete` (always archives, `{ outcome: 'ARCHIVED' }`, D36; the list hides Archived unless `status=ARCHIVED`) |
 | GET | `/api/v1/members/:id/activity` | `members:view` |
 | GET | `/api/v1/members/:id/documents` | `members:view` |
 | POST | `/api/v1/members/:id/documents/:documentType` | `members:edit` |
 | DELETE | `/api/v1/members/:id/documents/:documentType` | `members:edit` |
 | PATCH | `/api/v1/members/:id/documents/:documentType/review` | `members:approve|reject` |
 | POST | `/api/v1/members/:id/documents/reminders` | `members:status_change` |
-| PATCH | `/api/v1/members/:id/status` | `members:status_change` |
+| PATCH | `/api/v1/members/:id/status` | `members:status_change` (item 6: one step at a time, Active → Inactive → Suspended; Archived restores to Inactive; 409 names the step to take first) |
 | GET | `/api/v1/members/:id/status-history` | `members:view` |
 | GET | `/api/v1/products` | `products:view` |
 | GET | `/api/v1/products/:id` | `products:view` |
@@ -422,6 +422,21 @@ never returned. Upload without `R2_PRIVATE_BUCKET` configured returns 503.
 | POST | `/api/v1/orders/pay-batch/cod` | signed in (own records, or checked in the handler) |
 | POST | `/api/v1/orders/pay-batch/verify` | signed in (own records, or checked in the handler) |
 | POST | `/api/v1/payments/webhook/razorpay` | public |
+
+**Saved delivery address (item 2.2, D37):** `GET /rbac/users/me` also returns `address`, `city`,
+`state`, `pincode` (staff user lists never do). `PUT /rbac/users/me/address` (signed in, own row)
+saves `{ address, state, city, pincode }`: strict body, state and city from the India list, 6-digit
+PIN, 422 otherwise. `POST /orders/checkout` refuses a `shippingState`/`shippingCity` pair outside
+the India list (422) and, when all four `shipping*` fields are given, saves them as the customer's
+address (also on a repeat checkout of the same pending order).
+
+**Member view of an order** (`GET /orders`, `GET /orders/:id` for a caller who owns a member,
+item 5, `services/order.service.ts` `scopeOrderForMember`): `items` holds only their own lines;
+`subtotal`, `total` and each `payments[].amount` are the sum of those lines; `vendorId`,
+`vendorNameSnapshot`, `vendor` and `branchId`, `branchNameSnapshot` are their own (the order's
+primary vendor and branch can be another member's), and `branch` is null unless it is their own.
+An order with none of their lines is 404. `search` matches the customer name and their own item
+names only. Staff and the ordering customer see the whole order.
 | GET | `/api/v1/wishlist` | signed in (own records, or checked in the handler) |
 | POST | `/api/v1/wishlist` | signed in (own records, or checked in the handler) |
 | DELETE | `/api/v1/wishlist/:dealId` | signed in (own records, or checked in the handler) |
@@ -467,8 +482,10 @@ returns today's response plus the new `tag` field.
   `tags=expire_soon,hot,new,deal` (any of the four, comma list; anything else → 422).
 - `GET /catalog/deals`: `categoryId` stays optional, so `/deals` lists every category.
 - `GET /catalog/products`: adds `categoryIds` (comma list, max 50, wins over `categoryId`),
-  `tags`. `GET /catalog/products/facets` takes the same filters minus paging and sort and
-  returns `{ categories: [{ id, name, slug, count }], tags: [{ tag, count }], price: { min, max } }`.
+  `vendorIds` (comma list, max 50, wins over `vendorId`; item 4, D39) and `tags`.
+  `GET /catalog/products/facets` takes the same filters minus paging and sort and returns
+  `{ categories: [{ id, name, slug, count }], vendors: [{ id, name, count }], tags: [{ tag, count }], price: { min, max } }`;
+  category, business, tag and price counts each ignore their own selection.
 - `GET /catalog/therapists`: adds `sort=relevance|price_asc|price_desc|distance` (price = lowest
   active package; `distance` needs coordinates, else behaves like `relevance`), `minPrice` /
   `maxPrice` (lowest package), `radiusKm`, `city` / `state`, `vendorIds` / `branchIds`, and

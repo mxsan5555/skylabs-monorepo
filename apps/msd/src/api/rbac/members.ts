@@ -90,7 +90,8 @@ export function changeMemberStatus(token: string | null, id: string, status: 'AC
 }
 
 export function deleteMember(token: string | null, id: string, reason: string) {
-  return apiDelete<{ outcome: 'DELETED' | 'ARCHIVED' }>(`/members/${id}`, token, { reason });
+  // Delete always archives the member (item 6); nothing is erased.
+  return apiDelete<{ outcome: 'ARCHIVED' }>(`/members/${id}`, token, { reason });
 }
 
 /** Per channel: SENT, FAILED, or null when the member has no email or phone on record. */

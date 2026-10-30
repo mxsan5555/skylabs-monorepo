@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { registerPublicVendor, getVendorOwnerAvailability } from './vendors';
 
 const apiGetMock = vi.fn();
 const apiPostMock = vi.fn();
@@ -12,7 +13,6 @@ vi.mock('./client', async () => {
   };
 });
 
-import { registerPublicVendor, getVendorOwnerAvailability } from './vendors';
 
 beforeEach(() => {
   vi.clearAllMocks();

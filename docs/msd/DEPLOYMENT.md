@@ -39,6 +39,7 @@ silently ships the bare SPA); preview and local builds fall back to the SPA. Red
 | `TRUST_PROXY_HOPS` | `1` on Railway (one proxy); leave unset locally | |
 | `API_DOCS` | unset (Swagger `/docs` off in production); `true` only to open it temporarily | |
 | `REQUEST_LOGGING` | unset (one JSON line per request, with `X-Request-Id`); `false` to silence | |
+| `DEV_OTP_IDENTIFIERS` | **never set** on Railway (local test accounts only; production refuses to boot with it) | |
 | `CORS_ORIGIN` | exact Vercel origins, comma-separated | |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth client id / secret | 🔒 (secret) |
 | `GOOGLE_CALLBACK_URL` | `https://<msd-api-railway-domain>/api/v1/auth/google/callback` | |
@@ -53,7 +54,9 @@ silently ships the bare SPA); preview and local builds fall back to the SPA. Red
 | `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | R2 token | 🔒 |
 | `R2_PUBLIC_URL` | optional public URL of the bucket | |
 | `R2_PRIVATE_BUCKET` | `msd-private` (public access off); member documents. Uploads return 503 until set | |
-| `SUPPORT_EMAIL` / `SUPPORT_PHONE` | support contact printed in member notices | |
+| `SUPPORT_EMAIL` / `SUPPORT_PHONE` | support contact printed in member and order notices | |
+| `PUBLIC_SITE_URL` | storefront origin for links in customer emails (default: the first `CORS_ORIGIN`) | |
+| `SMS_DLT_TEMPLATE_ORDER_CONFIRMED` / `SMS_DLT_TEMPLATE_PAYMENT_FAILED` | DLT template ids; an order SMS goes out only when its id is set (D38), email always goes | |
 | `FIELD_ENCRYPTION_KEY` | 32 random bytes, base64; encrypts full Aadhaar and PAN numbers | 🔒 |
 | `DOC_HASH_PEPPER` | secret for the document number duplicate hash | 🔒 |
 | `CRON_SECRET` | 64-char hex; the same value goes on the cron service | 🔒 |

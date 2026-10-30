@@ -17,7 +17,7 @@ import { MemberHeaderActions } from './member-header-actions';
 import { MemberDocumentsTab } from './member-documents-tab';
 import { MemberActivityTab } from './member-activity-tab';
 import { VendorCustomers } from './vendor-customers';
-import { pluralize } from '../../../../utils/format';
+import { MemberSummary } from './member-summary';
 import {
   MEMBER_STATUS_LABEL,
   MEMBER_STATUS_TONE,
@@ -27,7 +27,6 @@ import {
   canBeReminded,
   documentsChipLabel,
   documentsChipTone,
-  dueDateLabel,
   reminderOutcome,
 } from './member-status';
 
@@ -152,8 +151,9 @@ export function MemberDetailPage() {
   };
 
   const onDelete = async (reason: string) => {
-    const { data } = await deleteMember(token, member.id, reason);
-    showSnackbar(data.outcome === 'ARCHIVED' ? 'Member archived. We kept their records.' : 'Member deleted.');
+    // Delete always archives (item 6): nothing is erased and the member can be restored.
+    await deleteMember(token, member.id, reason);
+    showSnackbar('Member archived. Restore them any time from the Archived filter.');
     navigate('/account/members', { replace: true });
   };
 
@@ -173,22 +173,10 @@ export function MemberDetailPage() {
   };
 
   const summary = member.documentsSummary;
-  const due = dueDateLabel(summary);
   const reviewFlagged = Boolean(member.reviewFlaggedAt);
   const tabId = (value: Tab) => `${idBase}-tab-${value}`;
   const panelId = `${idBase}-panel`;
   const activeLabel = visibleTabs.find((t) => t.value === tab)?.label ?? '';
-  // Each count links to its filtered list for staff who can open that list (P10-49).
-  const countLink = (count: number, noun: string, to: string, allowed: boolean) => {
-    const text = `${count} ${pluralize(count, noun)}`;
-    return allowed ? (
-      <Link className="text-link" to={to}>
-        {text}
-      </Link>
-    ) : (
-      <span>{text}</span>
-    );
-  };
 
   return (
     <div className="admin-page admin-page--wide">
@@ -200,15 +188,7 @@ export function MemberDetailPage() {
           <p>
             <sky-badge status={MEMBER_STATUS_TONE[member.status]}>{MEMBER_STATUS_LABEL[member.status]}</sky-badge>{' '}
             <sky-badge status={documentsChipTone(summary)}>{documentsChipLabel(summary)}</sky-badge>
-            {due && <span className="field-hint"> {due}</span>}
           </p>
-          {member.customerCount !== undefined && member.orderCount !== undefined && (
-            <p className="field-hint">
-              {countLink(member.customerCount, 'customer', `/account/members/${member.id}/customers`, can('customers', 'view'))}
-              {' · '}
-              {countLink(member.orderCount, 'order', `/account/orders?vendorId=${member.id}`, can('orders', 'view'))}
-            </p>
-          )}
           {reviewFlagged && member.status !== 'SUSPENDED' && (
             <p>
               <sky-badge status={REVIEW_FLAG_TONE}>{REVIEW_FLAG_LABEL}</sky-badge>
@@ -243,6 +223,9 @@ export function MemberDetailPage() {
           {error}
         </p>
       )}
+
+      {/* Item 7: the member's state at a glance before the tabs; counts link to their tab (P10-49). */}
+      <MemberSummary member={member} tabs={visibleTabs.map((t) => t.value)} canOpenOrders={can('orders', 'view')} />
 
       <div className="admin-tabs-wrap">
         {createElement(

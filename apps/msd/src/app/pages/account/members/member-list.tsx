@@ -30,8 +30,9 @@ const SORT_FIELD_BY_COLUMN: Record<string, MemberSortField> = {
   Due: 'documentsDueAt',
 };
 
-/** Lifecycle states staff can filter by. Archived members are hidden everywhere, so not listed. */
-export const FILTERABLE_STATUSES = ['ACTIVE', 'INACTIVE', 'SUSPENDED'] as const satisfies readonly MemberStatus[];
+/** Lifecycle states staff can filter by. The default list hides Archived (deleted) members; this
+ *  filter is where staff find them to restore (item 6). */
+export const FILTERABLE_STATUSES = ['ACTIVE', 'INACTIVE', 'SUSPENDED', 'ARCHIVED'] as const satisfies readonly MemberStatus[];
 
 /** Non-status filter values; members.tsx maps each one to its list query. */
 export const DOCUMENTS_FILTER = 'documents';

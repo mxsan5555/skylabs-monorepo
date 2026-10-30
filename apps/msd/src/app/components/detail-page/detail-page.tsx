@@ -6,6 +6,7 @@ import { fillTemplate, formatINR, formatStreetAddress, formatTime12h } from '../
 import content from '../../../content.json';
 import { useHydrated } from '../../../hooks/use-hydrated';
 import { DealMap, type DealMapPoint } from '../deal-map/deal-map';
+import { QuantityStepper } from '../quantity-stepper/quantity-stepper';
 import './detail-page.css';
 
 const t = content.detailPage;
@@ -251,15 +252,14 @@ export function DetailPurchase({ unitPrice, quantity, onQuantityChange, onAdd, a
     <>
       <div className="detail-page__row body-large">
         <span id="detail-quantity">{t.quantity}</span>
-        <div className="detail-page__stepper" role="group" aria-labelledby="detail-quantity">
-          <OutlinedIconButton aria-label={t.decrease} disabled={quantity <= 1} onClick={() => onQuantityChange(Math.max(1, quantity - 1))}>
-            <Icon aria-hidden="true">remove</Icon>
-          </OutlinedIconButton>
-          <output aria-live="polite">{quantity}</output>
-          <OutlinedIconButton aria-label={t.increase} disabled={soldOut || atMax} onClick={() => onQuantityChange(quantity + 1)}>
-            <Icon aria-hidden="true">add</Icon>
-          </OutlinedIconButton>
-        </div>
+        <QuantityStepper
+          value={quantity}
+          onChange={onQuantityChange}
+          max={soldOut || atMax ? quantity : maxQuantity}
+          labelledBy="detail-quantity"
+          decreaseLabel={t.decrease}
+          increaseLabel={t.increase}
+        />
       </div>
       <div className="detail-page__row body-large">
         <span>{t.total}</span>

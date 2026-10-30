@@ -14,6 +14,7 @@ import app from '../app';
 import { prisma } from '../lib/prisma';
 import { resolveGrantedPermissionKeys } from '../services/permission-resolver.service';
 import { bearerFor } from '../test-utils/auth-test-utils';
+import { env } from '../config/env';
 
 const resolveMock = vi.mocked(resolveGrantedPermissionKeys);
 const prismaMock = vi.mocked(prisma, true);
@@ -87,6 +88,8 @@ const orderFixture = {
   branchNameSnapshot: null,
   subtotal: '398.00',
   total: '398.00',
+  // ORDER_INCLUDE always loads payments; a member's view rewrites each amount to their share.
+  payments: [],
   items: [{
     id: 'oi-1',
     productId: PRODUCT_ID,
@@ -136,6 +139,31 @@ describe('GET /api/v1/orders/me — item images', () => {
     expect(res.status).toBe(200);
     expect(res.body.data[0].items[0].image).toBe('deals/deal-1/primary.jpg');
     expect(res.body.data[0].items[0].deal).toBeUndefined();
+  });
+
+  it('prefixes the image key with R2_PUBLIC_URL when it is set', async () => {
+    prismaMock.order.findMany.mockResolvedValue([{
+      ...orderFixture,
+      type: 'SERVICE',
+      items: [{
+        ...orderFixture.items[0],
+        dealId: SERVICE_DEAL_ID,
+        productId: null,
+        deal: { images: [], mediaImages: [{ storageKey: 'deals/deal-1/primary.jpg', isPrimary: true, sortOrder: 0 }] },
+        product: null,
+      }],
+    }]);
+    prismaMock.order.count.mockResolvedValue(1);
+    const previous = env.r2PublicUrl;
+    env.r2PublicUrl = 'https://media.example';
+    try {
+      const res = await request(app)
+        .get('/api/v1/orders/me?pageSize=50')
+        .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
+      expect(res.body.data[0].items[0].image).toBe('https://media.example/deals/deal-1/primary.jpg');
+    } finally {
+      env.r2PublicUrl = previous;
+    }
   });
 });
 
@@ -276,6 +304,54 @@ describe('POST /api/v1/orders/checkout — Product Cart -> Order', () => {
       .send({ contactPhone: '12345' }); // not a valid 10-digit Indian mobile number
     expect(res.status).toBe(422);
     expect(prismaMock.order.create).not.toHaveBeenCalled();
+  });
+});
+
+/** Item 2.2 (D37): checkout keeps the delivery address on the account for next time. */
+describe('POST /api/v1/orders/checkout — saved address', () => {
+  const DELIVERY = {
+    contactName: 'Neeraj Singh',
+    contactPhone: '9177889991',
+    contactEmail: 'neeraj@test.com',
+    shippingAddress: '1457, D Block, Pacchim Vihar',
+    shippingState: 'Delhi',
+    shippingCity: 'New Delhi',
+    shippingPincode: '110063',
+  };
+  const checkout = (body: object) =>
+    request(app).post('/api/v1/orders/checkout').set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] })).send(body);
+
+  beforeEach(() => {
+    prismaMock.cart.findUnique.mockResolvedValue(cartWithOneItem);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.product.findFirst.mockResolvedValue(productFixture);
+    prismaMock.order.create.mockResolvedValue(orderFixture);
+    prismaMock.user.update.mockResolvedValue({});
+  });
+
+  it('saves the full delivery address to the customer as their latest one', async () => {
+    const res = await checkout(DELIVERY);
+    expect(res.status).toBe(201);
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      where: { id: CUSTOMER_ID },
+      data: { address: DELIVERY.shippingAddress, state: 'Delhi', city: 'New Delhi', pincode: '110063' },
+    });
+  });
+
+  it('leaves the saved address alone when the delivery details are partial', async () => {
+    const res = await checkout({ contactName: 'Neeraj Singh' });
+    expect(res.status).toBe(201);
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+  });
+
+  it('refuses a state and city that are not on the India list', async () => {
+    const res = await checkout({ ...DELIVERY, shippingCity: 'Mumbai' });
+    expect(res.status).toBe(422);
+    expect(prismaMock.order.create).not.toHaveBeenCalled();
+  });
+
+  it('needs a signed-in customer', async () => {
+    expect((await request(app).post('/api/v1/orders/checkout').send(DELIVERY)).status).toBe(401);
   });
 });
 

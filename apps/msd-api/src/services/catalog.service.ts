@@ -722,6 +722,8 @@ export interface ProductWhereOpts {
   categoryIds?: string[];
   subcategoryId?: string;
   vendorId?: string;
+  /** Business ids (`vendorIds=`, item 4); win over `vendorId`. */
+  vendorIds?: string[];
   search?: string;
   minPrice?: number;
   maxPrice?: number;
@@ -734,7 +736,7 @@ export function buildProductWhere(opts: ProductWhereOpts) {
     ...VISIBLE_PRODUCT_WHERE,
     ...(opts.categoryIds?.length ? { categoryId: { in: opts.categoryIds } } : opts.categoryId ? { categoryId: opts.categoryId } : {}),
     ...(opts.subcategoryId ? { subcategoryId: opts.subcategoryId } : {}),
-    ...(opts.vendorId ? { vendorId: opts.vendorId } : {}),
+    ...(opts.vendorIds?.length ? { vendorId: { in: opts.vendorIds } } : opts.vendorId ? { vendorId: opts.vendorId } : {}),
     ...(opts.minPrice !== undefined || opts.maxPrice !== undefined
       ? {
           price: {
@@ -797,19 +799,28 @@ export async function listPublicProducts(
 }
 
 /** Filter-panel counts for the public product list (`GET /catalog/products/facets`): base
- *  filters in SQL, category / tag / price in memory so each ignores its own selection. */
+ *  filters in SQL, category / business / tag / price in memory so each ignores its own selection. */
 export async function getPublicProductFacets(opts: ProductWhereOpts & { tags?: OfferTagKey[] }) {
-  const { categoryId, categoryIds, minPrice, maxPrice, tags = [], ...base } = opts;
+  const { categoryId, categoryIds, vendorIds, minPrice, maxPrice, tags = [], ...base } = opts;
   const now = new Date();
   const [rows, hot] = await Promise.all([
     prisma.product.findMany({
       where: buildProductWhere(base),
-      select: { id: true, price: true, discount: true, createdAt: true, category: { select: PUBLIC_CATEGORY_SELECT } },
+      select: {
+        id: true,
+        price: true,
+        discount: true,
+        createdAt: true,
+        vendorId: true,
+        category: { select: PUBLIC_CATEGORY_SELECT },
+        vendor: { select: { businessName: true } },
+      },
     }),
     getHotIds('product', now),
   ]);
   return computeProductFacets(withOfferTags(rows, (p) => p.discount, hot, now), {
     categoryIds: categoryIds ?? (categoryId ? [categoryId] : []),
+    vendorIds,
     tags,
     minPrice,
     maxPrice,

@@ -106,9 +106,24 @@ only and never change an order's status, for deals or products (D27).
 | Active | Default at creation. A welcome message goes out by SMS and email. |
 | Inactive | Business pause. The member logs in and sees everything (orders, customers, own catalog) but cannot change anything existing or add anything new, and sees a view-only banner on every screen. Their items are hidden from the website. Admin can return them to Active at any time; everything comes back as it was. |
 | Suspended | Admin action, reason required (10 to 500 characters). The member cannot log in (open sessions end at once), everything they own and their profile disappear from the website, and they get an email and SMS with the reason, the support contact and the steps to return. A suspended member who tries to log in sees the same message. Customers who already paid are honoured by default; Admin can refund. |
-| Archived | Set by the system when a suspended member with order history is deleted: hidden everywhere, records kept. |
-| Deleted | Super Admin only, only from Suspended (journey Inactive → Suspended → Delete), only when the member never had an order. |
+| Archived | What Delete does (D36): Super Admin only, only from Suspended. Hidden everywhere (the default members list too, an Archived filter shows them), every record and file kept, owner cannot log in. Restore brings the member back as Inactive. |
 
+- **Journey (item 6, 2026-10-29):** Active → Inactive → Suspended → Delete (Archived), one step at a
+  time; Active cannot jump to Suspended ("Make the member inactive first"). Every step can come
+  back: Inactive and Suspended reactivate to Active, Archived restores to Inactive. The console
+  shows the next blocked step disabled with its reason, and only the action whose panel is open is
+  filled.
+- **Member page overview (item 7):** between the header and the tabs, dashboard-style cards
+  (`StatTile`, shared with the admin dashboard): Status, Documents (complete or incomplete, due
+  date), Branches, Deals, Therapists, Products (all, with how many are live), Customers, Orders.
+  Each card opens its tab, Orders the filtered orders list, when the viewer may; plain otherwise.
+  The header keeps the status and documents chips; the banners give the suspension reason.
+- **Profile form (item 8):** one clean form, plain titled sections (Business details, Owner,
+  Registered address, KYC documents, Bank details), two columns up to 960px and one on phones,
+  State and City from the India location list. Save is never disabled without a reason: it
+  validates on click and names what to fix; the save bar stays at the bottom with Discard.
+- **Notices:** every change sends the member an email and an SMS (inactive, suspended, active
+  again, archived, restored) and emails every staff user holding `members:status_change`.
 - Status can change at any time, even with no branches or deals.
 - Branches, deals and therapists keep their own status. The storefront shows an item only when the
   member, the branch and the deal are all active, so reactivation restores everything.
@@ -325,6 +340,66 @@ A member who opens another member's deal, branch, package or therapist gets 404.
 
 - Customers sign in with OTP or Google and use cart, wishlist, checkout (Razorpay or COD), order
   history, payments and support requests. They have no console grants (R8).
+- **Checkout details (item 2.2, D37):** checkout and payment need a signed-in customer (page guard
+  and API). The form fills from the customer's profile and saved address; State is a list from the
+  India location list and City lists that state's cities (City locked until a state is chosen,
+  cleared when the state changes). Every field is required; Continue saves the address on the
+  account, so the next checkout starts filled. The profile page (`/my-account`, `/account/profile`)
+  shows and edits the same saved address with the same State and City lists, saved through
+  `PUT /users/me/address`; it never reads the address from an order. Layout (no page CSS):
+  `PageSection` + `SplitLayout`; h1 and a `StepIndicator` (Your Details, Payment); each step is a
+  `FormPanel` (on the page surface, no card: blocks and the button footer split by dividers); the details
+  form on `.form-grid` with a `FormField` per control (its error as an alert; City keyed by the
+  state so the saved city shows) with Back to cart beside Continue; the payment step shows Delivering to with Edit details, a
+  `RadioCardGroup` for Online or Cash on delivery (chosen card on secondary-container), the amount
+  and Back / Pay; a `SummaryPanel` beside both steps lists the lines as receipt rows with the
+  total. 60 = surface, 30 = the summary panel and the chosen card, 10 = primary on the current
+  step, the Pay or Continue button and the total. Every string is in `content.json`.
+- **Line cards (item 2.3):** the cart and both checkout steps show each line as its own card
+  (`PurchaseLineCard`, built by `utils/cart-items.ts` from a cart item or an order item): type tag,
+  title, the member's name and branch inside the card, duration, quantity and price. Title and
+  image open the detail page in a new tab, and the title says so to screen readers.
+- **Cart actions (item 2.1):** each cart card has a select checkbox, the quantity stepper, Move
+  to wishlist (deals and products; therapists have no wishlist) and Remove. Select all plus
+  Remove selected removes several lines at once (one clear call when every line is selected,
+  otherwise one call per line); Move to wishlist adds the item first and only then removes it
+  from the cart, so a failed add keeps the line. Layout (no page CSS): `PageSection` +
+  `SplitLayout`; h1 with the item count (`SectionHead`), the Select all toolbar, the line cards
+  (prices on-surface), and a `SummaryPanel` beside them (surface-container, the 30; subtotal,
+  total in primary, the 10, with Proceed to Checkout). An empty cart is a neutral `StatusPanel`
+  with Explore Deals. `QuantityStepper` is shared with the detail pages.
+- **Order notices (item 3, D38):** the customer gets an email when an order is confirmed (online
+  payment verified, webhook captured, or cash on delivery) and when an online payment fails
+  (signature check failed or the `payment.failed` webhook), at the checkout contact email, else
+  the account email. One email covers every order of a combined checkout and lists each line with
+  its member, the total, the order links and the support contact. SMS goes out only when that
+  notice's DLT template id is set. Local test accounts (`DEV_OTP_IDENTIFIERS`) see the notice in
+  the API console. Sends run after the commit and never undo a payment. Payments settled by
+  another attempt (`already settled`) send nothing.
+- **Order result page (item 3):** checkout always lands on `/orders/:id/confirmation` (signed in,
+  `noindex`): after cash on delivery, a verified payment, a failed verification, or closing the
+  Razorpay window after a failed attempt (`?payment=failed`). The page reads the order from the
+  server, so the URL never decides the result: confirmed or completed shows the thank-you page
+  (contact email, lines with their member, total, View order); unpaid with a failed latest
+  payment, or reported failed, shows payment failed with Pay now (back to checkout for the same
+  order); unpaid otherwise shows waiting for payment; cancelled says so; a load error offers Try
+  again. Focus moves to the h1. Layout: `SplitLayout` with a `StatusPanel` (panel and text in the
+  outcome's M3 role pair: confirmed = primary-container, the brand green; failed and load
+  error = error-container (with error-role buttons); waiting and cancelled = surface-container; icon badge, h1, text, order
+  number and date, actions, help link) and a
+  `SummaryPanel` beside it (item count, lines as receipt rows, prices on-surface; only the total
+  and the actions take primary, the 10); stacked on phones; no page CSS.
+- **Customer account pages** (`/my-dashboard`, `/my-account`, `/orders`, `/my-account/cart`,
+  `/my-account/support`): one shell (`MyAccountLayout`), the sidebar on surface-container (the
+  30, active link on secondary-container, a themed focus ring for keyboard only) beside the page
+  on surface (the 60); every page an h1 (`SectionHead`) and `noindex`; all copy in `content.json`
+  (`myAccount`, `customerDashboard`, `profileSettings`, `orders`, `support`). Dashboard: four
+  `StatTile` counts that open each list, then the latest three orders. Profile: Contact details and
+  Delivery address as two `FormPanel` blocks, each with its own save. Orders: All / Cancelled
+  (`ChipNav`), each order a `SummaryPanel` receipt named by its short number with date, item count
+  and a tonal status badge; one checkout can hold lines from several members, so every line shows
+  its own image, member and branch and opens its detail page in a new tab. Cart: the cart page,
+  flush in the column. Support: one `FormPanel` request form.
 - Staff block or unblock a customer with a reason (`customers:status_change`); customers are never
   deleted.
 - **Refunds (D11):** Support raises a refund request; Admin or Super Admin approves or rejects
@@ -375,7 +450,7 @@ A member who opens another member's deal, branch, package or therapist gets 404.
   via `badge-color` / `badge-tone`), price, old price and discount with a one-star score, title
   (two lines, ellipsis). Services: no description; a hairline divider, then the member and the
   place with distance from the visitor, one line each (`divided`). Products: a two-line
-  description. Add to cart and wishlist. The whole card opens the detail page; Add
+  description, then the member's business name (item 4, D39). Add to cart and wishlist. The whole card opens the detail page; Add
   to cart (a deal asks for its package) and the heart act on their own, signed-out visitors go to
   sign in first. Grid or list view. `color` takes the same M3 roles as the feature card (none,
   surface, surface-high, primary, secondary, tertiary, inverse), slotted buttons included.
@@ -415,7 +490,7 @@ A member who opens another member's deal, branch, package or therapist gets 404.
     | Kind | Sections | Sort |
     |---|---|---|
     | Deals (`/deals`, SERVICE category) | Your location, Distance, Price, Tags, Business, Branches | Relevance, Price low-high / high-low, Distance (with coordinates) |
-    | Products (`/products`, PRODUCT category) | Category (`/products` only), Price, Tags; no location or distance | Relevance, Newest, Price low-high / high-low, Discount |
+    | Products (`/products`, PRODUCT category) | Category (`/products` only), Price, Tags, Business (D39); no location, distance or branches | Relevance, Newest, Price low-high / high-low, Discount |
     | Therapists (`/therapists`, THERAPY category) | Your location, Distance, Price ("From" price), Business, Branches | Relevance, Price low-high / high-low, Distance (with coordinates) |
     | Explore | the selected kind's sections; "All" shows Your location, Distance, Price | the selected kind's sorts |
     No Reviews filter until a review system exists (ST-22).
@@ -662,6 +737,10 @@ expire after 5 minutes (ARCHITECTURE.md §12.3).
 | D33 | Branch before deal (2026-10-26) | Branch state and city required from the India location list; no deal without a branch; one branch per deal plus Copy to branch |
 | D34 | Deal URLs (2026-10-26) | `/deal/{title}-{member}-{city}` slug, fixed once Active; old UUID links and old slugs still open the deal |
 | D35 | Deal FAQs and reviews (2026-10-26) | Per-deal FAQs now; ratings and reviews wait for ST-22 |
+| D36 | Member delete (2026-10-29, Q2) | Delete always archives: nothing is erased, Archived restores to Inactive; the journey is Active → Inactive → Suspended → Delete |
+| D37 | Customer checkout details (2026-10-29, Q1) | Saved on the customer's account (address, state, city, pincode), pre-filled at checkout, editable, updated on each order |
+| D38 | Order and status SMS (2026-10-29, Q3) | Email for every notice now; an SMS goes out only for notice types whose DLT template id is set in env |
+| D39 | Product business (2026-10-29, item 4) | Overrides D29's "products have no Business filter": product cards show the member's business name and product listings (`/products`, product categories) get a Business filter; `GET /catalog/products` takes `vendorIds`, `/products/facets` returns `vendors` counts |
 | B2 | Vendor rename | Prisma `Vendor` → `Member`, `VendorDocument` → `MemberDocument` with `@@map`; FK columns stay `vendorId` |
 | B5 | Permission key | `vendors` → `members`; role `vendor` → `member`; role `support` added |
 | N1 | Reminder decisions (2026-10-17) | Clear the flag when documents complete; bell alert to `members:status_change` holders; Remind now in this release |

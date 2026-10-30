@@ -423,6 +423,53 @@ describe('GET/PATCH /api/v1/rbac/users/me', () => {
   });
 });
 
+/** Item 2.2 (D37): the customer's saved delivery address, read and saved by the customer only. */
+describe('saved address on /api/v1/rbac/users/me', () => {
+  const me = {
+    id: USER_ID,
+    name: 'Neeraj Singh',
+    email: 'neeraj@test.com',
+    phone: '+919177889991',
+    status: 'active',
+    lastLoginAt: null,
+    createdAt: new Date('2026-01-01T00:00:00Z'),
+    updatedAt: new Date('2026-01-01T00:00:00Z'),
+    address: '1457, D Block, Pacchim Vihar',
+    city: 'New Delhi',
+    state: 'Delhi',
+    pincode: '110063',
+    roles: [{ role: { id: ROLE_ID, key: 'customer', name: 'Customer' } }],
+  };
+  const ADDRESS = { address: '12, Raj Nagar', state: 'Karnataka', city: 'Bengaluru', pincode: '560001' };
+  const asMe = () => bearerFor({ sub: USER_ID, roles: ['customer'] });
+
+  it('GET /users/me returns the saved address', async () => {
+    resolveMock.mockResolvedValue([]);
+    prismaMock.user.findFirst.mockResolvedValue(me);
+    const res = await request(app).get('/api/v1/rbac/users/me').set('Authorization', asMe());
+    expect(res.body.data).toMatchObject({ address: me.address, city: 'New Delhi', state: 'Delhi', pincode: '110063' });
+  });
+
+  it('PUT /users/me/address saves a valid India address for the caller only', async () => {
+    resolveMock.mockResolvedValue([]);
+    prismaMock.user.update.mockResolvedValue({ ...me, ...ADDRESS });
+    const res = await request(app).put('/api/v1/rbac/users/me/address').set('Authorization', asMe()).send(ADDRESS);
+    expect(res.status).toBe(200);
+    expect(prismaMock.user.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: USER_ID }, data: ADDRESS }));
+    expect(res.body.data).toMatchObject(ADDRESS);
+  });
+
+  it('refuses a city outside the chosen state, a bad PIN code, an unknown key and no token', async () => {
+    resolveMock.mockResolvedValue([]);
+    const put = (body: object) => request(app).put('/api/v1/rbac/users/me/address').set('Authorization', asMe()).send(body);
+    expect((await put({ ...ADDRESS, city: 'Mumbai' })).status).toBe(422);
+    expect((await put({ ...ADDRESS, pincode: '5600' })).status).toBe(422);
+    expect((await put({ ...ADDRESS, userId: 'someone-else' })).status).toBe(422);
+    expect((await request(app).put('/api/v1/rbac/users/me/address').send(ADDRESS)).status).toBe(401);
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+  });
+});
+
 describe('POST /api/v1/rbac/users', () => {
   const validBody = { name: 'Nikita Sharma', email: 'nikita@example.com', roleId: ROLE_ID };
 
@@ -681,18 +728,18 @@ describe('GET /api/v1/rbac/permissions/catalog', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns 200 with the full msd menu x action catalog', async () => {
+  it('returns 200 with the resource x action catalog and the permission id of each action', async () => {
     resolveMock.mockResolvedValue(['rbac.roles:view']);
-    prismaMock.permission.findMany.mockResolvedValue([]);
+    prismaMock.permission.upsert.mockResolvedValue({});
+    prismaMock.permission.findMany.mockResolvedValue([{ id: PERMISSION_ID, key: 'members:view', label: 'Members: view' }]);
     const res = await request(app)
       .get('/api/v1/rbac/permissions/catalog')
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }));
     expect(res.status).toBe(200);
-    expect(Array.isArray(res.body.data)).toBe(true);
-    // `vendors.branches` is the real key `requirePermission()`/the sidebar read for this row
-    // (PLANNING.md §1.2's "Branches") — not a parallel, UI-only key (see role.service.ts
-    // `getPermissionCatalog`'s own doc comment).
-    expect(res.body.data.find((m: { menuKey: string }) => m.menuKey === 'vendors.branches')).toBeDefined();
+    const members = res.body.data.find((m: { menuKey: string }) => m.menuKey === 'members');
+    expect(members.actions).toEqual(
+      expect.arrayContaining([expect.objectContaining({ action: 'view', key: 'members:view', permissionId: PERMISSION_ID })]),
+    );
   });
 });
 
@@ -710,15 +757,15 @@ describe('GET /api/v1/rbac/roles/:id/permissions', () => {
     expect(res.status).toBe(422);
   });
 
-  it('returns 200 with { permissionIds }', async () => {
+  it('returns 200 with the granted permissions and their scope', async () => {
     resolveMock.mockResolvedValue(['rbac.roles:view']);
     prismaMock.role.findUnique.mockResolvedValue(roleFixture);
-    prismaMock.rolePermission.findMany.mockResolvedValue([{ permissionId: PERMISSION_ID }]);
+    prismaMock.rolePermission.findMany.mockResolvedValue([{ roleId: ROLE_ID, permissionId: PERMISSION_ID, scope: 'OWN' }]);
     const res = await request(app)
       .get(`/api/v1/rbac/roles/${ROLE_ID}/permissions`)
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }));
     expect(res.status).toBe(200);
-    expect(res.body.data).toEqual({ permissionIds: [PERMISSION_ID] });
+    expect(res.body.data).toEqual([expect.objectContaining({ permissionId: PERMISSION_ID, scope: 'OWN' })]);
   });
 
   it('returns 404 when the role does not exist', async () => {
@@ -739,7 +786,7 @@ describe('PUT /api/v1/rbac/roles/:id/permissions', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns 422 when a permission entry has a non-uuid permissionId', async () => {
+  it('returns 422 when a permission id is not a uuid', async () => {
     resolveMock.mockResolvedValue(['rbac.roles:edit']);
     const res = await request(app)
       .put(`/api/v1/rbac/roles/${ROLE_ID}/permissions`)

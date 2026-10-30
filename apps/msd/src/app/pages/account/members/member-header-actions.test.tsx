@@ -23,7 +23,7 @@ function renderActions(props: Partial<ComponentProps<typeof MemberHeaderActions>
 
 // M3 buttons keep their native <button> in shadow DOM, so getByRole cannot see them under jsdom.
 function buttons(): HTMLElement[] {
-  return Array.from(document.querySelectorAll<HTMLElement>('md-filled-button, md-outlined-button, md-text-button'));
+  return Array.from(document.querySelectorAll<HTMLElement>('md-filled-button, md-filled-tonal-button, md-outlined-button, md-text-button'));
 }
 
 function button(text: string): HTMLElement | undefined {
@@ -47,11 +47,33 @@ function typeReason(value: string) {
 }
 
 describe('MemberHeaderActions', () => {
-  it('shows Make inactive and Suspend for an Active member', () => {
+  it('shows Make inactive, and Suspend disabled with its reason, for an Active member (item 6)', () => {
     renderActions();
-    expect(button('Make inactive')).toBeTruthy();
-    expect(button('Suspend')).toBeTruthy();
+    expect(mustButton('Make inactive').disabled).toBe(false);
+    const suspend = mustButton('Suspend');
+    expect(suspend.disabled).toBe(true);
+    const hint = document.getElementById(suspend.getAttribute('aria-describedby') ?? '');
+    expect(hint?.textContent).toBe('Make the member inactive first.');
     expect(button('Delete')).toBeUndefined();
+  });
+
+  it('draws only the open action as filled, so the highlight matches the panel', () => {
+    renderActions({ status: 'INACTIVE' });
+    expect(mustButton('Reactivate').tagName).toBe('MD-OUTLINED-BUTTON');
+    expect(mustButton('Suspend').tagName).toBe('MD-OUTLINED-BUTTON');
+    fireEvent.click(mustButton('Suspend'));
+    expect(mustButton('Suspend').tagName).toBe('MD-FILLED-TONAL-BUTTON');
+    expect(mustButton('Suspend').getAttribute('aria-expanded')).toBe('true');
+    expect(mustButton('Reactivate').tagName).toBe('MD-OUTLINED-BUTTON');
+  });
+
+  it('restores an Archived member to Inactive', async () => {
+    const { onChange } = renderActions({ status: 'ARCHIVED' });
+    fireEvent.click(mustButton('Restore'));
+    typeReason('Owner asked to come back');
+    fireEvent.click(mustButton('Confirm restore'));
+    expect(onChange).toHaveBeenCalledWith('INACTIVE', 'Owner asked to come back');
+    await waitFor(() => expect(reasonField()).toBeNull());
   });
 
   it('shows Reactivate and Delete for a Suspended member when the viewer may delete', () => {
@@ -73,7 +95,7 @@ describe('MemberHeaderActions', () => {
   });
 
   it('keeps Confirm disabled until the reason has 10 characters', async () => {
-    const { onChange } = renderActions();
+    const { onChange } = renderActions({ status: 'INACTIVE' });
     fireEvent.click(mustButton('Suspend'));
     expect(mustButton('Confirm suspend').disabled).toBe(true);
     typeReason('Too short');
@@ -105,7 +127,7 @@ describe('MemberHeaderActions', () => {
   });
 
   it('prefills the suspend reason when the review flag is set', () => {
-    renderActions({ reasonPrefill: 'Documents not completed' });
+    renderActions({ status: 'INACTIVE', reasonPrefill: 'Documents not completed' });
     fireEvent.click(mustButton('Suspend'));
     expect(reasonField().value).toBe('Documents not completed');
   });
@@ -117,7 +139,7 @@ describe('MemberHeaderActions', () => {
   });
 
   it('moves focus to the reason field on open and back to the trigger on cancel', async () => {
-    renderActions();
+    renderActions({ status: 'INACTIVE' });
     fireEvent.click(mustButton('Suspend'));
     await waitFor(() => expect(document.activeElement).toBe(reasonField()));
     fireEvent.click(mustButton('Cancel'));
@@ -126,7 +148,7 @@ describe('MemberHeaderActions', () => {
   });
 
   it('labels the confirm panel as a group named by an h2, with no h3 or feature card inside', () => {
-    renderActions();
+    renderActions({ status: 'INACTIVE' });
     fireEvent.click(mustButton('Suspend'));
     const group = screen.getByRole('group', { name: 'Suspend this member' });
     expect(group.querySelector('h2')?.textContent).toBe('Suspend this member');
@@ -136,7 +158,7 @@ describe('MemberHeaderActions', () => {
   });
 
   it('closes on Escape', () => {
-    renderActions();
+    renderActions({ status: 'INACTIVE' });
     fireEvent.click(mustButton('Suspend'));
     fireEvent.keyDown(reasonField(), { key: 'Escape' });
     expect(reasonField()).toBeNull();

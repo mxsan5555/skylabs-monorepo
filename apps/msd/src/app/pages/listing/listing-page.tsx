@@ -78,7 +78,7 @@ export function ListingPage({ kind }: { kind: ListingKind }) {
           vendorIds,
           branchIds,
         }
-      : { categoryIds }),
+      : { categoryIds, vendorIds }),
     ...(kind !== 'therapists' ? { tags } : {}),
   };
   const listKey = JSON.stringify([kind, base, sort]);

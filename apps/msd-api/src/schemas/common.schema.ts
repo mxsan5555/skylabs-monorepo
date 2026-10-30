@@ -102,6 +102,9 @@ export const PhoneSchema = z
 /** Longest address SMTP delivers (RFC 5321 path limit). */
 const EMAIL_MAX = 254;
 
+/** Indian postal PIN code: exactly 6 digits. */
+export const PincodeSchema = z.string().regex(/^\d{6}$/, 'PIN code must be 6 digits');
+
 /** Email address, trimmed and lower-cased. */
 export const EmailSchema = z.string().trim().toLowerCase().max(EMAIL_MAX).pipe(z.email());
 

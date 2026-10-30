@@ -242,7 +242,8 @@ export async function listVendors(opts: {
 }) {
   const providedStatuses: MemberDocumentStatus[] = ['SUBMITTED', 'APPROVED'];
   const where: Prisma.MemberWhereInput = {
-    ...(opts.status ? { status: opts.status } : {}),
+    // Archived (deleted) members only show when asked for, so they can be found and restored.
+    status: opts.status ?? { not: 'ARCHIVED' },
     ...(opts.reviewFlag ? { reviewFlaggedAt: { not: null } } : {}),
     ...(opts.documents === 'incomplete'
       ? {

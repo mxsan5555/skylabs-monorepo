@@ -125,6 +125,7 @@ describe('MemberManagement list filter', () => {
     ['ACTIVE', { status: 'ACTIVE' }],
     ['INACTIVE', { status: 'INACTIVE' }],
     ['SUSPENDED', { status: 'SUSPENDED' }],
+    ['ARCHIVED', { status: 'ARCHIVED' }],
     ['documents', { documents: 'incomplete' }],
     ['review', { reviewFlag: 'true' }],
     ['', {}],

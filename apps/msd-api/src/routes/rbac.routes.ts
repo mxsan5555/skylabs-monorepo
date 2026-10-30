@@ -16,6 +16,7 @@ import {
   UserListQuerySchema,
   UserCreateSchema,
   UserUpdateSchema,
+  MyAddressSchema,
   UserStatusUpdateSchema,
   UserRoleSetSchema,
   RoleConflictResolveSchema,
@@ -190,6 +191,7 @@ router.get('/permissions/catalog', requirePermission('rbac.roles', 'view'), asyn
 router.get(
   '/roles/:id/permissions',
   requirePermission('rbac.roles', 'view'),
+  validateParams(UuidParamSchema),
   async (req, res, next) => {
     try {
       const data =
@@ -352,7 +354,24 @@ router.post(
 router.get('/users/me', async (req, res, next) => {
   try {
     const user = await userService.getUserOrThrow(req.user!.sub);
-    sendData(res, userService.serializeUser(user));
+    sendData(res, userService.serializeMe(user));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Item 2.2 (D37): the caller's own saved delivery address, pre-filled at checkout.
+router.put('/users/me/address', validateBody(MyAddressSchema), async (req, res, next) => {
+  try {
+    const user = await userService.saveMyAddress(req.user!.sub, req.body);
+    await writeAuditLog({
+      actorUserId: req.user!.sub,
+      action: 'user.address.update',
+      targetType: 'User',
+      targetId: user.id,
+      ...requestMeta(req),
+    });
+    sendData(res, user);
   } catch (err) {
     next(err);
   }

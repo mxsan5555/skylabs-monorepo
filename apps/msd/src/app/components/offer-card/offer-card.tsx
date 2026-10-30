@@ -97,7 +97,7 @@ export function OfferCard({ item, tag, color, variant = 'plain', layout = 'verti
       {...(shownTag ? { badge: shownTag.label, 'badge-color': shownTag.color, 'badge-tone': shownTag.tone ?? 'filled' } : {})}
       heading={card.title}
       {...(description ? { description } : {})}
-      {...(isDeal && card.providerName ? { eyebrow: card.providerName } : {})}
+      {...(card.providerName ? { eyebrow: card.providerName } : {})}
       {...(place ? { location: place } : {})}
       {...(isDeal && card.distance != null ? { distance: formatDistance(card.distance) } : {})}
       price={formatINR(card.price)}

@@ -127,7 +127,17 @@ describe('Explore', () => {
     fireEvent.click(chip(t.kinds.products));
     await waitFor(() => expect(currentUrl()).toBe('/explore?q=oil&kind=products'));
     await waitFor(() => expect(m.listProducts.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ search: 'oil', pageSize: 12 })));
-    expect(await panelHeaders()).toEqual([content.category.filterPanel.price.title, content.category.filterPanel.tags.title]);
+    expect(await panelHeaders()).toEqual([
+      content.category.filterPanel.price.title,
+      content.category.filterPanel.tags.title,
+      content.category.filterPanel.business.title,
+    ]);
+  });
+
+  it('products: ?vendor= reaches the product list as vendorIds (item 4)', async () => {
+    const vendorId = 'f1f1f1f1-0000-4000-8000-0000000000c5';
+    renderAt(`/explore?q=oil&kind=products&vendor=${vendorId}`);
+    await waitFor(() => expect(m.listProducts).toHaveBeenCalledWith(expect.objectContaining({ vendorIds: [vendorId], pageSize: 12 })));
   });
 
   it('?category= from a treatment link narrows to that category and its kind', async () => {

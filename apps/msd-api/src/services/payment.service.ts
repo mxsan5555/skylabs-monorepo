@@ -6,7 +6,7 @@ import { ApiError } from '../lib/http';
 import { Prisma } from '../generated/prisma-client';
 import { getMyOrderOrThrow, finalizeCartForOrder } from './order.service';
 import { notifyOrderConfirmed } from './notification.service';
-import { createEntitlementsForOrder } from './settlement.service';
+import { sendOrderNotice } from './order-notice.service';
 
 /**
  * Razorpay integration for the existing Order (Phase 8) — see the Phase 9 architecture plan.
@@ -142,6 +142,8 @@ export async function createCodPayment(customerId: string, orderId: string) {
     return { payment, updatedOrder };
   });
 
+  // Customer email (and SMS per D38), after the commit; never throws (item 3).
+  void sendOrderNotice('CONFIRMED', [updatedOrder.id]);
   return { order: updatedOrder, payment };
 }
 
@@ -244,6 +246,7 @@ export async function createCodBatchPayment(customerId: string, orderIds: string
     return results;
   });
 
+  void sendOrderNotice('CONFIRMED', updatedOrders.map((order) => order.id));
   return { orders: updatedOrders };
 }
 
@@ -291,6 +294,7 @@ export async function verifyBatchPayment(customerId: string, orderIds: string[],
       where: { id: { in: payments.map((p) => p.id) } },
       data: { status: 'FAILED', failureReason: 'Signature verification failed' },
     });
+    void sendOrderNotice('PAYMENT_FAILED', orderIds);
     throw new ApiError('VALIDATION_ERROR', 'Payment signature verification failed');
   }
 
@@ -313,6 +317,7 @@ export async function verifyBatchPayment(customerId: string, orderIds: string[],
     return results;
   });
 
+  void sendOrderNotice('CONFIRMED', updatedOrders.map((order) => order.id));
   return { orders: updatedOrders };
 }
 
@@ -366,6 +371,7 @@ export async function verifyPayment(customerId: string, orderId: string, input: 
 
   if (!timingSafeEqualHex(expectedSignature, input.razorpay_signature)) {
     await prisma.payment.update({ where: { id: payment.id }, data: { status: 'FAILED', failureReason: 'Signature verification failed' } });
+    void sendOrderNotice('PAYMENT_FAILED', [order.id]);
     throw new ApiError('VALIDATION_ERROR', 'Payment signature verification failed');
   }
 
@@ -384,6 +390,7 @@ export async function verifyPayment(customerId: string, orderId: string, input: 
     return { updatedPayment, updatedOrder };
   });
 
+  void sendOrderNotice('CONFIRMED', [updatedOrder.id]);
   return { order: updatedOrder, payment: updatedPayment };
 }
 
@@ -460,7 +467,7 @@ export async function handleWebhookEvent(body: RazorpayWebhookBody): Promise<voi
   if (pending.length === 0) return; // already terminal
 
   if (body.event === 'payment.captured') {
-    await prisma.$transaction(async (tx) => {
+    const confirmedIds = await prisma.$transaction(async (tx): Promise<string[]> => {
       // A pending Payment's Order may have already been settled by a different attempt (e.g.
       // COD, placed while this Razorpay payment was still in flight) — those must be marked
       // FAILED here, not PAID, or the order ends up with two "successful-looking" Payment rows
@@ -478,7 +485,7 @@ export async function handleWebhookEvent(body: RazorpayWebhookBody): Promise<voi
       }
 
       const live = pending.filter((p) => statusByOrderId.get(p.orderId) === 'PENDING_PAYMENT');
-      if (live.length === 0) return;
+      if (live.length === 0) return [];
 
       await tx.payment.updateMany({
         where: { id: { in: live.map((p) => p.id) } },
@@ -496,11 +503,14 @@ export async function handleWebhookEvent(body: RazorpayWebhookBody): Promise<voi
         // Notifies each vendor involved + Superadmin — see notifyOrderConfirmed's own doc comment.
         await notifyOrderConfirmed(tx, order.id);
       }
+      return orderIds;
     });
+    if (confirmedIds.length > 0) void sendOrderNotice('CONFIRMED', confirmedIds);
   } else if (body.event === 'payment.failed') {
     await prisma.payment.updateMany({
       where: { id: { in: pending.map((p) => p.id) } },
       data: { status: 'FAILED', failureReason: entity.error_description ?? 'Payment failed', providerPaymentId: entity.id },
     });
+    void sendOrderNotice('PAYMENT_FAILED', [...new Set(pending.map((p) => p.orderId))]);
   }
 }

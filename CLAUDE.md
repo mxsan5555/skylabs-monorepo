@@ -134,6 +134,13 @@ No hex values in app code; brand colour comes from each app's generated M3 theme
 | `CardRail` / `CardGrid` | Swiper carousel / responsive grid (272px min columns, `layout="list"` one per row; `above`, `panel` tabpanel, `fallback`). |
 | `ChipNav` | Single-select pill row (`md-filter-chip`), or a `<nav>` of real links when items have `href` (category chips); `end` = the result count at the row end. Scrolls sideways on phones. |
 | `listing/` | `ListingBody` (toolbar, filter panel, grid or map, load more), `useListingParams` (URL state), `listingCards`, `useListingFacets`: the shared results band of category, `/deals`, `/products`, `/therapists` and explore. |
+| `StatusPanel` | Outcome panel for a finished task (order result): `tone` picks an M3 role pair for panel and text plus the icon badge (`success` = primary-container / primary, the brand green; `error` = error-container / error; `neutral` = surface-container), filled and outlined actions recoloured to keep contrast on that container, h1, text, `facts` description list, `actions`, `footer`. |
+| `SummaryPanel` | Totals panel beside a list (cart, checkout, order result): surface-container, optional `meta` (text or nodes, e.g. a status badge) and child lines (`PurchaseLineList variant="receipt"`), rows and total as a `dl`, total in primary, note, full-width actions (`inlineActions` for one end-aligned button, the order list); `as="h3"` under a section heading. |
+| `QuantityStepper` | Minus / value / plus as one named group (`groupLabel` or `labelledBy`), `min` / `max` guarded in code; cart lines and detail pages. |
+| `FormPanel` / `FormPanelSection` | One form step on the page surface (the 60, no card, no corners): h2 + intro, sections and footer split by dividers (optional h3 with icon and an action such as Edit details); the footer holds `footerLead`, `actions` and `note`. Checkout steps. |
+| `StepIndicator` | Read-only progress through a short flow (checkout): named `ol`, `aria-current="step"`, check on done steps. |
+| `RadioCardGroup` | Single choice as cards (payment method): fieldset + legend, raw `md-radio` per option, chosen card on secondary-container. |
+| `FormField` (`form-controls`) | One control with its error as an alert; `wide` spans a `.form-grid` row. `renderSelect` takes `selectKey` to remount a dependent list (City by State). |
 | `ClampText` | Two-line clamped description with More / Less. |
 | `ListingToolbar` | Toolbar row above a listing (`start` / `end` slots). |
 | `ChoiceMenu` | Trigger (assist chip or text button) + `md-menu` of single choices (sort). |
@@ -144,7 +151,7 @@ No hex values in app code; brand colour comes from each app's generated M3 theme
 | `CheckboxFacet` / `PriceRangeField` | Searchable checkbox list with counts / range slider + Min/Max fields. |
 | `CityPickerDialog` | City picker (used by the header `CityChip` and the filter panel). |
 | `DealMap` | Deal price markers on a map (see Maps below). |
-| `OfferCard` | Deal or product as `sky-product-card price-first` (tag, price, two-line title; services: no description, then `divided` member, place and distance; products: two-line description; Add to cart, wishlist; whole card opens the detail page). Options: `tag`, `color`, `variant`, `layout`, `slider` (image slider with previous / next buttons and dots via `ProductCardGallery fill`, when the item has 2+ images; default off). Used by the home hero (`color="surface-high" variant="plain"`). |
+| `OfferCard` | Deal or product as `sky-product-card price-first` (tag, price, two-line title; services: no description, then `divided` member, place and distance; products: two-line description, then the business name; Add to cart, wishlist; whole card opens the detail page). Options: `tag`, `color`, `variant`, `layout`, `slider` (image slider with previous / next buttons and dots via `ProductCardGallery fill`, when the item has 2+ images; default off). Used by the home hero (`color="surface-high" variant="plain"`). |
 | `TherapistCard` | Therapist listing card (image slider, member, area, distance, From price; optional actions); helpers `lowestPackagePrice`, `formatDistance`. Home, search, category, therapists, related rails. |
 | `detail-page/` | Detail page blocks shared by `/deal/:id` and `/therapist/:id`: `DetailGallery`, `DetailPrice`, `DetailPurchase` (quantity, total, Add to cart, share), `BranchPanels` (location + hours), `DetailNotFound`; with `DurationPackageSelector` for packages. |
 
@@ -157,7 +164,7 @@ events on elements React hydrated from prerendered HTML).
 `/products`, `/therapists[/:city]`, explore `/explore`): h1, description, chip row with the total
 (`meta.total`) at its end, toolbar (Filters, List/Grid/Map, Sort per kind), filter panel per kind
 (deals: location, distance, price, tags, business, branches; products: category on `/products`,
-price, tags; therapists: deals minus tags; explore "All": location, distance, price), 12 cards per
+price, tags, business; therapists: deals minus tags; explore "All": location, distance, price), 12 cards per
 page. Card images carry the API's tag (New, Deal, Hot, Expire soon). All view state is in the
 URL: `sub`, `sort`, `view`, `radius`, `vendor`, `branch`, `min`, `max`, `tag`, `cat`, `kind`.
 No ratings anywhere until a review system exists.
@@ -172,7 +179,7 @@ No ratings anywhere until a review system exists.
 `branchIds` comma lists, `radiusKm` with `latitude`/`longitude`, `minPrice`/`maxPrice`, paging
 with `meta.total`), `GET /deals/facets` (vendor / branch / distance-bucket counts + price range,
 each facet ignoring its own selection, plus tag counts), `GET /products` (sorts, `categoryIds`,
-`tags`) + `GET /products/facets`, `GET /therapists` (server-side `sort`, price = lowest package,
+`vendorIds`, `tags`) + `GET /products/facets` (category / business / tag / price), `GET /therapists` (server-side `sort`, price = lowest package,
 `radiusKm`, `city`, `vendorIds`, `branchIds`) + `GET /therapists/facets`. Deals and products carry
 a computed `tag` (`services/offer-tag.ts`, rule in `docs/msd/PLANNING.md` §4) and accept `tags=`.
 With coordinates the deal and therapist lists are ranked in memory (`deal-ranking.ts`,

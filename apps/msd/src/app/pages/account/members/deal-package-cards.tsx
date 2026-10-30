@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { FilledButton, OutlinedButton, TextButton, Icon } from '@skylabs-monorepo/shared-ui/react';
 import type { DealPackageInput } from '../../../../api/rbac/vendors';
-import { renderCheckbox, renderTextField } from './form-controls';
+import { renderCheckbox, renderTextField } from '../../../components/form-controls/form-controls';
 import { StringListField } from './string-list-field';
 import { packageLabel, percentOff } from './deal-format';
 

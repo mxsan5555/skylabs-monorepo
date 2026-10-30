@@ -27,14 +27,12 @@ model User {
   createdAt              DateTime               @default(now())
   updatedAt              DateTime               @updatedAt
   deletedAt              DateTime?
-  /// Set by the single-role migration sweep (`prisma/role-migration.ts`, run from seed.ts) for an
-  /// account whose legacy multiple-role assignment couldn't be converted automatically (e.g. holds
-  /// both `customer` and `vendor` with no actual linked Vendor business) — requires an authorized
-  /// admin to pick one explicit final role via the Role Conflicts review screen. Never set by
-  /// ordinary application code; cleared only by that same resolution action
-  /// (`resolveAccountRoleConflict`). Not a permission flag — purely "this account's role
-  /// assignment still needs human review."
-  roleConflict           Boolean                @default(false)
+  /// The customer's saved delivery address (D37, item 2.2): pre-fills checkout, editable there,
+  /// and replaced by the details of each placed order. State and city from the India list.
+  address                String?
+  city                   String?
+  state                  String?
+  pincode                String?
   auditLogsAsActor       AuditLog[]             @relation("AuditLogActor")
   cart                   Cart?
   impersonationsAsAdmin  ImpersonationSession[] @relation("ImpersonationSuperAdmin")
