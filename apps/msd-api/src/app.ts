@@ -41,6 +41,12 @@ import dashboardRoutes from './routes/dashboard.routes';
 import notificationsRoutes from './routes/notifications.routes';
 import customerRoutes from './routes/customersummary.routes';
 import supportRoutes from './routes/support.routes';
+import contactRoutes from './routes/contact.routes';
+import accountsRoutes from './routes/accounts.routes';
+import settlementsRoutes from './routes/settlements.routes';
+import vouchersRoutes from './routes/vouchers.routes';
+import disputesRoutes from './routes/disputes.routes';
+import refundsRoutes from './routes/refunds.routes';
 import { requestLogger } from './middleware/requestLogger';
 /**
  * The Express app, wired up but not listening. Split out of main.ts so Supertest can

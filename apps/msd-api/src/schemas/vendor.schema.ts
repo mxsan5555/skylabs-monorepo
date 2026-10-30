@@ -3,7 +3,7 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { PaginationQuerySchema, ReasonSchema } from './common.schema';
 import { normalizeIdentifier } from '../lib/normalizeIdentifier';
 import { isIndiaLocation } from '@skylabs-monorepo/shared-utils';
-
+import { richTextField } from './common.schema';
 extendZodWithOpenApi(z);
 
 export const MemberListQuerySchema = PaginationQuerySchema.extend({
