@@ -20,4 +20,9 @@ describe('StepIndicator', () => {
     const numbers = Array.from(document.querySelectorAll('.step-indicator__marker')).map((m) => m.textContent);
     expect(numbers).toEqual(['1', '2']);
   });
+
+  it('marks the current step in the error role when asked (a cancellation)', () => {
+    render(<StepIndicator label="Steps" steps={['Placed', 'Cancelled']} current={1} doneLabel="completed" tone="error" />);
+    expect(document.querySelector('.step-indicator')?.classList.contains('step-indicator--error')).toBe(true);
+  });
 });

@@ -285,6 +285,14 @@ complete production environment" (seen 2026-10-29 in `nx run-many`, passes alone
   the latest three orders and a load error as an alert; Support asks for both fields, sends
   them trimmed and confirms; Profile shows Contact details as a region with a read-only phone and
   asks for a name.
+- Order page (`order-detail.test.tsx`): h1 is the short number with the date and status badge,
+  the full id never shows, the breadcrumb links My orders, `noindex`; one progress list with the
+  current step marked (Delivered when the order holds a product); every line with its member and
+  a new-tab detail link; the summary lists payment, method, date and total and the delivery
+  address shows; Cancel calls the API only after the dialog confirms and the badge turns to
+  cancelled; a cancelled paid order ends on Cancelled with the refund notice and no Cancel action;
+  a failed payment shows its notice and Pay opens checkout for the order; a load error shows not
+  found.
 - A customer never reads or changes another customer's cart, wishlist or order by changing an id.
 - A member never changes an order's status (403), for a deal or a product order (D27).
 - A member with no business record gets empty Orders and Customers lists and 404 on any order;

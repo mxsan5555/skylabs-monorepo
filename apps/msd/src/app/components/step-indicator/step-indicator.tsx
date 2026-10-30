@@ -9,13 +9,15 @@ export interface StepIndicatorProps {
   current: number;
   /** Read after a done step's name (e.g. "completed"). */
   doneLabel: string;
+  /** Role of the current step: `primary` (default) or `error` (a cancellation). */
+  tone?: 'primary' | 'error';
 }
 
 /** Read-only progress through a short flow (checkout): numbered markers, a check on done steps,
  *  `aria-current="step"` on the current one. */
-export function StepIndicator({ label, steps, current, doneLabel }: StepIndicatorProps) {
+export function StepIndicator({ label, steps, current, doneLabel, tone = 'primary' }: StepIndicatorProps) {
   return (
-    <ol className="step-indicator" aria-label={label}>
+    <ol className={tone === 'error' ? 'step-indicator step-indicator--error' : 'step-indicator'} aria-label={label}>
       {steps.map((step, index) => {
         const state = index < current ? 'done' : index === current ? 'current' : 'next';
         return (

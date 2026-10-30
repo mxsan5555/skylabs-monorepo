@@ -124,6 +124,24 @@
   color: var(--_fg);
 }
 
+/* Compact: a notice inside a page; icon beside the text, tighter padding. */
+.status-panel--compact {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+  padding: 20px 24px;
+}
+
+.status-panel--compact .status-panel__icon {
+  inline-size: 40px;
+  block-size: 40px;
+  --md-icon-size: 24px;
+}
+
+.status-panel--compact > :not(.status-panel__icon):not(.status-panel__intro) {
+  grid-column: 2;
+}
+
 /* Phones: less padding so the copy keeps its width. */
 @media (max-width: 599px) {
   .status-panel {

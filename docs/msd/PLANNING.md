@@ -400,6 +400,14 @@ A member who opens another member's deal, branch, package or therapist gets 404.
   and a tonal status badge; one checkout can hold lines from several members, so every line shows
   its own image, member and branch and opens its detail page in a new tab. Cart: the cart page,
   flush in the column. Support: one `FormPanel` request form.
+- **Order page** (`/orders/:id`, `noindex`, no page CSS): breadcrumb (Home, My orders, the short
+  number), h1 `Order ORD-XXXXXXXX` with the date and the tonal status badge, one `StepIndicator`
+  for the whole order (Order placed, Confirmed, then Delivered when it holds a product or Completed
+  for services; Order placed, Cancelled for a cancelled order), a failed-payment `StatusPanel`
+  (error) or a refund `StatusPanel` (cancelled and paid), the Items list (`PurchaseLineCard`s with
+  their own image, member, branch and new-tab link), the delivery address for product orders, and
+  a `SummaryPanel` beside it (Payment, Paid via, Placed on, Total; Pay, Download invoice, Cancel
+  order). Cancel asks in the app dialog ("Keep order" / "Yes, cancel order").
 - Staff block or unblock a customer with a reason (`customers:status_change`); customers are never
   deleted.
 - **Refunds (D11):** Support raises a refund request; Admin or Super Admin approves or rejects
