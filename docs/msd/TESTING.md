@@ -275,6 +275,16 @@ complete production environment" (seen 2026-10-29 in `nx run-many`, passes alone
   verification both open `/orders/:id/confirmation`; closing Razorpay after `payment.failed`
   opens it with `?payment=failed`; closing it with no failed attempt stays on checkout.
 
+- Customer account pages (`customer-order-card.test.tsx`, `orders.test.tsx`,
+  `customer-dashboard.test.tsx`, `support.test.tsx`, `profile-form.test.tsx`): an order with
+  lines from three members lists all three with their own image, member, branch and a new-tab
+  detail link, is named `Order ORD-XXXXXXXX` (never the full id), shows the date, item count,
+  tonal status (cancelled = error) and total, and View details opens it; Orders hides orders
+  awaiting payment, the Cancelled chip shows only cancelled ones, and no orders shows the empty
+  state; the dashboard has one h1, four count links (cart and wishlist to their account pages),
+  the latest three orders and a load error as an alert; Support asks for both fields, sends
+  them trimmed and confirms; Profile shows Contact details as a region with a read-only phone and
+  asks for a name.
 - A customer never reads or changes another customer's cart, wishlist or order by changing an id.
 - A member never changes an order's status (403), for a deal or a product order (D27).
 - A member with no business record gets empty Orders and Customers lists and 404 on any order;

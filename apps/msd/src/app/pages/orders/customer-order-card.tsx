@@ -1,75 +1,61 @@
 import { OutlinedButton } from '@skylabs-monorepo/shared-ui/react';
-import type { Order } from '../../../api/orders';
-import { Icon } from '@skylabs-monorepo/shared-ui/react';
-import { ProductOrderTimeline } from './product-order-timeline';
-interface CustomerOrderCardProps {
-    order: Order;
-    onViewDetails: (order: Order) => void;
-}
-function formatDate(date: string): string {
-    return new Date(date).toLocaleDateString('en-IN', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-    });
-}
-function formatAmount(amount: string): string {
-    return `₹${Number(amount).toLocaleString('en-IN')}`;
-}
-function getStatusLabel(status: Order['status']): string {
-    return status.replace('_', ' ');
-}
-export function CustomerOrderCard({
-    order,
-    onViewDetails,
-}: CustomerOrderCardProps) {
-    //   const shortOrderId = order.id.slice(0, 8);
-    return (
-        <>
-            {/* NEW CARD */}
-            <sky-tile-card  >
-                <div className="customer-order-card-new">
-                    {order.items?.[0]?.image && (
-                        <img
-                            className="customer-order-card-new__image"
-                            src={order.items[0].image}
-                            alt={order.items[0].itemName ?? 'Order item'}
-                            width={120}
-                            height={120}
-                            loading="lazy"
-                        />
-                    )}
-                    <div className="customer-order-card-new__content">
-                        <div className="customer-order-card-new__top">
-                            <div>
-                                <p className="customer-order-card-new__eyebrow">Order</p>
-                                <h3 className="customer-order-card-new__title">Order #{order.id}</h3>
-                                <p className="customer-order-card-new__date">{formatDate(order.createdAt)}</p>
-                            </div>
-                            <sky-badge>{getStatusLabel(order.status)}</sky-badge>
-                        </div>
-                        <div className="customer-order-card-new__items">
-                            {order.items?.map((item) => (
-                                <div key={item.id} className="customer-order-card-new__item">
-                                    <span>{item.itemName}</span>
-                                    <span>Qty: {item.quantity}</span>
-                                    <strong>{formatAmount(item.lineTotal)}</strong>
-                                </div>
-                            ))}
-                        </div>
-                     
+import type { Order, OrderStatus } from '../../../api/orders';
+import { fillTemplate, formatINR, formatLongDate, orderNumber } from '../../../utils/format';
+import { lineFromOrderItem } from '../../../utils/cart-items';
+import { PurchaseLineCard, PurchaseLineList } from '../../components/purchase-line-card/purchase-line-card';
+import { SummaryPanel } from '../../components/summary-panel/summary-panel';
+import content from '../../../content.json';
 
-                        {/* {order.type === 'PRODUCT' && (
-                            <ProductOrderTimeline status={order.status} />
-                        )} */}
-                        <div className="customer-order-card-new__bottom">
-                            <strong className="customer-order-card-new__total">Total: {formatAmount(order.total)}</strong>
-                            <OutlinedButton onClick={() => onViewDetails(order)}>View Details</OutlinedButton>
-                        </div>
-                    </div>
-                </div>
-            </sky-tile-card>
-        </>
-    );
+const t = content.orders;
+
+/** Tonal `sky-badge` status per order state. */
+const STATUS_TONE: Record<OrderStatus, 'success' | 'warning' | 'error'> = {
+  PENDING_PAYMENT: 'warning',
+  CONFIRMED: 'success',
+  COMPLETED: 'success',
+  CANCELLED: 'error',
+};
+
+interface CustomerOrderCardProps {
+  order: Order;
+  onViewDetails: (order: Order) => void;
+  /** `h3` when the list sits under a section heading (dashboard). */
+  headingLevel?: 'h2' | 'h3';
 }
+
+/**
+ * One order in the customer's list (orders page, dashboard): a receipt panel named by the short
+ * order number, with the date, item count and status. One checkout can hold deals, products and
+ * therapists from several members, so every line shows its own image, member and branch and links
+ * to its detail page in a new tab (item 3 follow-up).
+ */
+export function CustomerOrderCard({ order, onViewDetails, headingLevel = 'h2' }: CustomerOrderCardProps) {
+  const count = order.items.reduce((sum, item) => sum + item.quantity, 0);
+  const itemCount = count === 1 ? t.itemCountOne : fillTemplate(t.itemCountMany, { count: String(count) });
+  return (
+    <SummaryPanel
+      id={`order-${order.id}`}
+      as={headingLevel}
+      heading={fillTemplate(t.orderLabel, { number: orderNumber(order.id) })}
+      meta={
+        <>
+          <span>
+            {formatLongDate(order.createdAt)} · {itemCount}
+          </span>
+          <sky-badge status={STATUS_TONE[order.status]}>{t.statuses[order.status]}</sky-badge>
+        </>
+      }
+      total={{ label: t.total, value: formatINR(Number(order.total)) }}
+      actions={<OutlinedButton onClick={() => onViewDetails(order)}>{t.viewDetails}</OutlinedButton>}
+      inlineActions
+    >
+      <PurchaseLineList variant="receipt">
+        {order.items.map((item) => (
+          <PurchaseLineCard key={item.id} line={lineFromOrderItem(item)} />
+        ))}
+      </PurchaseLineList>
+    </SummaryPanel>
+  );
+}
+
 export default CustomerOrderCard;

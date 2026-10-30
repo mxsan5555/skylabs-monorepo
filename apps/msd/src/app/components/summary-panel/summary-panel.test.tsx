@@ -34,4 +34,10 @@ describe('SummaryPanel', () => {
     expect(document.querySelector('.summary-panel__note')).toBeNull();
     expect(document.querySelector('.summary-panel__actions')).toBeNull();
   });
+
+  it('heads the region with an h3 when nested under a section heading', () => {
+    render(<SummaryPanel id="o" as="h3" heading="Order ORD-1" total={{ label: 'Total', value: '₹1' }} />);
+    expect(screen.getByRole('heading', { level: 3, name: 'Order ORD-1' }).id).toBe('o');
+    expect(screen.getByRole('region', { name: 'Order ORD-1' })).toBeTruthy();
+  });
 });

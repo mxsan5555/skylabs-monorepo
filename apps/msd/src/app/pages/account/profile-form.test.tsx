@@ -123,4 +123,16 @@ describe('ProfileForm delivery address', () => {
     expect((await screen.findByRole('alert')).textContent).toBe(t.incomplete);
     expect(saveMyAddressMock).not.toHaveBeenCalled();
   });
+
+  it('shows the contact details as their own region with a read-only phone, and asks for a name', async () => {
+    renderForm();
+    const contact = await screen.findByRole('region', { name: content.profileSettings.contact.heading });
+    await waitFor(() => expect(textField(content.profileSettings.contact.name).value).toBe('Neeraj Singh'));
+    const phone = textField(content.profileSettings.contact.phone);
+    expect(phone.hasAttribute('readonly')).toBe(true);
+    expect(contact.contains(phone)).toBe(true);
+    type(textField(content.profileSettings.contact.name), ' ');
+    fireEvent.click(Array.from(contact.querySelectorAll('md-filled-button'))[0] as HTMLElement);
+    expect((await screen.findByRole('alert')).textContent).toBe(content.profileSettings.nameRequired);
+  });
 });

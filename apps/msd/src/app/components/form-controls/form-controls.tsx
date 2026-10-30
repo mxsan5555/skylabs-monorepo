@@ -75,6 +75,7 @@ export function renderTextField({
   disabled,
   placeholder,
   inputMode,
+  readOnly,
   onInput,
 }: {
   label: string;
@@ -92,6 +93,8 @@ export function renderTextField({
   disabled?: boolean;
   placeholder?: string;
   inputMode?: string;
+  /** Shown but not editable (a sign-in phone number). */
+  readOnly?: boolean;
   onInput: (value: string) => void;
 }) {
   return createElement('md-outlined-text-field', {
@@ -111,6 +114,7 @@ export function renderTextField({
       disabled,
       placeholder,
       inputmode: inputMode,
+      readonly: readOnly,
     }),
     onInput: (e: DrivenChangeEvent) => onInput(e.currentTarget.value),
   });

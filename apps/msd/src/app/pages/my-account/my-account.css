@@ -1,77 +1,24 @@
+/* Account shell: the sidebar on surface-container (the 30), the page on surface (the 60); the
+   active link takes secondary-container, so primary (the 10) stays on each page's actions. */
 .my-account-shell {
+  box-sizing: border-box;
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
-  grid-template-rows: auto 1fr;
-  column-gap: 32px;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 15px 25px;
-  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px 32px;
+  inline-size: 100%;
+  max-inline-size: var(--sky-content-max);
+  margin-inline: auto;
+  padding: 16px var(--sky-content-gutter) 64px;
 }
 
 .my-account-shell__breadcrumb {
   grid-column: 1 / -1;
-  min-width: 0;
-  margin-bottom: 12px;
-}
-
-.my-account-nav {
-  grid-column: 1;
-  grid-row: 2;
-  position: sticky;
-  top: 88px;
-  align-self: start;
-  height: fit-content;
-}
-
-.my-account-shell__content {
-  grid-column: 2;
-  grid-row: 2;
-  min-width: 0;
-  width: 100%;
-}
-
-@media (max-width: 768px) {
-  .my-account-shell {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto 1fr;
-    gap: 16px;
-    padding: 20px 12px 96px;
-  }
-
-  .my-account-shell__breadcrumb {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .my-account-nav {
-    grid-column: 1;
-    grid-row: 2;
-    position: static;
-    width: 100%;
-    min-width: 0;
-  }
-
-  .my-account-shell__content {
-    grid-column: 1;
-    grid-row: 3;
-    width: 100%;
-    min-width: 0;
-  }
-}
-
-
-.my-account-nav {
-  position: sticky;
-  top: 88px;
-  align-self: start;
-  height: fit-content;
+  min-inline-size: 0;
 }
 
 .my-account-nav .entity-list {
-  margin: 0;
   padding: 8px;
-  border-radius: 16px;
+  border-radius: var(--md-sys-shape-corner-large);
   background-color: var(--md-sys-color-surface-container);
 }
 
@@ -80,64 +27,48 @@
 }
 
 .my-account-nav .role-list__name {
-  display: flex;
-  align-items: center;
   gap: 12px;
+  --md-icon-size: 24px;
 }
 
-.my-account-nav .role-list__name md-icon {
-  font-size: 24px;
+/* A themed ring for keyboard focus only; a click leaves no ring on the active link. */
+.my-account-nav .entity-list__item:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
 }
 
-.my-account-nav__logout {
-  margin-top: 0;
-}
-
-.my-account-nav__icon {
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  min-height: 28px;
-  font-size: 24px;
-  line-height: 28px;
-  flex-shrink: 0;
+.my-account-nav .entity-list__item:focus:not(:focus-visible) {
+  outline: none;
 }
 
 .my-account-nav__logout .entity-list__item {
-  width: 100%;
+  inline-size: 100%;
 }
 
+/* Pages stack their blocks with one gap; band pages (cart) sit flush in the column. */
 .my-account-shell__content {
-  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 24px;
+  min-inline-size: 0;
 }
 
-.my-account__breadcrumb {
-  margin-bottom: 10px;
+.my-account-shell__content > .page-section {
+  padding-block: 0;
 }
 
-.my-account-shell__breadcrumb {
-  grid-column: 1 / -1;
-  min-width: 0;
+.my-account-shell__content > .page-section > .page-section__container {
+  padding-inline: 0;
 }
 
-.my-account-nav {
-  grid-column: 1;
-  grid-row: 2;
-}
-
-.my-account-shell__content {
-  grid-column: 2;
-  grid-row: 2;
-  min-width: 0;
-}
-
-@media (max-width: 768px) {
+@media (min-width: 840px) {
   .my-account-shell {
-    grid-template-columns: 1fr;
-    padding: 20px 16px 48px;
+    grid-template-columns: 240px minmax(0, 1fr);
   }
 
   .my-account-nav {
-    position: static;
+    position: sticky;
+    inset-block-start: calc(var(--site-header-top-size) + 16px);
+    align-self: start;
   }
 }

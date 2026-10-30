@@ -389,6 +389,17 @@ A member who opens another member's deal, branch, package or therapist gets 404.
   number and date, actions, help link) and a
   `SummaryPanel` beside it (item count, lines as receipt rows, prices on-surface; only the total
   and the actions take primary, the 10); stacked on phones; no page CSS.
+- **Customer account pages** (`/my-dashboard`, `/my-account`, `/orders`, `/my-account/cart`,
+  `/my-account/support`): one shell (`MyAccountLayout`), the sidebar on surface-container (the
+  30, active link on secondary-container, a themed focus ring for keyboard only) beside the page
+  on surface (the 60); every page an h1 (`SectionHead`) and `noindex`; all copy in `content.json`
+  (`myAccount`, `customerDashboard`, `profileSettings`, `orders`, `support`). Dashboard: four
+  `StatTile` counts that open each list, then the latest three orders. Profile: Contact details and
+  Delivery address as two `FormPanel` blocks, each with its own save. Orders: All / Cancelled
+  (`ChipNav`), each order a `SummaryPanel` receipt named by its short number with date, item count
+  and a tonal status badge; one checkout can hold lines from several members, so every line shows
+  its own image, member and branch and opens its detail page in a new tab. Cart: the cart page,
+  flush in the column. Support: one `FormPanel` request form.
 - Staff block or unblock a customer with a reason (`customers:status_change`); customers are never
   deleted.
 - **Refunds (D11):** Support raises a refund request; Admin or Super Admin approves or rejects

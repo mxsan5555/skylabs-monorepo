@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createElement } from 'react';
 import {
   Dialog,
-  OutlinedButton,
-  OutlinedTextField,
+  FilledButton,
   TextButton,
 } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
@@ -16,15 +15,22 @@ import {
 } from '../../../api/rbac/me';
 import { ApiRequestError } from '../../../api/rbac/client';
 import {
+  FormField,
   asOptions,
   renderSelect,
   renderTextField,
 } from '../../components/form-controls/form-controls';
+import {
+  FormPanel,
+  FormPanelSection,
+} from '../../components/form-panel/form-panel';
 import { validateEmail } from '../../../utils/validation';
 import { showSnackbar } from '../../../snackbar/snackbar';
 import content from '../../../content.json';
 
-const t = content.profileSettings.address;
+const s = content.profileSettings;
+const c = s.contact;
+const t = s.address;
 const fields = content.checkout.fields;
 const EMPTY_ADDRESS: MyAddressInput = {
   address: '',
@@ -33,7 +39,9 @@ const EMPTY_ADDRESS: MyAddressInput = {
   pincode: '',
 };
 const PINCODE = /^\d{6}$/;
-const value = (event: Event) => (event.target as HTMLInputElement).value;
+
+/** Profile page (`/my-account`, `/account/profile`): contact details and the saved delivery address
+ *  (D37), each a `FormPanel` with its own save. */
 export function ProfileForm() {
   const { token } = useAuth();
   const [name, setName] = useState('');
@@ -80,11 +88,7 @@ export function ProfileForm() {
         setOriginalAddress(saved);
       } catch (err) {
         if (!cancelled) {
-          setError(
-            err instanceof ApiRequestError
-              ? err.message
-              : 'Could not load your profile.',
-          );
+          setError(err instanceof ApiRequestError ? err.message : s.loadFailed);
         }
       } finally {
         if (!cancelled) {
@@ -108,7 +112,7 @@ export function ProfileForm() {
     const trimmedName = name.trim();
     const trimmedEmail = email.trim();
     if (!trimmedName) {
-      setError('Name is required.');
+      setError(s.nameRequired);
       return;
     }
     if (trimmedEmail && !validateEmail(trimmedEmail)) {
@@ -136,15 +140,11 @@ export function ProfileForm() {
       setOriginalName(updatedName);
       setOriginalEmail(updatedEmail);
       dialogRef.current?.close();
-      showSnackbar('Your profile was updated successfully.', {
+      showSnackbar(s.saved, {
         variant: 'success',
       });
     } catch (err) {
-      setError(
-        err instanceof ApiRequestError
-          ? err.message
-          : 'Could not save your profile.',
-      );
+      setError(err instanceof ApiRequestError ? err.message : s.saveFailed);
     } finally {
       setSaving(false);
     }
@@ -191,55 +191,70 @@ export function ProfileForm() {
     }
   };
   return loading ? (
-    <p className="loading-state">Loading your profile…</p>
+    <p className="loading-state" role="status">
+      {s.loading}
+    </p>
   ) : (
     <>
-      {error && (
-        <p className="error-state" role="alert">
-          {error}
-        </p>
-      )}
-      <section className="account-card">
-        <div className="account-fields">
-          <OutlinedTextField
-            label="Name"
-            value={name}
-            onInput={(event: Event) => setName(value(event))}
-          />
-          <OutlinedTextField
-            label="Email"
-            type="email"
-            autocomplete="email"
-            value={email}
-            onInput={(event: Event) => setEmail(value(event))}
-          />
-          <OutlinedTextField
-            label="Phone"
-            type="tel"
-            autocomplete="tel"
-            value={phone}
-            required
-            readOnly
-          />
-        </div>
-        <div className="account-card__actions">
-          <OutlinedButton
+      <FormPanel
+        id="contact-details-title"
+        heading={c.heading}
+        intro={c.intro}
+        footerLead={
+          error && (
+            <p className="form-field__error body-medium" role="alert">
+              {error}
+            </p>
+          )
+        }
+        actions={
+          <FilledButton
             disabled={!hasChanges || saving}
             onClick={requestProfileUpdate}
           >
-            Update
-          </OutlinedButton>
-        </div>
-      </section>
+            {saving ? c.saving : c.save}
+          </FilledButton>
+        }
+      >
+        <FormPanelSection>
+          <div className="form-grid">
+            <FormField>
+              {renderTextField({
+                label: c.name,
+                value: name,
+                required: true,
+                onInput: setName,
+              })}
+            </FormField>
+            <FormField>
+              {renderTextField({
+                label: c.email,
+                type: 'email',
+                value: email,
+                onInput: setEmail,
+              })}
+            </FormField>
+            <FormField>
+              {renderTextField({
+                label: c.phone,
+                type: 'tel',
+                value: phone,
+                readOnly: true,
+                onInput: setPhone,
+              })}
+            </FormField>
+          </div>
+        </FormPanelSection>
+      </FormPanel>
       <Dialog ref={dialogRef}>
-        <div slot="headline">Update profile?</div>
-        <div slot="content">Are you sure you want to update your records?</div>
+        <div slot="headline">{c.confirmHeading}</div>
+        <div slot="content">{c.confirmText}</div>
         <div slot="actions">
           <TextButton
             disabled={saving}
             onClick={() => dialogRef.current?.close()}
           >
-            Cancel
+            {c.cancel}
           </TextButton>
           <TextButton
             disabled={saving}
@@ -247,72 +262,77 @@ export function ProfileForm() {
               void confirmProfileUpdate();
             }}
           >
-            {saving ? 'Updating…' : 'Okay'}
+            {saving ? c.saving : c.confirm}
           </TextButton>
         </div>
       </Dialog>
-      <section
-        className="account-card"
-        aria-labelledby="delivery-address-title"
-      >
-        <div className="account-card__head">
-          <h2 id="delivery-address-title">{t.heading}</h2>
-          <p className="field-hint">{t.hint}</p>
-        </div>
-        {addressError && (
-          <p className="error-state" role="alert">
-            {addressError}
-          </p>
+      <FormPanel
+        id="delivery-address-title"
+        heading={t.heading}
+        intro={t.hint}
+        footerLead={
+          addressError && (
+            <p className="form-field__error body-medium" role="alert">
+              {addressError}
+            </p>
+          )
+        }
+        actions={createElement(
+          'md-filled-button',
+          {
+            ...(!hasAddressChanges || addressSaving ? { disabled: true } : {}),
+            onClick: () => void saveAddress(),
+          },
+          addressSaving ? t.saving : t.save,
         )}
-        <div className="account-fields address-fields">
-          {renderTextField({
-            label: fields.address,
-            value: addressDraft.address,
-            required: true,
-            onInput: setAddress('address'),
-          })}
-          {renderSelect({
-            label: fields.state,
-            value: addressDraft.state,
-            required: true,
-            placeholder: fields.selectState,
-            options: asOptions(STATES),
-            onChange: chooseState,
-          })}
-          {renderSelect({
-            selectKey: addressDraft.state,
-            label: fields.city,
-            value: addressDraft.city,
-            required: true,
-            disabled: !addressDraft.state,
-            placeholder: addressDraft.state
-              ? fields.selectCity
-              : fields.selectStateFirst,
-            options: asOptions(citiesForState(addressDraft.state)),
-            onChange: setAddress('city'),
-          })}
-          {renderTextField({
-            label: fields.pincode,
-            value: addressDraft.pincode,
-            required: true,
-            maxLength: 6,
-            inputMode: 'numeric',
-            onInput: setAddress('pincode'),
-          })}
-        </div>
-        <div className="account-card__actions">
-          {createElement(
-            'md-filled-button',
-            {
-              ...(!hasAddressChanges || addressSaving
-                ? { disabled: true }
-                : {}),
-              onClick: () => void saveAddress(),
-            },
-            addressSaving ? t.saving : t.save,
-          )}
-        </div>
-      </section>
+      >
+        <FormPanelSection>
+          <div className="form-grid">
+            <FormField wide>
+              {renderTextField({
+                label: fields.address,
+                value: addressDraft.address,
+                required: true,
+                onInput: setAddress('address'),
+              })}
+            </FormField>
+            <FormField>
+              {renderSelect({
+                label: fields.state,
+                value: addressDraft.state,
+                required: true,
+                placeholder: fields.selectState,
+                options: asOptions(STATES),
+                onChange: chooseState,
+              })}
+            </FormField>
+            <FormField>
+              {renderSelect({
+                selectKey: addressDraft.state,
+                label: fields.city,
+                value: addressDraft.city,
+                required: true,
+                disabled: !addressDraft.state,
+                placeholder: addressDraft.state
+                  ? fields.selectCity
+                  : fields.selectStateFirst,
+                options: asOptions(citiesForState(addressDraft.state)),
+                onChange: setAddress('city'),
+              })}
+            </FormField>
+            <FormField>
+              {renderTextField({
+                label: fields.pincode,
+                value: addressDraft.pincode,
+                required: true,
+                maxLength: 6,
+                inputMode: 'numeric',
+                onInput: setAddress('pincode'),
+              })}
+            </FormField>
+          </div>
+        </FormPanelSection>
+      </FormPanel>
     </>
   );
 }

@@ -8,6 +8,20 @@
     "fixFields": "Fix the highlighted fields and try again.",
     "loadFailed": "Could not load your profile.",
     "saveFailed": "Could not save your profile.",
+    "loading": "Loading your profile…",
+    "contact": {
+      "heading": "Contact details",
+      "intro": "The name and email on your account. Your phone number signs you in, so it can't change here.",
+      "name": "Name",
+      "email": "Email",
+      "phone": "Phone",
+      "save": "Save changes",
+      "saving": "Saving…",
+      "confirmHeading": "Update profile?",
+      "confirmText": "Your new name and email will be used on your next orders.",
+      "cancel": "Cancel",
+      "confirm": "Update"
+    },
     "address": {
       "heading": "Delivery address",
       "hint": "Checkout fills these in for you.",
@@ -1119,6 +1133,17 @@
     "errors": {
       "load": "Could not load your orders."
     },
+    "orderLabel": "Order {number}",
+    "itemCountOne": "1 item",
+    "itemCountMany": "{count} items",
+    "total": "Total",
+    "viewDetails": "View details",
+    "statuses": {
+      "PENDING_PAYMENT": "Awaiting payment",
+      "CONFIRMED": "Confirmed",
+      "COMPLETED": "Completed",
+      "CANCELLED": "Cancelled"
+    },
     "filtersLabel": "Order status filters",
     "filters": {
       "all": "All",
@@ -1154,7 +1179,44 @@
     },
     "viewInvoice": "View invoice →"
   },
+  "myAccount": {
+    "navLabel": "My account",
+    "home": "Home",
+    "fallbackPage": "My account",
+    "nav": {
+      "dashboard": "Dashboard",
+      "profile": "Profile",
+      "orders": "Orders",
+      "wishlist": "Wishlist",
+      "cart": "Cart",
+      "support": "Support"
+    },
+    "switchToMember": "Switch to member dashboard",
+    "logout": "Logout",
+    "loggedOut": "You have been logged out successfully."
+  },
+  "customerDashboard": {
+    "metaTitle": "My Dashboard · MSD",
+    "metaDescription": "Your bookings, purchases and saved items at a glance.",
+    "path": "/my-dashboard",
+    "title": "My dashboard",
+    "subtitle": "Your bookings, purchases and saved items at a glance.",
+    "statsLabel": "Your account at a glance",
+    "stats": {
+      "deals": "Booked deals",
+      "products": "Purchased products",
+      "cart": "Items in cart",
+      "wishlist": "Saved items"
+    },
+    "recentHeading": "Recent orders",
+    "seeAll": "All orders",
+    "noOrders": "No orders yet. Your bookings and purchases show up here.",
+    "loadError": "Could not load your dashboard."
+  },
   "profile": {
+    "metaTitle": "My Profile · MSD",
+    "metaDescription": "Your contact details and saved delivery address at MySpaDeal.",
+    "path": "/my-account",
     "title": "Profile Details",
     "subtitle": "Manage your contact details and saved addresses."
   },
@@ -1550,7 +1612,10 @@
     "sending": "Sending…",
     "required": "Enter a subject and a message.",
     "sent": "Your support request has been sent.",
-    "failed": "We could not send your request. Try again."
+    "failed": "We could not send your request. Try again.",
+    "formHeading": "New request",
+    "metaDescription": "Ask MSD support about an order, a booking or your account.",
+    "path": "/my-account/support"
   },
   "about": {
     "path": "/about",
