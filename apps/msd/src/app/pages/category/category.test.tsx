@@ -292,10 +292,11 @@ describe('Category page /:city', () => {
     getCatalogCategoryMock.mockResolvedValue({ data: { ...CATEGORY, type: 'PRODUCT' } });
     listCatalogProductsMock.mockResolvedValue({ data: [product] });
 
-    renderAt('/category/product');
+    renderAt(`/category/${CATEGORY.slug}`);
     const favoriteButton = await waitFor(() => {
       const card = document.querySelector('sky-product-card');
-      const button = card?.shadowRoot?.querySelector('md-icon-button.favorite');
+      // OfferCard's heart: a slotted M3 icon button named after the item.
+      const button = card?.querySelector('md-outlined-icon-button[aria-label="Save Massage Oil to wishlist"]');
       if (!button) throw new Error('Product favorite button did not render');
       return button;
     });
@@ -656,7 +657,7 @@ describe('Category page layout', () => {
       expect(await screen.findByRole('dialog', { name: content.category.filterPanel.title })).toBeTruthy();
     });
 
-    it('product category: requests product facets; the panel shows Price and Tags, no location (ST-41)', async () => {
+    it('product category: requests product facets; the panel shows Price, Tags and Business, no location (ST-41, item 4)', async () => {
       stubMedia(true);
       getCatalogCategoryMock.mockResolvedValue({ data: { ...CATEGORY, type: 'PRODUCT' } });
       renderAt('/category/massage');
@@ -666,6 +667,7 @@ describe('Category page layout', () => {
       expect(sections.map((s) => s.header ?? s.getAttribute('header'))).toEqual([
         content.category.filterPanel.price.title,
         content.category.filterPanel.tags.title,
+        content.category.filterPanel.business.title,
       ]);
       expect(getCatalogDealFacetsMock).not.toHaveBeenCalled();
       await waitFor(() => expect(getCatalogProductFacetsMock).toHaveBeenCalledWith(expect.objectContaining({ categoryId: CATEGORY.id })));

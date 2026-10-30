@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SnackbarHost } from '../../../../snackbar/snackbar';
 import type { BlogPost } from '../../../../api/rbac/blog-posts';
+import { BlogList } from './blog-list';
 
 import { BlogList } from './blog-list';
 

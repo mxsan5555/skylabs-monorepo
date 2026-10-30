@@ -92,7 +92,7 @@ export function Search() {
   const near = { latitude: coords?.latitude ?? undefined, longitude: coords?.longitude ?? undefined, radiusKm: hasCoords ? radius : undefined };
   const members = kind === 'all' ? {} : { vendorIds, branchIds };
   const dealOpts = { ...shared, ...near, ...members, ...(kind === 'deals' ? { tags } : {}) };
-  const productOpts = { ...shared, ...(kind === 'products' ? { tags } : {}) };
+  const productOpts = { ...shared, ...(kind === 'products' ? { tags, vendorIds } : {}) };
   const therapistOpts = { ...shared, ...near, ...members };
   const base = kind === 'products' ? productOpts : kind === 'therapists' ? therapistOpts : dealOpts;
   const listKey = JSON.stringify([kind, dealOpts, productOpts, therapistOpts, sort]);

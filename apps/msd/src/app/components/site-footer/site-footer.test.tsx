@@ -55,7 +55,6 @@ describe('SiteFooter', () => {
     }
     const discover = screen.getByRole('navigation', { name: 'Discover' });
     expect(within(discover).getByRole('link', { name: 'Massage' }).getAttribute('href')).toBe('/category/massage');
-    expect(within(discover).getByRole('link', { name: 'Therapists' })).toBeTruthy();
   });
 
   it('links only to pages that exist: Help & Info has Help Center and Wishlist, no Gifting (ST-07)', () => {

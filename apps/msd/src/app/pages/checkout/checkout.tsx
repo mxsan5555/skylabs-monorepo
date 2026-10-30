@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { FilledButton, OutlinedButton, Icon, Divider, OutlinedTextField, Radio, } from '@skylabs-monorepo/shared-ui/react';
+import {
+  FilledButton,
+  OutlinedButton,
+  Icon,
+  OutlinedTextField,
+  TextButton,
+} from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 
 import {
@@ -15,12 +21,46 @@ import {
 } from '../../../api/orders';
 
 import { ApiRequestError } from '../../../api/rbac/client';
-import { loadRazorpayScript } from '../../../utils/razorpay';
-import { formatINR } from '../../../utils/format';
+import { getMyProfile } from '../../../api/rbac/me';
+import { getCart } from '../../../api/cart';
+import {
+  lineFromCartItem,
+  lineFromOrderItem,
+  type PurchaseLine,
+} from '../../../utils/cart-items';
+import {
+  PurchaseLineCard,
+  PurchaseLineList,
+} from '../../components/purchase-line-card/purchase-line-card';
+import { STATES, citiesForState } from '@skylabs-monorepo/shared-utils';
+import {
+  FormField,
+  asOptions,
+  renderSelect,
+} from '../../components/form-controls/form-controls';
+import { PageSection } from '../../components/page-section/page-section';
+import { SplitLayout } from '../../components/split-layout/split-layout';
+import { SectionHead } from '../../components/section-head/section-head';
+import {
+  FormPanel,
+  FormPanelSection,
+} from '../../components/form-panel/form-panel';
+import { StepIndicator } from '../../components/step-indicator/step-indicator';
+import { RadioCardGroup } from '../../components/radio-card-group/radio-card-group';
+import { StatusPanel } from '../../components/status-panel/status-panel';
+import { SummaryPanel } from '../../components/summary-panel/summary-panel';
+import { Seo } from '../../seo/seo';
+import {
+  loadRazorpayScript,
+  RAZORPAY_THEME_COLOR,
+} from '../../../utils/razorpay';
+import { fillTemplate, formatINR } from '../../../utils/format';
 import { groupOrderItemsByVendor } from '../../../utils/order-items';
 import content from '../../../content.json';
-import './checkout.css';
 const { checkout: checkoutContent } = content;
+const TITLE_ID = 'checkout-title';
+const STEP_ID = 'checkout-step-title';
+const SUMMARY_ID = 'checkout-summary-title';
 interface CheckoutLocationState {
   /**
    * Retry payment for an existing order.
@@ -45,17 +85,16 @@ export function Checkout() {
   // cart line (whichever kind) becomes an OrderItem on this same Order (see msd-api's
   // order.service.ts#createOrderFromCart doc comment; there is no separate Booking flow).
   const [order, setOrder] = useState<Order | null>(null);
-  const [paymentIntent, setPaymentIntent] =
-    useState<PaymentIntent | null>(null);
+  const [paymentIntent, setPaymentIntent] = useState<PaymentIntent | null>(
+    null,
+  );
 
-  const [paymentMethod, setPaymentMethod] =
-    useState<PaymentMethod>('online');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('online');
 
   const [loading, setLoading] = useState(isRetryPayment);
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState('');
   const initRef = useRef(false);
-  const prefilledRef = useRef(false);
   // Re-entrancy guards for submitDetails/openRazorpay/placeCodOrder — a `disabled` state prop
   // alone can't stop a second click/tap that fires before React commits the disabling re-render
   // (same gap fixed for TherapistFormDialog/PackageFormDialog elsewhere in this app). Checked
@@ -71,16 +110,64 @@ export function Checkout() {
   const [shippingState, setShippingState] = useState('');
   const [shippingPincode, setShippingPincode] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  // Item 2.3: the cart lines shown as cards in the summary before the order exists.
+  const [cartLines, setCartLines] = useState<PurchaseLine[]>([]);
   const [detailsSubmitting, setDetailsSubmitting] = useState(false);
+  // Item 2.2 (D37): the signed-in customer's saved details fill the form; checkout saves them
+  // again, so the next order starts filled. Session details stand in if the profile fails to load.
+  // No run-once guard: StrictMode runs this twice in dev and the first run's cleanup drops its
+  // response, so every run fetches; the `v ||` setters keep whatever the customer already typed.
   useEffect(() => {
-    if (prefilledRef.current || !bootstrap?.user) {
+    if (!token) {
       return;
     }
-    prefilledRef.current = true;
-    setContactName(bootstrap.user.name ?? '');
-    setContactPhone((bootstrap.user.phone ?? '').replace(/^\+91/, ''),);
-    setContactEmail(bootstrap.user.email ?? '');
-  }, [bootstrap]);
+    let live = true;
+    const fill = (who: {
+      name?: string | null;
+      phone?: string | null;
+      email?: string | null;
+    }) => {
+      setContactName((v) => v || (who.name ?? ''));
+      setContactPhone((v) => v || (who.phone ?? '').replace(/^\+91/, ''));
+      setContactEmail((v) => v || (who.email ?? ''));
+    };
+    getMyProfile(token)
+      .then(({ data }) => {
+        if (!live) return;
+        fill(data);
+        setShippingAddress((v) => v || (data.address ?? ''));
+        setShippingState((v) => v || (data.state ?? ''));
+        setShippingCity((v) => v || (data.city ?? ''));
+        setShippingPincode((v) => v || (data.pincode ?? ''));
+      })
+      .catch(() => {
+        if (live && bootstrap?.user) fill(bootstrap.user);
+      });
+    return () => {
+      live = false;
+    };
+  }, [token, bootstrap]);
+
+  useEffect(() => {
+    if (isRetryPayment || !token) return;
+    let live = true;
+    getCart(token)
+      .then(({ data }) => {
+        if (live) setCartLines(data.items.map(lineFromCartItem));
+      })
+      .catch(() => {
+        // The summary stays empty; checkout itself still works from the server's cart.
+      });
+    return () => {
+      live = false;
+    };
+  }, [isRetryPayment, token]);
+
+  /** A new state clears the city, which belonged to the old one. */
+  const chooseState = (value: string) => {
+    setShippingState(value);
+    if (value !== shippingState) setShippingCity('');
+  };
   useEffect(() => {
     if (initRef.current) {
       return;
@@ -94,12 +181,15 @@ export function Checkout() {
       setLoading(true);
       setError('');
       try {
-        const currentOrder =
-          (await getMyOrder(token, orderId)).data;
+        const currentOrder = (await getMyOrder(token, orderId)).data;
 
         setOrder(currentOrder);
       } catch (err) {
-        setError(err instanceof ApiRequestError ? err.message : 'Could not start checkout.',);
+        setError(
+          err instanceof ApiRequestError
+            ? err.message
+            : checkoutContent.errors.startCheckout,
+        );
       } finally {
         setLoading(false);
       }
@@ -117,12 +207,15 @@ export function Checkout() {
     (async () => {
       setError('');
       try {
-        const intent =
-          (await pay(token, order.id)).data;
+        const intent = (await pay(token, order.id)).data;
 
         setPaymentIntent(intent);
       } catch (err) {
-        setError(err instanceof ApiRequestError ? err.message : 'Could not prepare payment.',);
+        setError(
+          err instanceof ApiRequestError
+            ? err.message
+            : checkoutContent.errors.preparePayment,
+        );
       }
     })();
 
@@ -135,27 +228,26 @@ export function Checkout() {
 
   function validateDetails(): boolean {
     const errors: FieldErrors = {};
-    if (!contactName.trim()) { errors.contactName = 'Name is required.'; }
-    if (!/^[6-9]\d{9}$/.test(contactPhone.trim())) {
-      errors.contactPhone = 'Enter a valid 10-digit mobile number.';
+    if (!contactName.trim()) {
+      errors.contactName = checkoutContent.validation.emptyName;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-      contactEmail.trim(),
-    )
-    ) {
-      errors.contactEmail = 'Enter a valid email address.';
+    if (!/^[6-9]\d{9}$/.test(contactPhone.trim())) {
+      errors.contactPhone = checkoutContent.validation.invalidPhone;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())) {
+      errors.contactEmail = checkoutContent.validation.invalidEmail;
     }
     if (!shippingAddress.trim()) {
-      errors.shippingAddress = 'Address is required.';
+      errors.shippingAddress = checkoutContent.validation.emptyAddress;
     }
     if (!shippingCity.trim()) {
-      errors.shippingCity = 'City is required.';
+      errors.shippingCity = checkoutContent.validation.emptyCity;
     }
     if (!shippingState.trim()) {
-      errors.shippingState = 'State is required.';
+      errors.shippingState = checkoutContent.validation.emptyState;
     }
     if (!/^\d{6}$/.test(shippingPincode.trim())) {
-      errors.shippingPincode = 'Enter a valid 6-digit pincode.';
+      errors.shippingPincode = checkoutContent.validation.invalidPincode;
     }
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
@@ -186,7 +278,11 @@ export function Checkout() {
       setOrder(newOrder);
       setStep('payment');
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not start checkout.',);
+      setError(
+        err instanceof ApiRequestError
+          ? err.message
+          : checkoutContent.errors.startCheckout,
+      );
     } finally {
       submittingDetailsRef.current = false;
       setDetailsSubmitting(false);
@@ -203,69 +299,58 @@ export function Checkout() {
     try {
       await loadRazorpayScript();
       if (!window.Razorpay) {
-        throw new Error('Payment gateway unavailable.',
-        );
+        throw new Error(checkoutContent.errors.gatewayUnavailable);
       }
 
+      let paymentFailed = false;
       const rzp = new window.Razorpay({
         key: paymentIntent.keyId,
 
-        order_id:
-          paymentIntent.providerOrderId,
+        order_id: paymentIntent.providerOrderId,
 
-        amount:
-          Math.round(
-            Number(paymentIntent.amount) * 100,
-          ),
+        amount: Math.round(Number(paymentIntent.amount) * 100),
 
         currency: paymentIntent.currency,
 
         name: 'MSD',
 
-        description: order.items
-          .map((item) => item.itemName)
-          .join(', '),
+        description: order.items.map((item) => item.itemName).join(', '),
         theme: {
-          color: '#007C2B',
+          color: RAZORPAY_THEME_COLOR,
         },
         modal: {
           ondismiss: () => {
             payingRef.current = false;
             setPaying(false);
+            // Closed after a failed attempt: show the payment-failed page (item 3).
+            if (paymentFailed)
+              navigate(`/orders/${order.id}/confirmation?payment=failed`);
           },
         },
         handler: (response) => {
-          verifyPayment(
-            token,
-            order.id,
-            response,
-          )
+          verifyPayment(token, order.id, response)
             .then(({ data }) => {
-              navigate(`/orders/${data.id}`);
+              navigate(`/orders/${data.id}/confirmation`);
             })
-            .catch((err) => {
-              setError(
-                err instanceof ApiRequestError
-                  ? err.message
-                  : checkoutContent.errors.verificationFailed,
-              );
-              payingRef.current = false;
-              setPaying(false);
+            .catch(() => {
+              // The result page reads the order's real state (failed, or confirmed by the webhook).
+              navigate(`/orders/${order.id}/confirmation`);
             });
         },
+      });
+      rzp.on('payment.failed', () => {
+        paymentFailed = true;
       });
       rzp.open();
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : 'Could not open the payment gateway.',
+        err instanceof Error ? err.message : checkoutContent.errors.openGateway,
       );
       payingRef.current = false;
       setPaying(false);
     }
   };
-  
+
   const placeCodOrder = async () => {
     if (payingRef.current) return;
     if (!order) {
@@ -275,15 +360,14 @@ export function Checkout() {
     setError('');
     setPaying(true);
     try {
-      const { data } =
-        await payCod(token, order.id);
+      const { data } = await payCod(token, order.id);
 
-      navigate(`/orders/${data.id}`);
+      navigate(`/orders/${data.id}/confirmation`);
     } catch (err) {
       setError(
         err instanceof ApiRequestError
           ? err.message
-          : 'Could not place your order. Please try again.',
+          : checkoutContent.errors.placeOrder,
       );
 
       payingRef.current = false;
@@ -297,542 +381,338 @@ export function Checkout() {
   const vendorGroups = groupOrderItemsByVendor(order?.items ?? []);
   const combinedTotal = Number(order?.total ?? 0);
 
-  // ---------------------------------------------------------------------------
-  // Loading
-  // ---------------------------------------------------------------------------
+  const seo = (
+    <Seo
+      title={content.meta.checkout.title}
+      description={content.meta.checkout.description}
+      path={content.meta.checkout.path}
+      noindex
+    />
+  );
+  const errorAlert = error && (
+    <p className="form-field__error body-medium" role="alert">
+      {error}
+    </p>
+  );
 
   if (loading) {
     return (
-      <div className="checkout-page checkout-page--empty">
-        <title> {content.meta.checkout.title}</title>
-        <div className="checkout-empty-state">
-          <div className="checkout-empty-state__icon">
-            <Icon>shopping_bag</Icon>
-          </div>
-          <h1>Preparing your checkout</h1>
-          <p className="loading-state"> Please wait while we prepare your order…
-          </p>
-        </div>
-      </div>
+      <PageSection>
+        {seo}
+        <p className="loading-state" role="status">
+          {checkoutContent.loadingOrder}
+        </p>
+      </PageSection>
     );
   }
-  if (error && !order) {
+  if (error && !order && isRetryPayment) {
     return (
-      <div className="checkout-page checkout-page--empty">
-        <title>  {content.meta.checkout.title} </title>
-        <div className="checkout-empty-state">
-          <div className="checkout-empty-state__icon checkout-empty-state__icon--error">
-            <Icon>error_outline</Icon>
-          </div>
-          <h1>Checkout unavailable</h1>
-          <p className="error-state" role="alert"> {error} </p>
-          <FilledButton onClick={() => navigate('/categories')} > Back to Categories</FilledButton>
-        </div>
-      </div>
+      <PageSection aria-labelledby={TITLE_ID}>
+        {seo}
+        <SplitLayout asideLabel={checkoutContent.orderSummaryHeading}>
+          <StatusPanel
+            id={TITLE_ID}
+            icon="error"
+            tone="error"
+            heading={checkoutContent.unavailableHeading}
+            text={error}
+            actions={
+              <FilledButton onClick={() => navigate('/categories')}>
+                {checkoutContent.backToCategories}
+              </FilledButton>
+            }
+          />
+        </SplitLayout>
+      </PageSection>
     );
   }
-  // ---------------------------------------------------------------------------
-  // Header
-  // ---------------------------------------------------------------------------
+
+  const onPayment = step === 'payment' && order;
+  const lines = onPayment ? order.items.map(lineFromOrderItem) : cartLines;
+  const total = onPayment
+    ? combinedTotal
+    : cartLines.reduce((sum, line) => sum + line.total, 0);
+  const field =
+    (setter: (value: string) => void, clean?: (value: string) => string) =>
+    (e: Event) => {
+      const raw = (e.target as HTMLInputElement).value;
+      setter(clean ? clean(raw) : raw);
+    };
+  const digits = (max: number) => (value: string) =>
+    value.replace(/\D/g, '').slice(0, max);
+  const payingText =
+    vendorGroups.length > 1
+      ? fillTemplate(checkoutContent.payingAcross, {
+          amount: formatINR(combinedTotal),
+          count: String(vendorGroups.length),
+        })
+      : fillTemplate(checkoutContent.payingTo, {
+          amount: formatINR(combinedTotal),
+          member: order?.vendorNameSnapshot ?? '',
+        });
 
   return (
-    <div className="checkout-page">
-      <title> {content.meta.checkout.title} </title>
-      <meta name="description" content={content.meta.checkout.description} />
-      <meta name="robots" content="noindex" />
-      <div className="checkout-page__inner">
-        <header className="checkout-header">
-          <div className="checkout-header__top">
-            <div>
-              <p className="checkout-header__eyebrow"> MSD CHECKOUT </p>
-              <h1 className="checkout-header__title"> {checkoutContent.title} </h1>
-            </div>
-            <div className="checkout-header__secure">
-              <Icon aria-hidden="true"> lock </Icon>
-              <span> Secure Checkout </span>
-            </div>
-          </div>
+    <PageSection aria-labelledby={TITLE_ID}>
+      {seo}
+      <SplitLayout
+        asideLabel={checkoutContent.orderSummaryHeading}
+        aside={
+          <SummaryPanel
+            id={SUMMARY_ID}
+            heading={checkoutContent.orderSummaryHeading}
+            total={{ label: content.cart.total, value: formatINR(total) }}
+            note={checkoutContent.summaryNote}
+          >
+            <PurchaseLineList variant="receipt">
+              {lines.map((line) => (
+                <PurchaseLineCard key={line.id} line={line} />
+              ))}
+            </PurchaseLineList>
+          </SummaryPanel>
+        }
+      >
+        <div>
+          <SectionHead
+            id={TITLE_ID}
+            as="h1"
+            titleClassName="headline-medium"
+            heading={checkoutContent.title}
+          />
           {!isRetryPayment && (
-            <ol className="checkout-steps" aria-label="Checkout steps" >
-              <li className={`checkout-steps__step${step === 'payment' ? ' checkout-steps__step--done' : ''}`} >
-                <span className="checkout-steps__num" aria-hidden="true">
-                  {step === 'payment' ? (
-                    <Icon>check</Icon>
-                  ) : (1)}
-                </span>
-                <span className="checkout-steps__label">{checkoutContent.steps[0]} </span>
-              </li>
-              <li className={`checkout-steps__step${step === 'payment' ? ' checkout-steps__step--active' : ''}`}>
-                <span className="checkout-steps__num" aria-hidden="true" > 2</span>
-                <span className="checkout-steps__label"> {checkoutContent.steps[2]} </span>
-              </li>
-            </ol>
+            <StepIndicator
+              label={checkoutContent.stepsLabel}
+              steps={[checkoutContent.steps[0], checkoutContent.steps[2]]}
+              current={step === 'payment' ? 1 : 0}
+              doneLabel={checkoutContent.stepDone}
+            />
           )}
-        </header>
+        </div>
+
         {step === 'details' ? (
-          <div className="checkout-page__layout">
-            <div className="checkout-page__form">
-              <section aria-labelledby="step-details-heading" className="checkout-form-section" >
-                <div className="checkout-form-section__header">
-                  <div className="checkout-form-section__icon">
-                    <Icon> person </Icon>
-                  </div>
-                  <div>
-                    <h2 id="step-details-heading" className="checkout-form__heading"> {checkoutContent.stepHeadings[0]} </h2>
-                    <p className="checkout-form__subheading">
-                      Enter your contact and delivery
-                      information to continue.
-                    </p>
-                  </div>
-                </div>
-                <div className="checkout-form__fields">
-                  <div className="checkout-form__fields checkout-form__fields--row">
-                    <div className="checkout-form__field-wrapper">
-                      <OutlinedTextField
-                        label={checkoutContent.fields.name}
-                        value={contactName}
-                        required
-                        autocomplete="name"
-                        onInput={(e) =>
-                          setContactName(
-                            (
-                              e.target as unknown as { value: string; }
-                            ).value,
-                          )
-                        }
-                      />
-                      {fieldErrors.contactName && (
-                        <p className="checkout-form__error" role="alert"> {fieldErrors.contactName} </p>
-                      )}
-                    </div>
-                    <div className="checkout-form__field-wrapper">
-                      <OutlinedTextField
-                        label={checkoutContent.fields.phone}
-                        type="tel"
-                        inputMode="numeric"
-                        autocomplete="tel"
-                        maxLength={10}
-                        required
-                        value={contactPhone}
-                        onInput={(e) =>
-                          setContactPhone(
-                            (
-                              e.target as unknown as { value: string; }
-                            ).value
-                              .replace(/\D/g, '')
-                              .slice(0, 10),
-                          )
-                        }
-                      />
-                      {fieldErrors.contactPhone && (
-                        <p className="checkout-form__error" role="alert" > {fieldErrors.contactPhone} </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="checkout-form__field-wrapper">
-                    <OutlinedTextField
-                      label={checkoutContent.fields.email}
-                      type="email"
-                      autocomplete="email"
-                      required
-                      value={contactEmail}
-                      onInput={(e) =>
-                        setContactEmail(
-                          (
-                            e.target as unknown as { value: string; }
-                          ).value,
-                        )
-                      }
-                    />
-                    {fieldErrors.contactEmail && (
-                      <p className="checkout-form__error" role="alert"> {fieldErrors.contactEmail} </p>
-                    )}
-                  </div>
-                  <div className="checkout-form__field-wrapper">
-                    <OutlinedTextField
-                      label="Address"
-                      autocomplete="street-address"
-                      required
-                      value={shippingAddress}
-                      onInput={(e) =>
-                        setShippingAddress(
-                          (
-                            e.target as unknown as { value: string; }
-                          ).value,
-                        )
-                      }
-                    />
-                    {fieldErrors.shippingAddress && (
-                      <p className="checkout-form__error" role="alert"> {fieldErrors.shippingAddress} </p>
-                    )}
-                  </div>
-                  <div className="checkout-form__fields checkout-form__fields--row">
-                    <div className="checkout-form__field-wrapper">
-                      <OutlinedTextField
-                        label="City"
-                        autocomplete="address-level2"
-                        required
-                        value={shippingCity}
-                        onInput={(e) =>
-                          setShippingCity(
-                            (
-                              e.target as unknown as { value: string; }
-                            ).value,
-                          )
-                        }
-                      />
-                      {fieldErrors.shippingCity && (
-                        <p className="checkout-form__error" role="alert">{fieldErrors.shippingCity} </p>
-                      )}
-                    </div>
-                    <div className="checkout-form__field-wrapper">
-                      <OutlinedTextField
-                        label="State"
-                        autocomplete="address-level1"
-                        required
-                        value={shippingState}
-                        onInput={(e) =>
-                          setShippingState(
-                            (
-                              e.target as unknown as { value: string; }
-                            ).value,
-                          )
-                        }
-                      />
-                      {fieldErrors.shippingState && (
-                        <p className="checkout-form__error" role="alert">{fieldErrors.shippingState}</p>
-                      )}
-                    </div>
-                    <div className="checkout-form__field-wrapper">
-                      <OutlinedTextField
-                        label={checkoutContent.fields.pincode}
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        autocomplete="postal-code"
-                        maxLength={6}
-                        required
-                        value={shippingPincode}
-                        onInput={(e) =>
-                          setShippingPincode(
-                            (
-                              e.target as unknown as { value: string; }
-                            ).value
-                              .replace(/\D/g, '')
-                              .slice(0, 6),
-                          )
-                        }
-                      />
-                      {fieldErrors.shippingPincode && (
-                        <p className="checkout-form__error" role="alert" > {fieldErrors.shippingPincode} </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                {error && (
-                  <p className="error-state" role="alert" > {error} </p>
-                )}
-                <div className="checkout-form__nav">
-                  <FilledButton
-                    className="checkout-form__next-btn"
-                    onClick={submitDetails}
-                    disabled={detailsSubmitting}
-                  >
-                    {detailsSubmitting ? 'Please wait…' : checkoutContent.nextLabel}
-                    <Icon slot="trailing-icon" aria-hidden="true" >  arrow_forward </Icon>
-                  </FilledButton>
-                </div>
-              </section>
-            </div>
-            <aside className="checkout-page__summary" aria-label="Order summary" >
-              <div className="checkout-summary-card">
-                <div className="checkout-summary">
-                  <div className="checkout-summary__header">
-                    <div>
-                      <p className="checkout-summary__eyebrow"> YOUR ORDER </p>
-                      <h2 className="checkout-summary__heading"> {checkoutContent.orderSummaryHeading} </h2>
-                    </div>
-                    <div className="checkout-summary__bag">
-                      <Icon> shopping_bag </Icon>
-                    </div>
-                  </div>
-                  <div className="checkout-summary__empty">
-                    <Icon> shopping_cart </Icon>
-                    <p> Your order summary will appear
-                      after checkout.
-                    </p>
-                  </div>
-                  <Divider />
-                  <div className="checkout-summary__secure">
-                    <Icon> verified_user </Icon>
-                    <div>
-                      <strong> Safe & Secure</strong>
-                      <span> Your information is protected. </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </aside>
-          </div>
-        ) : !order ? null : (
-          <div className="checkout-page__layout">
-            <div className="checkout-page__form">
-              <section
-                aria-labelledby="step-pay-heading"
-                className="checkout-form-section"
-              >
-                <div className="checkout-form-section__header">
-                  <div className="checkout-form-section__icon">
-                    <Icon> credit_card </Icon>
-                  </div>
-                  <div>
-                    <h2 id="step-pay-heading" className="checkout-form__heading" > {checkoutContent.stepHeadings[2]} </h2>
-                    <p className="checkout-form__subheading">
-                      Choose your preferred payment
-                      method to complete your order.
-                    </p>
-                  </div>
-                </div>
-                {order.status !== 'PENDING_PAYMENT' ? (
-                  <div className="checkout-payment-status">
-                    <div className="checkout-payment-status__icon">
-                      <Icon> check_circle </Icon>
-                    </div>
-                    <p className="field-hint"> This order is already{' '} {order.status.toLowerCase()}. </p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="checkout-form__group">
-                      <p className="checkout-form__group-label"> Payment Method </p>
-                      <div
-                        role="radiogroup"
-                        aria-label="Payment method"
-                        className="checkout-payment-methods"
-                      >
-                        <label
-                          className={`checkout-payment-methods__opt${paymentMethod === 'online' ? ' checkout-payment-methods__opt--selected' : ''}`}
-                        >
-                          <Radio
-                            name="payment-method"
-                            checked={paymentMethod === 'online'}
-                            onChange={() =>
-                              setPaymentMethod('online',
-                              )
-                            }
-                          />
-                          <span className="checkout-payment-methods__content">
-                            <span className="checkout-payment-methods__icon">
-                              <Icon> account_balance_wallet </Icon>
-                            </span>
-                            <span>
-                              <strong> Online Payment </strong>
-                              <small> Razorpay · UPI · Card · Net Banking</small>
-                            </span>
-                          </span>
-                        </label>
-                        <label
-                          className={`checkout-payment-methods__opt${paymentMethod === 'cod'
-                            ? ' checkout-payment-methods__opt--selected'
-                            : ''
-                            }`}
-                        >
-
-                          <Radio
-                            name="payment-method"
-                            checked={
-                              paymentMethod ===
-                              'cod'
-                            }
-                            onChange={() =>
-                              setPaymentMethod(
-                                'cod',
-                              )
-                            }
-                          />
-
-                          <span className="checkout-payment-methods__content">
-
-                            <span className="checkout-payment-methods__icon">
-                              <Icon>
-                                payments
-                              </Icon>
-                            </span>
-
-                            <span>
-                              <strong>
-                                Cash on Delivery
-                              </strong>
-
-                              <small>
-                                Pay when your order arrives
-                              </small>
-                            </span>
-
-                          </span>
-
-                        </label>
-
-                      </div>
-
-                    </div>
-
-                    {/* Amount Information */}
-
-                    <div className="checkout-payment-total">
-
-                      <div>
-                        <span>
-                          Amount payable
-                        </span>
-
-                        <strong>
-                          {formatINR(
-                            combinedTotal,
-                          )}
-                        </strong>
-                      </div>
-
-                      <p>
-                        You're paying{' '}
-                        <strong>
-                          {formatINR(combinedTotal,)}
-                        </strong>{' '}
-                        {vendorGroups.length <= 1 ? (
-                          <>
-                            to{' '}
-                            <strong>{order.vendorNameSnapshot}</strong>
-                            {' '}({order.branchNameSnapshot}).
-                          </>
-                        ) : (
-                          `across ${vendorGroups.length} vendors in one payment.`
-                        )}
-                      </p>
-                    </div>
-                    {paymentMethod ===
-                      'online' ? (
-                      <div className="checkout-payment-action">
-                        <FilledButton
-                          className="checkout-form__next-btn"
-                          onClick={openRazorpay}
-                          disabled={paying || !paymentIntent}
-                        >
-                          {paying ? 'Opening payment…' : `Pay ${formatINR(combinedTotal,)}`}
-                          <Icon slot="trailing-icon" aria-hidden="true"
-                          > arrow_forward</Icon>
-                        </FilledButton>
-                        <p className="checkout-form__secure">
-                          <Icon aria-hidden="true"> lock </Icon>
-                          Payments are handled
-                          securely by Razorpay.
-                          Card/UPI/netbanking
-                          details never touch
-                          MSD's servers.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="checkout-payment-action">
-                        <FilledButton
-                          className="checkout-form__next-btn"
-                          onClick={placeCodOrder}
-                          disabled={paying}
-                        >
-                          {paying ? 'Placing order…' : checkoutContent.placeOrderLabel}
-                          <Icon slot="trailing-icon" aria-hidden="true"> check </Icon>
-                        </FilledButton>
-                      </div>
-                    )}
-                  </>
-                )}
-                {error && (
-                  <p className="error-state" role="alert" >  {error} </p>
-                )}
-              </section>
-            </div>
-            <aside className="checkout-page__summary" aria-label="Order summary">
-              <div className="checkout-summary-card">
-                <div className="checkout-summary">
-                  <div className="checkout-summary__header">
-                    <div>
-                      <p className="checkout-summary__eyebrow"> ORDER REVIEW </p>
-                      <h2 className="checkout-summary__heading"> {checkoutContent.orderSummaryHeading}</h2>
-                    </div>
-                    <div className="checkout-summary__bag">
-                      <Icon> shopping_bag </Icon>
-                    </div>
-                  </div>
-                  {vendorGroups.map((group) => (
-                    <div key={group.vendorId} className="checkout-summary__vendor-group">
-                      {vendorGroups.length > 1 && (
-                        <p className="checkout-summary__vendor-heading">
-                          <Icon aria-hidden="true">storefront</Icon>
-                          {group.vendorName}
-                        </p>
-                      )}
-                      <ul className="checkout-summary__items">
-                        {group.items.map(
-                          (item) => (
-                            <li key={item.id} className="checkout-summary__item">
-                              <div className="checkout-summary__item-main">
-                                <p className="checkout-summary__item-title">{item.itemName} </p>
-                                <p className="checkout-summary__item-qty">  × {item.quantity} {item.durationMinutes && ` · ${item.durationMinutes} min`} </p>
-                              </div>
-                              <p className="checkout-summary__item-price">{formatINR(Number(item.lineTotal,),)} </p>
-                            </li>
-                          ),
-                        )}
-                      </ul>
-                    </div>
-                  ))}
-                  <Divider />
-                  <div className="checkout-summary__total">
-                    <span> {content.cart.total} </span>
-                    <strong>{formatINR(combinedTotal,)} </strong>
-                  </div>
-                  {order.shippingAddress && (
-                    <>
-                      <Divider />
-                      <div className="checkout-summary__delivery">
-                        <div className="checkout-summary__delivery-icon">
-                          <Icon> location_on </Icon>
-                        </div>
-                        <div>
-                          <strong> Delivery Details </strong>
-                          <p>
-                            {order.contactName}
-                            {' · '}
-                            {order.shippingAddress}
-                            {', '}
-                            {order.shippingCity}
-                            {' '}
-                            {order.shippingPincode}
-                          </p>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                  <div className="checkout-summary__secure">
-                    <Icon> verified_user </Icon>
-                    <div>
-                      <strong> Secure Checkout </strong>
-                      <span>
-                        Your payment and personal
-                        information are protected.
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              {!isRetryPayment && (
-                <OutlinedButton className="checkout-summary__back" onClick={() => setStep('details')} >
-                  <Icon slot="icon" aria-hidden="true"> arrow_back </Icon>
-                  {checkoutContent.backLabel}
+          <FormPanel
+            id={STEP_ID}
+            heading={checkoutContent.stepHeadings[0]}
+            intro={checkoutContent.detailsIntro}
+            footerLead={errorAlert}
+            actions={
+              <>
+                <OutlinedButton onClick={() => navigate('/cart')}>
+                  <Icon slot="icon" aria-hidden="true">
+                    arrow_back
+                  </Icon>
+                  {checkoutContent.backToCart}
                 </OutlinedButton>
+                <FilledButton
+                  onClick={submitDetails}
+                  disabled={detailsSubmitting}
+                >
+                  {detailsSubmitting
+                    ? checkoutContent.pleaseWait
+                    : checkoutContent.nextLabel}
+                  <Icon slot="trailing-icon" aria-hidden="true">
+                    arrow_forward
+                  </Icon>
+                </FilledButton>
+              </>
+            }
+          >
+            <FormPanelSection>
+              <div className="form-grid">
+                <FormField error={fieldErrors.contactName}>
+                  <OutlinedTextField
+                    label={checkoutContent.fields.name}
+                    value={contactName}
+                    required
+                    autocomplete="name"
+                    onInput={field(setContactName)}
+                  />
+                </FormField>
+                <FormField error={fieldErrors.contactPhone}>
+                  <OutlinedTextField
+                    label={checkoutContent.fields.phone}
+                    type="tel"
+                    inputMode="numeric"
+                    autocomplete="tel"
+                    maxLength={10}
+                    required
+                    value={contactPhone}
+                    onInput={field(setContactPhone, digits(10))}
+                  />
+                </FormField>
+                <FormField error={fieldErrors.contactEmail} wide>
+                  <OutlinedTextField
+                    label={checkoutContent.fields.email}
+                    type="email"
+                    autocomplete="email"
+                    required
+                    value={contactEmail}
+                    onInput={field(setContactEmail)}
+                  />
+                </FormField>
+                <FormField error={fieldErrors.shippingAddress} wide>
+                  <OutlinedTextField
+                    label={checkoutContent.fields.address}
+                    autocomplete="street-address"
+                    required
+                    value={shippingAddress}
+                    onInput={field(setShippingAddress)}
+                  />
+                </FormField>
+                {/* State first, then its cities: the shared India list, as on branches (D33). */}
+                <FormField error={fieldErrors.shippingState}>
+                  {renderSelect({
+                    label: checkoutContent.fields.state,
+                    value: shippingState,
+                    required: true,
+                    placeholder: checkoutContent.fields.selectState,
+                    options: asOptions(STATES),
+                    onChange: chooseState,
+                  })}
+                </FormField>
+                {/* Keyed by state: md-select only shows a value that matches an option it already has. */}
+                <FormField key={shippingState} error={fieldErrors.shippingCity}>
+                  {renderSelect({
+                    label: checkoutContent.fields.city,
+                    value: shippingCity,
+                    required: true,
+                    disabled: !shippingState,
+                    placeholder: shippingState
+                      ? checkoutContent.fields.selectCity
+                      : checkoutContent.fields.selectStateFirst,
+                    options: asOptions(citiesForState(shippingState)),
+                    onChange: setShippingCity,
+                  })}
+                </FormField>
+                <FormField error={fieldErrors.shippingPincode}>
+                  <OutlinedTextField
+                    label={checkoutContent.fields.pincode}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    autocomplete="postal-code"
+                    maxLength={6}
+                    required
+                    value={shippingPincode}
+                    onInput={field(setShippingPincode, digits(6))}
+                  />
+                </FormField>
+              </div>
+            </FormPanelSection>
+          </FormPanel>
+        ) : order ? (
+          <FormPanel
+            id={STEP_ID}
+            heading={checkoutContent.stepHeadings[2]}
+            intro={checkoutContent.paymentIntro}
+            footerLead={
+              <>
+                {order.status === 'PENDING_PAYMENT' && (
+                  <p className="body-large">{payingText}</p>
+                )}
+                {errorAlert}
+              </>
+            }
+            actions={
+              order.status === 'PENDING_PAYMENT' && (
+                <>
+                  {!isRetryPayment && (
+                    <OutlinedButton onClick={() => setStep('details')}>
+                      <Icon slot="icon" aria-hidden="true">
+                        arrow_back
+                      </Icon>
+                      {checkoutContent.backLabel}
+                    </OutlinedButton>
+                  )}
+                  {paymentMethod === 'online' ? (
+                    <FilledButton
+                      onClick={openRazorpay}
+                      disabled={paying || !paymentIntent}
+                    >
+                      {paying
+                        ? checkoutContent.openingPayment
+                        : fillTemplate(checkoutContent.payLabel, {
+                            amount: formatINR(combinedTotal),
+                          })}
+                      <Icon slot="trailing-icon" aria-hidden="true">
+                        arrow_forward
+                      </Icon>
+                    </FilledButton>
+                  ) : (
+                    <FilledButton onClick={placeCodOrder} disabled={paying}>
+                      {paying
+                        ? checkoutContent.placingOrder
+                        : checkoutContent.placeOrderLabel}
+                      <Icon slot="trailing-icon" aria-hidden="true">
+                        check
+                      </Icon>
+                    </FilledButton>
+                  )}
+                </>
+              )
+            }
+            note={
+              order.status === 'PENDING_PAYMENT' && paymentMethod === 'online'
+                ? checkoutContent.securePaymentNote
+                : undefined
+            }
+          >
+            {order.shippingAddress && (
+              <FormPanelSection
+                title={checkoutContent.deliveringTo}
+                icon="location_on"
+                action={
+                  !isRetryPayment && (
+                    <TextButton onClick={() => setStep('details')}>
+                      {checkoutContent.editDetails}
+                    </TextButton>
+                  )
+                }
+              >
+                <p className="body-medium">
+                  {[
+                    order.contactName,
+                    order.shippingAddress,
+                    order.shippingCity,
+                    order.shippingPincode,
+                  ]
+                    .filter(Boolean)
+                    .join(', ')}
+                </p>
+              </FormPanelSection>
+            )}
+            <FormPanelSection>
+              {order.status !== 'PENDING_PAYMENT' ? (
+                <p className="body-large">
+                  {checkoutContent.orderStatusPrefix}{' '}
+                  {order.status.toLowerCase()}.
+                </p>
+              ) : (
+                <RadioCardGroup
+                  legend={checkoutContent.paymentMethod}
+                  name="payment-method"
+                  value={paymentMethod}
+                  options={[
+                    {
+                      value: 'online',
+                      icon: 'account_balance_wallet',
+                      ...checkoutContent.methods.online,
+                    },
+                    {
+                      value: 'cod',
+                      icon: 'payments',
+                      ...checkoutContent.methods.cod,
+                    },
+                  ]}
+                  onChange={(method) =>
+                    setPaymentMethod(method as PaymentMethod)
+                  }
+                />
               )}
-            </aside>
-          </div>
-        )}
-      </div>
-    </div>
+            </FormPanelSection>
+          </FormPanel>
+        ) : null}
+      </SplitLayout>
+    </PageSection>
   );
 }
+
 export default Checkout;

@@ -93,6 +93,7 @@ const CUSTOMER_ORDER_INCLUDE = {
       },
       product: {
         select: {
+          slug: true,
           image: true,
           gallery: true,
           mediaImages: {
@@ -211,13 +212,29 @@ export async function createOrderFromCart(customerId: string, contactDetails: Or
       throw new ApiError('VALIDATION_ERROR', 'Your cart is empty');
     }
 
+    // Item 2.2 (D37): a complete delivery address becomes the customer's saved one for next time.
+    const { shippingAddress, shippingState, shippingCity, shippingPincode } = contactDetails;
+    if (shippingAddress && shippingState && shippingCity && shippingPincode) {
+      await tx.user.update({
+        where: { id: customerId },
+        data: { address: shippingAddress, state: shippingState, city: shippingCity, pincode: shippingPincode },
+      });
+    }
+
     // Idempotent reuse — see Cart.pendingOrderId's schema doc comment. A repeat checkout call
     // (double-click, page refresh, browser back/forward) for a cart whose Order is still in
     // flight returns that same Order instead of creating a duplicate one.
     if (cart.pendingOrderId) {
       const pending = await tx.order.findUnique({ where: { id: cart.pendingOrderId }, include: ORDER_INCLUDE });
       if (pending && pending.status === 'PENDING_PAYMENT') {
-        return pending;
+        // Keep the order idempotent, but refresh the checkout snapshot if the customer edited
+        // their details before retrying checkout. Otherwise a retry returns the previous
+        // PENDING_PAYMENT order with stale contact fields, even though this request supplied
+        // newer details.
+        const hasContactUpdates = Object.values(contactDetails).some((value) => value !== undefined);
+        return hasContactUpdates
+          ? tx.order.update({ where: { id: pending.id }, data: contactDetails, include: ORDER_INCLUDE })
+          : pending;
       }
       // Stale reference (that Order was since cancelled, or is otherwise gone) — clear it and
       // fall through to create a fresh Order from the cart's still-intact items.
@@ -378,18 +395,13 @@ export async function createOrderFromCart(customerId: string, contactDetails: Or
   });
 }
 
-//HELPER FUNCTION
-
+/** An order item image: full URLs (legacy images) as they are; an R2 storage key prefixed with
+ *  `R2_PUBLIC_URL` when set, else the bare key, which the frontend resolves with
+ *  `VITE_MEDIA_BASE_URL` (never `/<key>`, which would point at the frontend's own origin). */
 function getPublicImageUrl(storageKey: string | null | undefined): string | null {
   if (!storageKey) return null;
-
-  // Agar already full URL hai toh waisa hi return kar do
-  if (storageKey.startsWith('http://') || storageKey.startsWith('https://')) {
-    return storageKey;
-  }
-
-  // R2 storage key hai → public URL banao
-  return `${env.r2PublicUrl}/${storageKey}`;
+  if (storageKey.startsWith('http://') || storageKey.startsWith('https://')) return storageKey;
+  return env.r2PublicUrl ? `${env.r2PublicUrl}/${storageKey}` : storageKey;
 }
 // ─── Customer self-service ────────────────────────────────────────────────────
 
@@ -437,11 +449,47 @@ interface OrderListFilters {
   search?: string;
 }
 
-/** For a vendor caller, an Order's `items[]` must never include another vendor's line items —
- *  a multi-vendor order is only ever fully visible to the customer who placed it and to
- *  admin/SuperAdmin. Applied to every order returned to a vendor caller in this file. */
-function scopeOrderItemsToVendor<T extends { items: { vendorId: string }[] }>(order: T, vendorId: string): T {
-  return { ...order, items: order.items.filter((item) => item.vendorId === vendorId) };
+interface ScopableItem {
+  vendorId: string;
+  vendorNameSnapshot: string;
+  branchId: string | null;
+  branchNameSnapshot: string | null;
+  lineTotal: Prisma.Decimal;
+}
+
+interface ScopableOrder {
+  vendorId: string;
+  branchId: string | null;
+  branch: { id: string } | null;
+  items: ScopableItem[];
+  payments: { amount: Prisma.Decimal }[];
+}
+
+/**
+ * A member's view of an order (item 5). A multi-member order is whole only for the customer who
+ * placed it and for staff; a member sees their own lines and nothing that reveals another member:
+ * totals and each payment amount become the sum of their own lines, and the order's "primary"
+ * vendor and branch (the first line's, possibly another member's) are replaced by their own.
+ * Applied to every order this file returns to a member.
+ */
+function scopeOrderForMember<T extends ScopableOrder>(order: T, memberId: string): T {
+  const items = order.items.filter((item) => item.vendorId === memberId);
+  const own = items[0];
+  const ownTotal = items.reduce((sum, item) => sum.plus(item.lineTotal), new Prisma.Decimal(0));
+  const ownBranchId = own?.branchId ?? null;
+  return {
+    ...order,
+    items,
+    subtotal: ownTotal,
+    total: ownTotal,
+    vendorId: memberId,
+    vendorNameSnapshot: own?.vendorNameSnapshot ?? '',
+    vendor: { id: memberId, businessName: own?.vendorNameSnapshot ?? '' },
+    branchId: ownBranchId,
+    branchNameSnapshot: own?.branchNameSnapshot ?? null,
+    branch: order.branch && order.branch.id === ownBranchId ? order.branch : null,
+    payments: order.payments.map((payment) => ({ ...payment, amount: ownTotal })),
+  };
 }
 
 /**
@@ -506,6 +554,24 @@ function buildBaseOrderWhere(
  * results additionally have every returned order's `items[]` filtered down to their own items
  * only — never another vendor's line items/pricing, even for an order they're scoped to see.
  */
+/** Order search: staff match any business, branch, customer or item name; a member matches only
+ *  the customer and their own item names, so a search never reveals another member's orders. */
+function orderSearch(search: string, memberId?: string): Prisma.OrderWhereInput[] {
+  const contains = { contains: search, mode: 'insensitive' as const };
+  const ownItems = memberId ? { vendorId: memberId } : {};
+  return [
+    { customer: { is: { name: contains } } },
+    { items: { some: { ...ownItems, itemName: contains } } },
+    ...(memberId
+      ? []
+      : [
+          { vendorNameSnapshot: contains },
+          { branchNameSnapshot: contains },
+          { items: { some: { vendorNameSnapshot: contains } } },
+        ]),
+  ];
+}
+
 /** ALL = the caller holds orders:{action}; OWN = member self-service, own business only. */
 export type OrderScope = 'ALL' | 'OWN';
 
@@ -519,12 +585,21 @@ export async function listOrders(callerUserId: string, scope: OrderScope, opts: 
     // Order has no single "payment status" column of its own (Order 1 -> Payment[]) — this
     // matches "has at least one payment attempt in this state", not "the current/latest one".
     ...(opts.paymentStatus ? { payments: { some: { status: opts.paymentStatus } } } : {}),
+    ...(opts.createdFrom || opts.createdTo
+      ? {
+          createdAt: {
+            ...(opts.createdFrom ? { gte: new Date(opts.createdFrom) } : {}),
+            ...(opts.createdTo ? { lte: new Date(opts.createdTo) } : {}),
+          },
+        }
+      : {}),
+    ...(opts.search ? { OR: orderSearch(opts.search, vendor?.id) } : {}),
   };
   const [rawItems, total] = await Promise.all([
     prisma.order.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (opts.page - 1) * opts.pageSize, take: opts.pageSize, include: ORDER_INCLUDE }),
     prisma.order.count({ where }),
   ]);
-  const items = vendor ? rawItems.map((order) => scopeOrderItemsToVendor(order, vendor.id)) : rawItems;
+  const items = vendor ? rawItems.map((order) => scopeOrderForMember(order, vendor.id)) : rawItems;
   return { items, total };
 }
 
@@ -563,7 +638,7 @@ export async function getOrderOrThrow(callerUserId: string, scope: OrderScope, i
   const order = await prisma.order.findUnique({ where: { id }, include: ORDER_INCLUDE });
   if (!order) throw new ApiError('NOT_FOUND', 'Order not found');
   if (!vendor) return order;
-  const scoped = scopeOrderItemsToVendor(order, vendor.id);
+  const scoped = scopeOrderForMember(order, vendor.id);
   if (scoped.items.length === 0) throw new ApiError('NOT_FOUND', 'Order not found');
   return scoped;
 }
@@ -583,8 +658,8 @@ export async function getOrderOrThrow(callerUserId: string, scope: OrderScope, i
  * still included for every caller who can see the order at all, since Order.status/payment
  * events aren't vendor-split).
  */
-export async function getOrderActivityHistory(callerUserId: string, id: string) {
-  const order = await getOrderOrThrow(callerUserId, id);
+export async function getOrderActivityHistory(callerUserId: string, scope: OrderScope, id: string) {
+  const order = await getOrderOrThrow(callerUserId, scope, id);
   const itemIds = order.items.map((item) => item.id);
 
   const items = itemIds.length

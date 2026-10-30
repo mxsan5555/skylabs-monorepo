@@ -160,8 +160,13 @@ router.get('/deals/:id', validateParams(DealIdOrSlugParamSchema), async (req, re
 
 router.get('/products', validateQuery(CatalogProductQuerySchema), async (req, res, next) => {
   try {
-    const { categoryIds, tags, ...query } = req.validatedQuery as ReturnType<typeof CatalogProductQuerySchema.parse>;
-    const { items, total } = await catalogService.listPublicProducts({ ...query, categoryIds: splitIds(categoryIds), tags: splitTags(tags) });
+    const { categoryIds, vendorIds, tags, ...query } = req.validatedQuery as ReturnType<typeof CatalogProductQuerySchema.parse>;
+    const { items, total } = await catalogService.listPublicProducts({
+      ...query,
+      categoryIds: splitIds(categoryIds),
+      vendorIds: splitIds(vendorIds),
+      tags: splitTags(tags),
+    });
     sendData(res, items, { meta: { total, page: query.page, pageSize: query.pageSize } });
   } catch (err) {
     next(err);
@@ -171,8 +176,11 @@ router.get('/products', validateQuery(CatalogProductQuerySchema), async (req, re
 // Before `/products/:id` (UUID-validated), same as `/deals/facets`.
 router.get('/products/facets', validateQuery(CatalogProductFacetQuerySchema), async (req, res, next) => {
   try {
-    const { categoryIds, tags, ...query } = req.validatedQuery as ReturnType<typeof CatalogProductFacetQuerySchema.parse>;
-    sendData(res, await catalogService.getPublicProductFacets({ ...query, categoryIds: splitIds(categoryIds), tags: splitTags(tags) }));
+    const { categoryIds, vendorIds, tags, ...query } = req.validatedQuery as ReturnType<typeof CatalogProductFacetQuerySchema.parse>;
+    sendData(
+      res,
+      await catalogService.getPublicProductFacets({ ...query, categoryIds: splitIds(categoryIds), vendorIds: splitIds(vendorIds), tags: splitTags(tags) }),
+    );
   } catch (err) {
     next(err);
   }

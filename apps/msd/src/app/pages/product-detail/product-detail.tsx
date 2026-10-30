@@ -32,7 +32,7 @@ const SITE_URL = (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
  * in a location/hours panel here.
  */
 export function ProductDetail() {
-  const { slug: id = '' } = useParams<{ slug: string }>();
+  const { slug = '' } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const { token, isAuthenticated } = useAuth();
@@ -53,7 +53,7 @@ export function ProductDetail() {
     // reported "blinking" (content → stale refetch flips loading back on → content again).
     let cancelled = false;
 
-    if (!id) {
+    if (!slug) {
       setProduct(null);
       setError(products.detail.errors.invalidProduct);
       setLoading(false);
@@ -62,7 +62,7 @@ export function ProductDetail() {
     setLoading(true);
     setError('');
     setActiveImg(0);
-    getCatalogProduct(id)
+    getCatalogProduct(slug)
       .then(({ data }) => { if (!cancelled) setProduct(data); })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -78,7 +78,7 @@ export function ProductDetail() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [slug]);
   useEffect(() => {
     if (!product) return;
     const canonical = productPath(product);
@@ -163,7 +163,7 @@ export function ProductDetail() {
   }
   const seoName = name.length > 50 ? `${name.slice(0, 47)}…` : name;
   const seoDesc = description ? `${description.slice(0, 120)} Shop now at MSD.` : `Shop ${name} at MSD.`;
-  const canonicalUrl = `${SITE_URL}/products/${product.id}`;
+  const canonicalUrl = `${SITE_URL}${productPath(product)}`;
   return (
     <div className="product-detail">
       <title>{`${seoName} | MSD`}</title>

@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
+import { productionEnvProblems } from './env-checks';
 
 // Loaded once, first thing, before any other module reads process.env.
 // apps/msd-api/.env.local is never committed (see .gitignore); .env.example documents the shape.
@@ -61,6 +62,8 @@ export const env = {
   trustProxyHops: optionalInt('TRUST_PROXY_HOPS', 0),
   /** Swagger UI at /docs: on outside production, off in production unless API_DOCS=true. */
   apiDocsEnabled: process.env.API_DOCS === 'true' || process.env.NODE_ENV !== 'production',
+  /** One JSON log line per request (P2-10). On outside tests unless REQUEST_LOGGING=false. */
+  requestLogging: process.env.REQUEST_LOGGING ? process.env.REQUEST_LOGGING === 'true' : process.env.NODE_ENV !== 'test',
 
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? '',
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
@@ -69,6 +72,18 @@ export const env = {
   supportPhone: process.env.SUPPORT_PHONE ?? '',
   /** 32 bytes, base64. Encrypts full Aadhaar and PAN numbers at rest. Optional in development. */
   fieldEncryptionKey: process.env.FIELD_ENCRYPTION_KEY ?? '',
+  /** Local test accounts (comma-separated phones or emails) whose OTP prints in the API console
+   *  instead of being sent. Development only: production refuses to boot with it set. */
+  devOtpIdentifiers: (process.env.DEV_OTP_IDENTIFIERS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+  /** The storefront's public origin, for links in customer emails (order page). Defaults to the
+   *  first CORS origin, which is the storefront in every environment we run. */
+  publicSiteUrl: (process.env.PUBLIC_SITE_URL ?? '').trim().replace(/\/$/, ''),
+  /** D38: an order SMS goes out only when its DLT template id is set; email always goes. */
+  smsDltTemplateOrderConfirmed: process.env.SMS_DLT_TEMPLATE_ORDER_CONFIRMED ?? '',
+  smsDltTemplatePaymentFailed: process.env.SMS_DLT_TEMPLATE_PAYMENT_FAILED ?? '',
   /** Shared with the Railway cron service; guards `/internal/jobs/*`. Unset disables the jobs (503). */
   cronSecret: process.env.CRON_SECRET ?? '',
   /** Secret mixed into the document number hash used for the duplicate check. */
@@ -115,3 +130,10 @@ export const env = {
   r2PrivateBucket: process.env.R2_PRIVATE_BUCKET ?? '',
   r2PublicUrl: process.env.R2_PUBLIC_URL ?? '',
 };
+
+// P2-09: production fails fast on weak or missing security settings instead of starting with
+// them. The message names the variables only, never their values.
+if (env.nodeEnv === 'production') {
+  const problems = productionEnvProblems(process.env);
+  if (problems.length > 0) throw new Error(`Unsafe production environment: ${problems.join('; ')}`);
+}

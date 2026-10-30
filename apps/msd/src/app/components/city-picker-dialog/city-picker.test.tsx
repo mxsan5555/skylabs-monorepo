@@ -89,4 +89,17 @@ describe('CityPicker', () => {
     expect(screen.queryByRole('alert')).toBeNull();
     expect(onDone).not.toHaveBeenCalled();
   });
+
+  it('stays open and says no partner city is near when the visitor is too far away (ST-05)', async () => {
+    requestBrowser.mockResolvedValue('far');
+    const onDone = vi.fn();
+    render(<CityPicker onDone={onDone} />);
+    await locate();
+    expect(onDone).not.toHaveBeenCalled();
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent(t.locateFarTitle);
+    expect(alert).toHaveTextContent('75 km');
+    expect(alert).not.toHaveTextContent(t.locateFailedTitle);
+    expect(screen.getByText(t.useCurrent).closest('md-filled-tonal-button')).toHaveAttribute('aria-describedby', alert.id);
+  });
 });

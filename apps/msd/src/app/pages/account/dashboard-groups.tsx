@@ -1,5 +1,6 @@
 import { useId } from 'react';
 import { Link } from 'react-router-dom';
+import { StatTile } from '../../components/stat-tile/stat-tile';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { Icon } from '@skylabs-monorepo/shared-ui/react';
 import type { DashboardStats } from '../../../api/rbac/dashboard';
@@ -63,20 +64,6 @@ export interface DashboardGroupsProps {
   widgetKeys: string[];
 }
 
-function StatBody({ card, stats, loading }: { card: StatCard; stats: DashboardStats | null; loading: boolean }) {
-  return (
-    <>
-      <span className="dashboard-stat__icon">
-        <Icon aria-hidden="true">{card.icon}</Icon>
-      </span>
-      <div className="dashboard-stat__text">
-        <p className="dashboard-stat__value title-large">{loading || !stats ? '—' : card.value(stats)}</p>
-        <p className="dashboard-stat__label body-medium">{card.label}</p>
-      </div>
-    </>
-  );
-}
-
 function StatGroup({ title, cards, stats, loading }: { title: string; cards: StatCard[]; stats: DashboardStats | null; loading: boolean }) {
   const headingId = useId();
   const { can } = useAuth();
@@ -89,18 +76,12 @@ function StatGroup({ title, cards, stats, loading }: { title: string; cards: Sta
       <ul className="dashboard-stats" aria-busy={loading}>
         {cards.map((card) => (
           <li key={card.key}>
-            {can(card.link.menuKey, 'view') ? (
-              <Link to={card.link.to} className="dashboard-stat">
-                <StatBody card={card} stats={stats} loading={loading} />
-                <span className="dashboard-stat__go">
-                  <Icon aria-hidden="true">arrow_forward</Icon>
-                </span>
-              </Link>
-            ) : (
-              <div className="dashboard-stat">
-                <StatBody card={card} stats={stats} loading={loading} />
-              </div>
-            )}
+            <StatTile
+              icon={card.icon}
+              value={loading || !stats ? '—' : card.value(stats)}
+              label={card.label}
+              to={can(card.link.menuKey, 'view') ? card.link.to : undefined}
+            />
           </li>
         ))}
       </ul>

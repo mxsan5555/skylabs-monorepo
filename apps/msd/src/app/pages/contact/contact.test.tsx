@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import content from '../../../content.json';
@@ -55,6 +55,34 @@ describe('Contact', () => {
     expect(screen.getByTitle(t.mapTitle).getAttribute('src')).toBe(
       'https://maps.example/embed',
     );
+  });
+
+  /** CO-01: each empty CMS field falls back on its own, never the whole row. */
+  it('falls back field by field when the CMS row is partly filled', async () => {
+    contactUs.mockResolvedValue({
+      data: { address: '1 MG Road, Pune', phone: '', email: '', mapEmbedUrl: '' },
+    });
+    renderContact();
+    expect(await screen.findByText('1 MG Road, Pune')).toBeTruthy();
+    expect(screen.getByRole('link', { name: t.defaults.email }).getAttribute('href')).toBe(`mailto:${t.defaults.email}`);
+    // No CMS phone and no default phone yet (ST-34): the phone row is left out, never blank.
+    expect(document.querySelector('a[href^="tel:"]')).toBeNull();
+    expect(screen.getByTitle(t.mapTitle).getAttribute('src')).toContain(encodeURIComponent('1 MG Road, Pune'));
+  });
+
+  it('uses the CMS meta title and description when set, else the page defaults', async () => {
+    contactUs.mockResolvedValue({
+      data: { address: '', phone: '', email: '', mapEmbedUrl: '', metaTitle: 'Talk to MySpaDeal', metaDescription: 'Reach our team in Pune.' },
+    });
+    const { unmount } = renderContact();
+    await waitFor(() => expect(document.title).toContain('Talk to MySpaDeal'));
+    expect(document.querySelector('meta[name="description"]')?.getAttribute('content')).toBe('Reach our team in Pune.');
+    unmount();
+
+    contactUs.mockResolvedValue({ data: null });
+    renderContact();
+    await waitFor(() => expect(document.title).toContain(t.title));
+    expect(document.querySelector('meta[name="description"]')?.getAttribute('content')).toBe(t.description);
   });
 
   it('asks for the required fields before sending', () => {

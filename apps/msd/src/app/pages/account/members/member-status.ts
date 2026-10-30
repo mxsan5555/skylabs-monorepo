@@ -88,7 +88,7 @@ export const ACTIVITY_DETAIL_LABEL: Record<ActivityItem['kind'], string> = {
   review: 'Reason',
 };
 
-const documentsState = (summary: Summary | undefined) => (summary?.complete ? 'complete' : 'incomplete');
+export const documentsState = (summary: Summary | undefined) => (summary?.complete ? 'complete' : 'incomplete');
 
 export function documentsChipLabel(summary: Summary | undefined): string {
   return DOCUMENTS_LABEL[documentsState(summary)];
@@ -107,18 +107,35 @@ export function dueDateLabel(summary: Summary | undefined): string {
   return `${summary.overdue ? 'Overdue since' : 'Due'} ${formatDate(summary.dueAt)}`;
 }
 
-export type StatusAction = 'deactivate' | 'suspend' | 'reactivate' | 'delete';
+export type StatusAction = 'deactivate' | 'suspend' | 'reactivate' | 'delete' | 'restore';
 
+/** One header action; `blockedBy` marks the next step that is not allowed yet and why. */
+export interface StatusActionOption {
+  action: StatusAction;
+  blockedBy?: string;
+}
+
+/** Why the next step is not available yet (item 6). Mirrors the msd-api status machine. */
+export const MAKE_INACTIVE_FIRST = 'Make the member inactive first.';
+export const SUSPEND_FIRST = 'Suspend the member first.';
+
+/**
+ * Header actions for a member's status (item 6): Active, then Inactive, then Suspended, then
+ * Delete, which archives; every step can come back (Reactivate, Restore). The next step that is
+ * not allowed yet is listed with `blockedBy`, so staff see the journey instead of a missing button.
+ */
 export function availableStatusActions(
   status: MemberStatus,
   can: { canStatusChange: boolean; canDelete: boolean },
-): StatusAction[] {
-  const actions: StatusAction[] = [];
+): StatusActionOption[] {
+  const actions: StatusActionOption[] = [];
   if (can.canStatusChange) {
-    if (status === 'ACTIVE') actions.push('deactivate', 'suspend');
-    if (status === 'INACTIVE') actions.push('reactivate', 'suspend');
-    if (status === 'SUSPENDED') actions.push('reactivate');
+    if (status === 'ACTIVE') actions.push({ action: 'deactivate' }, { action: 'suspend', blockedBy: MAKE_INACTIVE_FIRST });
+    if (status === 'INACTIVE') actions.push({ action: 'reactivate' }, { action: 'suspend' });
+    if (status === 'SUSPENDED') actions.push({ action: 'reactivate' });
+    if (status === 'ARCHIVED') actions.push({ action: 'restore' });
   }
-  if (can.canDelete && status === 'SUSPENDED') actions.push('delete');
+  if (can.canDelete && can.canStatusChange && status === 'INACTIVE') actions.push({ action: 'delete', blockedBy: SUSPEND_FIRST });
+  if (can.canDelete && status === 'SUSPENDED') actions.push({ action: 'delete' });
   return actions;
 }

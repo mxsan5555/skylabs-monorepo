@@ -242,7 +242,8 @@ export async function listVendors(opts: {
 }) {
   const providedStatuses: MemberDocumentStatus[] = ['SUBMITTED', 'APPROVED'];
   const where: Prisma.MemberWhereInput = {
-    ...(opts.status ? { status: opts.status } : {}),
+    // Archived (deleted) members only show when asked for, so they can be found and restored.
+    status: opts.status ?? { not: 'ARCHIVED' },
     ...(opts.reviewFlag ? { reviewFlaggedAt: { not: null } } : {}),
     ...(opts.documents === 'incomplete'
       ? {
@@ -584,7 +585,11 @@ export async function createMember(input: MemberCreateInput, createdByUserId: st
  * the owner's own current row so re-saving their own unchanged email/phone is never a false
  * conflict.
  */
-async function syncOwnerUserFromVendorFields(ownerUserId: string, input: VendorUpdateInput) {
+async function syncOwnerUserFromVendorFields(
+  ownerUserId: string,
+  input: VendorUpdateInput,
+  currentNames: { firstName: string | null; lastName: string | null },
+) {
   const touchesOwnerIdentity =
     'ownerFirstName' in input || 'ownerLastName' in input || 'ownerEmail' in input || 'ownerMobile' in input;
   if (!touchesOwnerIdentity) return;
@@ -608,10 +613,10 @@ async function syncOwnerUserFromVendorFields(ownerUserId: string, input: VendorU
   const owner = await prisma.user.findUnique({ where: { id: ownerUserId }, select: { name: true, email: true, phone: true } });
   if (!owner) return;
 
-  const firstName = 'ownerFirstName' in input ? input.ownerFirstName ?? '' : undefined;
-  const lastName = 'ownerLastName' in input ? input.ownerLastName ?? '' : undefined;
+  const firstName = 'ownerFirstName' in input ? input.ownerFirstName ?? '' : currentNames.firstName ?? '';
+  const lastName = 'ownerLastName' in input ? input.ownerLastName ?? '' : currentNames.lastName ?? '';
   const nextName = firstName !== undefined || lastName !== undefined
-    ? [firstName, lastName].filter((part) => part !== undefined && part !== '').join(' ').trim()
+    ? [firstName, lastName].map((part) => part.trim()).filter(Boolean).join(' ')
     : undefined;
 
   const nextEmail = 'ownerEmail' in input ? (email ?? null) : owner.email;
@@ -632,12 +637,26 @@ async function syncOwnerUserFromVendorFields(ownerUserId: string, input: VendorU
 
 export async function updateVendor(id: string, input: VendorUpdateInput) {
   const existing = await getVendorOrThrow(id);
+  if (existing.ownerUserId) {
+    await syncOwnerUserFromVendorFields(existing.ownerUserId, input, {
+      firstName: existing.ownerFirstName,
+      lastName: existing.ownerLastName,
+    });
+  }
   // The admin-create pipeline's Step 1 persists a Vendor before any businessName is known (see
   // createVendor above), so its slug starts out id-derived rather than name-derived. The FIRST
   // time a real businessName arrives via update, upgrade the slug to reflect it — but never
   // again after that, so a vendor's public `/vendor/:slug` URL never unexpectedly changes once
   // it's been derived from a real name.
   const data: Prisma.MemberUncheckedUpdateInput = { ...input } as Prisma.MemberUncheckedUpdateInput;
+  if (
+    !('contactPerson' in input) &&
+    ('ownerFirstName' in input || 'ownerLastName' in input)
+  ) {
+    const firstName = input.ownerFirstName ?? existing.ownerFirstName ?? '';
+    const lastName = input.ownerLastName ?? existing.ownerLastName ?? '';
+    data.contactPerson = [firstName, lastName].map((part) => part.trim()).filter(Boolean).join(' ');
+  }
   if (!existing.businessName && input.businessName) {
     data.slug = await ensureUniqueSlug(input.businessName, id, (candidate) =>
       prisma.member.findUnique({ where: { slug: candidate } }).then((v) => Boolean(v) && v!.id !== id),

@@ -9,7 +9,7 @@ import { AdminPage } from './admin/admin-page';
 import Home from './pages/home/home';
 import NotFound from './pages/not-found/not-found';
 import Showcase from './pages/showcase/showcase';
-import Blog from './pages/blog/blog';
+import Blog, { BlogCategory } from './pages/blog/blog';
 import BlogDetail from './pages/blog-detail/blog-detail';
 import SignIn from './pages/sign-in/sign-in';
 import Otp from './pages/otp/otp';
@@ -88,6 +88,7 @@ import WebsitePage from './pages/website-page/website-page';
 import { Orders } from './pages/orders/orders';
 import { OrderDetail } from './pages/orders/order-detail';
 import { Invoice } from './pages/invoice/invoice';
+import { OrderResult } from './pages/order-result/order-result';
 import DealDetail from './pages/deal-detail/deal-detail';
 import { Cart } from './pages/cart/cart';
 import Wishlist from './pages/wishlist/wishlist';
@@ -190,13 +191,13 @@ export function AppRoutes() {
           <Route path="/deals" element={<ListingPage key="deals" kind="deals" />} />
           <Route path="/deals/:city" element={<ListingPage key="deals" kind="deals" />} />
           <Route path="/products" element={<ListingPage key="products" kind="products" />} />
-          <Route path="/products/:id" element={<ProductDetail />} />
+          <Route path="/products/:slug" element={<ProductDetail />} />
           <Route path="/vendor/:slug" element={<VendorPage />} />
           {/* Therapist as an independent, directly browsable/purchasable entity — never reachable
             only via a Deal's page (see msd-api's Therapist schema doc comment). */}
           <Route path="/therapists" element={<ListingPage key="therapists" kind="therapists" />} />
           <Route path="/therapists/:city" element={<ListingPage key="therapists" kind="therapists" />} />
-          <Route path="/therapist/:id" element={<TherapistDetail />} />
+          <Route path="/therapist/:slug" element={<TherapistDetail />} />
           {/* Cart / Wishlist / Checkout — plain PublicLayout children (Header+Footer, no sidebar),
             exactly as they worked before the Customer Sidebar fix. These are NOT part of the
             Customer Sidebar — they stay reachable from the existing Header cart/wishlist icons,
@@ -293,6 +294,16 @@ export function AppRoutes() {
             }
           />
 
+          {/* Order result after checkout (item 3): thank you, payment failed, waiting, error. */}
+          <Route
+            path="/orders/:id/confirmation"
+            element={
+              <RequireAuth>
+                <OrderResult />
+              </RequireAuth>
+            }
+          />
+
           {/* Invoice — standalone storefront page */}
           <Route
             path="/orders/:id/invoice"
@@ -305,6 +316,7 @@ export function AppRoutes() {
 
           {/* ── Content pages ── */}
           <Route path="/blog" element={<Blog />} />
+          <Route path="/blog/category/:slug" element={<BlogCategory />} />
           <Route path="/blog/:slug" element={<BlogDetail />} />
           <Route path="/about" element={<About />} />
           <Route path="/help-center" element={<HelpCenter />} />
@@ -312,7 +324,8 @@ export function AppRoutes() {
           <Route path="/careers" element={<Careers />} />
           {/* Public, unauthenticated Vendor self-registration ("Become a Vendor") — the storefront
             counterpart of the admin "Add Vendor" wizard, see become-vendor.tsx's own doc
-            comment. Linked from the footer's "Partner With Us" entry (content.json). */}
+            comment. Linked from the header's "Become a Member" and the footer's "Partner With Us"
+            entries (content.json). */}
           <Route path="/become-member" element={<BecomeVendor />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
           {/* One legal page component for the 4 fixed WebsitePage rows (see website-page.tsx). */}
@@ -320,7 +333,6 @@ export function AppRoutes() {
           <Route path="/terms" element={<WebsitePage page="terms" />} />
           <Route path="/accessibility" element={<WebsitePage page="accessibility" />} />
           <Route path="/cookies" element={<WebsitePage page="cookies" />} />
-          <Route path="/products/:slug" element={<ProductDetail />} />
           <Route path="/showcase" element={<Showcase />} />
           {/* ── Catch-all 404, inside the shell so it keeps header/footer. ── */}
           <Route path="*" element={<NotFound />} />

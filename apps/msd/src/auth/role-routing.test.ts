@@ -159,6 +159,7 @@ describe('isCustomerAccountUser', () => {
   });
 });
 
+<<<<<<< HEAD
 /**
  * Regression coverage for the msd-api `vendor` -> `member` role-key rename (see
  * `lib/role-keys.ts#MEMBER_ROLE_KEYS` server-side): a real Member account's bootstrap carries
@@ -193,5 +194,35 @@ describe('isDualRoleUser / resolvePostLoginPath', () => {
 
   it('sends staff to the admin console even if also flagged member (should not happen, but staff wins)', () => {
     expect(resolvePostLoginPath(withRoles('admin', 'member'))).toBe('/account/dashboard');
+=======
+/** ST-06: where each role lands after sign-in. The member role key is `member` (P1-02); support
+ *  is staff and always uses the console. */
+describe('resolvePostLoginPath and the role checks', () => {
+  const withRoles = (...keys: string[]) => ({ roles: keys.map((key) => ({ key })) }) as unknown as BootstrapResponse;
+
+  it.each([
+    [['super_admin'], '/account/dashboard'],
+    [['admin', 'customer'], '/account/dashboard'],
+    [['sales'], '/account/dashboard'],
+    [['marketing'], '/account/dashboard'],
+    [['support', 'customer'], '/account/dashboard'],
+    [['member'], '/account/dashboard'],
+    [['customer', 'member'], '/choose-experience'],
+    [['customer'], '/'],
+    [[], '/'],
+  ])('%j lands on %s', (roles, path) => {
+    expect(resolvePostLoginPath(withRoles(...roles))).toBe(path);
+  });
+
+  it('treats support as staff', () => {
+    expect(isStaffUser(withRoles('support'))).toBe(true);
+    expect(isCustomerAccountUser(withRoles('support', 'customer'))).toBe(false);
+  });
+
+  it('a customer who is also a member chooses an experience; staff never do', () => {
+    expect(isDualRoleUser(withRoles('customer', 'member'))).toBe(true);
+    expect(isDualRoleUser(withRoles('admin', 'customer', 'member'))).toBe(false);
+    expect(isDualRoleUser(withRoles('member'))).toBe(false);
+>>>>>>> 8794f0cef8f38b14a81c1e54af4a9532c5fe543f
   });
 });

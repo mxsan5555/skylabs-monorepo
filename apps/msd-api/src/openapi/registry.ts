@@ -14,6 +14,7 @@ import {
   DashboardWidgetCreateSchema,
   UserCreateSchema,
   UserUpdateSchema,
+  MyAddressSchema,
   UserStatusUpdateSchema,
   ImpersonateRequestSchema,
 } from '../schemas/rbac.schema';
@@ -378,6 +379,16 @@ export function buildOpenApiDocument() {
     security: bearer,
     request: { body: { content: { 'application/json': { schema: UserUpdateSchema } } } },
     responses: { 200: { description: 'Updated' } },
+  });
+
+  registry.registerPath({
+    method: 'put',
+    path: '/rbac/users/me/address',
+    summary: "Save the caller's own delivery address (item 2.2): state and city from the India list; checkout pre-fills it",
+    tags: ['RBAC - Users'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: MyAddressSchema } } } },
+    responses: { 200: { description: 'The caller with the saved address' }, 422: { description: 'Invalid address' } },
   });
 
   registry.registerPath({
@@ -1491,10 +1502,10 @@ export function buildOpenApiDocument() {
     path: '/catalog/products/facets',
     summary:
       'Filter-panel counts for the product list — same filters as GET /catalog/products minus paging/sort; ' +
-      'category, tag and price each ignore their own selection. Registered before /catalog/products/{id}.',
+      'category, business, tag and price each ignore their own selection. Registered before /catalog/products/{id}.',
     tags: ['Catalogue (public)'],
     request: { query: CatalogProductFacetQuerySchema },
-    responses: { 200: { description: 'Product facets: { categories[], tags[], price | null }' } },
+    responses: { 200: { description: 'Product facets: { categories[], vendors[], tags[], price | null }' } },
   });
 
   registry.registerPath({

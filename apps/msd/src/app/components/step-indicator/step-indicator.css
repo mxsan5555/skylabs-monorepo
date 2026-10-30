@@ -1,0 +1,55 @@
+/* Step indicator: current = primary (the 10), done = primary-container, next = neutral. */
+.step-indicator {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step-indicator__step {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* A hairline between steps. */
+.step-indicator__step + .step-indicator__step::before {
+  content: '';
+  inline-size: 32px;
+  block-size: 1px;
+  margin-inline-end: 4px;
+  background-color: var(--md-sys-color-outline-variant);
+}
+
+.step-indicator__marker {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 28px;
+  block-size: 28px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background-color: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface-variant);
+  --md-icon-size: 18px;
+}
+
+.step-indicator__step--current {
+  color: var(--md-sys-color-on-surface);
+}
+
+.step-indicator__step--current .step-indicator__marker {
+  background-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+}
+
+.step-indicator__step--done {
+  color: var(--md-sys-color-on-surface);
+}
+
+.step-indicator__step--done .step-indicator__marker {
+  background-color: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}

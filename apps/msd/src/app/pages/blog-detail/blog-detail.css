@@ -13,7 +13,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: var(--md-sys-color-primary, #3a693c);
+  color: var(--md-sys-color-primary);
   text-decoration: none;
   font-size: 0.875rem;
 }
@@ -41,7 +41,7 @@
   font-size: clamp(1.9rem, 5vw, 2.6rem);
   line-height: 1.15;
   letter-spacing: -0.01em;
-  color: var(--md-sys-color-on-surface, #1a1c19);
+  color: var(--md-sys-color-on-surface);
 }
 
 .post__meta {
@@ -51,7 +51,7 @@
   align-items: center;
   gap: 6px;
   font-size: 0.9rem;
-  color: var(--md-sys-color-on-surface-variant, #424940);
+  color: var(--md-sys-color-on-surface-variant);
 }
 
 .post__read {
@@ -72,14 +72,14 @@
   border-radius: 16px;
   display: block;
   margin: 24px 0 32px;
-  background-color: var(--md-sys-color-surface-variant, #dde4d8);
+  background-color: var(--md-sys-color-surface-variant);
 }
 
 .post__body {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  color: var(--md-sys-color-on-surface, #1a1c19);
+  color: var(--md-sys-color-on-surface);
   font-size: 1.075rem;
   line-height: 1.75;
 }
@@ -87,7 +87,7 @@
 .post__body>p:first-child {
   font-size: 1.2rem;
   line-height: 1.6;
-  color: var(--md-sys-color-on-surface, #1a1c19);
+  color: var(--md-sys-color-on-surface);
 }
 
 .post__body h2 {
@@ -95,17 +95,17 @@
   font-size: 1.5rem;
   line-height: 1.25;
   letter-spacing: -0.01em;
-  color: var(--md-sys-color-on-surface, #1a1c19);
+  color: var(--md-sys-color-on-surface);
 }
 
 .post__body a {
-  color: var(--md-sys-color-primary, #3a693c);
+  color: var(--md-sys-color-primary);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .post__body strong {
-  color: var(--md-sys-color-on-surface, #1a1c19);
+  color: var(--md-sys-color-on-surface);
 }
 
 .post__body ul {
@@ -119,8 +119,8 @@
 .post__body blockquote {
   margin: 4px 0;
   padding: 4px 0 4px 20px;
-  border-left: 4px solid var(--md-sys-color-primary, #3a693c);
-  color: var(--md-sys-color-on-surface-variant, #424940);
+  border-left: 4px solid var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-surface-variant);
   font-size: 1.2rem;
   font-style: italic;
   line-height: 1.5;
@@ -129,7 +129,7 @@
 .post__footer {
   margin-top: 40px;
   padding-top: 24px;
-  border-top: 1px solid var(--md-sys-color-outline-variant, #c1c9bd);
+  border-top: 1px solid var(--md-sys-color-outline-variant);
   display: flex;
   flex-direction: column;
   gap: 16px;

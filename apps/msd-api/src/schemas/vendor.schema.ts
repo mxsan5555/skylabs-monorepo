@@ -6,6 +6,8 @@ import { isIndiaLocation } from '@skylabs-monorepo/shared-utils';
 
 extendZodWithOpenApi(z);
 
+const vendorReasonSchema = z.string().trim().min(10).max(500);
+
 export const MemberListQuerySchema = PaginationQuerySchema.extend({
   search: z.string().max(200).optional(),
   status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED', 'ARCHIVED']).optional(),
@@ -160,9 +162,9 @@ const VendorFieldsSchema = z.object({
   website: z.string().url().optional(),
   logoUrl: z.string().url().optional(),
 
-  ownerFirstName: z.string().max(75).optional(),
-  ownerLastName: z.string().max(75).optional(),
-  contactPerson: z.string().max(150).optional(),
+  ownerFirstName: z.string().trim().max(75).optional(),
+  ownerLastName: z.string().trim().max(75).optional(),
+  contactPerson: z.string().trim().max(150).optional(),
   ownerEmail: z.string().email().optional(),
   ownerMobile: vendorPhoneSchema,
   alternateOwnerMobile: vendorPhoneSchema,
@@ -258,13 +260,13 @@ export const VendorApplicationCreateSchema = z
 export const MemberStatusChangeSchema = z
   .object({
     status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']),
-    reason: z.string().trim().min(10).max(500),
+    reason: vendorReasonSchema,
   })
   .strict()
   .openapi('MemberStatusChange');
 
 export const MemberDeleteSchema = z
-  .object({ reason: z.string().trim().min(10).max(500) })
+  .object({ reason: vendorReasonSchema })
   .strict()
   .openapi('MemberDelete');
 

@@ -159,7 +159,17 @@ describe('POST /api/v1/members', () => {
     expect(res.status).toBe(200);
     const { where } = prismaMock.member.findMany.mock.calls[0][0];
     expect(where).toMatchObject({ reviewFlaggedAt: { not: null } });
-    expect(where).not.toHaveProperty('status');
+    // Item 6: archived (deleted) members never appear in the default list.
+    expect(where.status).toEqual({ not: 'ARCHIVED' });
+  });
+
+  it('status=ARCHIVED lists the deleted members, so they can be restored (item 6)', async () => {
+    grants.mockResolvedValue(['members:view']);
+    prismaMock.member.findMany.mockResolvedValue([]);
+    prismaMock.member.count.mockResolvedValue(0);
+    const res = await request(app).get('/api/v1/members?status=ARCHIVED').set('Authorization', ADMIN);
+    expect(res.status).toBe(200);
+    expect(prismaMock.member.findMany.mock.calls[0][0].where.status).toBe('ARCHIVED');
   });
 
   it('422 for a reviewFlag value other than true', async () => {
@@ -208,8 +218,9 @@ describe('PATCH /api/v1/members/:id/status', () => {
     prismaMock.member.updateMany.mockResolvedValue({ count: 1 });
     prismaMock.memberStatusHistory.create.mockResolvedValue({});
     prismaMock.refreshSession.updateMany.mockResolvedValue({ count: 0 });
+    // Item 6: a member is suspended from Inactive, never straight from Active.
     prismaMock.member.findUnique
-      .mockResolvedValueOnce(MEMBER_ROW)
+      .mockResolvedValueOnce({ ...MEMBER_ROW, status: 'INACTIVE' })
       .mockResolvedValue({ ...MEMBER_ROW, status: 'SUSPENDED' });
     const res = await request(app)
       .patch(`/api/v1/members/${MEMBER_ID}/status`)
@@ -219,7 +230,7 @@ describe('PATCH /api/v1/members/:id/status', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('SUSPENDED');
     expect(prismaMock.memberStatusHistory.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ memberId: MEMBER_ID, fromStatus: 'ACTIVE', toStatus: 'SUSPENDED' }),
+      data: expect.objectContaining({ memberId: MEMBER_ID, fromStatus: 'INACTIVE', toStatus: 'SUSPENDED' }),
     });
   });
 

@@ -4,6 +4,7 @@ import { hydrateRoot, type Root } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from './app/app';
+import { listCatalogLocations } from './api/catalog';
 import { render } from './entry-server';
 import { PrerenderDataProvider, categoryDataKey, type PrerenderPayload } from './prerender-data/prerender-data';
 
@@ -133,6 +134,37 @@ describe('prerender hydration round-trip', () => {
     expect(recoverable).toEqual([]);
     expect(hydrationErrors).toEqual([]);
     expect(container.textContent).toContain('Swedish Massage 60');
+  });
+
+  /** ST-18: popular searches come from the prerendered shell, so crawlers get the links. */
+  it('prerenders the footer popular searches and keeps hydration clean when a saved city reorders them', async () => {
+    const shell = {
+      ...fx.shell,
+      locations: [
+        { state: 'Uttar Pradesh', city: 'Gorakhpur', latitude: 26.76, longitude: 83.37 },
+        { state: 'Maharashtra', city: 'Pune', latitude: 18.52, longitude: 73.85 },
+      ],
+    };
+    localStorage.setItem('msd.location', JSON.stringify(shell.locations[1]));
+    // The client shell refetches the locations; serve the same two cities.
+    vi.mocked(listCatalogLocations).mockResolvedValue({ data: shell.locations });
+    try {
+      const { html, recoverable, hydrationErrors, container } = await roundTrip('/', {
+        shell,
+        home: { deals: [fx.deal], products: [fx.product], therapists: [fx.therapist], faqs: [fx.faq] },
+      });
+      const server = document.createElement('div');
+      server.innerHTML = html;
+      const serverLinks = Array.from(server.querySelectorAll('#footer-popular-list a')).map((a) => a.getAttribute('href'));
+      expect(serverLinks).toEqual(['/category/massage/gorakhpur', '/category/massage/pune']);
+      expect(recoverable).toEqual([]);
+      expect(hydrationErrors).toEqual([]);
+      const clientLinks = Array.from(container.querySelectorAll('#footer-popular-list a')).map((a) => a.getAttribute('href'));
+      expect(clientLinks).toEqual(['/category/massage/pune', '/category/massage/gorakhpur']);
+    } finally {
+      localStorage.clear();
+      vi.mocked(listCatalogLocations).mockResolvedValue({ data: fx.shell.locations });
+    }
   });
 
   it('hydrates a city page without a mismatch', async () => {

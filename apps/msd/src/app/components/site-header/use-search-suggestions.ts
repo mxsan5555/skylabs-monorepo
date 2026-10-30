@@ -13,6 +13,7 @@ import {
 import type { Coordinates } from '../../../location/geo';
 import { fillTemplate, formatINR } from '../../../utils/format';
 import { resolveTherapistMedia } from '../../../utils/media';
+import { productPath, therapistPath } from '../../seo/public-urls';
 import { toDealCardDeal, toProductCardDeal } from '../../pages/home/home-data';
 import {
   formatDistance,
@@ -106,7 +107,7 @@ function therapistItem(therapist: CatalogTherapist): SearchSuggestionItem {
     sublabel: [therapist.therapistType, therapist.vendor?.businessName]
       .filter(Boolean)
       .join(' · '),
-    href: `/therapist/${therapist.id}`,
+    href: therapistPath(therapist),
     image: resolveTherapistMedia(therapist).images[0],
     imageAlt: '',
     place: therapist.branch?.address ?? therapist.branch?.city ?? undefined,
@@ -127,7 +128,7 @@ function productItem(product: CatalogProduct): SearchSuggestionItem {
     id: product.id,
     label: card.title,
     sublabel: product.brand ?? card.providerName,
-    href: `/products/${product.id}`,
+    href: productPath(product),
     image: card.image || undefined,
     imageAlt: '',
     price: formatINR(card.price),

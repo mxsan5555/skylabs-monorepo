@@ -16,10 +16,9 @@ import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
 import { memberTrail } from './member-crumbs';
 import { STATES, citiesForState } from '@skylabs-monorepo/shared-utils';
 import { normalizeOpeningHours, OpeningHoursEditor, validateBranchPincode, validateMapLocationUrl } from './vendor-branches';
-import { renderSelect, renderTextField } from './form-controls';
+import { asOptions, renderSelect, renderTextField } from '../../../components/form-controls/form-controls';
 
 /** The shared selects take value/label pairs; states and cities are both. */
-const asOptions = (values: string[]) => values.map((value) => ({ value, label: value }));
 
 interface BranchFormPageProps {
   token: string | null;

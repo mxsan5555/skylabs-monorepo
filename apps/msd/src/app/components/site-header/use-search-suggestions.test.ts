@@ -2,6 +2,7 @@ import { renderHook } from '@testing-library/react';
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CatalogCategoryWithChildren, CatalogDeal, CatalogProduct, CatalogTherapist } from '../../../api/catalog';
+import { useSearchSuggestions } from './use-search-suggestions';
 
 const listCatalogDealsMock = vi.fn();
 const listCatalogProductsMock = vi.fn();
@@ -14,7 +15,6 @@ vi.mock('../../../api/catalog', async (importOriginal) => ({
   listCatalogTherapists: (...args: unknown[]) => listCatalogTherapistsMock(...args),
 }));
 
-import { useSearchSuggestions } from './use-search-suggestions';
 
 const CATEGORIES: CatalogCategoryWithChildren[] = [
   {

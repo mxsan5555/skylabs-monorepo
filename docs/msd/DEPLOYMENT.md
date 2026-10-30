@@ -38,7 +38,9 @@ silently ships the bare SPA); preview and local builds fall back to the SPA. Red
 | `OTP_IDENTIFIER_RATE_LIMIT_PER_HOUR` | `10` (OTP sends per phone or email per hour, any IP) | |
 | `TRUST_PROXY_HOPS` | `1` on Railway (one proxy); leave unset locally | |
 | `API_DOCS` | unset (Swagger `/docs` off in production); `true` only to open it temporarily | |
-| `CORS_ORIGIN` | exact trusted frontend origins, comma-separated; no wildcards | |
+| `REQUEST_LOGGING` | unset (one JSON line per request, with `X-Request-Id`); `false` to silence | |
+| `DEV_OTP_IDENTIFIERS` | **never set** on Railway (local test accounts only; production refuses to boot with it) | |
+| `CORS_ORIGIN` | exact Vercel origins, comma-separated | |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth client id / secret | 🔒 (secret) |
 | `GOOGLE_CALLBACK_URL` | `https://<msd-api-railway-domain>/api/v1/auth/google/callback` | |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` | e.g. `smtp.gmail.com` / `587` / `false` / Gmail address | |
@@ -52,7 +54,9 @@ silently ships the bare SPA); preview and local builds fall back to the SPA. Red
 | `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | R2 token | 🔒 |
 | `R2_PUBLIC_URL` | optional public URL of the bucket | |
 | `R2_PRIVATE_BUCKET` | `msd-private` (public access off); member documents. Uploads return 503 until set | |
-| `SUPPORT_EMAIL` / `SUPPORT_PHONE` | support contact printed in member notices | |
+| `SUPPORT_EMAIL` / `SUPPORT_PHONE` | support contact printed in member and order notices | |
+| `PUBLIC_SITE_URL` | storefront origin for links in customer emails (default: the first `CORS_ORIGIN`) | |
+| `SMS_DLT_TEMPLATE_ORDER_CONFIRMED` / `SMS_DLT_TEMPLATE_PAYMENT_FAILED` | DLT template ids; an order SMS goes out only when its id is set (D38), email always goes | |
 | `FIELD_ENCRYPTION_KEY` | 32 random bytes, base64; encrypts full Aadhaar and PAN numbers | 🔒 |
 | `DOC_HASH_PEPPER` | secret for the document number duplicate hash | 🔒 |
 | `CRON_SECRET` | 64-char hex; the same value goes on the cron service | 🔒 |
@@ -61,13 +65,11 @@ silently ships the bare SPA); preview and local builds fall back to the SPA. Red
 SMTP, SMS, Razorpay and R2 are checked on first use, so the API boots without them; that feature
 just fails until its group is filled.
 
-The auth API contract and frontend must be deployed as one coordinated release. Users with only
-the previous localStorage refresh token will need to sign in once; refresh tokens are not migrated
-from JavaScript storage. In production, the refresh cookie is `Secure; HttpOnly; SameSite=None`
-and credentialed requests require the exact `CORS_ORIGIN`. Browsers may block third-party cookies
-when the API remains on a Railway hostname; use a same-site custom API host (for example,
-`api.myspadeal.in` alongside the frontend domain) or a same-origin proxy in that case. No schema
-migration or new environment variable is required; configure the existing `CORS_ORIGIN` values.
+**Production boot check (P2-09).** With `NODE_ENV=production` the API refuses to start, naming
+each problem (never a value), when `JWT_SECRET` is under 32 characters, `CORS_ORIGIN` is empty or
+contains `*`, `FIELD_ENCRYPTION_KEY` is missing or not 32 bytes of base64, or `R2_PRIVATE_BUCKET`,
+`DOC_HASH_PEPPER` or `CRON_SECRET` is missing (`src/config/env-checks.ts`). Set all six on
+Railway **before** deploying a build that contains this check, or the deploy will not boot.
 
 ## 3. Scheduled job: member document reminders
 

@@ -43,7 +43,7 @@ function PurchaseVerification({ item, onRaiseIssue }: { item: OrderItem; onRaise
           {verification.voucherLabel}: <code>{e.voucherCode}</code> · {verification.statusLabel}:{' '}
           {ENTITLEMENT_STATUS_LABEL[e.entitlementStatus] ?? e.entitlementStatus}
           {e.dispute ? (
-            <> · {verification.disputeStatus[e.dispute.status]}</>
+            <> · {verification.disputeStatus[e.dispute.status as keyof typeof verification.disputeStatus] ?? e.dispute.status}</>
           ) : (
             <>
               {' '}

@@ -69,3 +69,6 @@ export function formatStreetAddress(parts: (string | null | undefined)[]): strin
   }
   return line;
 }
+
+/** Short display number for an order, the same `ORD-XXXXXXXX` the API puts in emails. */
+export const orderNumber = (orderId: string): string => `ORD-${orderId.slice(-8).toUpperCase()}`;
