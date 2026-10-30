@@ -104,7 +104,7 @@ export function OfferCard({ item, tag, color, variant = 'plain', layout = 'verti
       {...(card.originalPrice ? { 'original-price': formatINR(card.originalPrice) } : {})}
       {...(card.discount ? { discount: fillTemplate(t.discount, { percent: String(card.discount) }) } : {})}
       {...(rating ? { rating: rating.rating, reviews: rating.reviews } : {})}
-      href={isDeal ? dealHref(item.deal) : `/products/${id}`}
+      href={isDeal ? dealHref(item.deal) : `/products/${item.product.slug}`}
     >
       {gallery && <ProductCardGallery slot="media" images={gallery} alt={card.imageAlt} layout={layout} fill />}
       <ListingToolbar
