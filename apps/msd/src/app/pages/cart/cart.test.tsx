@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SnackbarHost } from '../../../snackbar/snackbar';
+import content from '../../../content.json';
 import { Cart } from './cart';
 
 const m = vi.hoisted(() => ({
@@ -134,5 +135,38 @@ describe('Cart', () => {
     fireEvent.click(textButton('Remove selected (3)'));
     await waitFor(() => expect(m.clearCart).toHaveBeenCalledWith('test-token'));
     expect(m.removeCartItem).not.toHaveBeenCalled();
+  });
+
+  it('heads the page with one h1 and the item count, and totals the cart in the summary panel', async () => {
+    await renderCart();
+    const h1 = screen.getByRole('heading', { level: 1 });
+    expect(h1.textContent).toBe(content.cart.title);
+    // Headings stay in order: the line titles (h3) sit under a (visually hidden) h2.
+    expect(screen.getByRole('heading', { level: 2, name: content.cart.itemsAriaLabel })).toBeTruthy();
+    // 1 deal + 2 products + 1 therapist = 4 items.
+    expect(h1.closest('.section-head')?.textContent).toContain('4 items');
+    const summary = screen.getByRole('region', { name: content.cart.orderSummaryHeading });
+    expect(summary.querySelector('.summary-panel__total dd')?.textContent).toBe('₹5,978');
+    expect(summary.textContent).toContain(`${content.cart.subtotal} (4 items)`);
+  });
+
+  it('changes a line quantity through the stepper', async () => {
+    m.updateCartItemQuantity.mockResolvedValue(cartOf({ ...PRODUCT, quantity: 3 }));
+    await renderCart();
+    const group = screen.getByRole('group', { name: `${content.cart.quantityLabel} Daily Hair Care Shampoo` });
+    fireEvent.click(group.querySelector(`[aria-label="${content.cart.increaseQuantity}"]`) as HTMLElement);
+    await waitFor(() => expect(m.updateCartItemQuantity).toHaveBeenCalledWith('test-token', 'ci2', 3));
+  });
+
+  it('shows the empty state with its copy and a way back to the deals', async () => {
+    m.getCart.mockResolvedValue(cartOf());
+    render(
+      <MemoryRouter>
+        <Cart />
+      </MemoryRouter>,
+    );
+    expect((await screen.findByRole('heading', { level: 1 })).textContent).toBe(content.cart.emptyHeading);
+    expect(screen.getByText(content.cart.emptySubheading)).toBeTruthy();
+    expect(screen.queryByRole('region', { name: content.cart.orderSummaryHeading })).toBeNull();
   });
 });

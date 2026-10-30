@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { createElement, type ChangeEvent, type ReactNode } from 'react';
 import { Icon } from '@skylabs-monorepo/shared-ui/react';
 import type { PurchaseLine } from '../../../utils/cart-items';
 import { formatINR } from '../../../utils/format';
@@ -86,43 +86,37 @@ export default PurchaseLineCard;
 export interface PurchaseLineListProps {
   /** `PurchaseLineCard`s. */
   children: ReactNode;
+  /** `cards` (default, cart) or `receipt`: rows split by hairlines, for a summary panel. */
+  variant?: 'cards' | 'receipt';
   className?: string;
 }
 
-/** A list of `PurchaseLineCard`s (checkout summary). */
-export function PurchaseLineList({ children, className }: PurchaseLineListProps) {
-  return <ul className={['purchase-lines', className].filter(Boolean).join(' ')}>{children}</ul>;
+/** A list of `PurchaseLineCard`s (cart, checkout summary). */
+export function PurchaseLineList({ children, variant = 'cards', className }: PurchaseLineListProps) {
+  const classes = ['purchase-lines', variant === 'receipt' && 'purchase-lines--receipt', className].filter(Boolean).join(' ');
+  return <ul className={classes}>{children}</ul>;
 }
 
-export interface PurchaseSummaryProps {
-  /** Id of the h2, which names the section. */
-  id: string;
-  heading: string;
-  /** Short line beside the heading (item count). */
-  meta?: string;
-  /** `PurchaseLineCard`s, shown as receipt rows. */
-  children: ReactNode;
-  total: { label: string; amount: number };
+export interface SelectAllLinesProps {
+  checked: boolean;
+  /** Some, not all, lines selected. */
+  indeterminate: boolean;
+  label: string;
+  onChange: (checked: boolean) => void;
 }
 
-/**
- * Receipt of an order (order result): heading, the lines as compact rows split by hairlines, and
- * the total. Line prices stay on-surface; only the total takes primary, so one price leads.
- */
-export function PurchaseSummary({ id, heading, meta, children, total }: PurchaseSummaryProps) {
+/** Labelled "Select all" checkbox above a selectable `PurchaseLineList` (cart). Raw `md-checkbox`
+ *  so tests can drive `checked`. */
+export function SelectAllLines({ checked, indeterminate, label, onChange }: SelectAllLinesProps) {
   return (
-    <section className="purchase-summary" aria-labelledby={id}>
-      <div className="purchase-summary__head">
-        <h2 id={id} className="purchase-summary__heading title-large">
-          {heading}
-        </h2>
-        {meta && <p className="purchase-summary__meta body-medium">{meta}</p>}
-      </div>
-      <ul className="purchase-lines purchase-lines--receipt">{children}</ul>
-      <p className="purchase-summary__total">
-        <span className="title-medium">{total.label}</span>
-        <strong className="purchase-summary__amount headline-small">{formatINR(total.amount)}</strong>
-      </p>
-    </section>
+    <label className="purchase-select-all">
+      {createElement('md-checkbox', {
+        checked,
+        indeterminate,
+        'touch-target': 'wrapper',
+        onChange: (e: ChangeEvent<HTMLElement & { checked: boolean }>) => onChange(e.currentTarget.checked),
+      })}
+      <span className="body-medium">{label}</span>
+    </label>
   );
 }

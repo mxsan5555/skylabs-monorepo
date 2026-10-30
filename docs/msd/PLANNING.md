@@ -346,7 +346,15 @@ A member who opens another member's deal, branch, package or therapist gets 404.
   cleared when the state changes). Every field is required; Continue saves the address on the
   account, so the next checkout starts filled. The profile page (`/my-account`, `/account/profile`)
   shows and edits the same saved address with the same State and City lists, saved through
-  `PUT /users/me/address`; it never reads the address from an order.
+  `PUT /users/me/address`; it never reads the address from an order. Layout (no page CSS):
+  `PageSection` + `SplitLayout`; h1 and a `StepIndicator` (Your Details, Payment); each step is a
+  `FormPanel` (on the page surface, no card: blocks and the button footer split by dividers); the details
+  form on `.form-grid` with a `FormField` per control (its error as an alert; City keyed by the
+  state so the saved city shows) with Back to cart beside Continue; the payment step shows Delivering to with Edit details, a
+  `RadioCardGroup` for Online or Cash on delivery (chosen card on secondary-container), the amount
+  and Back / Pay; a `SummaryPanel` beside both steps lists the lines as receipt rows with the
+  total. 60 = surface, 30 = the summary panel and the chosen card, 10 = primary on the current
+  step, the Pay or Continue button and the total. Every string is in `content.json`.
 - **Line cards (item 2.3):** the cart and both checkout steps show each line as its own card
   (`PurchaseLineCard`, built by `utils/cart-items.ts` from a cart item or an order item): type tag,
   title, the member's name and branch inside the card, duration, quantity and price. Title and
@@ -355,7 +363,11 @@ A member who opens another member's deal, branch, package or therapist gets 404.
   to wishlist (deals and products; therapists have no wishlist) and Remove. Select all plus
   Remove selected removes several lines at once (one clear call when every line is selected,
   otherwise one call per line); Move to wishlist adds the item first and only then removes it
-  from the cart, so a failed add keeps the line.
+  from the cart, so a failed add keeps the line. Layout (no page CSS): `PageSection` +
+  `SplitLayout`; h1 with the item count (`SectionHead`), the Select all toolbar, the line cards
+  (prices on-surface), and a `SummaryPanel` beside them (surface-container, the 30; subtotal,
+  total in primary, the 10, with Proceed to Checkout). An empty cart is a neutral `StatusPanel`
+  with Explore Deals. `QuantityStepper` is shared with the detail pages.
 - **Order notices (item 3, D38):** the customer gets an email when an order is confirmed (online
   payment verified, webhook captured, or cash on delivery) and when an online payment fails
   (signature check failed or the `payment.failed` webhook), at the checkout contact email, else
@@ -371,9 +383,11 @@ A member who opens another member's deal, branch, package or therapist gets 404.
   (contact email, lines with their member, total, View order); unpaid with a failed latest
   payment, or reported failed, shows payment failed with Pay now (back to checkout for the same
   order); unpaid otherwise shows waiting for payment; cancelled says so; a load error offers Try
-  again. Focus moves to the h1. Layout: `SplitLayout` with a `StatusPanel` (surface-container, the
-  30: tonal icon badge, h1, text, order number and date, actions, help link) and a
-  `PurchaseSummary` receipt beside it (lines as hairline rows, prices on-surface; only the total
+  again. Focus moves to the h1. Layout: `SplitLayout` with a `StatusPanel` (panel and text in the
+  outcome's M3 role pair: confirmed = primary-container, the brand green; failed and load
+  error = error-container (with error-role buttons); waiting and cancelled = surface-container; icon badge, h1, text, order
+  number and date, actions, help link) and a
+  `SummaryPanel` beside it (item count, lines as receipt rows, prices on-surface; only the total
   and the actions take primary, the 10); stacked on phones; no page CSS.
 - Staff block or unblock a customer with a reason (`customers:status_change`); customers are never
   deleted.

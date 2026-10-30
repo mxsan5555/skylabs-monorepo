@@ -83,7 +83,7 @@ describe('OrderResult', () => {
     const card = summary.querySelector('li.purchase-line');
     expect(card?.textContent).toContain('Repair Hair Treatment');
     expect(card?.textContent).toContain('Alok Kumar Wellness');
-    expect(summary.querySelector('.purchase-summary__total')?.textContent).toContain('₹3,080');
+    expect(summary.querySelector('.summary-panel__total')?.textContent).toContain('₹3,080');
     expect(getMyOrder).toHaveBeenCalledWith('test-token', ORDER_ID);
   });
 

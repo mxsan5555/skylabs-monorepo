@@ -1,12 +1,39 @@
-/* Outcome panel. 30 = surface-container; the badge takes a tonal container role per outcome;
-   primary (10) stays on the actions slotted inside. */
+/* Outcome panel. Each tone is an M3 colour role pair for the panel (container + on-container)
+   and the badge and filled action (role + on-role): success = primary (the brand green),
+   error = error, neutral = surface-container (the 30) with primary actions. Outlined actions take
+   the panel's own text colour, so every button keeps its contrast on every container. */
 .status-panel {
+  --_bg: var(--md-sys-color-surface-container);
+  --_fg: var(--md-sys-color-on-surface);
+  --_muted: var(--md-sys-color-on-surface-variant);
+  --_badge-bg: var(--md-sys-color-surface-container-highest);
+  --_badge-fg: var(--md-sys-color-on-surface-variant);
+  --_action-bg: var(--md-sys-color-primary);
+  --_action-fg: var(--md-sys-color-on-primary);
   display: grid;
   gap: 24px;
   padding: 32px;
   border-radius: var(--md-sys-shape-corner-extra-large);
-  background-color: var(--md-sys-color-surface-container);
-  color: var(--md-sys-color-on-surface);
+  background-color: var(--_bg);
+  color: var(--_fg);
+}
+
+.status-panel--success {
+  --_bg: var(--md-sys-color-primary-container);
+  --_fg: var(--md-sys-color-on-primary-container);
+  --_muted: var(--md-sys-color-on-primary-container);
+  --_badge-bg: var(--md-sys-color-primary);
+  --_badge-fg: var(--md-sys-color-on-primary);
+}
+
+.status-panel--error {
+  --_bg: var(--md-sys-color-error-container);
+  --_fg: var(--md-sys-color-on-error-container);
+  --_muted: var(--md-sys-color-on-error-container);
+  --_badge-bg: var(--md-sys-color-error);
+  --_badge-fg: var(--md-sys-color-on-error);
+  --_action-bg: var(--md-sys-color-error);
+  --_action-fg: var(--md-sys-color-on-error);
 }
 
 .status-panel__icon {
@@ -15,22 +42,9 @@
   inline-size: 56px;
   block-size: 56px;
   border-radius: var(--md-sys-shape-corner-full);
+  background-color: var(--_badge-bg);
+  color: var(--_badge-fg);
   --md-icon-size: 32px;
-}
-
-.status-panel--success .status-panel__icon {
-  background-color: var(--md-sys-color-secondary-container);
-  color: var(--md-sys-color-on-secondary-container);
-}
-
-.status-panel--error .status-panel__icon {
-  background-color: var(--md-sys-color-error-container);
-  color: var(--md-sys-color-on-error-container);
-}
-
-.status-panel--neutral .status-panel__icon {
-  background-color: var(--md-sys-color-surface-container-highest);
-  color: var(--md-sys-color-on-surface-variant);
 }
 
 .status-panel__intro {
@@ -52,7 +66,7 @@
 .status-panel__text {
   margin: 0;
   max-inline-size: 60ch;
-  color: var(--md-sys-color-on-surface-variant);
+  color: var(--_muted);
 }
 
 .status-panel__facts {
@@ -61,7 +75,8 @@
   gap: 16px 24px;
   margin: 0;
   padding-block-start: 24px;
-  border-block-start: 1px solid var(--md-sys-color-outline-variant);
+  /* A hairline from the panel's own text colour, so it reads on every container. */
+  border-block-start: 1px solid color-mix(in srgb, var(--_fg) 24%, transparent);
 }
 
 .status-panel__fact {
@@ -70,7 +85,7 @@
 }
 
 .status-panel__fact dt {
-  color: var(--md-sys-color-on-surface-variant);
+  color: var(--_muted);
 }
 
 .status-panel__fact dd {
@@ -83,10 +98,30 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px 12px;
+  /* Filled: the tone's strong role. Outlined: the panel's text colour for label and outline. */
+  --md-filled-button-container-color: var(--_action-bg);
+  --md-filled-button-label-text-color: var(--_action-fg);
+  --md-filled-button-hover-label-text-color: var(--_action-fg);
+  --md-filled-button-focus-label-text-color: var(--_action-fg);
+  --md-filled-button-pressed-label-text-color: var(--_action-fg);
+  --md-filled-button-hover-state-layer-color: var(--_action-fg);
+  --md-filled-button-pressed-state-layer-color: var(--_action-fg);
+  --md-outlined-button-label-text-color: var(--_fg);
+  --md-outlined-button-hover-label-text-color: var(--_fg);
+  --md-outlined-button-focus-label-text-color: var(--_fg);
+  --md-outlined-button-pressed-label-text-color: var(--_fg);
+  --md-outlined-button-hover-state-layer-color: var(--_fg);
+  --md-outlined-button-pressed-state-layer-color: var(--_fg);
+  --md-outlined-button-outline-color: var(--_fg);
 }
 
 .status-panel__footer {
-  color: var(--md-sys-color-on-surface-variant);
+  color: var(--_muted);
+}
+
+/* The help link keeps the panel's text colour: primary on a coloured container falls short of AA. */
+.status-panel__footer a {
+  color: var(--_fg);
 }
 
 /* Phones: less padding so the copy keeps its width. */

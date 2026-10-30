@@ -75,7 +75,7 @@ ignores every file under `apps/msd-api/src` today. Flaky under load: `deals-list
 mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
 `products-list-page.test.tsx` "delete asks for confirmation" (seen 2026-10-28, pass alone), and
 `home-hero.test.tsx` (one test, seen 2026-10-28, passes alone); msd-api `config/env-checks.test.ts` "boots with a
-complete production environment" (seen 2026-10-29 in `nx run-many`, passes alone).
+complete production environment" (seen 2026-10-29 in `nx run-many`, passes alone); `deals-list-page.test.tsx` "shows the DEAL_NOT_READY message" (seen 2026-10-29, passes alone).
 
 ## 4. Acceptance per module
 
@@ -227,8 +227,13 @@ complete production environment" (seen 2026-10-29 in `nx run-many`, passes alone
 - Checkout details (item 2.2, `checkout.test.tsx`): the form fills from `GET /users/me` (name,
   phone without +91, email, address, state, city, PIN) and Continue sends them; State lists the
   India states and City only the chosen state's cities; with nothing saved City is locked and
-  Continue names the missing fields without calling checkout; the form still fills under
-  `StrictMode` (dev runs each effect twice).
+  Continue names the missing fields (the `content.json` validation copy) without calling
+  checkout; Back to cart opens `/cart`; the form still fills under `StrictMode` (dev runs each effect twice); the summary
+  region lists every line and the total (`step-indicator.test.tsx`: named list, current step,
+  done steps read "completed"; `radio-card-group.test.tsx`: fieldset and legend, one radio per
+  option, the chosen one checked, change reported; `form-field.test.tsx`: error as an alert,
+  wide span; `form-panel.test.tsx`: region named by its h2, sections with an h3 and action,
+  footer with actions and note, nothing empty rendered).
 - Profile delivery address (item 2.2, `profile-form.test.tsx`, under `StrictMode`): fills from
   the saved account address, never from an order; City lists only the chosen state's cities and a
   new state clears it; Save address sends `{ address, state, city, pincode }` to
@@ -248,7 +253,10 @@ complete production environment" (seen 2026-10-29 in `nx run-many`, passes alone
   vendor group headings; Move to wishlist shows for deals and products only, adds the product
   then removes the line, and keeps the line with an alert when the add fails; Remove selected is
   disabled with nothing selected and removes only the chosen lines; Select all (n) selects every
-  line and clears the cart in one call.
+  line and clears the cart in one call; one h1 with the item count; the summary region shows the
+  subtotal with the count and the total; the stepper updates a line's quantity; an empty cart
+  shows the empty heading and copy and no summary (`quantity-stepper.test.tsx`: named group,
+  polite value, steps, stops at min and max; `summary-panel.test.tsx`: region, rows, total).
 - Order notices (item 3, `order-notice.service.test.ts`, `payment.routes.test.ts`): confirmation
   email to the checkout contact (account email as fallback) with every line, member, total and
   order link; payment-failed email with the pay-again link; SMS only with the DLT template id

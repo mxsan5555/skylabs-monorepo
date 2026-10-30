@@ -280,6 +280,7 @@ export function ProfileForm() {
             onChange: chooseState,
           })}
           {renderSelect({
+            selectKey: addressDraft.state,
             label: fields.city,
             value: addressDraft.city,
             required: true,

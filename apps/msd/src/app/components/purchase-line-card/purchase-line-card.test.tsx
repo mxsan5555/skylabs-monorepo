@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import type { PurchaseLine } from '../../../utils/cart-items';
-import { PurchaseLineCard, PurchaseSummary } from './purchase-line-card';
+import { PurchaseLineCard } from './purchase-line-card';
 
 const LINE: PurchaseLine = {
   id: 'l1',
@@ -70,24 +70,5 @@ describe('PurchaseLineCard', () => {
     expect(screen.getByText('qty')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Move to wishlist' })).toBeTruthy();
     expect(screen.getByRole('listitem').textContent).not.toContain('× 2');
-  });
-});
-
-/** The order result's receipt: named section, rows, and one emphasised total. */
-describe('PurchaseSummary', () => {
-  it('is a section named by its h2, lists the lines as receipt rows and shows the total', () => {
-    render(
-      <MemoryRouter>
-        <PurchaseSummary id="summary" heading="Order summary" meta="2 items" total={{ label: 'Total', amount: 6759 }}>
-          <PurchaseLineCard line={LINE} />
-          <PurchaseLineCard line={{ ...LINE, id: 'l2', title: 'Serum', total: 599 }} />
-        </PurchaseSummary>
-      </MemoryRouter>,
-    );
-    const section = screen.getByRole('region', { name: 'Order summary' });
-    expect(section.querySelector('h2')?.id).toBe('summary');
-    expect(section.textContent).toContain('2 items');
-    expect(section.querySelectorAll('ul.purchase-lines--receipt > li.purchase-line')).toHaveLength(2);
-    expect(section.querySelector('.purchase-summary__total')?.textContent).toContain('₹6,759');
   });
 });

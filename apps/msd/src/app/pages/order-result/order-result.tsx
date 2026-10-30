@@ -3,9 +3,10 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { FilledButton, OutlinedButton } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getMyOrder, type Order } from '../../../api/orders';
-import { formatLongDate, orderNumber } from '../../../utils/format';
+import { fillTemplate, formatINR, formatLongDate, orderNumber } from '../../../utils/format';
 import { lineFromOrderItem } from '../../../utils/cart-items';
-import { PurchaseLineCard, PurchaseSummary } from '../../components/purchase-line-card/purchase-line-card';
+import { PurchaseLineCard, PurchaseLineList } from '../../components/purchase-line-card/purchase-line-card';
+import { SummaryPanel } from '../../components/summary-panel/summary-panel';
 import { PageSection } from '../../components/page-section/page-section';
 import { SplitLayout } from '../../components/split-layout/split-layout';
 import { StatusPanel, type StatusTone } from '../../components/status-panel/status-panel';
@@ -39,7 +40,6 @@ const ICONS: Record<OrderOutcome, { icon: string; tone: StatusTone }> = {
   error: { icon: 'cloud_off', tone: 'error' },
 };
 
-const fill = (text: string, values: Record<string, string>) => text.replace(/\{(\w+)\}/g, (_, key: string) => values[key] ?? '');
 
 /**
  * Item 3: the page checkout lands on after paying, placing a cash-on-delivery order, or a failed
@@ -90,16 +90,13 @@ export function OrderResult() {
           asideLabel={t.summaryHeading}
           aside={
             order && (
-              <PurchaseSummary
-                id={SUMMARY_ID}
-                heading={t.summaryHeading}
-                meta={itemCount}
-                total={{ label: t.total, amount: Number(order.total) }}
-              >
-                {order.items.map((item) => (
-                  <PurchaseLineCard key={item.id} line={lineFromOrderItem(item)} />
-                ))}
-              </PurchaseSummary>
+              <SummaryPanel id={SUMMARY_ID} heading={t.summaryHeading} meta={itemCount} total={{ label: t.total, value: formatINR(Number(order.total)) }}>
+                <PurchaseLineList variant="receipt">
+                  {order.items.map((item) => (
+                    <PurchaseLineCard key={item.id} line={lineFromOrderItem(item)} />
+                  ))}
+                </PurchaseLineList>
+              </SummaryPanel>
             )
           }
         >
@@ -108,7 +105,7 @@ export function OrderResult() {
             icon={ICONS[outcome].icon}
             tone={ICONS[outcome].tone}
             heading={copy.heading}
-            text={fill(text, values)}
+            text={fillTemplate(text, values)}
             facts={
               order
                 ? [

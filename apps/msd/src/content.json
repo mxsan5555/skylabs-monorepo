@@ -900,6 +900,9 @@
   },
   "cart": {
     "title": "My Cart",
+    "itemCountOne": "1 item",
+    "itemCountMany": "{count} items",
+    "selectionLabel": "Cart selection",
     "emptyHeading": "Your cart is empty",
     "loading": "Loading your cart…",
     "emptySubheading": "Browse our deals and add something you love.",
@@ -925,7 +928,7 @@
     "selectItem": "Select {title}",
     "removeSelected": "Remove selected",
     "removeSelectedCount": "Remove selected ({count})",
-    "removedItems": "{count} {items} removed from your cart.",
+    "removedItems": "{items} removed from your cart.",
     "moveToWishlist": "Move to wishlist",
     "moveToWishlistLabel": "Move {title} to your wishlist",
     "movedToWishlist": "Moved to your wishlist.",
@@ -977,7 +980,25 @@
       "selectDate": "Select a date",
       "selectTime": "Select a time"
     },
+    "stepsLabel": "Checkout steps",
+    "stepDone": "completed",
+    "detailsIntro": "Enter your contact and delivery information to continue.",
+    "paymentIntro": "Choose how you want to pay for this order.",
+    "editDetails": "Edit details",
+    "paymentMethod": "Payment method",
+    "methods": {
+      "online": { "title": "Online payment", "description": "Razorpay: UPI, card or net banking" },
+      "cod": { "title": "Cash on delivery", "description": "Pay when your order arrives" }
+    },
+    "payLabel": "Pay {amount}",
+    "openingPayment": "Opening payment…",
+    "placingOrder": "Placing order…",
+    "payingTo": "You're paying {amount} to {member}.",
+    "payingAcross": "You're paying {amount} across {count} members in one payment.",
+    "unavailableHeading": "Checkout unavailable",
+    "summaryNote": "Prices are checked again before you pay. Your details stay private.",
     "backLabel": "Back",
+    "backToCart": "Back to cart",
     "nextLabel": "Continue",
     "placeOrderLabel": "Place Order",
     "loadingOrder": "Preparing your order…",
@@ -985,7 +1006,7 @@
     "pleaseWait": "Please wait…",
     "orderSummaryHeading": "Order Summary",
     "orderStatusPrefix": "This order is already",
-    "securePaymentNote": "Payments are handled securely by Razorpay — card/UPI/netbanking details never touch MSD's servers.",
+    "securePaymentNote": "Razorpay handles the payment. Card, UPI and net banking details never reach MSD's servers.",
     "durationSuffix": "min",
     "deliveringTo": "Delivering to",
     "fields": {
@@ -1223,7 +1244,8 @@
     },
     "checkout": {
       "title": "Checkout | MSD – MySpaDeal",
-      "description": "Complete your booking at MySpaDeal."
+      "description": "Complete your booking at MySpaDeal.",
+      "path": "/checkout"
     }
   },
   "auth": {

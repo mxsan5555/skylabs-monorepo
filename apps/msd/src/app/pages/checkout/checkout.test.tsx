@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import content from '../../../content.json';
 import { Checkout } from './checkout';
 
 const { checkoutMock, getMyProfileMock, getCartMock, getMyOrderMock, verifyPaymentMock } = vi.hoisted(() => ({
@@ -115,6 +116,24 @@ describe('Checkout details', () => {
     );
   });
 
+  it('goes back to the cart from the details step', async () => {
+    render(
+      <MemoryRouter initialEntries={['/checkout']}>
+        <Routes>
+          <Route path="/checkout" element={<Checkout />} />
+          <Route path="/cart" element={<p>cart page</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const back = await waitFor(() => {
+      const button = Array.from(document.querySelectorAll('md-outlined-button')).find((el) => el.textContent?.includes(content.checkout.backToCart));
+      if (!button) throw new Error('no back button');
+      return button as HTMLElement;
+    });
+    fireEvent.click(back);
+    expect(await screen.findByText('cart page')).toBeTruthy();
+  });
+
   it('offers the India states, and only the cities of the chosen state', async () => {
     renderCheckout();
     // The saved state is in once City unlocks (md-select's own value lags under jsdom).
@@ -130,7 +149,7 @@ describe('Checkout details', () => {
     await waitFor(() => expect(getMyProfileMock).toHaveBeenCalled());
     expect(select('City').disabled).toBe(true);
     fireEvent.click(continueButton());
-    await waitFor(() => expect(document.body.textContent).toContain('State is required.'));
+    await waitFor(() => expect(document.body.textContent).toContain(content.checkout.validation.emptyState));
     expect(checkoutMock).not.toHaveBeenCalled();
   });
 });
@@ -140,7 +159,7 @@ describe('Checkout summary', () => {
   it('lists every cart line as its own card with its member, and the total, before payment', async () => {
     renderCheckout();
     const cards = await waitFor(() => {
-      const items = Array.from(document.querySelectorAll('.checkout-page__summary li.purchase-line'));
+      const items = Array.from(document.querySelectorAll('.summary-panel li.purchase-line'));
       if (items.length !== 2) throw new Error('summary cards not ready');
       return items;
     });
@@ -148,7 +167,7 @@ describe('Checkout summary', () => {
     expect(cards[0].textContent).toContain('UrbanGlow Beauty & Care');
     expect(cards[1].textContent).toContain('Vitality Wellness & Beauty');
     expect(cards[1].textContent).toContain('× 2');
-    expect(document.querySelector('.checkout-page__summary')?.textContent).toContain('₹4,478');
+    expect(screen.getByRole('region', { name: content.checkout.orderSummaryHeading }).querySelector('.summary-panel__total')?.textContent).toContain('₹4,478');
     expect(document.body.textContent).not.toContain('Your order summary will appear');
   });
 });
