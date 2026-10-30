@@ -260,8 +260,9 @@ complete production environment" (seen 2026-10-29 in `nx run-many`, passes alone
   from the order state, not the URL (`outcomeOf`: confirmed/completed, cancelled, waiting, failed
   by latest payment or by `?payment=failed`, error); the thank-you page names the email, the
   order number, each line with its member and the total, and focuses the h1; Pay now reopens
-  checkout; a load error shows Try again and the Contact link and recovers; the page is
-  `noindex`; the heading icon is decorative and takes the outcome's colour role.
+  checkout; a load error shows Try again and the Contact link, no facts and no summary, and
+  recovers; the page is `noindex`; facts list the order number and date; the summary region
+  counts items and shows the total (`status-panel.test.tsx`, `purchase-line-card.test.tsx`).
 - Checkout payment result (item 3, `checkout.test.tsx`): a verified payment and a failed
   verification both open `/orders/:id/confirmation`; closing Razorpay after `payment.failed`
   opens it with `?payment=failed`; closing it with no failed attempt stays on checkout.

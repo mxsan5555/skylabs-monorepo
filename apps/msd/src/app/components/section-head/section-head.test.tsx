@@ -53,14 +53,4 @@ describe('SectionHead', () => {
     const img = document.querySelector('.section-head__media > img');
     expect(img?.getAttribute('src')).toBe('/logo.svg');
   });
-
-  it('renders an optional decorative icon in the given colour role, none by default', () => {
-    const { unmount } = renderHead(<SectionHead id="h" heading="Done" />);
-    expect(document.querySelector('.section-head__icon')).toBeNull();
-    unmount();
-    renderHead(<SectionHead id="h" heading="Failed" icon="error" iconTone="error" />);
-    const icon = document.querySelector('.section-head__icon');
-    expect(icon?.getAttribute('aria-hidden')).toBe('true');
-    expect(icon?.classList.contains('section-head__icon--error')).toBe(true);
-  });
 });

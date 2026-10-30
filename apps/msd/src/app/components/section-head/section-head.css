@@ -12,19 +12,6 @@
   gap: 8px;
   min-inline-size: 0;
 }
-/* Optional icon above the heading; its role says the outcome, the heading says it in words. */
-.section-head__icon {
-  --md-icon-size: 48px;
-}
-.section-head__icon--primary {
-  color: var(--md-sys-color-primary);
-}
-.section-head__icon--error {
-  color: var(--md-sys-color-error);
-}
-.section-head__icon--muted {
-  color: var(--md-sys-color-on-surface-variant);
-}
 .section-head__title {
   margin: 0;
   color: var(--md-sys-color-on-surface);

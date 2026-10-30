@@ -124,21 +124,87 @@
   gap: 4px;
 }
 
-/* A list of line cards and its total row. */
+/* A list of line cards. */
 .purchase-lines {
   display: grid;
   gap: 8px;
-  max-inline-size: 720px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.purchase-lines__total {
+/* Receipt (PurchaseSummary): rows split by hairlines instead of cards; prices on-surface. */
+.purchase-summary {
+  display: grid;
+  padding: 24px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-extra-large);
+  background-color: var(--md-sys-color-surface);
+}
+
+.purchase-summary__head {
   display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
   justify-content: space-between;
-  max-inline-size: 720px;
+  gap: 4px 16px;
+  padding-block-end: 8px;
+}
+
+.purchase-summary__heading,
+.purchase-summary__meta {
   margin: 0;
+}
+
+.purchase-summary__meta {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.purchase-lines--receipt {
+  gap: 0;
+}
+
+.purchase-lines--receipt .purchase-line {
+  padding: 16px 0;
+  border: 0;
+  border-radius: 0;
+  background-color: transparent;
+}
+
+.purchase-lines--receipt .purchase-line + .purchase-line {
+  border-block-start: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.purchase-lines--receipt .purchase-line__media {
+  inline-size: 64px;
+  block-size: 64px;
+}
+
+.purchase-lines--receipt .purchase-line__price {
+  color: var(--md-sys-color-on-surface);
+  font-variant-numeric: tabular-nums;
+}
+
+.purchase-summary__total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0;
+  padding-block-start: 16px;
+  border-block-start: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.purchase-summary__amount {
+  color: var(--md-sys-color-primary);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 599px) {
+  .purchase-summary {
+    padding: 20px 16px;
+  }
 }
 
 /* Phones: a smaller image so the text keeps its width. */

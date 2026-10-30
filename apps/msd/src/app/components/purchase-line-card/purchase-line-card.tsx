@@ -86,22 +86,43 @@ export default PurchaseLineCard;
 export interface PurchaseLineListProps {
   /** `PurchaseLineCard`s. */
   children: ReactNode;
-  /** Optional total row under the list: label and amount. */
-  total?: { label: string; amount: number };
   className?: string;
 }
 
-/** A list of `PurchaseLineCard`s with an optional total row (order result). */
-export function PurchaseLineList({ children, total, className }: PurchaseLineListProps) {
+/** A list of `PurchaseLineCard`s (checkout summary). */
+export function PurchaseLineList({ children, className }: PurchaseLineListProps) {
+  return <ul className={['purchase-lines', className].filter(Boolean).join(' ')}>{children}</ul>;
+}
+
+export interface PurchaseSummaryProps {
+  /** Id of the h2, which names the section. */
+  id: string;
+  heading: string;
+  /** Short line beside the heading (item count). */
+  meta?: string;
+  /** `PurchaseLineCard`s, shown as receipt rows. */
+  children: ReactNode;
+  total: { label: string; amount: number };
+}
+
+/**
+ * Receipt of an order (order result): heading, the lines as compact rows split by hairlines, and
+ * the total. Line prices stay on-surface; only the total takes primary, so one price leads.
+ */
+export function PurchaseSummary({ id, heading, meta, children, total }: PurchaseSummaryProps) {
   return (
-    <>
-      <ul className={['purchase-lines', className].filter(Boolean).join(' ')}>{children}</ul>
-      {total && (
-        <p className="purchase-lines__total title-medium">
-          <span>{total.label}</span>
-          <strong>{formatINR(total.amount)}</strong>
-        </p>
-      )}
-    </>
+    <section className="purchase-summary" aria-labelledby={id}>
+      <div className="purchase-summary__head">
+        <h2 id={id} className="purchase-summary__heading title-large">
+          {heading}
+        </h2>
+        {meta && <p className="purchase-summary__meta body-medium">{meta}</p>}
+      </div>
+      <ul className="purchase-lines purchase-lines--receipt">{children}</ul>
+      <p className="purchase-summary__total">
+        <span className="title-medium">{total.label}</span>
+        <strong className="purchase-summary__amount headline-small">{formatINR(total.amount)}</strong>
+      </p>
+    </section>
   );
 }

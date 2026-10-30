@@ -1,0 +1,98 @@
+/* Outcome panel. 30 = surface-container; the badge takes a tonal container role per outcome;
+   primary (10) stays on the actions slotted inside. */
+.status-panel {
+  display: grid;
+  gap: 24px;
+  padding: 32px;
+  border-radius: var(--md-sys-shape-corner-extra-large);
+  background-color: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface);
+}
+
+.status-panel__icon {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 56px;
+  block-size: 56px;
+  border-radius: var(--md-sys-shape-corner-full);
+  --md-icon-size: 32px;
+}
+
+.status-panel--success .status-panel__icon {
+  background-color: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+.status-panel--error .status-panel__icon {
+  background-color: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+}
+
+.status-panel--neutral .status-panel__icon {
+  background-color: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.status-panel__intro {
+  display: grid;
+  gap: 8px;
+}
+
+.status-panel__heading {
+  margin: 0;
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+/* The page moves focus here so screen readers announce the result; it is not a control, so no ring. */
+.status-panel__heading[tabindex='-1']:focus {
+  outline: none;
+}
+
+.status-panel__text {
+  margin: 0;
+  max-inline-size: 60ch;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.status-panel__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px 24px;
+  margin: 0;
+  padding-block-start: 24px;
+  border-block-start: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.status-panel__fact {
+  display: grid;
+  gap: 4px;
+}
+
+.status-panel__fact dt {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.status-panel__fact dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.status-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.status-panel__footer {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Phones: less padding so the copy keeps its width. */
+@media (max-width: 599px) {
+  .status-panel {
+    gap: 20px;
+    padding: 24px;
+  }
+}

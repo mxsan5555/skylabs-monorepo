@@ -134,6 +134,7 @@ No hex values in app code; brand colour comes from each app's generated M3 theme
 | `CardRail` / `CardGrid` | Swiper carousel / responsive grid (272px min columns, `layout="list"` one per row; `above`, `panel` tabpanel, `fallback`). |
 | `ChipNav` | Single-select pill row (`md-filter-chip`), or a `<nav>` of real links when items have `href` (category chips); `end` = the result count at the row end. Scrolls sideways on phones. |
 | `listing/` | `ListingBody` (toolbar, filter panel, grid or map, load more), `useListingParams` (URL state), `listingCards`, `useListingFacets`: the shared results band of category, `/deals`, `/products`, `/therapists` and explore. |
+| `StatusPanel` | Outcome panel for a finished task (order result): surface-container, tonal icon badge by `tone` (`success`, `error`, `neutral`), h1, text, `facts` description list, `actions`, `footer`. |
 | `ClampText` | Two-line clamped description with More / Less. |
 | `ListingToolbar` | Toolbar row above a listing (`start` / `end` slots). |
 | `ChoiceMenu` | Trigger (assist chip or text button) + `md-menu` of single choices (sort). |

@@ -371,8 +371,10 @@ A member who opens another member's deal, branch, package or therapist gets 404.
   (contact email, lines with their member, total, View order); unpaid with a failed latest
   payment, or reported failed, shows payment failed with Pay now (back to checkout for the same
   order); unpaid otherwise shows waiting for payment; cancelled says so; a load error offers Try
-  again. Focus moves to the h1. Composed from `SectionHead` (`icon` + `iconTone`),
-  `PurchaseLineList` and `ListingToolbar`; no page CSS.
+  again. Focus moves to the h1. Layout: `SplitLayout` with a `StatusPanel` (surface-container, the
+  30: tonal icon badge, h1, text, order number and date, actions, help link) and a
+  `PurchaseSummary` receipt beside it (lines as hairline rows, prices on-surface; only the total
+  and the actions take primary, the 10); stacked on phones; no page CSS.
 - Staff block or unblock a customer with a reason (`customers:status_change`); customers are never
   deleted.
 - **Refunds (D11):** Support raises a refund request; Admin or Super Admin approves or rejects

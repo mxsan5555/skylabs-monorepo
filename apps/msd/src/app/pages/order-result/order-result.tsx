@@ -3,18 +3,18 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { FilledButton, OutlinedButton } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getMyOrder, type Order } from '../../../api/orders';
-import { orderNumber } from '../../../utils/format';
+import { formatLongDate, orderNumber } from '../../../utils/format';
 import { lineFromOrderItem } from '../../../utils/cart-items';
-import { PurchaseLineCard, PurchaseLineList } from '../../components/purchase-line-card/purchase-line-card';
+import { PurchaseLineCard, PurchaseSummary } from '../../components/purchase-line-card/purchase-line-card';
 import { PageSection } from '../../components/page-section/page-section';
-import { SectionHead, type SectionHeadProps } from '../../components/section-head/section-head';
-import { ListingToolbar } from '../../components/listing-toolbar/listing-toolbar';
+import { SplitLayout } from '../../components/split-layout/split-layout';
+import { StatusPanel, type StatusTone } from '../../components/status-panel/status-panel';
 import { Seo } from '../../seo/seo';
 import content from '../../../content.json';
 
 const t = content.orderResult;
 const HEAD_ID = 'order-result-title';
-const ITEMS_ID = 'order-result-items';
+const SUMMARY_ID = 'order-result-summary';
 
 export type OrderOutcome = 'success' | 'failed' | 'pending' | 'cancelled' | 'error';
 
@@ -31,11 +31,11 @@ export function outcomeOf(order: Order | null, reportedFailed: boolean): OrderOu
   return latest?.status === 'FAILED' || reportedFailed ? 'failed' : 'pending';
 }
 
-const ICONS: Record<OrderOutcome, { icon: string; tone: SectionHeadProps['iconTone'] }> = {
-  success: { icon: 'check_circle', tone: 'primary' },
-  failed: { icon: 'error', tone: 'error' },
-  pending: { icon: 'schedule', tone: 'muted' },
-  cancelled: { icon: 'cancel', tone: 'muted' },
+const ICONS: Record<OrderOutcome, { icon: string; tone: StatusTone }> = {
+  success: { icon: 'check', tone: 'success' },
+  failed: { icon: 'priority_high', tone: 'error' },
+  pending: { icon: 'schedule', tone: 'neutral' },
+  cancelled: { icon: 'block', tone: 'neutral' },
   error: { icon: 'cloud_off', tone: 'error' },
 };
 
@@ -79,51 +79,67 @@ export function OrderResult() {
   const copy = t[outcome];
   const values = { number: orderNumber(id), email: order?.contactEmail ?? '' };
   const text = outcome === 'success' && !order?.contactEmail ? t.success.textNoEmail : copy.text;
+  const count = order?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
+  const itemCount = count === 1 ? t.itemCountOne : t.itemCountMany.replace('{count}', String(count));
 
   return (
     <>
       <Seo title={copy.heading} description={t.metaDescription} path={`/orders/${id}/confirmation`} noindex />
-      <PageSection stack aria-labelledby={HEAD_ID}>
-        <SectionHead
-          id={HEAD_ID}
-          as="h1"
-          icon={ICONS[outcome].icon}
-          iconTone={ICONS[outcome].tone}
-          heading={copy.heading}
-          subheading={fill(text, values)}
-        />
-        {order && (
-          <section aria-labelledby={ITEMS_ID}>
-            <SectionHead id={ITEMS_ID} heading={t.itemsHeading} titleClassName="title-large" subheading={fill(t.orderNumber, values)} />
-            <PurchaseLineList total={{ label: t.total, amount: Number(order.total) }}>
-              {order.items.map((item) => (
-                <PurchaseLineCard key={item.id} line={lineFromOrderItem(item)} />
-              ))}
-            </PurchaseLineList>
-          </section>
-        )}
-        <ListingToolbar
-          ariaLabel={t.nextSteps}
-          start={
-            <>
-              {outcome === 'failed' || outcome === 'pending' ? (
-                <FilledButton onClick={() => navigate('/checkout', { state: { orderId: id } })}>{t.payAgain}</FilledButton>
-              ) : outcome === 'error' ? (
-                <FilledButton onClick={load}>{t.tryAgain}</FilledButton>
-              ) : (
-                <FilledButton onClick={() => navigate(`/orders/${id}`)}>{t.viewOrder}</FilledButton>
-              )}
-              {outcome === 'success' || outcome === 'cancelled' ? (
-                <OutlinedButton onClick={() => navigate('/')}>{t.continueShopping}</OutlinedButton>
-              ) : (
-                <OutlinedButton onClick={() => navigate('/orders')}>{t.myOrders}</OutlinedButton>
-              )}
-            </>
+      <PageSection aria-labelledby={HEAD_ID}>
+        <SplitLayout
+          asideLabel={t.summaryHeading}
+          aside={
+            order && (
+              <PurchaseSummary
+                id={SUMMARY_ID}
+                heading={t.summaryHeading}
+                meta={itemCount}
+                total={{ label: t.total, amount: Number(order.total) }}
+              >
+                {order.items.map((item) => (
+                  <PurchaseLineCard key={item.id} line={lineFromOrderItem(item)} />
+                ))}
+              </PurchaseSummary>
+            )
           }
-        />
-        <p className="body-medium">
-          <Link className="text-link" to="/contact">{t.help}</Link>
-        </p>
+        >
+          <StatusPanel
+            id={HEAD_ID}
+            icon={ICONS[outcome].icon}
+            tone={ICONS[outcome].tone}
+            heading={copy.heading}
+            text={fill(text, values)}
+            facts={
+              order
+                ? [
+                    { label: t.orderNumberLabel, value: values.number },
+                    { label: t.placedOnLabel, value: formatLongDate(order.createdAt) },
+                  ]
+                : undefined
+            }
+            actions={
+              <>
+                {outcome === 'failed' || outcome === 'pending' ? (
+                  <FilledButton onClick={() => navigate('/checkout', { state: { orderId: id } })}>{t.payAgain}</FilledButton>
+                ) : outcome === 'error' ? (
+                  <FilledButton onClick={load}>{t.tryAgain}</FilledButton>
+                ) : (
+                  <FilledButton onClick={() => navigate(`/orders/${id}`)}>{t.viewOrder}</FilledButton>
+                )}
+                {outcome === 'success' || outcome === 'cancelled' ? (
+                  <OutlinedButton onClick={() => navigate('/')}>{t.continueShopping}</OutlinedButton>
+                ) : (
+                  <OutlinedButton onClick={() => navigate('/orders')}>{t.myOrders}</OutlinedButton>
+                )}
+              </>
+            }
+            footer={
+              <Link className="text-link" to="/contact">
+                {t.help}
+              </Link>
+            }
+          />
+        </SplitLayout>
       </PageSection>
     </>
   );

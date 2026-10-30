@@ -73,11 +73,17 @@ describe('OrderResult', () => {
     expect(h1.textContent).toBe('Thank you, your order is confirmed');
     await waitFor(() => expect(document.activeElement).toBe(h1));
     expect(document.body.textContent).toContain('We emailed the confirmation to neeraj@test.com');
-    expect(document.body.textContent).toContain('Order ORD-ABCD1234');
-    const card = document.querySelector('li.purchase-line');
+    const facts = Array.from(document.querySelectorAll('.status-panel__fact')).map((f) => [f.querySelector('dt')?.textContent, f.querySelector('dd')?.textContent]);
+    expect(facts).toEqual([
+      ['Order number', 'ORD-ABCD1234'],
+      ['Placed on', '29 October 2026'],
+    ]);
+    const summary = screen.getByRole('region', { name: 'Order summary' });
+    expect(summary.textContent).toContain('1 item');
+    const card = summary.querySelector('li.purchase-line');
     expect(card?.textContent).toContain('Repair Hair Treatment');
     expect(card?.textContent).toContain('Alok Kumar Wellness');
-    expect(document.querySelector('.purchase-lines__total')?.textContent).toContain('₹3,080');
+    expect(summary.querySelector('.purchase-summary__total')?.textContent).toContain('₹3,080');
     expect(getMyOrder).toHaveBeenCalledWith('test-token', ORDER_ID);
   });
 
@@ -85,7 +91,7 @@ describe('OrderResult', () => {
     getMyOrder.mockResolvedValue({ data: { ...ORDER, status: 'PENDING_PAYMENT', payments: [failedPayment] } });
     renderAt(`/orders/${ORDER_ID}/confirmation`);
     expect((await heading()).textContent).toBe('Your payment did not go through');
-    expect(document.querySelector('.section-head__icon--error')).not.toBeNull();
+    expect(document.querySelector('.status-panel--error')).not.toBeNull();
     fireEvent.click(screen.getByText('Pay now'));
     expect(await screen.findByText('checkout page')).toBeTruthy();
   });
@@ -106,6 +112,9 @@ describe('OrderResult', () => {
     getMyOrder.mockRejectedValueOnce(new Error('offline'));
     renderAt(`/orders/${ORDER_ID}/confirmation`);
     expect((await heading()).textContent).toBe('We could not load your order');
+    // Nothing to summarise without the order: no facts, no summary column.
+    expect(document.querySelector('.status-panel__facts')).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Order summary' })).toBeNull();
     expect(screen.getByRole('link', { name: /Contact us/ }).getAttribute('href')).toBe('/contact');
     fireEvent.click(screen.getByText('Try again'));
     await waitFor(() => expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Thank you, your order is confirmed'));
