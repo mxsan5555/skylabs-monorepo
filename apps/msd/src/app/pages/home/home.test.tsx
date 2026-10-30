@@ -374,8 +374,8 @@ describe('Home', () => {
     expect(option(productCard, 'href')).toBe('/products/prod-1');
     expect(option(productCard, 'price')).toBe('₹499');
     expect(option(productCard, 'description')).toBe('Calming oil.');
-    // Products show no member or place; services do (from the deal's vendor and branch).
-    expect(option(productCard, 'eyebrow')).toBeFalsy();
+    // Products show their member's business name but no place (item 4); services show both.
+    expect(option(productCard, 'eyebrow')).toBe('Calm Spa');
     // Each card's actions are a group named by the item: Add to cart, then the wishlist toggle.
     const actions = within(productCard).getByRole('group', { name: 'Massage Oil actions' });
     // Its visible text is its name (WCAG 2.5.3); the icon is decorative.

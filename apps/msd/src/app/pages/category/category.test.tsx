@@ -657,7 +657,7 @@ describe('Category page layout', () => {
       expect(await screen.findByRole('dialog', { name: content.category.filterPanel.title })).toBeTruthy();
     });
 
-    it('product category: requests product facets; the panel shows Price and Tags, no location (ST-41)', async () => {
+    it('product category: requests product facets; the panel shows Price, Tags and Business, no location (ST-41, item 4)', async () => {
       stubMedia(true);
       getCatalogCategoryMock.mockResolvedValue({ data: { ...CATEGORY, type: 'PRODUCT' } });
       renderAt('/category/massage');
@@ -667,6 +667,7 @@ describe('Category page layout', () => {
       expect(sections.map((s) => s.header ?? s.getAttribute('header'))).toEqual([
         content.category.filterPanel.price.title,
         content.category.filterPanel.tags.title,
+        content.category.filterPanel.business.title,
       ]);
       expect(getCatalogDealFacetsMock).not.toHaveBeenCalled();
       await waitFor(() => expect(getCatalogProductFacetsMock).toHaveBeenCalledWith(expect.objectContaining({ categoryId: CATEGORY.id })));

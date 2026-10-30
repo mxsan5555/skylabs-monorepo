@@ -380,6 +380,8 @@ export interface CatalogProductListOptions {
   categoryIds?: string[];
   subcategoryId?: string;
   vendorId?: string;
+  /** Business (member) ids, the Business filter (item 4); win over `vendorId`. */
+  vendorIds?: string[];
   search?: string;
   sort?: CatalogProductSort;
   minPrice?: number;
@@ -387,8 +389,8 @@ export interface CatalogProductListOptions {
   tags?: CatalogOfferTag[];
 }
 
-const productQuery = ({ categoryIds, tags, ...rest }: CatalogProductListOptions) =>
-  toQuery({ ...rest, categoryIds: joinList(categoryIds), tags: joinList(tags) });
+const productQuery = ({ categoryIds, vendorIds, tags, ...rest }: CatalogProductListOptions) =>
+  toQuery({ ...rest, categoryIds: joinList(categoryIds), vendorIds: joinList(vendorIds), tags: joinList(tags) });
 
 export function listCatalogProducts(opts: CatalogProductListOptions = {}) {
   return apiGet<CatalogProduct[]>(`/catalog/products${productQuery(opts)}`, null);
@@ -396,6 +398,7 @@ export function listCatalogProducts(opts: CatalogProductListOptions = {}) {
 
 export interface CatalogProductFacets {
   categories: { id: string; name: string; slug: string; count: number }[];
+  vendors: { id: string; name: string; count: number }[];
   tags: { tag: CatalogOfferTag; count: number }[];
   price: { min: number; max: number } | null;
 }

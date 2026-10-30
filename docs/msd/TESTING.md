@@ -74,7 +74,8 @@ ignores every file under `apps/msd-api/src` today. Flaky under load: `deals-list
 "toggle-status flips a non-ACTIVE deal" and `popular-tags.test.tsx` "mapping a category calls
 mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
 `products-list-page.test.tsx` "delete asks for confirmation" (seen 2026-10-28, pass alone), and
-`home-hero.test.tsx` (one test, seen 2026-10-28, passes alone).
+`home-hero.test.tsx` (one test, seen 2026-10-28, passes alone); msd-api `config/env-checks.test.ts` "boots with a
+complete production environment" (seen 2026-10-29 in `nx run-many`, passes alone).
 
 ## 4. Acceptance per module
 
@@ -386,8 +387,8 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
   coordinates behaves like `relevance`; `radiusKm`, `city`, `vendorIds`, `branchIds`,
   `minPrice` / `maxPrice` narrow and `meta.total` matches; therapist facets match the list.
 - Listing shell (ST-41, `filter-panel.test.tsx`, `chip-nav.test.tsx`, `category.test.tsx`): deals show Your location,
-  Distance, Price, Tags, Business, Branches; products show Category (on `/products`), Price and
-  Tags with no location or distance; therapists show Your location, Distance, Price, Business,
+  Distance, Price, Tags, Business, Branches; products show Category (on `/products`), Price,
+  Tags and Business with no location, distance or branches (item 4); therapists show Your location, Distance, Price, Business,
   Branches; Clear all empties every filter param; a tag checkbox writes `?tag=` and the card
   image shows the API tag with its theme role; no Reviews section.
 - Listing pages (ST-42, `listing-page.test.tsx`, `prerender/routes.test.ts`): `/deals`, `/deals/:city`, `/products`,
@@ -396,6 +397,13 @@ mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
   → not found and `noindex`; prerendered HTML holds the cards, ItemList and BreadcrumbList
   JSON-LD and hydrates without warnings; `sitemap.xml` lists the new routes and only cities
   with results. Checked at 1366 and 390 px, light and dark, no horizontal scroll at 320 px.
+- Product business (item 4, D39; `product-facets.test.ts`, `catalog.routes.test.ts`,
+  `offer-card.test.tsx`, `listing-page.test.tsx`): business counts ignore the business
+  selection and apply the others, sorted by count with zero-count businesses kept;
+  `vendorIds=` narrows `GET /catalog/products` and stays out of the facets SQL; a bad id → 422;
+  `/products?vendor=` sends `vendorIds` to the list and the facets, and explore with
+  `kind=products` to the list (`search.test.tsx`); a product card shows the
+  member's business name without the `divided` service layout.
 - Explore (ST-43, `search.test.tsx`): kind chips All, Deals, Products, Therapists with counts set
   `?kind=`; the filter panel follows the kind; list and grid render offer and therapist cards;
   signed-out Add to cart goes to sign in with the query kept; one (visually hidden) h1;

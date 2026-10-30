@@ -45,6 +45,7 @@ vi.mock('../../seo/site-url', () => ({ SITE_URL: 'https://example.test', absolut
 vi.mock('../../components/deal-map/deal-map', () => ({ DealMap: () => <div data-testid="deal-map" /> }));
 
 const OILS_ID = '0a0a0a0a-0000-4000-8000-000000000001';
+const CALM_SPA_ID = 'f1f1f1f1-0000-4000-8000-0000000000c5';
 const cat = (slug: string, name: string, type: 'SERVICE' | 'PRODUCT' | 'THERAPY') =>
   ({ id: `id-${slug}`, name, slug, description: null, type, children: [] }) as unknown as CatalogCategoryWithChildren;
 
@@ -109,7 +110,9 @@ beforeEach(() => {
   m.listProducts.mockResolvedValue({ data: [PRODUCT], meta: { total: 1 } });
   m.listTherapists.mockResolvedValue({ data: [], meta: { total: 0 } });
   m.dealFacets.mockResolvedValue({ data: { vendors: [], branches: [], distance: [], price: null, tags: [] } });
-  m.productFacets.mockResolvedValue({ data: { categories: [{ id: OILS_ID, name: 'Oils', slug: 'oils', count: 1 }], tags: [], price: null } });
+  m.productFacets.mockResolvedValue({
+    data: { categories: [{ id: OILS_ID, name: 'Oils', slug: 'oils', count: 1 }], vendors: [{ id: CALM_SPA_ID, name: 'Calm Spa', count: 1 }], tags: [], price: null },
+  });
   m.therapistFacets.mockResolvedValue({ data: { vendors: [], branches: [], distance: [], price: null } });
 });
 
@@ -146,7 +149,7 @@ describe('ListingPage', () => {
     expect(option('badge-color', 'badgeColor')).toBe('error');
   });
 
-  it('/products: PRODUCT chips, Category / Price / Tags filters and ?cat= sends categoryIds', async () => {
+  it('/products: PRODUCT chips, Category / Price / Tags / Business filters and ?cat= sends categoryIds', async () => {
     renderAt('/products');
     const nav = screen.getByRole('navigation', { name: content.listingPages.products.chipsLabel });
     expect(Array.from(nav.querySelectorAll('a')).map((a) => a.textContent)).toEqual([content.listingPages.products.all, 'Oils']);
@@ -154,6 +157,7 @@ describe('ListingPage', () => {
       content.category.filterPanel.category.title,
       content.category.filterPanel.price.title,
       content.category.filterPanel.tags.title,
+      content.category.filterPanel.business.title,
     ]);
     await waitFor(() => expect(document.querySelector('.checkbox-facet__label')?.textContent).toBe('Oils'));
     const box = document.querySelector('.checkbox-facet md-checkbox') as HTMLElement & { checked: boolean };
@@ -162,6 +166,12 @@ describe('ListingPage', () => {
     await waitFor(() => expect(screen.getByTestId('location-bar').textContent).toBe(`/products?cat=${OILS_ID}`));
     await waitFor(() => expect(m.listProducts.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ categoryIds: [OILS_ID] })));
     expect(m.listProducts).not.toHaveBeenCalledWith(expect.objectContaining({ city: expect.anything() }));
+  });
+
+  it('/products?vendor= sends vendorIds to the list and the facets (item 4)', async () => {
+    renderAt(`/products?vendor=${CALM_SPA_ID}`);
+    await waitFor(() => expect(m.listProducts.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ vendorIds: [CALM_SPA_ID] })));
+    await waitFor(() => expect(m.productFacets.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ vendorIds: [CALM_SPA_ID] })));
   });
 
   it('/therapists/:city: city in the h1 and the city sent to the API', async () => {

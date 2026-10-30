@@ -465,8 +465,10 @@ returns today's response plus the new `tag` field.
   `tags=expire_soon,hot,new,deal` (any of the four, comma list; anything else → 422).
 - `GET /catalog/deals`: `categoryId` stays optional, so `/deals` lists every category.
 - `GET /catalog/products`: adds `categoryIds` (comma list, max 50, wins over `categoryId`),
-  `tags`. `GET /catalog/products/facets` takes the same filters minus paging and sort and
-  returns `{ categories: [{ id, name, slug, count }], tags: [{ tag, count }], price: { min, max } }`.
+  `vendorIds` (comma list, max 50, wins over `vendorId`; item 4, D39) and `tags`.
+  `GET /catalog/products/facets` takes the same filters minus paging and sort and returns
+  `{ categories: [{ id, name, slug, count }], vendors: [{ id, name, count }], tags: [{ tag, count }], price: { min, max } }`;
+  category, business, tag and price counts each ignore their own selection.
 - `GET /catalog/therapists`: adds `sort=relevance|price_asc|price_desc|distance` (price = lowest
   active package; `distance` needs coordinates, else behaves like `relevance`), `minPrice` /
   `maxPrice` (lowest package), `radiusKm`, `city` / `state`, `vendorIds` / `branchIds`, and

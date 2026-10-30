@@ -1476,10 +1476,10 @@ export function buildOpenApiDocument() {
     path: '/catalog/products/facets',
     summary:
       'Filter-panel counts for the product list — same filters as GET /catalog/products minus paging/sort; ' +
-      'category, tag and price each ignore their own selection. Registered before /catalog/products/{id}.',
+      'category, business, tag and price each ignore their own selection. Registered before /catalog/products/{id}.',
     tags: ['Catalogue (public)'],
     request: { query: CatalogProductFacetQuerySchema },
-    responses: { 200: { description: 'Product facets: { categories[], tags[], price | null }' } },
+    responses: { 200: { description: 'Product facets: { categories[], vendors[], tags[], price | null }' } },
   });
 
   registry.registerPath({

@@ -1274,10 +1274,23 @@ describe('ST-40 product listing filters', () => {
     );
   });
 
-  it('GET /products/facets returns category, tag and price counts', async () => {
+  it('vendorIds narrows the list to those businesses (item 4) and rejects a bad id', async () => {
+    const VENDOR_A = 'f1f1f1f1-0000-4000-8000-000000000001';
+    const VENDOR_B = 'f1f1f1f1-0000-4000-8000-000000000002';
+    prismaMock.product.findMany.mockResolvedValue([]);
+    prismaMock.product.count.mockResolvedValue(0);
+    await request(app).get(`/api/v1/catalog/products?vendorIds=${VENDOR_A},${VENDOR_B}`);
+    expect(prismaMock.product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ vendorId: { in: [VENDOR_A, VENDOR_B] } }) }),
+    );
+    expect((await request(app).get('/api/v1/catalog/products?vendorIds=bad')).status).toBe(422);
+  });
+
+  it('GET /products/facets returns category, tag, price and business counts', async () => {
+    const VENDOR_A = 'f1f1f1f1-0000-4000-8000-000000000001';
     prismaMock.product.findMany.mockResolvedValue([
-      { id: 'p1', price: '100', discount: 50, createdAt: new Date('2026-01-01'), category: { id: CATEGORY_ID, name: 'Skin', slug: 'skin' } },
-      { id: 'p2', price: '300', discount: null, createdAt: new Date('2026-01-01'), category: { id: OTHER_CATEGORY_ID, name: 'Hair', slug: 'hair' } },
+      { id: 'p1', price: '100', discount: 50, createdAt: new Date('2026-01-01'), category: { id: CATEGORY_ID, name: 'Skin', slug: 'skin' }, vendorId: VENDOR_A, vendor: { businessName: 'Calm Spa' } },
+      { id: 'p2', price: '300', discount: null, createdAt: new Date('2026-01-01'), category: { id: OTHER_CATEGORY_ID, name: 'Hair', slug: 'hair' }, vendorId: VENDOR_A, vendor: { businessName: 'Calm Spa' } },
     ] as never);
     const res = await request(app).get(`/api/v1/catalog/products/facets?categoryIds=${CATEGORY_ID}`);
     expect(res.status).toBe(200);
@@ -1289,6 +1302,13 @@ describe('ST-40 product listing filters', () => {
     expect(res.body.data.price).toEqual({ min: 100, max: 100 });
     // The category selection stays out of SQL so its own counts can ignore it.
     expect((prismaMock.product.findMany.mock.calls[0][0]?.where as { categoryId?: unknown }).categoryId).toBeUndefined();
+    expect(res.body.data.vendors).toEqual([{ id: VENDOR_A, name: 'Calm Spa', count: 1 }]);
+  });
+
+  it('GET /products/facets keeps the business selection out of SQL so its own counts ignore it', async () => {
+    prismaMock.product.findMany.mockResolvedValue([]);
+    await request(app).get('/api/v1/catalog/products/facets?vendorIds=f1f1f1f1-0000-4000-8000-000000000001');
+    expect((prismaMock.product.findMany.mock.calls[0][0]?.where as { vendorId?: unknown }).vendorId).toBeUndefined();
   });
 });
 

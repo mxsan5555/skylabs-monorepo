@@ -144,7 +144,7 @@ No hex values in app code; brand colour comes from each app's generated M3 theme
 | `CheckboxFacet` / `PriceRangeField` | Searchable checkbox list with counts / range slider + Min/Max fields. |
 | `CityPickerDialog` | City picker (used by the header `CityChip` and the filter panel). |
 | `DealMap` | Deal price markers on a map (see Maps below). |
-| `OfferCard` | Deal or product as `sky-product-card price-first` (tag, price, two-line title; services: no description, then `divided` member, place and distance; products: two-line description; Add to cart, wishlist; whole card opens the detail page). Options: `tag`, `color`, `variant`, `layout`, `slider` (image slider with previous / next buttons and dots via `ProductCardGallery fill`, when the item has 2+ images; default off). Used by the home hero (`color="surface-high" variant="plain"`). |
+| `OfferCard` | Deal or product as `sky-product-card price-first` (tag, price, two-line title; services: no description, then `divided` member, place and distance; products: two-line description, then the business name; Add to cart, wishlist; whole card opens the detail page). Options: `tag`, `color`, `variant`, `layout`, `slider` (image slider with previous / next buttons and dots via `ProductCardGallery fill`, when the item has 2+ images; default off). Used by the home hero (`color="surface-high" variant="plain"`). |
 | `TherapistCard` | Therapist listing card (image slider, member, area, distance, From price; optional actions); helpers `lowestPackagePrice`, `formatDistance`. Home, search, category, therapists, related rails. |
 | `detail-page/` | Detail page blocks shared by `/deal/:id` and `/therapist/:id`: `DetailGallery`, `DetailPrice`, `DetailPurchase` (quantity, total, Add to cart, share), `BranchPanels` (location + hours), `DetailNotFound`; with `DurationPackageSelector` for packages. |
 
@@ -157,7 +157,7 @@ events on elements React hydrated from prerendered HTML).
 `/products`, `/therapists[/:city]`, explore `/explore`): h1, description, chip row with the total
 (`meta.total`) at its end, toolbar (Filters, List/Grid/Map, Sort per kind), filter panel per kind
 (deals: location, distance, price, tags, business, branches; products: category on `/products`,
-price, tags; therapists: deals minus tags; explore "All": location, distance, price), 12 cards per
+price, tags, business; therapists: deals minus tags; explore "All": location, distance, price), 12 cards per
 page. Card images carry the API's tag (New, Deal, Hot, Expire soon). All view state is in the
 URL: `sub`, `sort`, `view`, `radius`, `vendor`, `branch`, `min`, `max`, `tag`, `cat`, `kind`.
 No ratings anywhere until a review system exists.
@@ -172,7 +172,7 @@ No ratings anywhere until a review system exists.
 `branchIds` comma lists, `radiusKm` with `latitude`/`longitude`, `minPrice`/`maxPrice`, paging
 with `meta.total`), `GET /deals/facets` (vendor / branch / distance-bucket counts + price range,
 each facet ignoring its own selection, plus tag counts), `GET /products` (sorts, `categoryIds`,
-`tags`) + `GET /products/facets`, `GET /therapists` (server-side `sort`, price = lowest package,
+`vendorIds`, `tags`) + `GET /products/facets` (category / business / tag / price), `GET /therapists` (server-side `sort`, price = lowest package,
 `radiusKm`, `city`, `vendorIds`, `branchIds`) + `GET /therapists/facets`. Deals and products carry
 a computed `tag` (`services/offer-tag.ts`, rule in `docs/msd/PLANNING.md` §4) and accept `tags=`.
 With coordinates the deal and therapist lists are ranked in memory (`deal-ranking.ts`,

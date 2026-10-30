@@ -421,7 +421,7 @@ A member who opens another member's deal, branch, package or therapist gets 404.
   via `badge-color` / `badge-tone`), price, old price and discount with a one-star score, title
   (two lines, ellipsis). Services: no description; a hairline divider, then the member and the
   place with distance from the visitor, one line each (`divided`). Products: a two-line
-  description. Add to cart and wishlist. The whole card opens the detail page; Add
+  description, then the member's business name (item 4, D39). Add to cart and wishlist. The whole card opens the detail page; Add
   to cart (a deal asks for its package) and the heart act on their own, signed-out visitors go to
   sign in first. Grid or list view. `color` takes the same M3 roles as the feature card (none,
   surface, surface-high, primary, secondary, tertiary, inverse), slotted buttons included.
@@ -461,7 +461,7 @@ A member who opens another member's deal, branch, package or therapist gets 404.
     | Kind | Sections | Sort |
     |---|---|---|
     | Deals (`/deals`, SERVICE category) | Your location, Distance, Price, Tags, Business, Branches | Relevance, Price low-high / high-low, Distance (with coordinates) |
-    | Products (`/products`, PRODUCT category) | Category (`/products` only), Price, Tags; no location or distance | Relevance, Newest, Price low-high / high-low, Discount |
+    | Products (`/products`, PRODUCT category) | Category (`/products` only), Price, Tags, Business (D39); no location, distance or branches | Relevance, Newest, Price low-high / high-low, Discount |
     | Therapists (`/therapists`, THERAPY category) | Your location, Distance, Price ("From" price), Business, Branches | Relevance, Price low-high / high-low, Distance (with coordinates) |
     | Explore | the selected kind's sections; "All" shows Your location, Distance, Price | the selected kind's sorts |
     No Reviews filter until a review system exists (ST-22).
@@ -669,6 +669,7 @@ expire after 5 minutes (ARCHITECTURE.md §12.3).
 | D36 | Member delete (2026-10-29, Q2) | Delete always archives: nothing is erased, Archived restores to Inactive; the journey is Active → Inactive → Suspended → Delete |
 | D37 | Customer checkout details (2026-10-29, Q1) | Saved on the customer's account (address, state, city, pincode), pre-filled at checkout, editable, updated on each order |
 | D38 | Order and status SMS (2026-10-29, Q3) | Email for every notice now; an SMS goes out only for notice types whose DLT template id is set in env |
+| D39 | Product business (2026-10-29, item 4) | Overrides D29's "products have no Business filter": product cards show the member's business name and product listings (`/products`, product categories) get a Business filter; `GET /catalog/products` takes `vendorIds`, `/products/facets` returns `vendors` counts |
 | B2 | Vendor rename | Prisma `Vendor` → `Member`, `VendorDocument` → `MemberDocument` with `@@map`; FK columns stay `vendorId` |
 | B5 | Permission key | `vendors` → `members`; role `vendor` → `member`; role `support` added |
 | N1 | Reminder decisions (2026-10-17) | Clear the flag when documents complete; bell alert to `members:status_change` holders; Remind now in this release |

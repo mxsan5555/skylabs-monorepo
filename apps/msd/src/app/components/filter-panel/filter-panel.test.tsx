@@ -86,7 +86,7 @@ describe('FilterPanel', () => {
     ]);
   });
 
-  it('products with a category facet: category, price and tags; no location or distance (ST-41)', () => {
+  it('products with a category facet: category, price, tags and business; no location, distance or branches (ST-41, item 4)', () => {
     const onCategories = vi.fn();
     render(
       <FilterPanel
@@ -98,7 +98,7 @@ describe('FilterPanel', () => {
         })}
       />,
     );
-    expect(accordionItems().map((i) => i.header)).toEqual([copy.category.title, copy.price.title, copy.tags.title]);
+    expect(accordionItems().map((i) => i.header)).toEqual([copy.category.title, copy.price.title, copy.tags.title, copy.business.title]);
     const box = checkboxIn(document.body, 'c1');
     box.checked = true;
     fireEvent.change(box);
@@ -168,9 +168,15 @@ describe('FilterPanel', () => {
     expect(document.body.textContent).toContain(copy.distance.needsLocation);
   });
 
-  it('products without a category facet: price and tags only', () => {
-    render(<FilterPanel {...baseProps({ kind: 'products' })} />);
-    expect(accordionItems().map((i) => i.header)).toEqual([copy.price.title, copy.tags.title]);
+  it('products without a category facet: price, tags and business', () => {
+    const onVendors = vi.fn();
+    render(<FilterPanel {...baseProps({ kind: 'products', onVendors })} />);
+    expect(accordionItems().map((i) => i.header)).toEqual([copy.price.title, copy.tags.title, copy.business.title]);
+    const vendorId = facets.vendors?.[0]?.id as string;
+    const box = checkboxIn(document.body, vendorId);
+    box.checked = true;
+    fireEvent.change(box);
+    expect(onVendors).toHaveBeenCalledWith([vendorId]);
   });
 
   it('clears all filters', () => {

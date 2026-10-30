@@ -128,7 +128,7 @@ export function Category() {
           vendorIds,
           branchIds,
         }
-      : {}),
+      : { vendorIds }),
     ...(kind !== 'therapists' ? { tags } : {}),
   };
   const listKey = JSON.stringify([kind, base, sort]);
