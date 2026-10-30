@@ -227,7 +227,13 @@ complete production environment" (seen 2026-10-29 in `nx run-many`, passes alone
 - Checkout details (item 2.2, `checkout.test.tsx`): the form fills from `GET /users/me` (name,
   phone without +91, email, address, state, city, PIN) and Continue sends them; State lists the
   India states and City only the chosen state's cities; with nothing saved City is locked and
-  Continue names the missing fields without calling checkout.
+  Continue names the missing fields without calling checkout; the form still fills under
+  `StrictMode` (dev runs each effect twice).
+- Profile delivery address (item 2.2, `profile-form.test.tsx`, under `StrictMode`): fills from
+  the saved account address, never from an order; City lists only the chosen state's cities and a
+  new state clears it; Save address sends `{ address, state, city, pincode }` to
+  `PUT /users/me/address` and confirms only after it resolves; an API refusal shows as an alert
+  with no success message; an incomplete address names the missing fields without a request.
 - Saved delivery address (item 2.2, `rbac.routes.test.ts`, `orders.routes.test.ts`): `GET
   /users/me` returns it; `PUT /users/me/address` saves a valid India address for the caller only
   and refuses a city outside the state, a bad PIN, an unknown key and no token; checkout with all

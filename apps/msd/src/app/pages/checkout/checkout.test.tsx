@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -96,6 +97,21 @@ describe('Checkout details', () => {
         shippingCity: 'New Delhi',
         shippingPincode: '110063',
       }),
+    );
+  });
+
+  it('still fills the form under StrictMode, where dev runs every effect twice', async () => {
+    render(
+      <StrictMode>
+        <MemoryRouter>
+          <Checkout />
+        </MemoryRouter>
+      </StrictMode>,
+    );
+    await waitFor(() => expect(select('City').disabled).toBe(false));
+    fireEvent.click(continueButton());
+    await waitFor(() =>
+      expect(checkoutMock).toHaveBeenCalledWith('test-token', expect.objectContaining({ contactName: 'Neeraj Singh', shippingAddress: NEERAJ.address, shippingPincode: '110063' })),
     );
   });
 

@@ -344,7 +344,9 @@ A member who opens another member's deal, branch, package or therapist gets 404.
   and API). The form fills from the customer's profile and saved address; State is a list from the
   India location list and City lists that state's cities (City locked until a state is chosen,
   cleared when the state changes). Every field is required; Continue saves the address on the
-  account, so the next checkout starts filled.
+  account, so the next checkout starts filled. The profile page (`/my-account`, `/account/profile`)
+  shows and edits the same saved address with the same State and City lists, saved through
+  `PUT /users/me/address`; it never reads the address from an order.
 - **Line cards (item 2.3):** the cart and both checkout steps show each line as its own card
   (`PurchaseLineCard`, built by `utils/cart-items.ts` from a cart item or an order item): type tag,
   title, the member's name and branch inside the card, duration, quantity and price. Title and

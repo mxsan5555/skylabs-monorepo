@@ -61,7 +61,6 @@ export function Checkout() {
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState('');
   const initRef = useRef(false);
-  const prefilledRef = useRef(false);
   // Re-entrancy guards for submitDetails/openRazorpay/placeCodOrder — a `disabled` state prop
   // alone can't stop a second click/tap that fires before React commits the disabling re-render
   // (same gap fixed for TherapistFormDialog/PackageFormDialog elsewhere in this app). Checked
@@ -82,11 +81,12 @@ export function Checkout() {
   const [detailsSubmitting, setDetailsSubmitting] = useState(false);
   // Item 2.2 (D37): the signed-in customer's saved details fill the form; checkout saves them
   // again, so the next order starts filled. Session details stand in if the profile fails to load.
+  // No run-once guard: StrictMode runs this twice in dev and the first run's cleanup drops its
+  // response, so every run fetches; the `v ||` setters keep whatever the customer already typed.
   useEffect(() => {
-    if (prefilledRef.current || !token) {
+    if (!token) {
       return;
     }
-    prefilledRef.current = true;
     let live = true;
     const fill = (who: { name?: string | null; phone?: string | null; email?: string | null }) => {
       setContactName((v) => v || (who.name ?? ''));
