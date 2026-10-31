@@ -30,7 +30,7 @@ const d = content.detailPage;
  * `therapistId` + `therapistPackageId`), never through a Deal.
  */
 export function TherapistDetail() {
-  const { slug: id = '' } = useParams<{ slug: string }>();
+  const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { token } = useAuth();
   const requireSignIn = useRequireSignIn();

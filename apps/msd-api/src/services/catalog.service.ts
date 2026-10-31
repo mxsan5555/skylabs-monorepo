@@ -827,8 +827,13 @@ export async function getPublicProductFacets(opts: ProductWhereOpts & { tags?: O
   });
 }
 
-export async function getPublicProductOrThrow(id: string) {
-  const product = await prisma.product.findFirst({ where: { id, ...VISIBLE_PRODUCT_WHERE }, select: PUBLIC_PRODUCT_SELECT });
+/**
+ * Public product page (`GET /catalog/products/:idOrSlug`): accept either a UUID or the current
+ * product slug, with the response carrying the live `slug` so the page can replace stale URLs.
+ */
+export async function getPublicProductOrThrow(idOrSlug: string) {
+  const match = UUID_RE.test(idOrSlug) ? { id: idOrSlug } : { slug: idOrSlug };
+  const product = await prisma.product.findFirst({ where: { ...match, ...VISIBLE_PRODUCT_WHERE }, select: PUBLIC_PRODUCT_SELECT });
   if (!product) throw new ApiError('NOT_FOUND', 'Product not found');
   const [withTags] = await withProductPopularTags([product]);
   return withTags;
@@ -999,9 +1004,10 @@ export async function getPublicTherapistFacets(
   return { vendors, branches, distance, price };
 }
 
-export async function getPublicTherapistOrThrow(id: string) {
+export async function getPublicTherapistOrThrow(idOrSlug: string) {
+  const match = UUID_RE.test(idOrSlug) ? { id: idOrSlug } : { slug: idOrSlug };
   const therapist = await prisma.therapist.findFirst({
-    where: { OR: [{ id }, { slug: id }], ...VISIBLE_THERAPIST_WHERE },
+    where: { ...match, ...VISIBLE_THERAPIST_WHERE },
     select: PUBLIC_THERAPIST_LISTING_SELECT,
   });
   if (!therapist) throw new ApiError('NOT_FOUND', 'Therapist not found');

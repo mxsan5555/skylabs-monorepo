@@ -261,6 +261,7 @@ export function DealDetail() {
   const caps = [deal.stockLeft, deal.limitPerCustomer].filter((n): n is number => n != null && n > 0);
   const maxQuantity = caps.length ? Math.min(...caps) : undefined;
   const endsIn = hydrated && now ? endsInLabel(deal.endDate, now) : null;
+  const isExpirySoon = Boolean(endsIn);
   const chipCategory = deal.subcategory ?? deal.category;
 
   const crumbs = [
@@ -319,6 +320,9 @@ export function DealDetail() {
           <div className="detail-page__buy">
             <div className="detail-page__chips">
               {chipCategory && <sky-badge variant="secondary" size="small">{chipCategory.name}</sky-badge>}
+             {isExpirySoon && (
+    <sky-badge variant="error" size="small">Expire Soon</sky-badge>
+  )}
               {deal.vendor?.businessName &&
                 (deal.vendor.slug ? (
                   <Link to={`/vendor/${deal.vendor.slug}`}>

@@ -24,6 +24,23 @@ const ENTITLEMENT_STATUS_LABEL: Record<string, string> = {
   REFUNDED: 'Refunded',
 };
 
+const FALLBACK_VERIFICATION = {
+  heading: 'Voucher status',
+  voucherLabel: 'Voucher',
+  statusLabel: 'Status',
+  disputeStatus: { OPEN: 'Open', RESOLVED: 'Resolved' },
+  raiseIssue: {
+    cta: 'Raise issue',
+    success: 'Issue raised successfully.',
+    error: 'Could not raise this issue.',
+    dialogTitle: 'Raise issue',
+    reasonLabel: 'Reason',
+    descriptionLabel: 'Description (optional)',
+    cancel: 'Cancel',
+    submit: 'Submit',
+  },
+} as const;
+
 /**
  * Per-entitlement voucher display + "Raise Issue" — renders nothing when `item.entitlements` is
  * absent (see `api/orders.ts`'s own doc comment on that field: the backend doesn't populate it
@@ -31,8 +48,8 @@ const ENTITLEMENT_STATUS_LABEL: Record<string, string> = {
  * exists in `shared-ui` (confirmed, zero hits) — just the opaque voucher code and its status.
  */
 function PurchaseVerification({ item, onRaiseIssue }: { item: OrderItem; onRaiseIssue: (entitlementId: string) => void }) {
-  const { verification } = content.orderDetail;
-  if (!item.entitlements || item.entitlements.length === 0) return null;
+  const verification = (content.orderDetail as { verification?: typeof FALLBACK_VERIFICATION } | undefined)?.verification ?? FALLBACK_VERIFICATION;
+  if (!item?.entitlements || item.entitlements.length === 0) return null;
   return (
     <div className="cart-vendor-group__entitlements">
       <p className="field-hint">
@@ -64,6 +81,7 @@ export function OrderDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const { orderDetail } = content;
+  const verification = (orderDetail as { verification?: typeof FALLBACK_VERIFICATION } | undefined)?.verification ?? FALLBACK_VERIFICATION;
 
   const raiseIssueDialogRef = useRef<MdDialog>(null);
   const [raiseIssueEntitlementId, setRaiseIssueEntitlementId] = useState('');
@@ -91,10 +109,10 @@ export function OrderDetail() {
         description: raiseIssueDescription.trim() || undefined,
       });
       raiseIssueDialogRef.current?.close();
-      showSnackbar(orderDetail.verification.raiseIssue.success);
+      showSnackbar(verification.raiseIssue.success);
       load();
     } catch (err) {
-      setRaiseIssueError(err instanceof ApiRequestError ? err.message : orderDetail.verification.raiseIssue.error);
+      setRaiseIssueError(err instanceof ApiRequestError ? err.message : verification.raiseIssue.error);
     } finally {
       setRaiseIssueSaving(false);
     }
@@ -277,15 +295,15 @@ export function OrderDetail() {
       </div>
 
       <Dialog ref={raiseIssueDialogRef as RefObject<MdDialog>}>
-        <div slot="headline">{orderDetail.verification.raiseIssue.dialogTitle}</div>
+        <div slot="headline">{verification.raiseIssue.dialogTitle}</div>
         <div slot="content" className="form-grid">
           <OutlinedTextField
-            label={orderDetail.verification.raiseIssue.reasonLabel}
+            label={verification.raiseIssue.reasonLabel}
             value={raiseIssueReason}
             onInput={(e: Event) => setRaiseIssueReason((e.target as HTMLInputElement).value)}
           />
           <OutlinedTextField
-            label={orderDetail.verification.raiseIssue.descriptionLabel}
+            label={verification.raiseIssue.descriptionLabel}
             type="textarea"
             rows={3}
             value={raiseIssueDescription}
@@ -294,9 +312,9 @@ export function OrderDetail() {
           {raiseIssueError && <p className="error-state" role="alert">{raiseIssueError}</p>}
         </div>
         <div slot="actions">
-          <TextButton onClick={() => raiseIssueDialogRef.current?.close()}>{orderDetail.verification.raiseIssue.cancel}</TextButton>
+          <TextButton onClick={() => raiseIssueDialogRef.current?.close()}>{verification.raiseIssue.cancel}</TextButton>
           <FilledButton onClick={submitRaiseIssue} disabled={raiseIssueSaving || !raiseIssueReason.trim()}>
-            {raiseIssueSaving ? '…' : orderDetail.verification.raiseIssue.submit}
+            {raiseIssueSaving ? '…' : verification.raiseIssue.submit}
           </FilledButton>
         </div>
       </Dialog>

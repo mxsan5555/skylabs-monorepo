@@ -32,7 +32,7 @@ const SITE_URL = (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
  * in a location/hours panel here.
  */
 export function ProductDetail() {
-  const { slug: id = '' } = useParams<{ slug: string }>();
+  const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const { token, isAuthenticated } = useAuth();

@@ -22,8 +22,8 @@ const ENTITLEMENT_BASE_SELECT = {
 
 /**
  * Admin/vendor-facing entitlement columns for the Order Details page's "Service/Delivery/
- * Voucher" section — adds settlement status + carrier/tracking/delivery-evidence on top of the
- * shared base. Deliberately still narrow: no `grossAmount`/`commissionAmount`/`memberShareAmount`/
+ * Voucher" section — adds settlement status + carrier/tracking metadata on top of the shared
+ * base. Deliberately still narrow: no `grossAmount`/`commissionAmount`/`memberShareAmount`/
  * `payoutItemId` (payout internals belong to Member Settlements, not the order view) and, same
  * discipline as `CUSTOMER_ORDER_INCLUDE` below, never the OTP hash.
  */
@@ -33,8 +33,6 @@ const ADMIN_ENTITLEMENT_SELECT = {
   carrier: true,
   trackingNumber: true,
   shippedAt: true,
-  deliveryEvidenceStorageKey: true,
-  deliveryEvidenceNote: true,
 } as const;
 
 const ORDER_INCLUDE = {

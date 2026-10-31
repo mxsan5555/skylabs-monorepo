@@ -128,24 +128,27 @@ export async function saveMyAddress(userId: string, address: { address: string; 
   return serializeMe(user);
 }
 
-export function serializeUser(user: {
-  id: string;
-  name: string;
-  email: string | null;
-  phone: string | null;
-  status: string;
-  lastLoginAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-  roles: { role: { id: string; key: string; name: string } }[];
-}) {
+export function serializeUser(
+  user: {
+    id: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+    status: string;
+    lastLoginAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+    roles: { role: { id: string; key: string; name: string } }[];
+  },
+  opts: { includeLastLogin?: boolean } = {},
+) {
   return {
     id: user.id,
     name: user.name,
     email: user.email,
     phone: user.phone,
     status: user.status,
-    lastLoginAt: includeLastLogin ? user.lastLoginAt : null,
+    lastLoginAt: opts.includeLastLogin ? user.lastLoginAt : null,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
     roles: user.roles.map((ur) => ur.role),

@@ -11,6 +11,7 @@ import {
   createPromotion,
   updatePromotion,
   getPublicBanners,
+  getPublicPromotions,
 } from './promotion.service';
 import { VISIBLE_DEAL_WHERE, VISIBLE_PRODUCT_WHERE } from './catalog-visibility';
 
