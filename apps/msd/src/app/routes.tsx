@@ -331,7 +331,7 @@ export function AppRoutes() {
           {/* One legal page component for the 4 fixed WebsitePage rows (see website-page.tsx). */}
           <Route path="/privacy" element={<WebsitePage page="privacy" />} />
           <Route path="/terms" element={<WebsitePage page="terms" />} />
-          <Route path="/accessibility" element={<WebsitePage page="accessibility" />} />
+          <Route path="/return-refund-policy" element={<WebsitePage page="return-refund-policy" />} />
           <Route path="/cookies" element={<WebsitePage page="cookies" />} />
           {/* <Route path="/products/:slug" element={<ProductDetail />} /> */}
           <Route path="/showcase" element={<Showcase />} />

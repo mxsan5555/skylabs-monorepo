@@ -871,7 +871,7 @@ a.dashboard-stat:focus-visible {
 }
 
 /* Branch operating-hours editor (vendor-branches.tsx's OpeningHoursEditor) — one row per
-   weekday, each at least a 44px touch target per the app's accessibility baseline. */
+   weekday, each at least a 44px touch target per the app's return-refund-policy baseline. */
 .opening-hours-editor__row {
   display: flex;
   align-items: center;

@@ -1717,7 +1717,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/catalog/pages/{slug}',
-    summary: 'A single public website page (Privacy Policy/Terms of Service/Accessibility/Cookie Policy) — 404s if not found or not PUBLISHED',
+    summary: 'A single public website page (Privacy Policy/Terms of Service/return-refund-policy/Cookie Policy) — 404s if not found or not PUBLISHED',
     tags: ['Catalogue (public)'],
     request: { params: z.object({ slug: z.string() }) },
     responses: { 200: { description: 'Website page' }, 404: errorResponse },

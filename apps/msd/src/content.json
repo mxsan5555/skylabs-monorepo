@@ -258,8 +258,8 @@
           "to": "/terms"
         },
         {
-          "label": "Accessibility",
-          "to": "/accessibility"
+          "label": "Return / Refund Policy",
+          "to": "/return-refund-policy"
         },
         {
           "label": "Cookie Policy",
@@ -351,10 +351,26 @@
         "seeAllTo": "/therapists"
       },
       "homeTagSections": {
-        "NEW": { "heading": "New", "seeAll": "See all", "seeAllTo": "/explore" },
-        "HOT_DEAL": { "heading": "Hot Deal", "seeAll": "See all", "seeAllTo": "/explore" },
-        "DEAL": { "heading": "Deal", "seeAll": "See all", "seeAllTo": "/explore" },
-        "EXPIRE_SOON": { "heading": "Expire Soon", "seeAll": "See all", "seeAllTo": "/explore" }
+        "NEW": {
+          "heading": "New",
+          "seeAll": "See all",
+          "seeAllTo": "/explore"
+        },
+        "HOT_DEAL": {
+          "heading": "Hot Deal",
+          "seeAll": "See all",
+          "seeAllTo": "/explore"
+        },
+        "DEAL": {
+          "heading": "Deal",
+          "seeAll": "See all",
+          "seeAllTo": "/explore"
+        },
+        "EXPIRE_SOON": {
+          "heading": "Expire Soon",
+          "seeAll": "See all",
+          "seeAllTo": "/explore"
+        }
       }
     },
     "howItWorks": {
@@ -1007,8 +1023,14 @@
     "editDetails": "Edit details",
     "paymentMethod": "Payment method",
     "methods": {
-      "online": { "title": "Online payment", "description": "Razorpay: UPI, card or net banking" },
-      "cod": { "title": "Cash on delivery", "description": "Pay when your order arrives" }
+      "online": {
+        "title": "Online payment",
+        "description": "Razorpay: UPI, card or net banking"
+      },
+      "cod": {
+        "title": "Cash on delivery",
+        "description": "Pay when your order arrives"
+      }
     },
     "payLabel": "Pay {amount}",
     "openingPayment": "Opening payment…",
@@ -1958,9 +1980,9 @@
         }
       ]
     },
-    "accessibility": {
-      "path": "/accessibility",
-      "title": "Accessibility",
+    "return-refund-policy": {
+      "path": "/return-refund-policy",
+      "title": "Return / Refund Policy",
       "description": "How MySpaDeal works to make booking spa and wellness services accessible to everyone.",
       "body": [
         {

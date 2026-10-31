@@ -29,7 +29,7 @@ export const STATIC_PUBLIC_PATHS = [
   '/become-member',
   '/privacy',
   '/terms',
-  '/accessibility',
+  '/return-refund-policy',
   '/cookies',
 ] as const;
 

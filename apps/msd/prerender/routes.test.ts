@@ -81,7 +81,7 @@ describe('STATIC_PUBLIC_PATHS', () => {
   it('lists the public pages for the sitemap', () => {
     expect(STATIC_PUBLIC_PATHS).toEqual([
       '/', '/categories', '/deals', '/products', '/therapists', '/blog', '/about', '/how-it-works',
-      '/contact', '/help-center', '/careers', '/become-member', '/privacy', '/terms', '/accessibility', '/cookies',
+      '/contact', '/help-center', '/careers', '/become-member', '/privacy', '/terms', '/return-refund-policy', '/cookies',
     ]);
   });
 

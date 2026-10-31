@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
-import { Link, useSearchParams } from 'react-router-dom';
-import { Dialog, FilledButton, OutlinedSelect, SelectOption, TextButton } from '@skylabs-monorepo/shared-ui/react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Dialog, Icon, OutlinedTextField, OutlinedButton, FilledButton, OutlinedSelect, SelectOption, TextButton } from '@skylabs-monorepo/shared-ui/react';
 import type { SkyDataTableParamsDetail } from '@skylabs-monorepo/shared-ui';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
+import { CardGrid } from '../../../components/card-grid/card-grid';
 import {
   listOrders,
   getOrderCounts,
   setOrderStatus,
+  getOrder,
   shortOrderNumber,
   type Order,
   type OrderCounts,
@@ -83,41 +85,51 @@ export function describeOrderComposition(order: Order): string {
  *  groups via `secondaryKey` instead of the old one-field-per-column layout. */
 function toOrderRow(order: Order): Record<string, string | number> {
   const latestPayment = order.payments.length
-    ? [...order.payments].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+    ? [...order.payments].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )[0]
     : null;
+
   const vendorIds = new Set(order.items.map((i) => i.vendorId));
   const firstItem = order.items[0];
   const moreCount = Math.max(order.items.length - 1, 0);
+
   const purchasePrimary = firstItem
     ? `${firstItem.itemName}${moreCount > 0 ? ` +${moreCount} more item${moreCount > 1 ? 's' : ''}` : ''}`
     : '—';
+
   const memberLabel =
-    vendorIds.size > 1 ? `${vendorIds.size} members` : firstItem?.vendorNameSnapshot ?? order.vendorNameSnapshot;
+    vendorIds.size > 1
+      ? `${vendorIds.size} members`
+      : firstItem?.vendorNameSnapshot ?? order.vendorNameSnapshot;
 
   return {
     Order: shortOrderNumber(order.id),
     'Order Date': new Date(order.createdAt).toLocaleString(),
-    Customer: customerDisplayName(order.customer),
+    Customer: order.customer.name,
     'Customer Phone': order.customer.phone ?? '—',
     Purchase: purchasePrimary,
     'Purchase Detail': `${describeOrderComposition(order)} · ${memberLabel}`,
-    Amount: formatINR(Number(order.total)),
+    Amount: new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 2,
+    }).format(Number(order.total)),
     'Payment Status': latestPayment?.status ?? '—',
     'Order Status': order.status,
     'Created At': new Date(order.createdAt).toLocaleString(),
-    'Customer Phone': order.customer.phone ?? '—',
     'Customer Email': order.customer.email ?? '—',
-    // order.branch is null for a Product-only order (Product is vendor-level, not branch-level —
-    // see Order.branchId's schema doc comment in msd-api) — never read .address off it unguarded.
-    'Branch Address': (order.branch && formatStreetAddress([order.branch.address, order.branch.city])) || '—',
+    'Branch Address':
+      (order.branch && formatStreetAddress([order.branch.address, order.branch.city])) || '—',
     Subtotal: `₹${order.subtotal}`,
     Quantity: order.items.reduce((n, i) => n + i.quantity, 0),
     'Payment Provider': latestPayment?.provider ?? '—',
     'Payment Failure Reason': latestPayment?.failureReason ?? '—',
     'Cancellation Reason': order.cancellationReason ?? '—',
+    '__orderId': order.id,
+    '__customerId': order.customer.id,
   };
 }
-
 interface TableParams {
   page: number;
   pageSize: number;
@@ -251,7 +263,7 @@ export function OrderManagement({ scope = 'admin', refreshKey = 0 }: { scope?: '
   // — `sky-data-table`'s own row-detail drawer has no public API to open it programmatically, so
   // this fetches the same order via the existing GET /orders/:id and shows it in its own small
   // read-only Dialog (same key/value shape as the table's own drawer, via toOrderRow below).
- 
+
   const orderIdParam = searchParams.get('orderId');
   // P10-49: "N orders" on a member page opens this list filtered to that member.
   const vendorIdParam = searchParams.get('vendorId');
@@ -459,15 +471,15 @@ export function OrderManagement({ scope = 'admin', refreshKey = 0 }: { scope?: '
       {error && <p className="error-state" role="alert">{error}</p>}
 
       {scope === 'admin' && <>
-      <CardGrid layout="compact">
-        <sky-tile-card color="surface-high" icon="receipt_long" icon-style="surface" headline={String(counts?.total ?? '—')} text="All orders" />
-        <sky-tile-card color="secondary" icon="task_alt" icon-style="surface" headline={String(counts?.paid ?? '—')} text="Paid" />
-        <sky-tile-card color="tertiary" icon="hourglass_top" icon-style="surface" headline={String(counts?.pendingPayment ?? '—')} text="Awaiting Payment" />
-      </CardGrid>
-      <p className="field-hint">
-        {scopedByFilter ? 'Totals within your current member/search filters.' : 'Totals across every order.'} Order/Payment status
-        filters never change these three numbers — they stay a stable count of what else you've filtered to.
-      </p>
+        <CardGrid layout="compact">
+          <sky-tile-card color="surface-high" icon="receipt_long" icon-style="surface" headline={String(counts?.total ?? '—')} text="All orders" />
+          <sky-tile-card color="secondary" icon="task_alt" icon-style="surface" headline={String(counts?.paid ?? '—')} text="Paid" />
+          <sky-tile-card color="tertiary" icon="hourglass_top" icon-style="surface" headline={String(counts?.pendingPayment ?? '—')} text="Awaiting Payment" />
+        </CardGrid>
+        <p className="field-hint">
+          {scopedByFilter ? 'Totals within your current member/search filters.' : 'Totals across every order.'} Order/Payment status
+          filters never change these three numbers — they stay a stable count of what else you've filtered to.
+        </p>
 
       </>}
 

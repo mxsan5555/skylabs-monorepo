@@ -10,7 +10,7 @@ import { ApiRequestError } from '../../../../api/rbac/client';
 import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
 import { formatINR } from '../../../../utils/format';
 import { customerDisplayName } from '../customers/customer-list';
-import '../../cart/cart.css';
+
 
 const ORDER_STATUS_LABEL: Record<Order['status'], string> = {
   PENDING_PAYMENT: 'Pending Payment',
