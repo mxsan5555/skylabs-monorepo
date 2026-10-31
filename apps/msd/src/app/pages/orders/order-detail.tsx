@@ -1,306 +1,219 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
 import { useNavigate, useParams } from 'react-router-dom';
-import { FilledButton, CircularProgress, OutlinedButton, Divider, Icon, Dialog, OutlinedTextField, TextButton } from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, Icon, OutlinedButton } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { getMyOrder, cancelMyOrder, type Order, type OrderItem } from '../../../api/orders';
-import { raiseDispute } from '../../../api/rbac/disputes';
+import { cancelMyOrder, getMyOrder, type Order } from '../../../api/orders';
 import { ApiRequestError } from '../../../api/rbac/client';
-import { formatINR } from '../../../utils/format';
-import content from '../../../content.json';
-import { groupOrderItemsByVendor } from '../../../utils/order-items';
-import { showSnackbar } from '../../../snackbar/snackbar';
-import '../cart/cart.css';
+import { fillTemplate, formatINR, formatLongDate, formatStreetAddress, orderNumber } from '../../../utils/format';
+import { lineFromOrderItem } from '../../../utils/cart-items';
+import { PageSection } from '../../components/page-section/page-section';
+import { SplitLayout } from '../../components/split-layout/split-layout';
+import { SectionHead } from '../../components/section-head/section-head';
 import { Breadcrumb } from '../../components/breadcrumb';
-import { ProductOrderTimeline } from '../orders/product-order-timeline';
-import { OrderCancellationTimeline } from './order-cancellation-timeline';
+import { StepIndicator } from '../../components/step-indicator/step-indicator';
+import { StatusPanel } from '../../components/status-panel/status-panel';
+import { SummaryPanel } from '../../components/summary-panel/summary-panel';
+import { PurchaseLineCard, PurchaseLineList } from '../../components/purchase-line-card/purchase-line-card';
+import { useConfirmDialog } from '../../components/confirm-dialog';
+import { ORDER_STATUS_TONE } from './customer-order-card';
+import { Seo } from '../../seo/seo';
+import content from '../../../content.json';
 
-const ENTITLEMENT_STATUS_LABEL: Record<string, string> = {
-  ACTIVE: 'Not started yet',
-  STARTED: 'In progress',
-  OTP_REQUESTED: 'Completion in progress',
-  COMPLETED: 'Completed',
-  CANCELLED: 'Cancelled',
-  REFUNDED: 'Refunded',
-};
+const t = content.orderDetail;
+const TITLE_ID = 'order-detail-title';
+const ITEMS_ID = 'order-detail-items';
+const DELIVERY_ID = 'order-detail-delivery';
+const SUMMARY_ID = 'order-detail-summary';
 
-/**
- * Per-entitlement voucher display + "Raise Issue" — renders nothing when `item.entitlements` is
- * absent (see `api/orders.ts`'s own doc comment on that field: the backend doesn't populate it
- * yet, so this degrades to a no-op rather than showing broken/empty UI). No QR code — none
- * exists in `shared-ui` (confirmed, zero hits) — just the opaque voucher code and its status.
- */
-function PurchaseVerification({ item, onRaiseIssue }: { item: OrderItem; onRaiseIssue: (entitlementId: string) => void }) {
-  const { verification } = content.orderDetail;
-  if (!item.entitlements || item.entitlements.length === 0) return null;
-  return (
-    <div className="cart-vendor-group__entitlements">
-      <p className="field-hint">
-        <strong>{verification.heading}</strong>
-      </p>
-      {item.entitlements.map((e) => (
-        <p key={e.id} className="field-hint">
-          {verification.voucherLabel}: <code>{e.voucherCode}</code> · {verification.statusLabel}:{' '}
-          {ENTITLEMENT_STATUS_LABEL[e.entitlementStatus] ?? e.entitlementStatus}
-          {e.dispute ? (
-            <> · {verification.disputeStatus[e.dispute.status as keyof typeof verification.disputeStatus] ?? e.dispute.status}</>
-          ) : (
-            <>
-              {' '}
-              <TextButton onClick={() => onRaiseIssue(e.id)}>{verification.raiseIssue.cta}</TextButton>
-            </>
-          )}
-        </p>
-      ))}
-    </div>
-  );
+/** The steps of one order and the index of the current one (past the end = all done). */
+function progressOf(order: Order): { steps: string[]; current: number } {
+  if (order.status === 'CANCELLED') return { steps: [t.steps.placed, t.steps.cancelled], current: 1 };
+  const finished = order.items.some((item) => item.itemType === 'PRODUCT') ? t.steps.delivered : t.steps.completed;
+  const current = order.status === 'PENDING_PAYMENT' ? 0 : order.status === 'CONFIRMED' ? 1 : 3;
+  return { steps: [t.steps.placed, t.steps.confirmed, finished], current };
 }
 
+/**
+ * `/orders/:id`: one order. h1 with the short number, date and status; one progress list for the
+ * whole order; notices for a failed payment or a refund; every line as a card with its own image,
+ * member, branch and new-tab detail link; the delivery address; and an order summary beside it
+ * (payment, method, date, total, Pay / Download invoice / Cancel). Cancel asks in the app dialog.
+ */
 export function OrderDetail() {
   const { id = '' } = useParams<{ id: string }>();
   const { token } = useAuth();
   const navigate = useNavigate();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const { orderDetail } = content;
-
-  const raiseIssueDialogRef = useRef<MdDialog>(null);
-  const [raiseIssueEntitlementId, setRaiseIssueEntitlementId] = useState('');
-  const [raiseIssueReason, setRaiseIssueReason] = useState('');
-  const [raiseIssueDescription, setRaiseIssueDescription] = useState('');
-  const [raiseIssueError, setRaiseIssueError] = useState('');
-  const [raiseIssueSaving, setRaiseIssueSaving] = useState(false);
-
-  const openRaiseIssue = (entitlementId: string) => {
-    setRaiseIssueEntitlementId(entitlementId);
-    setRaiseIssueReason('');
-    setRaiseIssueDescription('');
-    setRaiseIssueError('');
-    raiseIssueDialogRef.current?.show();
-  };
-
-  const submitRaiseIssue = async () => {
-    if (!raiseIssueReason.trim()) return;
-    setRaiseIssueSaving(true);
-    setRaiseIssueError('');
-    try {
-      await raiseDispute(token, {
-        entitlementId: raiseIssueEntitlementId,
-        reason: raiseIssueReason.trim(),
-        description: raiseIssueDescription.trim() || undefined,
-      });
-      raiseIssueDialogRef.current?.close();
-      showSnackbar(orderDetail.verification.raiseIssue.success);
-      load();
-    } catch (err) {
-      setRaiseIssueError(err instanceof ApiRequestError ? err.message : orderDetail.verification.raiseIssue.error);
-    } finally {
-      setRaiseIssueSaving(false);
-    }
-  };
 
   const load = useCallback(() => {
     setLoading(true);
     setError('');
     getMyOrder(token, id)
       .then(({ data }) => setOrder(data))
-      .catch((err) =>
-        setError(err instanceof ApiRequestError ? err.message : orderDetail.errors.load,),
-      )
+      .catch((err) => setError(err instanceof ApiRequestError ? err.message : t.errors.load))
       .finally(() => setLoading(false));
-  }, [token, id, orderDetail.errors.load]);
-  useEffect(() => { load(); }, [load]);
+  }, [token, id]);
+  useEffect(() => {
+    load();
+  }, [load]);
+
   const cancel = async () => {
-    if (!order || !window.confirm(orderDetail.cancelDialog.message)) {
-      return;
-    }
+    if (!order) return;
+    const ok = await confirm({
+      title: t.cancelDialog.title,
+      message: t.cancelDialog.message,
+      confirmLabel: t.cancelDialog.confirm,
+      cancelLabel: t.cancelDialog.cancel,
+    });
+    if (!ok) return;
     setError('');
     try {
-      const { data } = await cancelMyOrder(token, order.id);
-      setOrder(data);
-    } catch (err) { setError(err instanceof ApiRequestError ? err.message : orderDetail.errors.cancel,); }
+      setOrder((await cancelMyOrder(token, order.id)).data);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.errors.cancel);
+    }
   };
-  const vendorGroups = order ? groupOrderItemsByVendor(order.items) : [];
+
+  const seo = <Seo title={t.metaTitle} description={t.metaDescription} path={`/orders/${id}`} noindex />;
   if (loading) {
     return (
-      <div className="order-loading">
-        <CircularProgress indeterminate aria-label="Loading order" />
-        <p>{orderDetail.loading}</p>
-      </div>
+      <PageSection>
+        {seo}
+        <p className="loading-state" role="status">
+          {t.loading}
+        </p>
+      </PageSection>
     );
   }
-  if (error || !order) {
+  if (!order) {
     return (
-      <div className="cart-page cart-page--empty">
-        <title>{orderDetail.notFound.metaTitle}</title>
-        <sky-info-card icon="search_off" heading={orderDetail.notFound.heading}
-          subheading={error || orderDetail.notFound.subheading} />
-        <FilledButton onClick={() => navigate('/orders')}>{orderDetail.notFound.cta}</FilledButton>
-      </div>
+      <PageSection aria-labelledby={TITLE_ID}>
+        {seo}
+        <SplitLayout asideLabel={t.summaryHeading}>
+          <StatusPanel
+            id={TITLE_ID}
+            icon="search_off"
+            tone="neutral"
+            heading={t.notFound.heading}
+            text={error || t.notFound.subheading}
+            actions={<FilledButton onClick={() => navigate('/orders')}>{t.notFound.cta}</FilledButton>}
+          />
+        </SplitLayout>
+      </PageSection>
     );
   }
-  const isCancelled = order.status === 'CANCELLED';
-  const isPaid = order.payments[0]?.status === 'PAID';
-  return (
-    <div className="cart-page">
-      <title>{orderDetail.metaTitle}</title>
-      <meta name="robots" content="noindex" />
-      <div className="cart-page__inner">
-        <Breadcrumb
-          items={[
-            { label: 'Home', to: '/' },
-            { label: 'My Orders', to: '/orders' },
-            { label: `Order #${order.id}` },
-          ]}
-        />
-        {error && (<p className="error-state" role="alert">{error}</p>)}
-        <div className="cart-page__layout">
-          <section className="cart-page__items">
-            {vendorGroups.map((group) => (
-              <div key={group.vendorId} className="cart-vendor-group">
-                <p className="cart-vendor-group__heading">
-                  <Icon aria-hidden="true">storefront</Icon>
-                  <strong>{group.vendorName}</strong>
-                  {group.branchName && ` · ${group.branchName}`}
-                </p>
-                <ul className="cart-list">
-                  {group.items.map((item) => (
-                    <li key={item.id} className="cart-item">
-                      {item.image && (
-                        <img
-                          className="cart-item__img"
-                          src={item.image}
-                          alt={item.itemName}
-                          width={100}
-                          height={100}
-                          loading="lazy"
-                        />
-                      )}
-                      <div className="cart-item__body">
-                        <div className="cart-item__top">
-                          <div>
-                            <p className="cart-item__provider">{item.itemType === 'SERVICE' ? 'Service' : 'Product'}</p>
-                            <h3 className="cart-item__title">{item.itemName}</h3>
-                            <p className="cart-item__provider">
-                              {item.quantity} ×{' '} {item.durationMinutes ? `${item.durationMinutes} min` : 'Item'}
-                            </p>
-                          </div>
-                          <p className="cart-item__price"> {formatINR(Number(item.lineTotal),)}</p>
-                        </div>
-                        {item.itemType === 'PRODUCT' &&
-                          !isCancelled && (
-                            <div className="cart-item__timeline"> <ProductOrderTimeline status={order.status}   paymentStatus={order.payments[0]?.status}/></div>
-                          )}
-                        {isCancelled && (
-                          <div className="cart-item__timeline"> <OrderCancellationTimeline order={order} /></div>
-                        )}
-                        <PurchaseVerification item={item} onRaiseIssue={openRaiseIssue} />
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-                {isCancelled && isPaid && (
-                  <sky-info-card
-                    icon="info"
-                    heading="Refund Information"
-                    subheading={orderDetail.messages.refundAfterCancellation}
-                  />
-                )}
-              </div>
-            ))}
-          </section>
-          <aside className="cart-page__summary" aria-label="Order summary">
-            <sky-card variant="outlined" className="cart-summary-card">
-              <div className="cart-summary">
-                <h2 className="cart-summary__heading">Order Summary</h2>
-                <div className="cart-summary__row">
-                  <span>Payment</span>
-                  <span>{order.payments[0]?.status ?? 'Not available'}</span>
-                </div>
-                {order.payments[0]?.provider && (
-                  <div className="cart-summary__row">
-                    <span>Paid via</span>
-                    <span>{order.payments[0].provider === 'RAZORPAY' ? 'Razorpay' : order.payments[0].provider}</span>
-                  </div>
-                )}
-                {order.branchNameSnapshot && (
-                  <div className="cart-summary__row">
-                    <span>Branch</span>
-                    <span>{order.branchNameSnapshot}</span>
-                  </div>
-                )}
-                <div className="cart-summary__row">
-                  <span>Order Placed</span>
-                  <span>
-                    {new Date(order.createdAt,).toLocaleDateString('en-IN', {
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric',
-                    })}
-                  </span>
-                </div>
-                <Divider />
-                <div className="cart-summary__row cart-summary__row--total">
-                  <strong>{orderDetail.labels.total}</strong>
-                  <strong>{formatINR(Number(order.total))}</strong>
-                </div>
-                <div className="cart-summary__actions">
-                  {order.status === 'PENDING_PAYMENT' && (
-                    <FilledButton
-                      onClick={() => navigate('/checkout', { state: { orderId: order.id, }, })}>
-                      {orderDetail.actions.payPrefix}{' '}{formatINR(Number(order.total))}
-                      <Icon slot="trailing-icon" aria-hidden="true">arrow_forward</Icon>
-                    </FilledButton>
-                  )}
-                  <FilledButton onClick={() => navigate(`/orders/${order.id}/invoice`,)}>
-                    {orderDetail.actions.downloadInvoice}
-                  </FilledButton>
-                  <OutlinedButton onClick={() => navigate('/orders')}>{orderDetail.actions.myOrders}</OutlinedButton>
-                  {(order.status === 'PENDING_PAYMENT' ||
-                    order.status === 'CONFIRMED') && (
-                      <OutlinedButton onClick={cancel}>{orderDetail.actions.cancelOrder}</OutlinedButton>
-                    )}
-                </div>
-              </div>
-            </sky-card>
-          </aside>
-        </div>
-        {order.status === 'PENDING_PAYMENT' &&
-          order.payments[0]?.status === 'FAILED' && (
-            <sky-info-card
-              icon="error"
-              heading={orderDetail.labels.paymentFailed}
-              subheading={order.payments[0].failureReason ?? orderDetail.labels.retryPayment}
-            />
-          )}
-      </div>
 
-      <Dialog ref={raiseIssueDialogRef as RefObject<MdDialog>}>
-        <div slot="headline">{orderDetail.verification.raiseIssue.dialogTitle}</div>
-        <div slot="content" className="form-grid">
-          <OutlinedTextField
-            label={orderDetail.verification.raiseIssue.reasonLabel}
-            value={raiseIssueReason}
-            onInput={(e: Event) => setRaiseIssueReason((e.target as HTMLInputElement).value)}
+  const number = orderNumber(order.id);
+  const payment = order.payments[0];
+  const progress = progressOf(order);
+  const total = formatINR(Number(order.total));
+  const canCancel = order.status === 'PENDING_PAYMENT' || order.status === 'CONFIRMED';
+  const hasProducts = order.items.some((item) => item.itemType === 'PRODUCT');
+  const payNow = () => navigate('/checkout', { state: { orderId: order.id } });
+
+  return (
+    <PageSection aria-labelledby={TITLE_ID}>
+      {seo}
+      {ConfirmDialog}
+      <Breadcrumb items={[{ label: content.myAccount.home, to: '/' }, { label: t.breadcrumbOrders, to: '/orders' }, { label: number }]} />
+      <SplitLayout
+        asideLabel={t.summaryHeading}
+        aside={
+          <SummaryPanel
+            id={SUMMARY_ID}
+            heading={t.summaryHeading}
+            rows={[
+              { label: t.rows.payment, value: payment ? t.paymentStatuses[payment.status] : t.notAvailable },
+              ...(payment ? [{ label: t.rows.paidVia, value: t.providers[payment.provider] }] : []),
+              { label: t.rows.placedOn, value: formatLongDate(order.createdAt) },
+            ]}
+            total={{ label: t.labels.total, value: total }}
+            actions={
+              <>
+                {order.status === 'PENDING_PAYMENT' && (
+                  <FilledButton onClick={payNow}>
+                    {t.actions.payPrefix} {total}
+                    <Icon slot="trailing-icon" aria-hidden="true">
+                      arrow_forward
+                    </Icon>
+                  </FilledButton>
+                )}
+                {order.status !== 'PENDING_PAYMENT' && (
+                  <FilledButton onClick={() => navigate(`/orders/${order.id}/invoice`)}>
+                    <Icon slot="icon" aria-hidden="true">
+                      download
+                    </Icon>
+                    {t.actions.downloadInvoice}
+                  </FilledButton>
+                )}
+                {canCancel && <OutlinedButton onClick={() => void cancel()}>{t.actions.cancelOrder}</OutlinedButton>}
+              </>
+            }
           />
-          <OutlinedTextField
-            label={orderDetail.verification.raiseIssue.descriptionLabel}
-            type="textarea"
-            rows={3}
-            value={raiseIssueDescription}
-            onInput={(e: Event) => setRaiseIssueDescription((e.target as HTMLTextAreaElement).value)}
+        }
+      >
+        <div>
+          <SectionHead
+            id={TITLE_ID}
+            as="h1"
+            titleClassName="headline-medium"
+            heading={fillTemplate(t.title.prefix + ' {number}', { number })}
+            subheading={fillTemplate(t.placedOn, { date: formatLongDate(order.createdAt) })}
+            actions={<sky-badge status={ORDER_STATUS_TONE[order.status]}>{content.orders.statuses[order.status]}</sky-badge>}
           />
-          {raiseIssueError && <p className="error-state" role="alert">{raiseIssueError}</p>}
+          <StepIndicator
+            label={t.progressLabel}
+            steps={progress.steps}
+            current={progress.current}
+            doneLabel={content.checkout.stepDone}
+            tone={order.status === 'CANCELLED' ? 'error' : 'primary'}
+          />
         </div>
-        <div slot="actions">
-          <TextButton onClick={() => raiseIssueDialogRef.current?.close()}>{orderDetail.verification.raiseIssue.cancel}</TextButton>
-          <FilledButton onClick={submitRaiseIssue} disabled={raiseIssueSaving || !raiseIssueReason.trim()}>
-            {raiseIssueSaving ? '…' : orderDetail.verification.raiseIssue.submit}
-          </FilledButton>
-        </div>
-      </Dialog>
-    </div>
+
+        {error && (
+          <p className="form-field__error body-medium" role="alert">
+            {error}
+          </p>
+        )}
+        {order.status === 'PENDING_PAYMENT' && payment?.status === 'FAILED' && (
+          <StatusPanel
+            id="order-detail-payment-failed"
+            as="h2"
+            compact
+            icon="error"
+            tone="error"
+            heading={t.paymentFailedHeading}
+            text={payment.failureReason ?? t.labels.retryPayment}
+          />
+        )}
+        {order.status === 'CANCELLED' && payment?.status === 'PAID' && (
+          <StatusPanel id="order-detail-refund" as="h2" compact icon="currency_rupee" tone="neutral" heading={t.refundHeading} text={t.messages.refundAfterCancellation} />
+        )}
+
+        <section aria-labelledby={ITEMS_ID}>
+          <SectionHead id={ITEMS_ID} heading={t.itemsHeading} titleClassName="title-large" />
+          <PurchaseLineList>
+            {order.items.map((item) => (
+              <PurchaseLineCard key={item.id} line={lineFromOrderItem(item)} />
+            ))}
+          </PurchaseLineList>
+        </section>
+
+        {hasProducts && order.shippingAddress && (
+          <section aria-labelledby={DELIVERY_ID}>
+            <SectionHead id={DELIVERY_ID} heading={t.deliveryHeading} titleClassName="title-large" />
+            <p className="body-large">
+              {formatStreetAddress([order.shippingAddress, order.shippingCity, order.shippingState])} {order.shippingPincode}
+            </p>
+          </section>
+        )}
+      </SplitLayout>
+    </PageSection>
   );
 }
+
 export default OrderDetail;

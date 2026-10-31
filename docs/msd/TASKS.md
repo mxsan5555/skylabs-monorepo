@@ -40,7 +40,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 1 | Admin and staff | 4 | 31 | 13 |
 | 2 | Members | 54 | 101 | 53 |
 | 3 | Customers and orders | 3 | 12 | 25 |
-| 4 | Storefront | 29 | 42 | 69 |
+| 4 | Storefront | 29 | 47 | 62 |
 | 5 | Static content | 2 | 5 | 40 |
 | 6 | CTA banners | 4 | 5 | 80 |
 | 7 | Home slider | 13 | 14 | 93 |
@@ -48,8 +48,8 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 9 | Payments, payouts and reports | 0 | 11 | 0 |
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
-| 12 | Platform, security and release | 15 | 70 | 21 |
-| | **Total** | **118** | **290** | **41** |
+| 12 | Platform, security and release | 15 | 71 | 21 |
+| | **Total** | **118** | **296** | **40** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -266,6 +266,11 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [x] | ST-43 | FE | `/explore` on the shell with kind chips and counts, `noindex, follow` | M | ST-41 | Done 2026-10-24: `search.test.tsx` rewritten (kind chips, counts, category param, `noindex, follow`, sign-in path); state/city dialogs replaced by the shared filter panel; checked at 1366 and 390 px |
 | [x] | ST-44 | FE | Home "Shop by category" becomes "Deals by category" with all 10 categories in a 5x2 grid from 840px (2 columns below) | S | - | Done 2026-10-24 (b01a585) |
 | [x] | ST-45 | FE | Category tiles get the M3 hover/press state layer (`sky-tile-card` with a slotted headline link); card rails and the home hero stop clipping card shadows and focus rings (padding inside Swiper's `::part(container)`) | S | - | Done 2026-10-24 (26981d8): `sky-tile-card.test.ts`; checked at 1280 px |
+| [ ] | ST-46 | FE | Rebuild the my-account Wishlist, Payments and Invoices pages on the shared blocks (60/30/10 roles, no page CSS, copy in `content.json`) and swap their raw robots `<meta>` for `Seo noindex` | M | - | Each page's tests; no page CSS left |
+| [ ] | ST-47 | FE | Rebuild the invoice page (`/orders/:id/invoice`, opened by Download invoice) on the shared blocks, print-friendly | S | - | Tests; prints on one page |
+| [ ] | ST-48 | FE | Move the console settings page (`/account/settings`) off the old `account-card` styles onto the shared blocks | S | - | Tests; `account-card` unused there |
+| [ ] | ST-49 | BIZ | Owner decisions from the cart, checkout and account rebuild: outline and corners on the payment method cards, `--sky-space-*` spacing tokens or the 4/8 px grid, removal of the dashboard Orders / Profile / Sign out cards | S | - | Decisions recorded in PLANNING.md §4 |
+| [ ] | ST-50 | QA | Manual browser checks of the rebuilt pages: Razorpay test card (paid; failed then window closed), Back to cart, Edit details and Cash on delivery at checkout, `/products` Business filter and business name on cards, dark mode on cart, checkout, order and account pages | S | - | Each check passes at desktop and phone width |
 
 Removed 2026-10-24: ST-17 (therapist city filter is in ST-40; products are not location bound, D29), ST-23 (explore filter panel is ST-43), ST-24 (products have no Business filter, D29).
 
@@ -418,3 +423,4 @@ Removed 2026-10-24: ST-17 (therapist city filter is in ST-40; products are not l
 | [ ] | X-03 | SEC | Rotate the secrets that were once committed (Gmail app password, ConnectExpress SMS key, Razorpay keys, `JWT_SECRET`); they remain in git history | S | - | All rotated at the provider |
 | [ ] | X-04 | OPS | Verify the msd-api production deploy end to end with the DEPLOYMENT.md checklist (health, /docs, sign-in, R2 upload survives a redeploy) | S | - | Checklist ticked |
 | [x] | X-05 | BE | Remove the leftover `console.log` in `apps/msd-api/src/middleware/requirePermission.ts` (prints every permission when routes load) | S | - | No log line at boot; done 2026-10-28 (`requirePermission.test.ts` "at boot") |
+| [ ] | X-06 | QA | Fix the pre-existing type errors (Dialog ref type in the profile form, showcase and CMS pages; `account/orders/orders.test.tsx`; `treatment-directory.tsx`) and the two newer flaky tests in TESTING.md §3 (`env-checks`, `deals-list-page`) | S | - | `tsc` clean for msd; both tests stable and removed from §3 |

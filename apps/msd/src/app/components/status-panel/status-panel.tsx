@@ -26,20 +26,22 @@ export interface StatusPanelProps {
   actions?: ReactNode;
   /** Small print under the actions (help link). */
   footer?: ReactNode;
+  /** Smaller notice inside a page (refund, failed payment) instead of a page result. */
+  compact?: boolean;
 }
 
 /**
  * Outcome panel for a finished task (order result): tinted surface-container (the 30), a tonal
  * icon badge, the heading, a short explanation, key facts and the next steps. Token-only CSS.
  */
-export function StatusPanel({ id, icon, tone, heading, as: Heading = 'h1', text, facts, actions, footer }: StatusPanelProps) {
+export function StatusPanel({ id, icon, tone, heading, as: Heading = 'h1', text, facts, actions, footer, compact = false }: StatusPanelProps) {
   return (
-    <div className={`status-panel status-panel--${tone}`}>
+    <div className={`status-panel status-panel--${tone}${compact ? ' status-panel--compact' : ''}`}>
       <span className="status-panel__icon">
         <Icon aria-hidden="true">{icon}</Icon>
       </span>
       <div className="status-panel__intro">
-        <Heading id={id} className="status-panel__heading headline-medium">
+        <Heading id={id} className={`status-panel__heading ${compact ? 'title-large' : 'headline-medium'}`}>
           {heading}
         </Heading>
         <p className="status-panel__text body-large">{text}</p>

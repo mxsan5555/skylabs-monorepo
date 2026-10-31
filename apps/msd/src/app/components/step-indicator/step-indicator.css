@@ -45,6 +45,11 @@
   color: var(--md-sys-color-on-primary);
 }
 
+.step-indicator--error .step-indicator__step--current .step-indicator__marker {
+  background-color: var(--md-sys-color-error);
+  color: var(--md-sys-color-on-error);
+}
+
 .step-indicator__step--done {
   color: var(--md-sys-color-on-surface);
 }
