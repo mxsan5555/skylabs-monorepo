@@ -17,11 +17,12 @@ npx vitest run <path> --config apps/msd-api/vite.config.ts  # one folder or file
 ### Local test accounts
 
 `npm run msd-api:prisma:seed-dev-users` creates (or updates) these accounts in the local database.
-Their phones and emails are made up, so `DEV_OTP_IDENTIFIERS` in `apps/msd-api/.env.local` lists
-both the phones and the emails (an email left off the list gets a real email, and `test.com` is a
-real domain): signing in with one prints the OTP in the `nx serve msd-api` console (a JSON line with
-`"event":"otp.dev_console"` and the 6-digit `code`) instead of sending an SMS or email. Every other
-phone or email still gets a real OTP, and production refuses to boot with the list set.
+Their phones and emails are made up. For login testing, `OTP_PROVIDER=dummy` uses the role-wise
+OTP environment variables documented in `apps/msd-api/.env.example`; customer phone login uses
+the fixed OTP `111111`. No dummy OTP is logged and no SMS is sent. Super Admin uses
+its separate `SUPERADMIN_LOGIN_MOBILE` and
+`SUPERADMIN_LOGIN_OTP` environment values. With `OTP_PROVIDER=sms`, the normal random OTP flow
+uses the configured SMS/email providers. Do not put credentials in frontend variables or source.
 
 | Role | Name | Phone (sign in with) | Email | Business / city |
 |---|---|---|---|---|
@@ -90,6 +91,15 @@ transform doesn't type-check, which is why these don't block `msd-api:test`.
 ## 4. Acceptance per module
 
 ### 4.1 Admin and staff
+
+- OTP provider tests: dummy mode uses backend environment values for Admin, Member, Sales,
+  Marketing and Support; each rejects other roles' OTPs and never calls SMS. Customers can use
+  their registered phone with fixed OTP `111111`. Super Admin uses only its
+  separate configured mobile/OTP and must already be an active Super Admin account.
+- Missing/invalid OTP configuration fails safely without returning or logging credential values;
+  unknown, inactive, suspended, deleted and wrong-role accounts cannot obtain staff tokens.
+- `OTP_PROVIDER=sms` preserves random OTP expiry/attempt behavior and the ConnectExpress sender;
+  provider failure never falls back to dummy. Refresh, logout, JWT roles and RBAC remain unchanged.
 
 - Matrix snapshot test: 7 roles × 14 resources × actions × scope equals `PLANNING.md` §1.2 (P1-08,
   still open for the full 14-resource spec — `prisma/permission-matrix.test.ts` covers the

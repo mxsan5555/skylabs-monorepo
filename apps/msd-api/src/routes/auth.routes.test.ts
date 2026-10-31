@@ -14,11 +14,15 @@ const { sendSmsOtpMock, sendOtpEmailMock } = vi.hoisted(() => ({
   sendSmsOtpMock: vi.fn().mockResolvedValue(true),
   sendOtpEmailMock: vi.fn().mockResolvedValue(true),
 }));
-vi.mock('../providers/sms/connectExpress.provider', () => ({ sendOtp: sendSmsOtpMock }));
+vi.mock('../providers/sms/connectExpress.provider', () => ({
+  sendOtp: sendSmsOtpMock,
+  missingOtpConfiguration: vi.fn().mockReturnValue([]),
+}));
 vi.mock('../providers/email/smtp.provider', () => ({ sendOtpEmail: sendOtpEmailMock }));
 
 import app from '../app';
 import { prisma } from '../lib/prisma';
+import { env } from '../config/env';
 
 const prismaMock = vi.mocked(prisma, true);
 
@@ -27,8 +31,10 @@ const OTP_CHALLENGE_ID = '3c8ac548-50c2-41ce-83eb-5e5c6249cfd2';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  env.otpProvider = 'sms';
   sendSmsOtpMock.mockReset().mockResolvedValue(true);
   sendOtpEmailMock.mockReset().mockResolvedValue(true);
+  prismaMock.user.findFirst.mockResolvedValue(null);
 });
 
 describe('POST /api/v1/auth/otp/request', () => {
@@ -53,6 +59,25 @@ describe('POST /api/v1/auth/otp/request', () => {
       .post('/api/v1/auth/otp/request')
       .send({ identifier: 'bad-purpose@example.com', purpose: 'not_a_real_purpose' });
     expect(res.status).toBe(422);
+  });
+
+  it('does not return or persist role OTP credentials in dummy mode', async () => {
+    env.otpProvider = 'dummy';
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: USER_ID,
+      status: 'active',
+      deletedAt: null,
+      roles: [{ role: { key: 'admin' } }],
+    } as never);
+    prismaMock.member.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).post('/api/v1/auth/otp/request').send({ identifier: '+919111111111' });
+
+    expect(res.status).toBe(200);
+    expect(JSON.stringify(res.body)).not.toContain('222222');
+    expect(JSON.stringify(res.body)).not.toContain('+919111111111');
+    expect(prismaMock.otpChallenge.create).not.toHaveBeenCalled();
+    expect(sendSmsOtpMock).not.toHaveBeenCalled();
   });
 
   // Edge case: rate limiting — 5/10min per (ip + identifier) per apps/msd-api/.env.local.
@@ -104,7 +129,7 @@ describe('POST /api/v1/auth/otp/verify', () => {
 
     expect(res.status).toBe(200);
     expect(typeof res.body.data.accessToken).toBe('string');
-    expect(typeof res.body.data.refreshToken).toBe('string');
+    expect(res.headers['set-cookie'].some((cookie: string) => cookie.startsWith('msd_refresh_token='))).toBe(true);
     expect(res.body.data.user.email).toBe(identifier);
   });
 
@@ -112,6 +137,16 @@ describe('POST /api/v1/auth/otp/verify', () => {
     const res = await request(app).post('/api/v1/auth/otp/verify').send({ identifier, otp: '123' });
     expect(res.status).toBe(422);
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('rejects a frontend-supplied role instead of trusting it during login', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/otp/verify')
+      .send({ identifier, otp: '123456', role: 'super_admin' });
+
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(prismaMock.user.upsert).not.toHaveBeenCalled();
   });
 
   it('returns 401 for a wrong OTP code', async () => {
@@ -156,12 +191,26 @@ describe('POST /api/v1/auth/otp/verify', () => {
     expect(res.status).toBe(401);
     expect(res.body.error.message).toMatch(/No pending OTP/);
   });
+
+  it('rate-limits repeated dummy OTP failures without storing the fixed value', async () => {
+    env.otpProvider = 'dummy';
+    const identifier = `+9192222${String(Date.now()).slice(-5)}`;
+    prismaMock.user.findFirst.mockResolvedValue(null);
+    let lastStatus = 0;
+    for (let i = 0; i < 6; i++) {
+      const res = await request(app).post('/api/v1/auth/otp/verify').send({ identifier, otp: '000000' });
+      lastStatus = res.status;
+    }
+    expect(lastStatus).toBe(429);
+    expect(prismaMock.otpChallenge.findFirst).not.toHaveBeenCalled();
+    expect(prismaMock.otpChallenge.create).not.toHaveBeenCalled();
+  });
 });
 
 describe('POST /api/v1/auth/refresh', () => {
-  it('returns 422 when refreshToken is missing/too short', async () => {
+  it('returns 401 when the refresh session cookie is missing', async () => {
     const res = await request(app).post('/api/v1/auth/refresh').send({ refreshToken: 'short' });
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(401);
   });
 
   it('returns 401 when the refresh token does not match any active session', async () => {

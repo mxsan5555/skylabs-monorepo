@@ -6,9 +6,21 @@ vi.mock('../lib/prisma', async () => {
 });
 vi.mock('../config/env', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../config/env')>();
-  return { env: { ...actual.env, supportEmail: '', supportPhone: '', otpExpiryMinutes: 10, otpMaxAttempts: 5 } };
+  return {
+    env: {
+      ...actual.env,
+      otpProvider: 'sms',
+      supportEmail: '',
+      supportPhone: '',
+      otpExpiryMinutes: 10,
+      otpMaxAttempts: 5,
+    },
+  };
 });
-vi.mock('../providers/sms/connectExpress.provider', () => ({ sendOtp: vi.fn().mockResolvedValue(true) }));
+vi.mock('../providers/sms/connectExpress.provider', () => ({
+  sendOtp: vi.fn().mockResolvedValue(true),
+  missingOtpConfiguration: vi.fn().mockReturnValue([]),
+}));
 vi.mock('../providers/email/smtp.provider', () => ({ sendOtpEmail: vi.fn().mockResolvedValue(true) }));
 vi.mock('./token.service', () => ({ issueRefreshSession: vi.fn().mockResolvedValue('refresh-token') }));
 
@@ -37,13 +49,13 @@ describe('suspended member cannot log in or receive an OTP', () => {
   it('refuses login with MEMBER_SUSPENDED and records a failed attempt', async () => {
     prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'u1', status: 'active' } as never);
     prismaMock.member.findUnique.mockResolvedValue({ status: 'SUSPENDED', statusReason: 'Rule break reported' } as never);
-    await expect(loginWithIdentifier(PHONE)).rejects.toMatchObject({ code: 'MEMBER_SUSPENDED' });
+    await expect(loginWithIdentifier(PHONE)).rejects.toMatchObject({ code: 'FORBIDDEN' });
     await expect(
       (async () => {
         prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'u1', status: 'active' } as never);
         return loginWithIdentifier(PHONE);
       })(),
-    ).rejects.toThrow('Rule break reported');
+    ).rejects.toThrow('Your member account is suspended. Please contact support.');
     expect(prismaMock.loginHistory.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ userId: 'u1', success: false }) }),
     );
@@ -60,7 +72,7 @@ describe('suspended member cannot log in or receive an OTP', () => {
   it('refuses Google login for a suspended member', async () => {
     prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'u1', status: 'active', name: 'A' } as never);
     prismaMock.member.findUnique.mockResolvedValue({ status: 'SUSPENDED', statusReason: null } as never);
-    await expect(loginWithGoogle('g1', 'a@example.com', 'A')).rejects.toMatchObject({ code: 'MEMBER_SUSPENDED' });
+    await expect(loginWithGoogle('g1', 'a@example.com', 'A')).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(prismaMock.user.update).not.toHaveBeenCalled();
   });
 

@@ -48,6 +48,10 @@ PostgreSQL database `msd`, schema `apps/msd-api/prisma/schema.prisma` (68 models
 | LoginHistory | 8 | user -> User | index(userId) |
 | ImpersonationSession | 7 | superAdmin -> User; target -> User | index(superAdminUserId); index(targetUserId) |
 
+OTP credentials/provider selection are environment-only. `OtpChallenge` remains for generated,
+hashed, expiring SMS/email challenges; dummy fixed role credentials and the Super Admin login
+credential are not written to any model. This change makes no schema or migration changes.
+
 - `RolePermission.scope` (`ALL` | `OWN`, default `ALL`) is resolved end to end since 2026-10-23
   (`permission-resolver.service.ts`, `GET /rbac/bootstrap`) but only actually enforced by a route
   for one key so far, `rbac.audit-logs:view` (F2); `setRolePermissions` rejects `scope: 'OWN'`

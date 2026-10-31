@@ -2,7 +2,12 @@ import { Router } from 'express';
 import { passport } from '../lib/passport';
 import { authenticate } from '../middleware/authenticate';
 import { validateBody } from '../middleware/validate';
-import { otpIdentifierRateLimiter, otpRequestRateLimiter } from '../middleware/rateLimiter';
+import {
+  otpDummyIdentifierVerifyRateLimiter,
+  otpDummyVerifyRateLimiter,
+  otpIdentifierRateLimiter,
+  otpRequestRateLimiter,
+} from '../middleware/rateLimiter';
 import { OtpRequestSchema, OtpVerifySchema } from '../schemas/auth.schema';
 import { requestOtp, verifyOtp } from '../services/otp.service';
 import { loginWithIdentifier } from '../services/auth.service';
@@ -48,7 +53,12 @@ router.post('/otp/request', otpRequestRateLimiter, otpIdentifierRateLimiter, val
   }
 });
 
-router.post('/otp/verify', validateBody(OtpVerifySchema), async (req, res, next) => {
+router.post(
+  '/otp/verify',
+  otpDummyVerifyRateLimiter,
+  otpDummyIdentifierVerifyRateLimiter,
+  validateBody(OtpVerifySchema),
+  async (req, res, next) => {
   try {
     const { otp } = req.body as { identifier: string; otp: string };
     const identifier = normalizeIdentifier(req.body.identifier as string);
@@ -59,7 +69,8 @@ router.post('/otp/verify', validateBody(OtpVerifySchema), async (req, res, next)
   } catch (err) {
     next(err);
   }
-});
+  },
+);
 
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'], session: false }));
 

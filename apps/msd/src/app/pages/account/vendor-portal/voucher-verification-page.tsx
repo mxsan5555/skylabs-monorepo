@@ -16,7 +16,6 @@ import {
 import type { EntitlementStatus, FulfilmentKind } from '../../../../api/rbac/settlements';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { showSnackbar } from '../../../../snackbar/snackbar';
-import '../../cart/cart.css';
 import { formatINR } from '../../../../utils/format';
 
 const RESULT_COPY: Record<VoucherVerifyResult, { icon: string; title: string; tone: 'success' | 'error' }> = {

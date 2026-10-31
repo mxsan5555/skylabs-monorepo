@@ -36,10 +36,13 @@ silently ships the bare SPA); preview and local builds fall back to the SPA. Red
 | `JWT_ACCESS_TTL_MINUTES` / `JWT_REFRESH_TTL_DAYS` | `15` / `30` | |
 | `OTP_EXPIRY_MINUTES` / `OTP_MAX_ATTEMPTS` / `OTP_REQUEST_RATE_LIMIT_PER_10_MIN` | `10` / `5` / `5` | |
 | `OTP_IDENTIFIER_RATE_LIMIT_PER_HOUR` | `10` (OTP sends per phone or email per hour, any IP) | |
+| `OTP_PROVIDER` | `sms` in production; dummy mode is rejected at startup | |
+| `SUPERADMIN_LOGIN_MOBILE` / `SUPERADMIN_LOGIN_OTP` | Required for the separate Super Admin login; use the existing owner-configured number and a project-owner-provided OTP | secret |
+| `ADMIN_LOGIN_OTP` / `MEMBER_LOGIN_OTP` / `SALES_LOGIN_OTP` / `MARKETING_LOGIN_OTP` / `SUPPORT_LOGIN_OTP` | Local/testing only with `OTP_PROVIDER=dummy`; do not set in production | secret |
 | `TRUST_PROXY_HOPS` | `1` on Railway (one proxy); leave unset locally | |
 | `API_DOCS` | unset (Swagger `/docs` off in production); `true` only to open it temporarily | |
 | `REQUEST_LOGGING` | unset (one JSON line per request, with `X-Request-Id`); `false` to silence | |
-| `DEV_OTP_IDENTIFIERS` | **never set** on Railway (local test accounts only; production refuses to boot with it) | |
+| `DEV_OTP_IDENTIFIERS` | Local order-notice contacts only; production refuses to boot with it | |
 | `CORS_ORIGIN` | exact Vercel origins, comma-separated | |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth client id / secret | 🔒 (secret) |
 | `GOOGLE_CALLBACK_URL` | `https://<msd-api-railway-domain>/api/v1/auth/google/callback` | |

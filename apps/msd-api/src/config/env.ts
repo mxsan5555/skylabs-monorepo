@@ -1,7 +1,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
-import { productionEnvProblems } from './env-checks';
+import { parseOtpProvider, productionEnvProblems } from './env-checks';
 
 // Loaded once, first thing, before any other module reads process.env.
 // apps/msd-api/.env.local is never committed (see .gitignore); .env.example documents the shape.
@@ -55,9 +55,22 @@ export const env = {
 
   otpExpiryMinutes: optionalInt('OTP_EXPIRY_MINUTES', 10),
   otpMaxAttempts: optionalInt('OTP_MAX_ATTEMPTS', 5),
+  otpProvider: parseOtpProvider(process.env.OTP_PROVIDER),
+  adminLoginOtp: process.env.ADMIN_LOGIN_OTP ?? '',
+  memberLoginOtp: process.env.MEMBER_LOGIN_OTP ?? '',
+  salesLoginOtp: process.env.SALES_LOGIN_OTP ?? '',
+  marketingLoginOtp: process.env.MARKETING_LOGIN_OTP ?? '',
+  supportLoginOtp: process.env.SUPPORT_LOGIN_OTP ?? '',
+  superAdminLoginMobile: process.env.SUPERADMIN_LOGIN_MOBILE ?? '',
+  superAdminLoginOtp: process.env.SUPERADMIN_LOGIN_OTP ?? '',
   otpRequestRateLimitPer10Min: optionalInt('OTP_REQUEST_RATE_LIMIT_PER_10_MIN', 5),
   /** OTP sends per identifier per hour, from any IP (stops IP rotation buying fresh codes). */
   otpIdentifierRateLimitPerHour: optionalInt('OTP_IDENTIFIER_RATE_LIMIT_PER_HOUR', 10),
+  /** Local test contacts whose order notices are written to the console instead of delivered. */
+  devOtpIdentifiers: (process.env.DEV_OTP_IDENTIFIERS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
   /** Proxies in front of the API (Railway: 1). 0 locally, so a client cannot fake its IP. */
   trustProxyHops: optionalInt('TRUST_PROXY_HOPS', 0),
   /** Swagger UI at /docs: on outside production, off in production unless API_DOCS=true. */
@@ -72,12 +85,6 @@ export const env = {
   supportPhone: process.env.SUPPORT_PHONE ?? '',
   /** 32 bytes, base64. Encrypts full Aadhaar and PAN numbers at rest. Optional in development. */
   fieldEncryptionKey: process.env.FIELD_ENCRYPTION_KEY ?? '',
-  /** Local test accounts (comma-separated phones or emails) whose OTP prints in the API console
-   *  instead of being sent. Development only: production refuses to boot with it set. */
-  devOtpIdentifiers: (process.env.DEV_OTP_IDENTIFIERS ?? '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean),
   /** The storefront's public origin, for links in customer emails (order page). Defaults to the
    *  first CORS origin, which is the storefront in every environment we run. */
   publicSiteUrl: (process.env.PUBLIC_SITE_URL ?? '').trim().replace(/\/$/, ''),

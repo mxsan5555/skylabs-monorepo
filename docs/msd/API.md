@@ -83,6 +83,12 @@ Closing the gap and a CI coverage check are P9-05 and P9-06.
 | POST | `/api/v1/auth/refresh` | public |
 | GET | `/api/v1/dashboard/stats` | `dashboard:view` |
 | GET | `/api/v1/health` | public |
+
+`POST /auth/otp/request` accepts only `{ identifier, purpose? }`; `POST /auth/otp/verify` accepts
+only `{ identifier, otp }`. Unknown keys (including a client-supplied role) are rejected. OTP
+delivery is selected by backend `OTP_PROVIDER`; fixed test credentials are never returned. Role
+and permissions in tokens continue to come from database relations, not request fields. See
+`DEPLOYMENT.md` for backend-only environment configuration.
 | GET | `/api/v1/notifications` | signed in (own records, or checked in the handler) |
 | PATCH | `/api/v1/notifications/:id/read` | signed in (own records, or checked in the handler) |
 | PATCH | `/api/v1/notifications/read-all` | signed in (own records, or checked in the handler) |

@@ -11,6 +11,7 @@ export const OtpRequestSchema = z
     identifier: z.string().min(3).max(255).openapi({ example: 'user@example.com' }),
     purpose: OtpPurposeSchema.default('login'),
   })
+  .strict()
   .openapi('OtpRequest');
 
 export const OtpVerifySchema = z
@@ -18,6 +19,7 @@ export const OtpVerifySchema = z
     identifier: z.string().min(3).max(255),
     otp: z.string().length(6).regex(/^\d{6}$/, 'OTP must be 6 digits'),
   })
+  .strict()
   .openapi('OtpVerify');
 
 export const AuthUserSchema = z

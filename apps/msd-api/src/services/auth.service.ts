@@ -19,11 +19,11 @@ import { readMemberAccessState } from './member-access.service';
  *  this same function before issuing anything, so suspension can never be bypassed by picking a
  *  different login method. */
 async function assertUserMayLogIn(
-  user: { id: string; status: string },
+  user: { id: string; status: string; deletedAt?: Date | null },
   meta: { ip?: string; userAgent?: string },
   method: LoginMethod,
 ) {
-  if (user.status !== 'active') {
+  if (user.deletedAt || user.status !== 'active') {
     await prisma.loginHistory.create({ data: { userId: user.id, method, success: false, ...meta } });
     throw new ApiError('FORBIDDEN', 'This account has been disabled. Please contact support.');
   }
@@ -118,9 +118,15 @@ export async function loginWithGoogle(
   meta: SessionMeta = {},
 ) {
   const existing = await prisma.user.findUnique({ where: { email } });
+  let rolesRows: { role: { key: string } }[] = [];
   if (existing) {
     await assertUserMayLogIn(existing, meta, 'google');
     await assertMemberMayLogIn(existing.id, meta, 'google');
+    rolesRows = await prisma.userRole.findMany({ where: { userId: existing.id }, include: { role: true } });
+    if (rolesRows.some(({ role }) => role.key === 'super_admin')) {
+      await prisma.loginHistory.create({ data: { userId: existing.id, method: 'google', success: false, ...meta } });
+      throw new ApiError('FORBIDDEN', 'Super Admin must use the configured mobile OTP login.');
+    }
   }
 
   const user = existing
@@ -132,15 +138,14 @@ export async function loginWithGoogle(
         data: { googleId, email, name, lastLoginAt: new Date() },
       });
 
-  const rolesRows = await prisma.userRole.findMany({ where: { userId: user.id }, include: { role: true } });
   if (rolesRows.length === 0) {
     const defaultRole = await prisma.role.findUnique({ where: { key: 'customer' } });
     if (defaultRole) {
       await prisma.userRole.create({ data: { userId: user.id, roleId: defaultRole.id } });
     }
+    rolesRows = await prisma.userRole.findMany({ where: { userId: user.id }, include: { role: true } });
   }
-  const roles = await prisma.userRole.findMany({ where: { userId: user.id }, include: { role: true } });
-  const roleKeys = roles.map((ur) => ur.role.key);
+  const roleKeys = rolesRows.map((ur) => ur.role.key);
 
   const accessToken = signAccessToken({ sub: user.id, roles: roleKeys, app: 'msd' });
   const refreshToken = await issueRefreshSession(user.id, meta);
