@@ -32,4 +32,10 @@ describe('StatusPanel', () => {
     expect(screen.getByRole('button', { name: 'Pay now' }).closest('.status-panel__actions')).not.toBeNull();
     expect(screen.getByRole('link', { name: 'Help' }).closest('.status-panel__footer')).not.toBeNull();
   });
+
+  it('has a compact size for notices inside a page, with a smaller heading', () => {
+    render(<StatusPanel id="n" as="h2" compact icon="info" tone="neutral" heading="Refund on its way" text="5 to 7 days." />);
+    expect(document.querySelector('.status-panel')?.classList.contains('status-panel--compact')).toBe(true);
+    expect(screen.getByRole('heading', { level: 2 }).className).toContain('title-large');
+  });
 });

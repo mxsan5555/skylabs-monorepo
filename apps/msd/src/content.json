@@ -1227,6 +1227,38 @@
     "subtitle": "Manage your contact details and saved addresses."
   },
   "orderDetail": {
+    "metaDescription": "Your MySpaDeal order: items, progress, payment and invoice.",
+    "breadcrumbOrders": "My orders",
+    "placedOn": "Placed on {date}",
+    "progressLabel": "Order progress",
+    "steps": {
+      "placed": "Order placed",
+      "confirmed": "Confirmed",
+      "delivered": "Delivered",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "itemsHeading": "Items",
+    "deliveryHeading": "Delivery address",
+    "summaryHeading": "Order summary",
+    "rows": {
+      "payment": "Payment",
+      "paidVia": "Paid via",
+      "placedOn": "Placed on"
+    },
+    "paymentStatuses": {
+      "CREATED": "Pending",
+      "PAID": "Paid",
+      "FAILED": "Failed",
+      "CANCELLED": "Cancelled"
+    },
+    "providers": {
+      "RAZORPAY": "Razorpay",
+      "COD": "Cash on delivery"
+    },
+    "notAvailable": "Not available",
+    "refundHeading": "Your refund is on its way",
+    "paymentFailedHeading": "Your payment did not go through",
     "loading": "Loading order…",
     "notFound": {
       "metaTitle": "Order Not Found | MSD",
@@ -1234,7 +1266,7 @@
       "subheading": "It may belong to a different account.",
       "cta": "My Orders"
     },
-    "metaTitle": "Order Confirmed | MSD",
+    "metaTitle": "Order details | MSD",
     "title": {
       "prefix": "Order",
       "placed": "placed"
@@ -1284,10 +1316,10 @@
       "title": "Cancel order",
       "message": "Cancel this order?",
       "cancel": "Keep order",
-      "confirm": "Cancel order"
+      "confirm": "Yes, cancel order"
     },
     "messages": {
-      "refundAfterCancellation": "Your refund will be credited to your original payment method within 5–7 business days.",
+      "refundAfterCancellation": "Your refund will reach your original payment method within 5 to 7 business days.",
       "cancelledWithoutReason": "This order has been cancelled."
     }
   },

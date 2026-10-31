@@ -8,8 +8,8 @@ import content from '../../../content.json';
 
 const t = content.orders;
 
-/** Tonal `sky-badge` status per order state. */
-const STATUS_TONE: Record<OrderStatus, 'success' | 'warning' | 'error'> = {
+/** Tonal `sky-badge` status per order state (order list and order page). */
+export const ORDER_STATUS_TONE: Record<OrderStatus, 'success' | 'warning' | 'error'> = {
   PENDING_PAYMENT: 'warning',
   CONFIRMED: 'success',
   COMPLETED: 'success',
@@ -42,7 +42,7 @@ export function CustomerOrderCard({ order, onViewDetails, headingLevel = 'h2' }:
           <span>
             {formatLongDate(order.createdAt)} · {itemCount}
           </span>
-          <sky-badge status={STATUS_TONE[order.status]}>{t.statuses[order.status]}</sky-badge>
+          <sky-badge status={ORDER_STATUS_TONE[order.status]}>{t.statuses[order.status]}</sky-badge>
         </>
       }
       total={{ label: t.total, value: formatINR(Number(order.total)) }}
