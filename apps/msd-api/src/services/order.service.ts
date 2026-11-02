@@ -93,7 +93,6 @@ const CUSTOMER_ORDER_INCLUDE = {
       },
       product: {
         select: {
-          slug: true,
           image: true,
           gallery: true,
           mediaImages: {
@@ -227,14 +226,7 @@ export async function createOrderFromCart(customerId: string, contactDetails: Or
     if (cart.pendingOrderId) {
       const pending = await tx.order.findUnique({ where: { id: cart.pendingOrderId }, include: ORDER_INCLUDE });
       if (pending && pending.status === 'PENDING_PAYMENT') {
-        // Keep the order idempotent, but refresh the checkout snapshot if the customer edited
-        // their details before retrying checkout. Otherwise a retry returns the previous
-        // PENDING_PAYMENT order with stale contact fields, even though this request supplied
-        // newer details.
-        const hasContactUpdates = Object.values(contactDetails).some((value) => value !== undefined);
-        return hasContactUpdates
-          ? tx.order.update({ where: { id: pending.id }, data: contactDetails, include: ORDER_INCLUDE })
-          : pending;
+        return pending;
       }
       // Stale reference (that Order was since cancelled, or is otherwise gone) — clear it and
       // fall through to create a fresh Order from the cart's still-intact items.
@@ -658,8 +650,8 @@ export async function getOrderOrThrow(callerUserId: string, scope: OrderScope, i
  * still included for every caller who can see the order at all, since Order.status/payment
  * events aren't vendor-split).
  */
-export async function getOrderActivityHistory(callerUserId: string, scope: OrderScope, id: string) {
-  const order = await getOrderOrThrow(callerUserId, scope, id);
+export async function getOrderActivityHistory(callerUserId: string, id: string) {
+  const order = await getOrderOrThrow(callerUserId, id);
   const itemIds = order.items.map((item) => item.id);
 
   const items = itemIds.length

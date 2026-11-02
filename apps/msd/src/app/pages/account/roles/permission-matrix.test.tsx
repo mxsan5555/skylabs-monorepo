@@ -1,5 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
+import type { PermissionScope } from '@skylabs-monorepo/shared-types';
 import type { PermissionCatalogRow, Role } from '../../../../api/rbac/roles';
 import { PermissionMatrix } from './permission-matrix';
 

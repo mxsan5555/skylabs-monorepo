@@ -39,7 +39,7 @@ beforeEach(() => {
 
 describe('POST /api/v1/auth/otp/request', () => {
   it('returns 200 with a generic message for a valid identifier (no user enumeration)', async () => {
-    prismaMock.otpChallenge.create.mockResolvedValue({});
+    prismaMock.otpChallenge.create.mockResolvedValue({} as any);
     const res = await request(app)
       .post('/api/v1/auth/otp/request')
       .send({ identifier: 'happy-path@example.com' });
@@ -82,7 +82,7 @@ describe('POST /api/v1/auth/otp/request', () => {
 
   // Edge case: rate limiting — 5/10min per (ip + identifier) per apps/msd-api/.env.local.
   it('returns 429 after exceeding the per-identifier OTP request rate limit', async () => {
-    prismaMock.otpChallenge.create.mockResolvedValue({});
+    prismaMock.otpChallenge.create.mockResolvedValue({} as any);
     const identifier = 'rate-limited@example.com';
     let lastStatus = 0;
     for (let i = 0; i < 6; i++) {
@@ -100,28 +100,32 @@ describe('POST /api/v1/auth/otp/verify', () => {
     prismaMock.otpChallenge.findFirst.mockResolvedValue({
       id: OTP_CHALLENGE_ID,
       identifier,
-      attempts: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      purpose: 'login',
       expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      attempts: 0,
       hashedOtp: '$2b$10$invalidPlaceholderHashForMismatchTests..................',
+      verifiedAt: null,
       ...overrides,
-    });
+    } as any);
   }
 
   it('returns 200 with access/refresh tokens on a correct OTP (happy path)', async () => {
     const realOtp = '123456';
     const hashedOtp = await bcrypt.hash(realOtp, 10);
     mockPendingChallenge({ hashedOtp });
-    prismaMock.otpChallenge.update.mockResolvedValue({});
+    prismaMock.otpChallenge.update.mockResolvedValue({} as any);
     prismaMock.user.upsert.mockResolvedValue({
       id: USER_ID,
       name: identifier,
       email: identifier,
       phone: null,
       roles: [{ role: { key: 'customer' } }],
-    });
-    prismaMock.userRole.findMany.mockResolvedValue([{ role: { key: 'customer' } }]);
-    prismaMock.loginHistory.create.mockResolvedValue({});
-    prismaMock.refreshSession.create.mockResolvedValue({});
+    } as any);
+    prismaMock.userRole.findMany.mockResolvedValue([{ role: { key: 'customer' } }] as any);
+    prismaMock.loginHistory.create.mockResolvedValue({} as any);
+    prismaMock.refreshSession.create.mockResolvedValue({} as any);
 
     const res = await request(app)
       .post('/api/v1/auth/otp/verify')
@@ -151,7 +155,7 @@ describe('POST /api/v1/auth/otp/verify', () => {
 
   it('returns 401 for a wrong OTP code', async () => {
     mockPendingChallenge();
-    prismaMock.otpChallenge.update.mockResolvedValue({});
+    prismaMock.otpChallenge.update.mockResolvedValue({} as any);
     const res = await request(app)
       .post('/api/v1/auth/otp/verify')
       .send({ identifier, otp: '000000' });

@@ -208,6 +208,87 @@ async function bannersFor(slot: BannerSlot, state: string | null) {
   });
 }
 
+const PUBLIC_PROMOTION_INCLUDE = {
+  category: { select: { slug: true } },
+  deal: {
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      status: true,
+      vendor: { select: { status: true } },
+      branch: { select: { isActive: true } },
+    },
+  },
+  product: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      isActive: true,
+      vendor: { select: { status: true } },
+    },
+  },
+  mediaImages: { orderBy: { sortOrder: 'asc' as const } },
+} satisfies Prisma.PromotionInclude;
+
+type PublicPromotionRow = Prisma.PromotionGetPayload<{ include: typeof PUBLIC_PROMOTION_INCLUDE }>;
+
+function publicDealSummary(row: PublicPromotionRow) {
+  if (row.destinationType !== 'DEAL' || !row.deal) return null;
+  if (row.deal.vendor.status !== 'ACTIVE' || row.deal.branch.isActive !== true || row.deal.status !== 'ACTIVE') return null;
+  return { id: row.deal.id, title: row.deal.title, slug: row.deal.slug };
+}
+
+function publicProductSummary(row: PublicPromotionRow) {
+  if (row.destinationType !== 'PRODUCT' || !row.product) return null;
+  if (row.product.vendor.status !== 'ACTIVE' || row.product.isActive !== true) return null;
+  return { id: row.product.id, name: row.product.name, slug: row.product.slug };
+}
+
+async function promotionsFor(state: string | null) {
+  const now = new Date();
+  return prisma.promotion.findMany({
+    where: {
+      isActive: true,
+      state,
+      OR: [
+        { destinationType: { in: ['ROUTE', 'CATEGORY'] } },
+        { destinationType: 'DEAL', deal: { is: VISIBLE_DEAL_WHERE } },
+        { destinationType: 'PRODUCT', product: { is: VISIBLE_PRODUCT_WHERE } },
+      ],
+      AND: [
+        { OR: [{ startDate: null }, { startDate: { lte: now } }] },
+        { OR: [{ endDate: null }, { endDate: { gte: now } }] },
+      ],
+    },
+    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+    include: PUBLIC_PROMOTION_INCLUDE,
+  });
+}
+
+/**
+ * Public CTA promotions shown on the storefront. The linked deal/product is re-validated at read
+ * time so a suspended member, inactive item or paused branch cannot stay visible via stale data.
+ */
+export async function getPublicPromotions(opts?: { state?: string | null }) {
+  const requestedState = opts?.state ?? null;
+  let rows = requestedState ? await promotionsFor(requestedState) : [];
+  if (rows.length === 0) rows = await promotionsFor(null);
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    buttonLabel: row.buttonLabel,
+    backgroundRole: row.backgroundRole,
+    buttonRole: row.buttonRole,
+    href: bannerHref(row),
+    image: row.mediaImages.find((img) => img.isPrimary)?.storageKey ?? row.mediaImages[0]?.storageKey ?? null,
+    deal: publicDealSummary(row),
+    product: publicProductSummary(row),
+  }));
+}
+
 /**
  * Public banners for one slot: the visitor's state's banners, or the Global/Default ones when the
  * state has none for the slot (or the visitor has no location). Visibility is re-checked on every

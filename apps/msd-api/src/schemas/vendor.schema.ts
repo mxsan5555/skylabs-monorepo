@@ -3,7 +3,6 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { PaginationQuerySchema, richTextField } from './common.schema';
 import { normalizeIdentifier } from '../lib/normalizeIdentifier';
 import { isIndiaLocation } from '@skylabs-monorepo/shared-utils';
-
 extendZodWithOpenApi(z);
 
 const vendorReasonSchema = z.string().trim().min(10).max(500);

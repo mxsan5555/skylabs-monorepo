@@ -50,6 +50,7 @@ export const AUDIT_ACTIONS = [
   'faq.delete',
   'faq.status_change',
   'faq.update',
+  'finance_settings.update',
   'home_hero_slide.create',
   'home_hero_slide.delete',
   'home_hero_slide.reorder',

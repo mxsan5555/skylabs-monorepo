@@ -389,6 +389,9 @@
 .home-hero__carousel {
   --hero-slide-gap: 16px;
   margin: -8px;
+   min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 /* Room inside Swiper's clip for the card hover shadow and focus ring (see card-rail.css). */

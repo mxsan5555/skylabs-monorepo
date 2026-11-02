@@ -26,6 +26,7 @@ export interface TagItem {
   createdAt: Date;
   endDate?: Date | null;
   discount?: number | null;
+  discountPercent?: number | null;
 }
 
 export function offerTag(item: TagItem, hotIds: ReadonlySet<string>, now: Date): OfferTagKey | null {

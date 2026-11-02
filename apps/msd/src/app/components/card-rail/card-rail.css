@@ -2,6 +2,11 @@
 .card-rail__nav {
   display: none;
 }
+.card-rail {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
+}
 /* Swiper clips slides at its inner .swiper (part="container", overflow: hidden), so host padding
    never helps. Room for the hover shadow (--sky-elevation-2 reaches 6px up, 8px sideways, 10px
    down) and the focus ring goes inside the clip; the negative margin keeps cards aligned with

@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { FilledButton, CircularProgress, OutlinedButton, Icon, } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
+import { Seo } from '../../seo/seo';
 import { getMyOrder, type Order } from '../../../api/orders';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { InvoiceDocument } from '../../components/invoice-document';
 import content from '../../../content.json';
 import './invoice.css';
-import { Seo } from '../../seo/seo';
 /**
  * Real, printable/downloadable invoice for a customer's own order — `GET /orders/me/:id`
  * (already ownership-scoped: 404s for another customer's order, same as every other `/me/*`

@@ -22,9 +22,12 @@ import content from '../../../content.json';
 import './home.css';
 import { dealHref, useCatalogShell } from '../../../catalog/catalog-shell';
 import { useVisitorLocation } from '../../../location/location-context';
-import type { CatalogDeal } from '../../../api/catalog';
+import type { CatalogDeal, CatalogHomeTagSectionTag, } from '../../../api/catalog';
 const { home } = content;
-const HOME_DEAL_TAGS: Record<'new' | 'hot' | 'expirySoon', OfferTag> = {
+const HOME_DEAL_TAGS: Record<
+  'new' | 'hot' | 'deal' | 'expirySoon',
+  OfferTag
+> = {
   new: {
     label: 'New',
     color: 'tertiary',
@@ -34,8 +37,13 @@ const HOME_DEAL_TAGS: Record<'new' | 'hot' | 'expirySoon', OfferTag> = {
     label: 'Hot',
     color: 'error',
   },
+  deal: {
+    label: 'Deal',
+    color: 'primary',
+    tone: 'tonal',
+  },
   expirySoon: {
-    label: 'Expire soon',
+    label: 'Expiry Soon',
     color: 'error',
     tone: 'tonal',
   },
@@ -114,7 +122,18 @@ const renderDealSection = (
         categories={categories}
         renderDeal={renderDeal}
       />
-      <HomeTagSections renderDeal={renderDeal} />
+      <HomeTagSections
+  renderDeal={(deal, sectionTag) => {
+    const tagMap: Record<CatalogHomeTagSectionTag, OfferTag> = {
+      NEW: HOME_DEAL_TAGS.new,
+      HOT_DEAL: HOME_DEAL_TAGS.hot,
+      DEAL: HOME_DEAL_TAGS.deal,
+      EXPIRE_SOON: HOME_DEAL_TAGS.expirySoon,
+    };
+
+    return renderDeal(deal, tagMap[sectionTag]);
+  }}
+/>
       <HowItWorks />
       {ready && catalog.therapists.length > 0 && (
         <PageSection tone="tint" aria-labelledby="therapists-heading">

@@ -7,13 +7,13 @@ import content from '../../../content.json';
 
 const t = content.legalPages;
 
-export type LegalPageKey = 'privacy' | 'terms' | 'accessibility' | 'cookies';
+export type LegalPageKey = 'privacy' | 'terms' | 'return-refund-policy' | 'cookies';
 
 /** The seeded rows only hold "Content coming soon.", which must not replace the real default. */
 const isPlaceholder = (blocks: BlogBlock[]) =>
   blocks.length === 0 || (blocks.length === 1 && 'text' in blocks[0] && blocks[0].text === t.placeholder);
 
-/** One page for the four fixed legal `WebsitePage` rows (privacy/terms/accessibility/cookies):
+/** One page for the four fixed legal `WebsitePage` rows (privacy/terms/return-refund-policy/cookies):
  *  the CMS body (`GET /catalog/pages/:slug`, slug = `page`) once an admin writes one, otherwise
  *  the content.json default. */
 export function WebsitePage({ page }: { page: LegalPageKey }) {

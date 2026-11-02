@@ -122,7 +122,7 @@ export function LegalPagesList() {
       <header className="page-head">
         <div>
           <h1>Legal Pages</h1>
-          <p>Edit the fixed legal pages shown on the public site (Privacy Policy, Terms of Service, Accessibility, Cookie Policy).</p>
+          <p>Edit the fixed legal pages shown on the public site (Privacy Policy, Terms of Service, Return / Refund Policy, Cookie Policy).</p>
         </div>
       </header>
 

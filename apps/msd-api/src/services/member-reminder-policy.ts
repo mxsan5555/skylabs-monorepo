@@ -7,10 +7,9 @@ import type { MemberStatus } from '../generated/prisma-client';
  * Everything here is pure, so the timeline is tested with a fake clock.
  */
 
-// const DAY_MS = 24 * 60 * 60 * 1000;
-const DAY_MS = 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
-export const DOCUMENTS_DUE_DAYS = 5;
+export const DOCUMENTS_DUE_DAYS = 14;
 export const REMINDER_INTERVAL_DAYS = 7;
 export const REMINDER_COUNT = 3;
 /** D4: the final warning promises a week, so the flag waits one interval after it. */

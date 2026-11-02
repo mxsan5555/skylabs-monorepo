@@ -67,20 +67,22 @@ describe('ineligibleReason', () => {
 });
 
 describe('setSectionEnabled', () => {
-  it('upserts by the (state, tag) compound key', async () => {
-    prismaMock.homeTagSection.upsert.mockResolvedValue({ id: 's1', state: 'Delhi', tag: 'NEW', isEnabled: true } as never);
+  it('creates a new row when the (state, tag) section does not exist', async () => {
+    prismaMock.homeTagSection.findFirst.mockResolvedValue(null);
+    prismaMock.homeTagSection.create.mockResolvedValue({ id: 's1', state: 'Delhi', tag: 'NEW', isEnabled: true } as never);
     await setSectionEnabled('Delhi', 'NEW', true);
-    expect(prismaMock.homeTagSection.upsert).toHaveBeenCalledWith({
-      where: { state_tag: { state: 'Delhi', tag: 'NEW' } },
-      create: { state: 'Delhi', tag: 'NEW', isEnabled: true },
-      update: { isEnabled: true },
-    });
+    expect(prismaMock.homeTagSection.findFirst).toHaveBeenCalledWith({ where: { state: 'Delhi', tag: 'NEW' } });
+    expect(prismaMock.homeTagSection.create).toHaveBeenCalledWith({ data: { state: 'Delhi', tag: 'NEW', isEnabled: true } });
+    expect(prismaMock.homeTagSection.update).not.toHaveBeenCalled();
   });
 
-  it('upserts the Global/Default (state: null) row the same way', async () => {
-    prismaMock.homeTagSection.upsert.mockResolvedValue({ id: 'g1', state: null, tag: 'DEAL', isEnabled: false } as never);
+  it('updates the existing Global/Default (state: null) row when it already exists', async () => {
+    prismaMock.homeTagSection.findFirst.mockResolvedValue({ id: 'g1', state: null, tag: 'DEAL', isEnabled: true } as never);
+    prismaMock.homeTagSection.update.mockResolvedValue({ id: 'g1', state: null, tag: 'DEAL', isEnabled: false } as never);
     await setSectionEnabled(null, 'DEAL', false);
-    expect(prismaMock.homeTagSection.upsert.mock.calls[0][0].where).toEqual({ state_tag: { state: null, tag: 'DEAL' } });
+    expect(prismaMock.homeTagSection.findFirst).toHaveBeenCalledWith({ where: { state: null, tag: 'DEAL' } });
+    expect(prismaMock.homeTagSection.update).toHaveBeenCalledWith({ where: { id: 'g1' }, data: { isEnabled: false } });
+    expect(prismaMock.homeTagSection.create).not.toHaveBeenCalled();
   });
 });
 
@@ -206,8 +208,8 @@ describe('getPublicHomeTagSections — per-tag fallback', () => {
   });
 
   it("serves the state's own enabled, eligible section directly", async () => {
-    prismaMock.homeTagSection.findUnique.mockImplementation(((args: { where: { state_tag: { state: string | null; tag: string } } }) => {
-      const { state, tag } = args.where.state_tag;
+    prismaMock.homeTagSection.findFirst.mockImplementation(((args: { where: { state: string | null; tag: string } }) => {
+      const { state, tag } = args.where;
       if (state === 'Delhi' && tag === 'NEW') return Promise.resolve({ id: 'sec-new', state: 'Delhi', tag: 'NEW', isEnabled: true });
       return Promise.resolve(null);
     }) as never);
@@ -217,23 +219,22 @@ describe('getPublicHomeTagSections — per-tag fallback', () => {
   });
 
   it("never falls back to Global when the state's own row for that tag is disabled", async () => {
-    prismaMock.homeTagSection.findUnique.mockImplementation(((args: { where: { state_tag: { state: string | null; tag: string } } }) => {
-      const { state, tag } = args.where.state_tag;
+    prismaMock.homeTagSection.findFirst.mockImplementation(((args: { where: { state: string | null; tag: string } }) => {
+      const { state, tag } = args.where;
       if (state === 'Delhi' && tag === 'NEW') return Promise.resolve({ id: 'sec-new', state: 'Delhi', tag: 'NEW', isEnabled: false });
       return Promise.resolve(null);
     }) as never);
     const result = await getPublicHomeTagSections('Delhi');
     expect(result).toEqual([]);
-    // Global was never even queried for NEW — the disabled state row resolved the tag outright.
-    const queriedGlobalForNew = prismaMock.homeTagSection.findUnique.mock.calls.some(
-      ([arg]) => (arg as { where: { state_tag: { state: null; tag: string } } }).where.state_tag.state === null && (arg as never as { where: { state_tag: { tag: string } } }).where.state_tag.tag === 'NEW',
+    const queriedGlobalForNew = prismaMock.homeTagSection.findFirst.mock.calls.some(
+      ([arg]) => (arg as { where: { state: string | null; tag: string } }).where.state === null && (arg as { where: { state: string | null; tag: string } }).where.tag === 'NEW',
     );
     expect(queriedGlobalForNew).toBe(false);
   });
 
   it("never falls back to Global when the state's own row has nothing eligible (still not Global)", async () => {
-    prismaMock.homeTagSection.findUnique.mockImplementation(((args: { where: { state_tag: { state: string | null; tag: string } } }) => {
-      const { state, tag } = args.where.state_tag;
+    prismaMock.homeTagSection.findFirst.mockImplementation(((args: { where: { state: string | null; tag: string } }) => {
+      const { state, tag } = args.where;
       if (state === 'Delhi' && tag === 'DEAL') return Promise.resolve({ id: 'sec-deal', state: 'Delhi', tag: 'DEAL', isEnabled: true });
       return Promise.resolve(null);
     }) as never);
@@ -243,8 +244,8 @@ describe('getPublicHomeTagSections — per-tag fallback', () => {
   });
 
   it('falls back to Global/Default when the state has no row at all for a tag', async () => {
-    prismaMock.homeTagSection.findUnique.mockImplementation(((args: { where: { state_tag: { state: string | null; tag: string } } }) => {
-      const { state, tag } = args.where.state_tag;
+    prismaMock.homeTagSection.findFirst.mockImplementation(((args: { where: { state: string | null; tag: string } }) => {
+      const { state, tag } = args.where;
       if (state === null && tag === 'HOT_DEAL') return Promise.resolve({ id: 'sec-global-hot', state: null, tag: 'HOT_DEAL', isEnabled: true });
       return Promise.resolve(null);
     }) as never);
@@ -254,10 +255,10 @@ describe('getPublicHomeTagSections — per-tag fallback', () => {
   });
 
   it('with no visitor state at all, checks only Global/Default directly', async () => {
-    prismaMock.homeTagSection.findUnique.mockResolvedValue(null);
+    prismaMock.homeTagSection.findFirst.mockResolvedValue(null);
     await getPublicHomeTagSections();
-    for (const [arg] of prismaMock.homeTagSection.findUnique.mock.calls) {
-      expect((arg as { where: { state_tag: { state: string | null } } }).where.state_tag.state).toBeNull();
+    for (const [arg] of prismaMock.homeTagSection.findFirst.mock.calls) {
+      expect((arg as { where: { state: string | null } }).where.state).toBeNull();
     }
   });
 
