@@ -6,8 +6,8 @@ import { ApiError } from '../lib/http';
 import { Prisma } from '../generated/prisma-client';
 import { getMyOrderOrThrow, finalizeCartForOrder } from './order.service';
 import { notifyOrderConfirmed } from './notification.service';
-import { sendOrderNotice } from './order-notice.service';
 import { createEntitlementsForOrder } from './settlement.service';
+import { sendOrderNotice } from './order-notice.service';
 
 /**
  * Razorpay integration for the existing Order (Phase 8) — see the Phase 9 architecture plan.

@@ -191,13 +191,13 @@ export function AppRoutes() {
           <Route path="/deals" element={<ListingPage key="deals" kind="deals" />} />
           <Route path="/deals/:city" element={<ListingPage key="deals" kind="deals" />} />
           <Route path="/products" element={<ListingPage key="products" kind="products" />} />
-          <Route path="/products/:id" element={<ProductDetail />} />
+          <Route path="/products/:slug" element={<ProductDetail />} />
           <Route path="/vendor/:slug" element={<VendorPage />} />
           {/* Therapist as an independent, directly browsable/purchasable entity — never reachable
             only via a Deal's page (see msd-api's Therapist schema doc comment). */}
           <Route path="/therapists" element={<ListingPage key="therapists" kind="therapists" />} />
           <Route path="/therapists/:city" element={<ListingPage key="therapists" kind="therapists" />} />
-          <Route path="/therapist/:id" element={<TherapistDetail />} />
+          <Route path="/therapist/:slug" element={<TherapistDetail />} />
           {/* Cart / Wishlist / Checkout — plain PublicLayout children (Header+Footer, no sidebar),
             exactly as they worked before the Customer Sidebar fix. These are NOT part of the
             Customer Sidebar — they stay reachable from the existing Header cart/wishlist icons,
@@ -333,7 +333,6 @@ export function AppRoutes() {
           <Route path="/terms" element={<WebsitePage page="terms" />} />
           <Route path="/return-refund-policy" element={<WebsitePage page="return-refund-policy" />} />
           <Route path="/cookies" element={<WebsitePage page="cookies" />} />
-          {/* <Route path="/products/:slug" element={<ProductDetail />} /> */}
           <Route path="/showcase" element={<Showcase />} />
           {/* ── Catch-all 404, inside the shell so it keeps header/footer. ── */}
           <Route path="*" element={<NotFound />} />

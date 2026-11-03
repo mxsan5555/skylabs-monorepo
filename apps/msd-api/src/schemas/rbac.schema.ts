@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { PERMISSION_ACTIONS, type PermissionAction } from '@skylabs-monorepo/shared-types';
 import { PaginationQuerySchema, PincodeSchema } from './common.schema';
+import { normalizeIdentifier } from '../lib/normalizeIdentifier';
 import { isIndiaLocation } from '@skylabs-monorepo/shared-utils';
 
 extendZodWithOpenApi(z);
@@ -47,18 +48,14 @@ export const RoleCreateSchema = z
   })
   .openapi('RoleCreate');
 
+export const RoleUpdateSchema = RoleCreateSchema.omit({ key: true }).partial().openapi('RoleUpdate');
+
 export const RoleCloneSchema = z
   .object({
-    key: z
-      .string()
-      .min(2)
-      .max(50)
-      .regex(/^[a-z][a-z0-9_]*$/, 'key must be a lower_snake_case slug'),
-    name: z.string().min(1).max(100),
+    key: RoleCreateSchema.shape.key,
+    name: RoleCreateSchema.shape.name,
   })
   .openapi('RoleClone');
-
-export const RoleUpdateSchema = RoleCreateSchema.omit({ key: true }).partial().openapi('RoleUpdate');
 
 export const RoleStatusUpdateSchema = z
   .object({

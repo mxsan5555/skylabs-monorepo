@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { CatalogTherapist } from '../../../api/catalog';
 import { fillTemplate, formatINR } from '../../../utils/format';
 import { resolveTherapistMedia } from '../../../utils/media';
+import { therapistPath } from '../../seo/public-urls';
 import { SkyProductCardWC } from '../sky-product-card-wc';
 import content from '../../../content.json';
 
@@ -42,7 +43,7 @@ export function TherapistCard({ therapist, layout, variant, badge, children }: T
       distance={therapist.distanceKm != null ? formatDistance(therapist.distanceKm) : undefined}
       pricePrefix={price != null ? content.therapistCard.from : undefined}
       price={price != null ? formatINR(price) : undefined}
-      href={`/therapist/${therapist.id}`}
+      href={therapistPath(therapist)}
       layout={layout}
     >
       {children}

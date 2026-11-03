@@ -96,6 +96,16 @@ only and never change an order's status, for deals or products (D27).
   `SUPPORT_EMAIL` / `SUPPORT_PHONE` until the settings table exists (D22).
 - Login history: Super Admin sees all, everyone else sees their own.
 - My profile: name, phone, email, avatar; phone and email changes go through OTP.
+- OTP delivery is backend-configured with `OTP_PROVIDER=sms|dummy`. Dummy mode is local/testing
+  only: Admin, Member, Sales, Marketing and Support use environment-configured role OTPs with
+  their own registered mobile; user roles always come from the database. Super Admin uses only
+  its separate `SUPERADMIN_LOGIN_MOBILE` + `SUPERADMIN_LOGIN_OTP` and an existing active
+  `super_admin` account. OTP credentials are never stored in Prisma, logged, or sent in API
+  responses. Dummy mode sends no SMS and is rejected in production; SMS mode retains the
+  existing random, expiring OTP flow. These staff roles authenticate with their
+  registered mobile, not email; Super Admin also cannot use Google login. Customer phone login
+  uses the registered phone and fixed OTP `111111` in dummy mode; customer email
+  login remains on the existing email OTP flow.
 
 ## 2. Members
 

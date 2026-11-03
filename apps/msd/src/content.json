@@ -1343,6 +1343,26 @@
     "messages": {
       "refundAfterCancellation": "Your refund will reach your original payment method within 5 to 7 business days.",
       "cancelledWithoutReason": "This order has been cancelled."
+    },
+    "verification": {
+      "heading": "Purchase verification",
+      "voucherLabel": "Voucher",
+      "statusLabel": "Status",
+      "disputeStatus": {
+        "OPEN": "Issue submitted",
+        "UNDER_REVIEW": "Under review",
+        "RESOLVED": "Resolved"
+      },
+      "raiseIssue": {
+        "cta": "Raise an issue",
+        "dialogTitle": "Raise an issue about this purchase",
+        "reasonLabel": "Reason",
+        "descriptionLabel": "Details (optional)",
+        "cancel": "Cancel",
+        "submit": "Submit issue",
+        "success": "Your issue was submitted.",
+        "error": "Could not submit your issue. Please try again."
+      }
     }
   },
   "meta": {

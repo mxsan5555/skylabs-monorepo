@@ -55,6 +55,9 @@ async function doFetch<T>(path: string, token: string | null, init: RequestInit)
   const isFormData = init.body instanceof FormData;
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
+    // This wrapper expects a JSON envelope. A browser-generated 304 has no body and
+    // `Response.ok` is false, so revalidation can incorrectly turn a valid GET into an error.
+    ...(init.method?.toUpperCase() === 'GET' ? { cache: 'no-store' as const } : {}),
     // Needed for the HttpOnly refresh/CSRF cookies (set on `/auth/otp/verify`) to actually be
     // stored/sent — without it `fetch` defaults to `same-origin`, which drops them since the
     // API (port 3333) and this app (port 4200 in dev) are different origins.

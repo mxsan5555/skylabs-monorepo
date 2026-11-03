@@ -436,8 +436,8 @@ export function getCatalogProductFacets(opts: Omit<CatalogProductListOptions, 'p
   return apiGet<CatalogProductFacets>(`/catalog/products/facets${productQuery(opts)}`, null);
 }
 
-export function getCatalogProduct(id: string) {
-  return apiGet<CatalogProduct>(`/catalog/products/${id}`, null);
+export function getCatalogProduct(slugOrId: string) {
+  return apiGet<CatalogProduct>(`/catalog/products/${encodeURIComponent(slugOrId)}`, null);
 }
 
 /** Distinct `{state, city}` pairs from active branches — drives the public State/City picker

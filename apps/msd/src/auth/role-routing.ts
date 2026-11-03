@@ -13,7 +13,6 @@ import type { BootstrapResponse } from '@skylabs-monorepo/shared-types';
 /** Role keys seeded by msd-api (`prisma/seed.ts`); the member role was renamed from `vendor`
  *  (P1-02). Support is staff and always uses the console. */
 const STAFF_ROLE_KEYS = ['super_admin', 'admin', 'marketing', 'sales', 'support'] as const;
-const MEMBER_ROLE_KEY = 'member';
 const CUSTOMER_ROLE_KEY = 'customer';
 
 /** Role keys that mean "this account owns a member business" — mirrors msd-api's
@@ -34,8 +33,13 @@ export function isCustomerUser(bootstrap: BootstrapResponse): boolean {
   return getRoleKeys(bootstrap).includes(CUSTOMER_ROLE_KEY);
 }
 
+export function isVendorUser(bootstrap: BootstrapResponse): boolean {
+  return isMemberUser(bootstrap);
+}
+
 export function isMemberUser(bootstrap: BootstrapResponse): boolean {
-  return getRoleKeys(bootstrap).includes(MEMBER_ROLE_KEY);
+  const roleKeys = getRoleKeys(bootstrap);
+  return (MEMBER_ROLE_KEYS as readonly string[]).some((k) => roleKeys.includes(k));
 }
 
 /** Who gets the storefront "My Account" area (`/my-dashboard`, `/my-account/*`, `/orders`):

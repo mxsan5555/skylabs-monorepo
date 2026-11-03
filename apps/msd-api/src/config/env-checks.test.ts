@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { MIN_JWT_SECRET_LENGTH, productionEnvProblems } from './env-checks';
+import { MIN_JWT_SECRET_LENGTH, parseOtpProvider, productionEnvProblems } from './env-checks';
 
 const KEY_32 = Buffer.alloc(32, 7).toString('base64');
 const GOOD = {
@@ -46,14 +46,32 @@ describe('productionEnvProblems', () => {
     expect(problems.join(' ')).not.toContain(Buffer.alloc(16).toString('base64'));
   });
 
-  it('refuses the dev OTP list in production', () => {
-    expect(productionEnvProblems({ ...GOOD, DEV_OTP_IDENTIFIERS: '9112312391' })).toEqual([
+  it('refuses dummy fixed OTPs in production', () => {
+    expect(productionEnvProblems({ ...GOOD, OTP_PROVIDER: 'dummy' })).toEqual([
+      'OTP_PROVIDER must be sms in production',
+    ]);
+  });
+
+  it('refuses local order-notice identifiers in production', () => {
+    expect(productionEnvProblems({ ...GOOD, DEV_OTP_IDENTIFIERS: 'test@example.com' })).toEqual([
       'DEV_OTP_IDENTIFIERS must be unset in production',
     ]);
   });
 
   it('treats blank values as missing', () => {
     expect(productionEnvProblems({ ...GOOD, CRON_SECRET: '   ' })).toEqual(['CRON_SECRET is required']);
+  });
+});
+
+describe('parseOtpProvider', () => {
+  it('supports dummy and sms and defaults to the existing SMS flow', () => {
+    expect(parseOtpProvider('dummy')).toBe('dummy');
+    expect(parseOtpProvider('sms')).toBe('sms');
+    expect(parseOtpProvider(undefined)).toBe('sms');
+  });
+
+  it('fails closed on an unsupported provider mode', () => {
+    expect(() => parseOtpProvider('fallback')).toThrow('OTP_PROVIDER must be either dummy or sms');
   });
 });
 

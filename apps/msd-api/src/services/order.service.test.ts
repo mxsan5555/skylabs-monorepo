@@ -152,7 +152,7 @@ describe('getOrderActivityHistory', () => {
     ] as never);
     prismaMock.auditLog.findMany.mockResolvedValue([{ id: 'log-1' }] as never);
 
-    const result = await getOrderActivityHistory(ADMIN_USER_ID, ORDER_ID);
+    const result = await getOrderActivityHistory(ADMIN_USER_ID, 'ALL', ORDER_ID);
 
     expect(prismaMock.auditLog.findMany).toHaveBeenCalledWith({
       where: {
@@ -173,7 +173,7 @@ describe('getOrderActivityHistory', () => {
     prismaMock.orderItem.findMany.mockResolvedValue([{ id: ITEM_ID, purchaseEntitlements: [], refunds: [] }] as never);
     prismaMock.auditLog.findMany.mockResolvedValue([] as never);
 
-    await getOrderActivityHistory(ADMIN_USER_ID, ORDER_ID);
+    await getOrderActivityHistory(ADMIN_USER_ID, 'ALL', ORDER_ID);
 
     expect(prismaMock.auditLog.findMany).toHaveBeenCalledWith({
       where: { OR: [{ targetType: 'Order', targetId: ORDER_ID }] },
@@ -183,7 +183,7 @@ describe('getOrderActivityHistory', () => {
 
   it('404s for a non-existent order — reuses getOrderOrThrow, never a parallel ownership check', async () => {
     prismaMock.order.findUnique.mockResolvedValue(null);
-    await expect(getOrderActivityHistory(ADMIN_USER_ID, ORDER_ID)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(getOrderActivityHistory(ADMIN_USER_ID, 'ALL', ORDER_ID)).rejects.toMatchObject({ code: 'NOT_FOUND' });
     expect(prismaMock.orderItem.findMany).not.toHaveBeenCalled();
   });
 
@@ -200,7 +200,7 @@ describe('getOrderActivityHistory', () => {
     prismaMock.orderItem.findMany.mockResolvedValue([{ id: ITEM_ID, purchaseEntitlements: [], refunds: [] }] as never);
     prismaMock.auditLog.findMany.mockResolvedValue([] as never);
 
-    await getOrderActivityHistory('vendor-owner-1', ORDER_ID);
+    await getOrderActivityHistory('vendor-owner-1', 'OWN', ORDER_ID);
 
     expect(prismaMock.orderItem.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: { in: [ITEM_ID] } } }),

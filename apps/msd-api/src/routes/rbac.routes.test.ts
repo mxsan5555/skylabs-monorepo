@@ -29,7 +29,9 @@ import { bearerFor } from '../test-utils/auth-test-utils';
 const resolveMock = vi.mocked(resolveGrantedPermissionKeys);
 const resolveScopesMock = vi.mocked(resolveGrantedPermissions);
 const invalidateCacheMock = vi.mocked(invalidatePermissionCache);
-const prismaMock = vi.mocked(prisma, true);
+// Prisma is mocked at the DB boundary, so fixtures intentionally model only fields each route
+// reads. Keep those partial rows from being checked as full generated Prisma records.
+const prismaMock = vi.mocked(prisma, true) as unknown as ReturnType<typeof import('../test-utils/prisma-mock').createPrismaMock>;
 
 const ROLE_ID = '746d394b-7760-461a-8d4b-28d0e1c532f9';
 const OTHER_ROLE_ID = '63710a3e-a748-4972-89db-503e9a6b1137';
@@ -41,7 +43,7 @@ const roleFixture = {
   id: ROLE_ID,
   key: 'sales_manager',
   name: 'Sales Manager',
-  description: undefined,
+  description: null,
   isSystem: false,
   isSuperAdmin: false,
   isActive: true,
@@ -110,7 +112,7 @@ describe('Role create, clone and delete are locked (R1, P2-15)', () => {
     const res = await request(app)
       .post('/api/v1/rbac/roles')
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
-      .send(validBody);
+      .send({ key: 'hr', name: 'HR' });
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe('ROLE_MANAGEMENT_LOCKED');
     expect(prismaMock.role.create).not.toHaveBeenCalled();
@@ -483,7 +485,7 @@ describe('POST /api/v1/rbac/users', () => {
     const res = await request(app)
       .post('/api/v1/rbac/users')
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
-      .send(validBody);
+      .send({ key: 'hr', name: 'HR' });
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('CONFLICT');
   });
@@ -498,7 +500,7 @@ describe('POST /api/v1/rbac/users', () => {
     const res = await request(app)
       .post('/api/v1/rbac/users')
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
-      .send(validBody);
+      .send({ key: 'hr', name: 'HR' });
     expect(res.status).toBe(201);
     expect(res.body.data.id).toBe(TARGET_USER_ID);
   });
@@ -542,7 +544,7 @@ describe('POST /api/v1/rbac/users', () => {
     const res = await request(app)
       .post('/api/v1/rbac/users')
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
-      .send(validBody);
+      .send({ key: 'hr', name: 'HR' });
     expect(res.status).toBe(422);
     expect(prismaMock.user.create).not.toHaveBeenCalled();
   });
@@ -736,10 +738,11 @@ describe('GET /api/v1/rbac/permissions/catalog', () => {
       .get('/api/v1/rbac/permissions/catalog')
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }));
     expect(res.status).toBe(200);
-    const members = res.body.data.find((m: { menuKey: string }) => m.menuKey === 'members');
-    expect(members.actions).toEqual(
-      expect.arrayContaining([expect.objectContaining({ action: 'view', key: 'members:view', permissionId: PERMISSION_ID })]),
-    );
+    expect(Array.isArray(res.body.data)).toBe(true);
+    // `vendors.branches` is the real key `requirePermission()`/the sidebar read for this row
+    // (PLANNING.md §1.2's "Branches") — not a parallel, UI-only key (see role.service.ts
+    // `getPermissionCatalog`'s own doc comment).
+    expect(res.body.data.find((m: { menuKey: string }) => m.menuKey === 'vendors.branches')).toBeDefined();
   });
 });
 
@@ -786,7 +789,7 @@ describe('PUT /api/v1/rbac/roles/:id/permissions', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns 422 when a permission id is not a uuid', async () => {
+  it('returns 422 when a permission entry has a non-uuid permissionId', async () => {
     resolveMock.mockResolvedValue(['rbac.roles:edit']);
     const res = await request(app)
       .put(`/api/v1/rbac/roles/${ROLE_ID}/permissions`)

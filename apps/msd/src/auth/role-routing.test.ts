@@ -1,6 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import type { BootstrapResponse } from '@skylabs-monorepo/shared-types';
-import { extractReturnUrl, isCustomerAccountUser, isDualRoleUser, isStaffUser, resolvePostLoginPath, sanitizeReturnUrl, signInPathWithNext, signInPathWithReturnTo } from './role-routing';
+import {
+  extractReturnUrl,
+  isCustomerAccountUser,
+  isDualRoleUser,
+  isVendorUser,
+  resolvePostLoginPath,
+  sanitizeReturnUrl,
+  signInPathWithNext,
+  signInPathWithReturnTo,
+} from './role-routing';
+
+const withRoles = (...keys: string[]) => ({ roles: keys.map((key) => ({ key })) }) as unknown as BootstrapResponse;
 
 describe('extractReturnUrl', () => {
   it('reads a plain ?next= path', () => {
@@ -148,11 +159,29 @@ describe('isCustomerAccountUser', () => {
   });
 });
 
+/**
+ * Regression coverage for the msd-api `vendor` -> `member` role-key rename (see
+ * `lib/role-keys.ts#MEMBER_ROLE_KEYS` server-side): a real Member account's bootstrap carries
+ * whichever key its Role row currently has, so this must recognize both during the transition —
+ * never only the pre-rename `'vendor'` key.
+ */
+describe('isVendorUser', () => {
+  it('is true for the canonical `member` key', () => {
+    expect(isVendorUser(withRoles('member'))).toBe(true);
+  });
+
+  it('is true for the pre-rename `vendor` key (transitional)', () => {
+    expect(isVendorUser(withRoles('vendor'))).toBe(true);
+  });
+
+  it('is false for a plain customer', () => {
+    expect(isVendorUser(withRoles('customer'))).toBe(false);
+  });
+});
+
 /** ST-06: where each role lands after sign-in. The member role key is `member` (P1-02); support
  *  is staff and always uses the console. */
 describe('resolvePostLoginPath and the role checks', () => {
-  const withRoles = (...keys: string[]) => ({ roles: keys.map((key) => ({ key })) }) as unknown as BootstrapResponse;
-
   it.each([
     [['super_admin'], '/account/dashboard'],
     [['admin', 'customer'], '/account/dashboard'],

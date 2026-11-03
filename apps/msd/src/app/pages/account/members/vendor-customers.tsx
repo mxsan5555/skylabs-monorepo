@@ -52,8 +52,8 @@ const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 20 };
  *  uses). The backend doesn't support a search param on this endpoint, so `searchable` is
  *  intentionally omitted rather than inventing a new query param. */
 export function VendorCustomers({ vendorId }: { vendorId?: string } = {}) {
-  const { token } = useAuth();
   const navigate = useNavigate();
+  const { token } = useAuth();
   /** Staff on a member's page (P10-49): the staff route, full contact details (D12), no page header. */
   const staffView = Boolean(vendorId);
   const [customers, setCustomers] = useState<CustomerRow[]>([]);

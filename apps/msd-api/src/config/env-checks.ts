@@ -10,6 +10,17 @@ const REQUIRED_IN_PRODUCTION = ['R2_PRIVATE_BUCKET', 'DOC_HASH_PEPPER', 'FIELD_E
 
 type EnvSource = Record<string, string | undefined>;
 
+export type OtpProvider = 'dummy' | 'sms';
+
+/** Defaults to SMS to preserve the existing login behavior unless an environment opts into dummy mode. */
+export function parseOtpProvider(raw: string | undefined): OtpProvider {
+  const value = raw?.trim().toLowerCase() || 'sms';
+  if (value !== 'dummy' && value !== 'sms') {
+    throw new Error('OTP_PROVIDER must be either dummy or sms');
+  }
+  return value;
+}
+
 const value = (source: EnvSource, name: string) => source[name]?.trim() ?? '';
 
 /**
@@ -19,6 +30,14 @@ const value = (source: EnvSource, name: string) => source[name]?.trim() ?? '';
  */
 export function productionEnvProblems(source: EnvSource): string[] {
   const problems: string[] = [];
+
+  if (value(source, 'OTP_PROVIDER') && value(source, 'OTP_PROVIDER').toLowerCase() !== 'sms') {
+    problems.push('OTP_PROVIDER must be sms in production');
+  }
+
+  if (value(source, 'DEV_OTP_IDENTIFIERS')) {
+    problems.push('DEV_OTP_IDENTIFIERS must be unset in production');
+  }
 
   if (value(source, 'JWT_SECRET').length < MIN_JWT_SECRET_LENGTH) {
     problems.push(`JWT_SECRET must be at least ${MIN_JWT_SECRET_LENGTH} characters`);
@@ -33,10 +52,6 @@ export function productionEnvProblems(source: EnvSource): string[] {
 
   for (const name of REQUIRED_IN_PRODUCTION) {
     if (!value(source, name)) problems.push(`${name} is required`);
-  }
-
-  if (value(source, 'DEV_OTP_IDENTIFIERS')) {
-    problems.push('DEV_OTP_IDENTIFIERS must be unset in production');
   }
 
   const fieldKey = value(source, 'FIELD_ENCRYPTION_KEY');

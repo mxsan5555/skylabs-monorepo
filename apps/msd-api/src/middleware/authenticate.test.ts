@@ -15,6 +15,26 @@ const prismaMock = vi.mocked(prisma, true);
 
 const USER_ID = 'a0a0a0a0-0000-4000-8000-000000000001';
 
+function mockUser(status: 'active' | 'inactive' | 'blocked', deletedAt: Date | null = null) {
+  return {
+    id: USER_ID,
+    name: 'Test User',
+    email: 'test@example.com',
+    phone: '+919999999999',
+    googleId: null,
+    status,
+    lastLoginAt: null,
+    createdAt: new Date('2024-01-01T00:00:00.000Z'),
+    updatedAt: new Date('2024-01-01T00:00:00.000Z'),
+    deletedAt,
+    address: null,
+    city: null,
+    state: null,
+    pincode: null,
+    roleConflict: false,
+  } as any;
+}
+
 function buildTestApp() {
   const app = express();
   app.get('/protected', authenticate, (req, res) => {
@@ -68,12 +88,12 @@ describe('authenticate middleware — per-request User.status re-check', () => {
     const token = bearerFor({ sub: USER_ID, roles: ['customer'] });
 
     // First request: the account is still active — goes through fine.
-    prismaMock.user.findUnique.mockResolvedValueOnce({ status: 'active', deletedAt: null });
+    prismaMock.user.findUnique.mockResolvedValueOnce(mockUser('active'));
     const first = await request(app).get('/protected').set('Authorization', token);
     expect(first.status).toBe(200);
 
     // Nothing about the token itself changed — but the account is suspended between requests.
-    prismaMock.user.findUnique.mockResolvedValueOnce({ status: 'blocked', deletedAt: null });
+    prismaMock.user.findUnique.mockResolvedValueOnce(mockUser('blocked'));
     const second = await request(app).get('/protected').set('Authorization', token);
     expect(second.status).toBe(403);
     expect(second.body.error.message).toMatch(/disabled/i);
@@ -81,14 +101,14 @@ describe('authenticate middleware — per-request User.status re-check', () => {
 
   it('rejects an inactive account the same way', async () => {
     const app = buildTestApp();
-    prismaMock.user.findUnique.mockResolvedValue({ status: 'inactive', deletedAt: null });
+    prismaMock.user.findUnique.mockResolvedValue(mockUser('inactive'));
     const res = await request(app).get('/protected').set('Authorization', bearerFor({ sub: USER_ID, roles: ['vendor'] }));
     expect(res.status).toBe(403);
   });
 
   it('rejects a soft-deleted user even if status still reads active', async () => {
     const app = buildTestApp();
-    prismaMock.user.findUnique.mockResolvedValue({ status: 'active', deletedAt: new Date() });
+    prismaMock.user.findUnique.mockResolvedValue(mockUser('active', new Date()));
     const res = await request(app).get('/protected').set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }));
     expect(res.status).toBe(403);
   });
@@ -102,7 +122,7 @@ describe('authenticate middleware — per-request User.status re-check', () => {
 
   it('lets an active, non-deleted user through completely unaffected (regression)', async () => {
     const app = buildTestApp();
-    prismaMock.user.findUnique.mockResolvedValue({ status: 'active', deletedAt: null });
+    prismaMock.user.findUnique.mockResolvedValue(mockUser('active'));
     const res = await request(app).get('/protected').set('Authorization', bearerFor({ sub: USER_ID, roles: ['customer'] }));
     expect(res.status).toBe(200);
     expect(res.body.user.sub).toBe(USER_ID);
@@ -110,7 +130,7 @@ describe('authenticate middleware — per-request User.status re-check', () => {
 
   it('re-checks status via prisma.user.findUnique keyed on the token subject, selecting only status/deletedAt', async () => {
     const app = buildTestApp();
-    prismaMock.user.findUnique.mockResolvedValue({ status: 'active', deletedAt: null });
+    prismaMock.user.findUnique.mockResolvedValue(mockUser('active'));
     await request(app).get('/protected').set('Authorization', bearerFor({ sub: USER_ID, roles: ['customer'] }));
     expect(prismaMock.user.findUnique).toHaveBeenCalledWith({ where: { id: USER_ID }, select: { status: true, deletedAt: true } });
   });

@@ -2,6 +2,7 @@ import type { CartItem } from '../api/cart';
 import type { OrderItem } from '../api/orders';
 import { dealHref } from '../catalog/catalog-shell';
 import { primaryImage, resolveDealMedia, resolveProductMedia } from './media';
+import { productPath } from '../app/seo/public-urls';
 
 export type LineKind = 'Deal' | 'Product' | 'Therapist';
 
@@ -49,7 +50,7 @@ export function lineFromCartItem(item: CartItem): PurchaseLine {
     href: item.deal
       ? dealHref(item.deal)
       : item.product
-        ? `/products/${item.product.id}`
+        ? productPath(item.product)
         : item.therapist
           ? `/therapist/${item.therapist.id}`
           : null,
@@ -73,7 +74,7 @@ export function lineFromOrderItem(item: OrderItem): PurchaseLine {
     href: item.dealId
       ? dealHref({ id: item.dealId })
       : item.productId
-        ? `/products/${item.productId}`
+        ? productPath({ id: item.productId, slug: item.product?.slug })
         : item.therapistId
           ? `/therapist/${item.therapistId}`
           : null,

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Dialog, Icon, OutlinedTextField, OutlinedButton, FilledButton, OutlinedSelect, SelectOption, TextButton } from '@skylabs-monorepo/shared-ui/react';
+import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
+import { Dialog, FilledButton, OutlinedSelect, SelectOption, TextButton, OutlinedButton, Icon, OutlinedTextField } from '@skylabs-monorepo/shared-ui/react';
 import type { SkyDataTableParamsDetail } from '@skylabs-monorepo/shared-ui';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { CardGrid } from '../../../components/card-grid/card-grid';
@@ -18,8 +18,7 @@ import {
 } from '../../../../api/rbac/orders';
 import { listVendors, type Vendor } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { formatStreetAddress } from '../../../../utils/format';
-
+import { formatINR, formatStreetAddress } from '../../../../utils/format';
 const ALLOWED_NEXT: Record<OrderStatus, OrderStatus[]> = {
   PENDING_PAYMENT: ['CONFIRMED', 'CANCELLED'],
   CONFIRMED: ['COMPLETED', 'CANCELLED'],
@@ -99,14 +98,16 @@ function toOrderRow(order: Order): Record<string, string | number> {
     : '—';
 
   const memberLabel =
-    vendorIds.size > 1
-      ? `${vendorIds.size} members`
-      : firstItem?.vendorNameSnapshot ?? order.vendorNameSnapshot;
+    vendorIds.size > 1 ? `${vendorIds.size} members` : firstItem?.vendorNameSnapshot ?? order.vendorNameSnapshot;
+  const customerName =
+    order.customer.name && order.customer.name !== order.customer.phone && order.customer.name !== order.customer.email
+      ? order.customer.name
+      : 'Name not added';
 
   return {
     Order: shortOrderNumber(order.id),
     'Order Date': new Date(order.createdAt).toLocaleString(),
-    Customer: order.customer.name,
+    Customer: customerName,
     'Customer Phone': order.customer.phone ?? '—',
     Purchase: purchasePrimary,
     'Purchase Detail': `${describeOrderComposition(order)} · ${memberLabel}`,

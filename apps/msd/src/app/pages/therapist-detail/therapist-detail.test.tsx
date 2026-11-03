@@ -49,7 +49,7 @@ const renderPage = () =>
   render(
     <MemoryRouter initialEntries={['/therapist/t1']}>
       <Routes>
-        <Route path="/therapist/:id" element={<TherapistDetail />} />
+        <Route path="/therapist/:slug" element={<TherapistDetail />} />
         <Route path="*" element={null} />
       </Routes>
       <PathProbe />

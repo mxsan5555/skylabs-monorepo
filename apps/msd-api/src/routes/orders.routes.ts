@@ -66,6 +66,8 @@ function requestMeta(req: import('express').Request) {
 
 router.post('/checkout', validateBody(OrderCheckoutSchema), async (req, res, next) => {
   try {
+    console.log('checkout request body:', req.body);
+    console.log('checkout request user:', req.user);
     const order = await orderService.createOrderFromCart(req.user!.sub, req.body);
     await writeAuditLog({
       actorUserId: req.user!.sub,
@@ -269,7 +271,7 @@ router.get('/:id', requireOrdersOrVendorSelf('view'), validateParams(UuidParamSc
 // see getOrderActivityHistory's own doc comment).
 router.get('/:id/activity', requireOrdersOrVendorSelf('view'), validateParams(UuidParamSchema), async (req, res, next) => {
   try {
-    sendData(res, await orderService.getOrderActivityHistory(req.user!.sub, req.params.id));
+    sendData(res, await orderService.getOrderActivityHistory(req.user!.sub, res.locals.orderScope, req.params.id));
   } catch (err) {
     next(err);
   }

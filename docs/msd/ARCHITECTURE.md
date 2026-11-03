@@ -116,6 +116,13 @@ notices go out after commit and never undo the change.
 - `blockWhenReadOnly` rejects every non-GET for an inactive member with 403
   `MEMBER_INACTIVE_READ_ONLY`, except logout and token refresh.
 - OTP request and login for a suspended member return the same 403 and send no OTP.
+- OTP delivery selection is isolated in `services/otp.service.ts`: `OTP_PROVIDER=sms` keeps the
+  existing random hashed challenge and ConnectExpress sender; `dummy` compares role-specific
+  environment values for an existing active account (including the fixed customer phone OTP)
+  and creates no OTP challenge row.
+  Super Admin uses a separate configured mobile/OTP and must already hold `super_admin` in DB.
+  Both modes retain request rate limits; dummy verification adds failure limits because there is
+  no persisted challenge attempt counter. Fixed OTP values are not logged or returned.
 - Storefront visibility: `publicVisibleWhere()` in `services/catalog-visibility.ts` (member
   ACTIVE, branch active, deal ACTIVE and in its date window; therapist and product active) is used
   by every `/catalog` query. The deal approval check is still read until P3-15.
