@@ -8,7 +8,7 @@ import { missingOtpConfiguration, sendOtp as sendSmsOtp } from '../providers/sms
 import { sendOtpEmail } from '../providers/email/smtp.provider';
 import { suspendedMessage } from '../lib/member-messages';
 import { readMemberAccessState } from './member-access.service';
-import { normalizeIdentifier } from '../lib/normalizeIdentifier';
+import { normalizeIdentifier, phoneLookupWhere } from '../lib/normalizeIdentifier';
 
 const OTP_HASH_ROUNDS = 10;
 const CUSTOMER_DUMMY_OTP = '111111';
@@ -44,7 +44,7 @@ function requireOtpValue(name: string, value: string): string {
 
 async function findPhoneAccount(identifier: string): Promise<DummyLoginAccount | null> {
   return (await prisma.user.findFirst({
-    where: { phone: identifier, deletedAt: null },
+    where: { ...phoneLookupWhere(identifier), deletedAt: null },
     select: {
       id: true,
       status: true,
@@ -68,6 +68,10 @@ async function getSuperAdminLoginOtp(
   identifier: string,
   account: DummyLoginAccount | null,
 ): Promise<{ handled: boolean; otp: string | null }> {
+  if (env.otpProvider !== 'dummy') {
+    return { handled: false, otp: null };
+  }
+
   const configured = env.superAdminLoginMobile ? normalizeIdentifier(env.superAdminLoginMobile) : '';
   const isConfiguredNumber = Boolean(configured && configured === identifier);
   if (!account || account.deletedAt) return { handled: isConfiguredNumber, otp: null };
@@ -122,7 +126,9 @@ function otpMatches(submitted: string, expected: string): boolean {
  */
 async function assertMemberMayRequestOtp(identifier: string): Promise<void> {
   const owner = await prisma.user.findFirst({
-    where: isPhoneIdentifier(identifier) ? { phone: identifier, deletedAt: null } : { email: identifier, deletedAt: null },
+    where: isPhoneIdentifier(identifier)
+      ? { ...phoneLookupWhere(identifier), deletedAt: null }
+      : { email: identifier, deletedAt: null },
     select: { id: true },
   });
   if (!owner) return;

@@ -1,8 +1,3 @@
-/*
-  Warnings:
-
-  - You are about to drop the column `roleConflict` on the `User` table. All the data in the column will be lost.
-
-*/
--- AlterTable
-ALTER TABLE "User" DROP COLUMN "roleConflict";
+-- This migration was an accidental rollback of a required field and must be treated as a no-op.
+-- The `User.roleConflict` column is still used by the RBAC sync logic.
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "roleConflict" BOOLEAN NOT NULL DEFAULT false;
