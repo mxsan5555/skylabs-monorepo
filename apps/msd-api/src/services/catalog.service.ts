@@ -44,7 +44,11 @@ export async function getHotIds(kind: TagKind, now = new Date()): Promise<string
     by: [key],
     where: {
       [key]: { not: null },
-      order: { status: { in: ['CONFIRMED', 'COMPLETED'] }, createdAt: { gte: daysFrom(now, -TAG_RULES.hotWindowDays) } },
+      order: {
+        status: { in: ['CONFIRMED', 'COMPLETED'] },
+        createdAt: { gte: daysFrom(now, -TAG_RULES.hotWindowDays) },
+        payments: { some: { status: 'PAID' } },
+      },
     },
     _count: { _all: true },
   });

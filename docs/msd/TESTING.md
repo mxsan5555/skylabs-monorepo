@@ -492,10 +492,11 @@ transform doesn't type-check, which is why these don't block `msd-api:test`.
   map hidden for products and therapists; a prerendered 404 renders not found on the first
   render; not-found keeps one h1; filter counts reload when the city resolves; a therapy category
   under a city URL does not filter by city; empty copy names the kind.
-- Card tags (ST-40, `offer-tag.test.ts`, `catalog.routes.test.ts`): a deal ending in 7 days or
+- Card tags (ST-40/ST-51, `offer-tag.test.ts`, `catalog.service.test.ts`, `catalog.routes.test.ts`): a deal ending in 7 days or
   less is Expire soon even when it is also hot, new or 30% off; ended deals get no Expire soon;
-  Hot needs the top 10% of paid lines in 30 days and at least 5 (4 lines → not hot; pending and
-  cancelled orders ignored); New is created within 14 days; Deal is 30% off or more (29% → none);
+  Hot needs the top 10% of paid lines in 30 days and at least 5 (4 lines → not hot; pending,
+  cancelled and confirmed-but-unpaid COD orders ignored); New is created within 14 days; Deal is
+  30% off or more (29% → none);
   products never get Expire soon; `tags=hot,new` returns only items whose shown tag is one of
   them; tag facet counts equal the filtered list totals; `tags=foo` → 422.
 - Catalog API for listings (ST-40, `catalog.routes.test.ts`): no new params → same items and

@@ -1242,14 +1242,17 @@ describe('ST-40 card tags on deals and products', () => {
     expect(res.body.data.map((d: { tag: string }) => d.tag)).toEqual(['expire_soon', 'deal']);
   });
 
-  it('marks a deal hot from paid order lines (top 10%, at least 5)', async () => {
+  it('marks a deal hot from paid order lines only (top 10%, at least 5)', async () => {
     prismaMock.orderItem.groupBy.mockResolvedValue([{ dealId: DEAL_ID, _count: { _all: 6 } }] as never);
     prismaMock.deal.findMany.mockResolvedValue([serviceDealFixture] as never);
     prismaMock.deal.count.mockResolvedValue(1);
     const res = await request(app).get('/api/v1/catalog/deals');
     expect(res.body.data[0].tag).toBe('hot');
-    const groupBy = prismaMock.orderItem.groupBy.mock.calls[0][0] as unknown as { where: { order: { status: { in: string[] } } } };
+    const groupBy = prismaMock.orderItem.groupBy.mock.calls[0][0] as unknown as {
+      where: { order: { status: { in: string[] }; payments: { some: { status: string } } } };
+    };
     expect(groupBy.where.order.status.in).toEqual(['CONFIRMED', 'COMPLETED']);
+    expect(groupBy.where.order.payments.some.status).toBe('PAID');
   });
 
   it('tags=hot,new narrows the SQL where with one clause per tag', async () => {

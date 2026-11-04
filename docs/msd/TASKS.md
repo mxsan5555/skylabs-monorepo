@@ -40,7 +40,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 1 | Admin and staff | 4 | 31 | 13 |
 | 2 | Members | 54 | 101 | 53 |
 | 3 | Customers and orders | 3 | 12 | 25 |
-| 4 | Storefront | 29 | 47 | 62 |
+| 4 | Storefront | 30 | 48 | 63 |
 | 5 | Static content | 2 | 5 | 40 |
 | 6 | CTA banners | 4 | 5 | 80 |
 | 7 | Home slider | 13 | 14 | 93 |
@@ -49,7 +49,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
 | 12 | Platform, security and release | 15 | 71 | 21 |
-| | **Total** | **118** | **296** | **40** |
+| | **Total** | **119** | **297** | **40** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -270,6 +270,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | ST-47 | FE | Rebuild the invoice page (`/orders/:id/invoice`, opened by Download invoice) on the shared blocks, print-friendly | S | - | Tests; prints on one page |
 | [ ] | ST-48 | FE | Move the console settings page (`/account/settings`) off the old `account-card` styles onto the shared blocks | S | - | Tests; `account-card` unused there |
 | [ ] | ST-49 | BIZ | Owner decisions from the cart, checkout and account rebuild: outline and corners on the payment method cards, `--sky-space-*` spacing tokens or the 4/8 px grid, removal of the dashboard Orders / Profile / Sign out cards | S | - | Decisions recorded in PLANNING.md §4 |
+| [x] | ST-51 | BE | Count only paid order lines when computing Hot deal/product tags; confirmed COD orders are unpaid until collection | S | ST-40 | Done: `catalog.service.test.ts` asserts Hot queries require `payments.some(status: PAID)`; `offer-tag.test.ts` passes |
 | [ ] | ST-50 | QA | Manual browser checks of the rebuilt pages: Razorpay test card (paid; failed then window closed), Back to cart, Edit details and Cash on delivery at checkout, `/products` Business filter and business name on cards, dark mode on cart, checkout, order and account pages | S | - | Each check passes at desktop and phone width |
 
 Removed 2026-10-24: ST-17 (therapist city filter is in ST-40; products are not location bound, D29), ST-23 (explore filter panel is ST-43), ST-24 (products have no Business filter, D29).
