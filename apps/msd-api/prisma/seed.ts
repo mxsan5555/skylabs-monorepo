@@ -513,35 +513,37 @@ async function seedDashboardWidgets(roles: Map<string, { id: string; isSuperAdmi
  * SUPERADMIN_EMAIL in .env.local — skipped (not guessed) if neither is set.
  */
 async function seedSuperAdminUser(roles: Map<string, { id: string; isSuperAdmin: boolean }>): Promise<string | undefined> {
-  const rawPhone = process.env.SUPERADMIN_PHONE || undefined;
-  const email = process.env.SUPERADMIN_EMAIL || undefined;
+  const rawPhone = process.env.SUPERADMIN_PHONE?.trim() || undefined;
+  const email = process.env.SUPERADMIN_EMAIL?.trim() || undefined;
   if (!rawPhone && !email) {
     console.log('SUPERADMIN_PHONE/SUPERADMIN_EMAIL not set — skipping SuperAdmin user seed.');
     return undefined;
   }
-  // Normalized to the same canonical form every real login identifier is now normalized to
-  // at the auth boundary (see src/lib/normalizeIdentifier.ts) — without this, a SuperAdmin
-  // seeded from the env var's raw bare-digit phone would never match a real login again.
-  const phone = rawPhone ? normalizeIdentifier(rawPhone) : undefined;
 
   const superAdminRole = roles.get('super_admin');
   if (!superAdminRole) return;
 
-  // One-time backfill: a seed run from before normalization existed may already have created
-  // this user under the old, un-normalized phone — reuse that row instead of creating a
-  // second "Super Admin" user.
-  if (phone && rawPhone && phone !== rawPhone) {
-    const legacy = await prisma.user.findUnique({ where: { phone: rawPhone } });
-    if (legacy && legacy.phone !== phone) {
-      await prisma.user.update({ where: { id: legacy.id }, data: { phone } });
-    }
+  const normalizedPhone = rawPhone ? normalizeIdentifier(rawPhone) : undefined;
+  const lookupWhere = rawPhone
+    ? { OR: [{ phone: rawPhone }, { phone: normalizedPhone ?? rawPhone }] }
+    : { email: email! };
+
+  let user = await prisma.user.findFirst({ where: lookupWhere, select: { id: true, phone: true, email: true } });
+
+  if (user && rawPhone && user.phone !== rawPhone) {
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: { phone: rawPhone },
+      select: { id: true, phone: true, email: true },
+    });
   }
 
-  const user = await prisma.user.upsert({
-    where: phone ? { phone } : { email: email! },
-    update: {},
-    create: { name: 'Super Admin', phone, email },
-  });
+  if (!user) {
+    user = await prisma.user.create({
+      data: { name: 'Super Admin', phone: rawPhone, email },
+      select: { id: true, phone: true, email: true },
+    });
+  }
 
   await prisma.userRole.upsert({
     where: { userId_roleId: { userId: user.id, roleId: superAdminRole.id } },
@@ -549,7 +551,7 @@ async function seedSuperAdminUser(roles: Map<string, { id: string; isSuperAdmin:
     create: { userId: user.id, roleId: superAdminRole.id },
   });
 
-  console.log(`Seeded SuperAdmin user (${phone ?? email}).`);
+  console.log(`Seeded SuperAdmin user (${rawPhone ?? email}).`);
   return user.id;
 }
 

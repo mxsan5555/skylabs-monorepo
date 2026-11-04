@@ -128,7 +128,7 @@ ALTER COLUMN "status" SET DEFAULT 'PROCESSED';
 ALTER TABLE "SettlementAdjustment" ALTER COLUMN "createdByUserId" DROP NOT NULL;
 
 -- AlterTable
-ALTER TABLE "User" ADD COLUMN     "roleConflict" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "roleConflict" BOOLEAN NOT NULL DEFAULT false;
 
 -- DropEnum
 DROP TYPE "CompletionOtpPurpose";

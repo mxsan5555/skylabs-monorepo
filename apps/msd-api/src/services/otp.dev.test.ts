@@ -69,6 +69,23 @@ afterEach(() => {
   for (const key of otpVariables) env[key] = originalOtps[key];
 });
 
+describe('runtime env re-read', () => {
+  it('reads OTP_PROVIDER and the fixed login values from the current process environment', () => {
+    process.env.OTP_PROVIDER = 'dummy';
+    expect(env.otpProvider).toBe('dummy');
+
+    process.env.OTP_PROVIDER = 'sms';
+    expect(env.otpProvider).toBe('sms');
+
+    process.env.ADMIN_LOGIN_OTP = '777777';
+    expect(env.adminLoginOtp).toBe('777777');
+
+    env.adminLoginOtp = '888888';
+    expect(process.env.ADMIN_LOGIN_OTP).toBe('888888');
+    expect(env.adminLoginOtp).toBe('888888');
+  });
+});
+
 describe('environment dummy OTP provider', () => {
   it('authenticates a customer by their registered phone with the fixed customer OTP', async () => {
     useAccount('customer');
@@ -112,14 +129,25 @@ describe('environment dummy OTP provider', () => {
     expect(smsMock).not.toHaveBeenCalled();
   });
 
-  it('keeps Super Admin on the fixed environment credential when the other roles use SMS', async () => {
+  it('accepts a legacy bare-digit Super Admin phone when the request arrives in normalized +91 form', async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: 'sa-legacy',
+      status: 'active',
+      deletedAt: null,
+      roles: [{ role: { key: 'super_admin' } }],
+    } as never);
+    env.superAdminLoginMobile = '7234882093';
+    env.superAdminLoginOtp = '888888';
+    await expect(verifyOtp('+917234882093', '888888')).resolves.toBeUndefined();
+  });
+
+  it('uses the real SMS flow for Super Admin when OTP_PROVIDER=sms', async () => {
     env.otpProvider = 'sms';
     useAccount('super_admin');
     await requestOtp('+919999999999', 'login');
-    await expect(verifyOtp('+919999999999', '111111')).resolves.toBeUndefined();
-    expect(prismaMock.otpChallenge.create).not.toHaveBeenCalled();
+    expect(prismaMock.otpChallenge.create).toHaveBeenCalledOnce();
+    expect(smsMock).toHaveBeenCalledOnce();
     expect(prismaMock.otpChallenge.findFirst).not.toHaveBeenCalled();
-    expect(smsMock).not.toHaveBeenCalled();
   });
 
   it('does not allow a different phone to use the configured Super Admin OTP', async () => {

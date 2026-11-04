@@ -4,6 +4,7 @@ import { signAccessToken } from '../lib/jwt';
 import { issueRefreshSession } from './token.service';
 import type { LoginMethod } from '../generated/prisma-client';
 import { suspendedMessage } from '../lib/member-messages';
+import { phoneLookupWhere } from '../lib/normalizeIdentifier';
 import { readMemberAccessState } from './member-access.service';
 
 /** Shared by both login paths below — a brand-new User always defaults to `active` (this
@@ -56,24 +57,41 @@ export async function loginWithIdentifier(identifier: string, meta: SessionMeta 
   // Checked via a plain read BEFORE the upsert below — a blocked/inactive RETURNING user must
   // never have `lastLoginAt` touched (misleading for a rejected attempt) or a token issued. A
   // brand-new identifier has no row yet, so this is a no-op for the signup path.
-  const existing = await prisma.user.findUnique({ where: kind === 'email' ? { email: identifier } : { phone: identifier } });
+  const existing = kind === 'email'
+    ? await prisma.user.findUnique({ where: { email: identifier } })
+    : await prisma.user.findFirst({ where: { ...phoneLookupWhere(identifier) } });
   if (existing) {
     await assertUserMayLogIn(existing, meta, method);
     await assertMemberMayLogIn(existing.id, meta, method);
   }
 
-  
-  const user = await prisma.user.upsert({
-    where: kind === 'email' ? { email: identifier } : { phone: identifier },
-    update: { lastLoginAt: new Date() },
-    create: {
-      name: identifier,
-      email: kind === 'email' ? identifier : undefined,
-      phone: kind === 'phone' ? identifier : undefined,
-      lastLoginAt: new Date(),
-    },
-    include: { roles: { include: { role: true } } },
-  });
+  const user = existing && kind !== 'email'
+    ? await prisma.user.update({
+        where: { id: existing.id },
+        data: { lastLoginAt: new Date() },
+        include: { roles: { include: { role: true } } },
+      })
+    : kind === 'email'
+      ? await prisma.user.upsert({
+          where: { email: identifier },
+          update: { lastLoginAt: new Date() },
+          create: {
+            name: identifier,
+            email: identifier,
+            lastLoginAt: new Date(),
+          },
+          include: { roles: { include: { role: true } } },
+        })
+      : await prisma.user.upsert({
+          where: { phone: identifier },
+          update: { lastLoginAt: new Date() },
+          create: {
+            name: identifier,
+            phone: identifier,
+            lastLoginAt: new Date(),
+          },
+          include: { roles: { include: { role: true } } },
+        });
 
   // Default role on first login for this RBAC's role set is 'customer' (see prisma/seed.ts —
   // this task's seed defines super_admin/admin/customer/vendor/marketing/sales, not the

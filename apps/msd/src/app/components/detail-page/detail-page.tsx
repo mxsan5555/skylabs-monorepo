@@ -8,40 +8,29 @@ import { useHydrated } from '../../../hooks/use-hydrated';
 import { DealMap, type DealMapPoint } from '../deal-map/deal-map';
 import { QuantityStepper } from '../quantity-stepper/quantity-stepper';
 import './detail-page.css';
-
 const t = content.detailPage;
 const g = t.gallery;
-/** Horizontal travel that counts as a swipe to the next or previous image. */
 const SWIPE_MIN_PX = 40;
 const days = content.vendor.days;
 const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
-
-/** Whole-number discount between an original and a sale price; 0 when there is none. */
 export function discountPercent(price: number, original?: number | null): number {
   return original != null && original > price ? Math.round(((original - price) / original) * 100) : 0;
 }
-
-/**
- * Deal and therapist gallery (PLANNING §2.7): the main image with the discount tag, previous /
- * next buttons, swipe on touch screens, thumbnails from 600px and dots below it, the video under
- * it, and a full-screen view (native `<dialog>`: arrow keys, Escape, "3 of 7"). `alts[i]` is the
- * image's own description; `alt` (the item's name) is the fallback.
- */
 export function DetailGallery({
   images,
   alts = [],
   video,
   alt,
   discountPct = 0,
+  tag,
 }: {
   images: string[];
   alts?: (string | null | undefined)[];
   video?: string | null;
   alt: string;
   discountPct?: number;
+  tag?: string | null;
 }) {
-  // The active image belongs to one set of images: a new set starts at the first image again.
-  // Kept with the set's key (callers build a new array every render, so the array itself can't be).
   const imagesKey = images.join('|');
   const [selection, setSelection] = useState({ key: imagesKey, index: 0 });
   const active = selection.key === imagesKey ? selection.index : 0;
@@ -53,12 +42,10 @@ export function DetailGallery({
   const dialogRef = useRef<HTMLDialogElement>(null);
   const openerRef = useRef<HTMLButtonElement>(null);
   const swipeStart = useRef<number | null>(null);
-
   const count = images.length;
   const altOf = (index: number) => alts[index]?.trim() || alt;
   const go = (delta: number) => setActive((i) => (i + delta + count) % count);
   const counter = (n: number) => fillTemplate(g.counter, { n: String(n + 1), count: String(count) });
-
   const onKey = (e: KeyboardEvent<HTMLElement>) => {
     if (count < 2) return;
     if (e.key === 'ArrowLeft') {
@@ -78,7 +65,6 @@ export function DetailGallery({
     swipeStart.current = null;
     if (Math.abs(dx) > SWIPE_MIN_PX) go(dx < 0 ? 1 : -1);
   };
-
   const openFullScreen = () => {
     const dialog = dialogRef.current;
     if (!dialog) return;
@@ -91,7 +77,6 @@ export function DetailGallery({
     else dialog?.removeAttribute('open');
     openerRef.current?.focus();
   };
-
   return (
     <div className="detail-page__gallery" role="group" aria-roledescription="carousel" aria-label={alt} onKeyDown={onKey}>
       <div className="detail-page__main-img-wrap" onPointerDown={onPointerDown} onPointerUp={onPointerUp}>
@@ -106,9 +91,13 @@ export function DetailGallery({
             <img key={active} className="detail-page__main-img" src={images[active]} alt={altOf(active)} width={800} height={450} />
           </button>
         )}
-        {discountPct > 0 && (
-          <sky-badge className="detail-page__badge" variant="error" size="large">
-            {fillTemplate(t.off, { percent: String(discountPct) })}
+        {tag && (
+          <sky-badge className="detail-page__badge" size="large"
+            variant={tag === 'new' ? 'tertiary'
+              : tag === 'hot' ? 'error' : 'primary'}
+            status={tag === 'expire_soon' ? 'error' : undefined}
+          >
+            {tag}
           </sky-badge>
         )}
         {count > 1 && (
@@ -154,20 +143,12 @@ export function DetailGallery({
         </>
       )}
       {video && <video className="detail-page__video" controls src={video} />}
-
       <dialog
         ref={dialogRef}
         className="detail-page__lightbox"
         aria-label={fillTemplate(g.dialog, { title: alt })}
-        onCancel={(e) => {
-          e.preventDefault();
-          closeFullScreen();
-        }}
-        onKeyDown={(e) => {
-          // The gallery around it listens too; handle the key once.
-          e.stopPropagation();
-          onKey(e);
-        }}
+        onCancel={(e) => { e.preventDefault(); closeFullScreen(); }}
+        onKeyDown={(e) => { e.stopPropagation(); onKey(e); }}
       >
         <div className="detail-page__lightbox-bar">
           <span className="label-large" aria-live="polite">{counter(active)}</span>
@@ -192,8 +173,6 @@ export function DetailGallery({
     </div>
   );
 }
-
-/** Current price, the struck-through original and the discount tag. */
 export function DetailPrice({ price, originalPrice, discountPct }: { price: number; originalPrice?: number | null; discountPct: number }) {
   return (
     <div className="detail-page__price-row">
@@ -209,7 +188,6 @@ export function DetailPrice({ price, originalPrice, discountPct }: { price: numb
     </div>
   );
 }
-
 function ShareButton() {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
@@ -217,9 +195,7 @@ function ShareButton() {
       await navigator.clipboard.writeText(window.location.href);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setCopied(false);
-    }
+    } catch { setCopied(false); }
   };
   return (
     <OutlinedIconButton aria-label={copied ? t.copied : t.share} onClick={() => void copy()}>
@@ -227,25 +203,18 @@ function ShareButton() {
     </OutlinedIconButton>
   );
 }
-
 export interface DetailPurchaseProps {
   unitPrice: number;
   quantity: number;
   onQuantityChange: (quantity: number) => void;
   onAdd: () => void;
   addDisabled?: boolean;
-  /** Highest quantity allowed (stock left, per-customer limit); no cap when omitted. */
   maxQuantity?: number;
-  /** Replaces Add to cart with a disabled "Sold out". */
   soldOut?: boolean;
-  /** Extra icon buttons before Share (e.g. the wishlist heart). */
   actions?: ReactNode;
-  /** Short lines under the buttons (bought count, ends in, limit). */
   notes?: ReactNode;
   error?: string;
 }
-
-/** Quantity stepper, total, Add to cart and the icon actions (extra + Share). */
 export function DetailPurchase({ unitPrice, quantity, onQuantityChange, onAdd, addDisabled, maxQuantity, soldOut, actions, notes, error }: DetailPurchaseProps) {
   const atMax = maxQuantity !== undefined && quantity >= maxQuantity;
   return (
@@ -274,15 +243,10 @@ export function DetailPurchase({ unitPrice, quantity, onQuantityChange, onAdd, a
         <ShareButton />
       </div>
       {notes}
-      {error && (
-        <p className="error-state" role="alert">
-          {error}
-        </p>
-      )}
+      {error && (<p className="error-state" role="alert">{error}</p>)}
     </>
   );
 }
-
 export interface DetailBranch {
   id: string;
   name: string;
@@ -292,10 +256,8 @@ export interface DetailBranch {
   latitude: string | null;
   longitude: string | null;
   phone?: string | null;
-  /** When the page already has the hours (deal page), no member lookup is made. */
   openingHours?: CatalogVendorBranch['openingHours'] | null;
 }
-
 function directionsUrl(branch: DetailBranch): string | undefined {
   if (branch.latitude != null && branch.longitude != null) {
     return `https://www.google.com/maps/dir/?api=1&destination=${branch.latitude},${branch.longitude}`;
@@ -303,9 +265,6 @@ function directionsUrl(branch: DetailBranch): string | undefined {
   const query = formatStreetAddress([branch.name, branch.address, branch.city]);
   return query ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(query)}` : undefined;
 }
-
-/** Location (address, Get directions, call) and the branch's weekly hours: given by the page, or
- *  read from the member's public page (`GET /catalog/vendors/:slug`). */
 export function BranchPanels({
   branch,
   vendorSlug,
@@ -313,8 +272,6 @@ export function BranchPanels({
 }: {
   branch: DetailBranch;
   vendorSlug?: string | null;
-  /** A compact map of the branch under the address (deal page, ST-26). Client-only: the map
-   *  engine loads after hydration, so prerendered HTML never contains it. */
   showMap?: boolean;
 }) {
   const hydrated = useHydrated();
@@ -327,7 +284,6 @@ export function BranchPanels({
   const given = branch.openingHours !== undefined;
   const [hours, setHours] = useState<CatalogVendorBranch['openingHours'] | null>(branch.openingHours ?? null);
   const [hoursLoaded, setHoursLoaded] = useState(given);
-
   useEffect(() => {
     if (given) {
       setHours(branch.openingHours ?? null);
@@ -346,9 +302,7 @@ export function BranchPanels({
       .catch(() => { if (!cancelled) setHours(null); })
       .finally(() => { if (!cancelled) setHoursLoaded(true); });
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- branch.openingHours is read through `given`
   }, [vendorSlug, branch.id, given]);
-
   const street = formatStreetAddress([branch.address, branch.addressLine2, branch.city]);
   const address = [branch.name, street].filter(Boolean).join(' — ');
   const directions = directionsUrl(branch);
@@ -402,8 +356,6 @@ export function BranchPanels({
     </aside>
   );
 }
-
-/** Not-found state with a way back to browsing. */
 export function DetailNotFound({ copy, to }: { copy: { metaTitle: string; heading: string; subheading: string; cta: string }; to: string }) {
   const navigate = useNavigate();
   return (

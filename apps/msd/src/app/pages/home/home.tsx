@@ -1,6 +1,6 @@
 import { useMemo, type ReactNode } from 'react';
 import '@skylabs-monorepo/shared-ui/carousel';
-import { OfferCard, type OfferTag, } from '../../components/offer-card/offer-card';
+import { OfferCard, offerTagFor, type OfferTag } from '../../components/offer-card/offer-card';
 import { primaryImage, resolveDealMedia } from '../../../utils/media';
 import { CardRail } from '../../components/card-rail/card-rail';
 import { TherapistCard } from '../../components/therapist-card/therapist-card';
@@ -8,7 +8,7 @@ import { PageSection } from '../../components/page-section/page-section';
 import { Seo } from '../../seo/seo';
 import { faqPageJsonLd, itemListJsonLd, type JsonLdObject } from '../../seo/jsonld';
 import { SITE_URL } from '../../seo/site-url';
-import { dealPath, productPath, therapistPath } from '../../seo/public-urls';
+import { dealPath, } from '../../seo/public-urls';
 import { CategoryTiles } from './category-tiles';
 import { DealsNearYou } from './deals-near-you';
 import { HomeTagSections } from './home-tag-sections';
@@ -20,31 +20,28 @@ import { TreatmentDirectory } from './treatment-directory';
 import { HOME_RAIL_SIZE, useHomeCatalog, } from './home-data';
 import content from '../../../content.json';
 import './home.css';
-import { dealHref, useCatalogShell } from '../../../catalog/catalog-shell';
+import { useCatalogShell } from '../../../catalog/catalog-shell';
 import { useVisitorLocation } from '../../../location/location-context';
-import type { CatalogDeal, CatalogHomeTagSectionTag, } from '../../../api/catalog';
+import type { CatalogDeal, CatalogHomeTagSection, } from '../../../api/catalog';
 const { home } = content;
-const getDealTag = (tag?: string | null): OfferTag | undefined => {
-  if (!tag?.trim()) {
-    return undefined;
-  }
-
-  return {
-    label: tag
-      .trim()
-      .replace(/_/g, ' ')
-      .replace(/\b\w/g, (char) => char.toUpperCase()),
-    color: 'primary',
-    tone: 'tonal',
-  };
+const getDealTag = (tag?: string | null, labelOverride?: string): OfferTag | undefined => {
+  const normalizedTag = typeof tag === 'string' && tag.trim() ? tag.trim() : undefined;
+  if (!normalizedTag) { return undefined; }
+  const normalizedKey = normalizedTag.toLowerCase();
+  const mappedTag =
+    normalizedKey === 'expire_soon' ? 'expire_soon' :
+      normalizedKey === 'hot' || normalizedKey === 'hot_deal' ? 'hot' :
+        normalizedKey === 'new' ? 'new' :
+          normalizedKey === 'deal' ? 'deal' :
+            undefined;
+  return mappedTag ? offerTagFor(mappedTag, labelOverride) : undefined;
 };
 export function Home() {
   const { categories } = useCatalogShell();
   const { status: locationStatus, coords } = useVisitorLocation();
   const catalog = useHomeCatalog(locationStatus === 'locating' ? undefined : coords);
   const ready = catalog.status === 'ready';
-  const spotlight = useMemo(
-    () => [...catalog.deals].sort((a, b) => (b.discountPercent ?? 0) - (a.discountPercent ?? 0))[0], [catalog.deals],);
+  const spotlight = useMemo(() => [...catalog.deals].sort((a, b) => (b.discountPercent ?? 0) - (a.discountPercent ?? 0))[0], [catalog.deals],);
   const jsonLd = useMemo(() => {
     const blocks: JsonLdObject[] = [];
     if (SITE_URL && catalog.deals.length > 0) {
@@ -65,9 +62,12 @@ export function Home() {
     if (catalog.faqs.length > 0) blocks.push(faqPageJsonLd(catalog.faqs));
     return blocks.length > 0 ? blocks : undefined;
   }, [catalog.deals, catalog.faqs]);
-  const renderDeal = (deal: CatalogDeal): ReactNode => {
-    const tag = getDealTag(deal.tag);
-
+  const renderDeal = (deal: CatalogDeal, tagInput?: string | number | CatalogHomeTagSection,): ReactNode => {
+    const tagKey = typeof tagInput === 'object' && tagInput ? tagInput.tag : deal.tag;
+    const tagLabel =
+      typeof tagInput === 'string' ? tagInput
+        : typeof tagInput === 'object' && tagInput ? tagInput.title : undefined;
+    const tag = getDealTag(tagKey, tagLabel);
     return (
       <swiper-slide key={deal.id} className="card-rail__slide">
         <OfferCard
@@ -80,21 +80,9 @@ export function Home() {
       </swiper-slide>
     );
   };
-  // tag wise sections
-  const renderDealSection = (
-    id: string,
-    heading: string,
-    seeAllTo: string,
-    tag: OfferTag,
-    tone: 'tint' | 'surface' = 'surface',
-  ) => (
+  const renderDealSection = (id: string, heading: string, seeAllTo: string, tag: OfferTag, tone: 'tint' | 'surface' = 'surface',) => (
     <PageSection tone={tone} aria-labelledby={id}>
-      <CardRail
-        id={id}
-        heading={heading}
-        seeAll="See All Deals"
-        seeAllTo={seeAllTo}
-      >
+      <CardRail id={id} heading={heading} seeAll="See All Deals" seeAllTo={seeAllTo} >
         {catalog.deals
           .slice(0, HOME_RAIL_SIZE)
           .map((deal) => renderDeal(deal))}
@@ -113,9 +101,7 @@ export function Home() {
         categories={categories}
         renderDeal={renderDeal}
       />
-      <HomeTagSections
-        renderDeal={(deal) => renderDeal(deal)}
-      />
+      <HomeTagSections renderDeal={(deal, section) => renderDeal(deal, section)} />
       <HowItWorks />
       {ready && catalog.therapists.length > 0 && (
         <PageSection tone="tint" aria-labelledby="therapists-heading">
@@ -126,9 +112,7 @@ export function Home() {
             seeAllTo={home.sections.therapists.seeAllTo}
           >
             {catalog.therapists.map((therapist) => (
-              <swiper-slide key={therapist.id} className="card-rail__slide">
-                <TherapistCard therapist={therapist} />
-              </swiper-slide>
+              <swiper-slide key={therapist.id} className="card-rail__slide"><TherapistCard therapist={therapist} /> </swiper-slide>
             ))}
           </CardRail>
         </PageSection>
@@ -156,7 +140,6 @@ export function Home() {
       )}
       <BannerSlot slot="HOME_AFTER_PRODUCTS" />
       <TreatmentDirectory groups={catalog.popularTreatments} />
-      {/* Visible FAQs back the FAQPage JSON-LD above (structured data must match the page). */}
       <HomeFaq faqs={catalog.faqs} />
       <PageSection flush aria-labelledby="partner-heading">
         <sky-cta-banner

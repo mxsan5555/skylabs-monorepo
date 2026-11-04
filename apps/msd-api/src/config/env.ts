@@ -40,6 +40,11 @@ function optionalInt(name: string, fallback: number): number {
   return Number.isNaN(parsed) ? fallback : parsed;
 }
 
+function envString(name: string, fallback = ''): string {
+  const value = process.env[name];
+  return value === undefined ? fallback : value;
+}
+
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: optionalInt('PORT', 3333),
@@ -55,14 +60,61 @@ export const env = {
 
   otpExpiryMinutes: optionalInt('OTP_EXPIRY_MINUTES', 10),
   otpMaxAttempts: optionalInt('OTP_MAX_ATTEMPTS', 5),
-  otpProvider: parseOtpProvider(process.env.OTP_PROVIDER),
-  adminLoginOtp: process.env.ADMIN_LOGIN_OTP ?? '',
-  memberLoginOtp: process.env.MEMBER_LOGIN_OTP ?? '',
-  salesLoginOtp: process.env.SALES_LOGIN_OTP ?? '',
-  marketingLoginOtp: process.env.MARKETING_LOGIN_OTP ?? '',
-  supportLoginOtp: process.env.SUPPORT_LOGIN_OTP ?? '',
-  superAdminLoginMobile: process.env.SUPERADMIN_LOGIN_MOBILE ?? '',
-  superAdminLoginOtp: process.env.SUPERADMIN_LOGIN_OTP ?? '',
+  get otpProvider() {
+    return parseOtpProvider(process.env.OTP_PROVIDER);
+  },
+  set otpProvider(value: string) {
+    process.env.OTP_PROVIDER = String(value).trim();
+  },
+  get adminLoginOtp() {
+    return envString('ADMIN_LOGIN_OTP');
+  },
+  set adminLoginOtp(value: string) {
+    if (value === undefined || value === null || value === '') delete process.env.ADMIN_LOGIN_OTP;
+    else process.env.ADMIN_LOGIN_OTP = String(value);
+  },
+  get memberLoginOtp() {
+    return envString('MEMBER_LOGIN_OTP');
+  },
+  set memberLoginOtp(value: string) {
+    if (value === undefined || value === null || value === '') delete process.env.MEMBER_LOGIN_OTP;
+    else process.env.MEMBER_LOGIN_OTP = String(value);
+  },
+  get salesLoginOtp() {
+    return envString('SALES_LOGIN_OTP');
+  },
+  set salesLoginOtp(value: string) {
+    if (value === undefined || value === null || value === '') delete process.env.SALES_LOGIN_OTP;
+    else process.env.SALES_LOGIN_OTP = String(value);
+  },
+  get marketingLoginOtp() {
+    return envString('MARKETING_LOGIN_OTP');
+  },
+  set marketingLoginOtp(value: string) {
+    if (value === undefined || value === null || value === '') delete process.env.MARKETING_LOGIN_OTP;
+    else process.env.MARKETING_LOGIN_OTP = String(value);
+  },
+  get supportLoginOtp() {
+    return envString('SUPPORT_LOGIN_OTP');
+  },
+  set supportLoginOtp(value: string) {
+    if (value === undefined || value === null || value === '') delete process.env.SUPPORT_LOGIN_OTP;
+    else process.env.SUPPORT_LOGIN_OTP = String(value);
+  },
+  get superAdminLoginMobile() {
+    return envString('SUPERADMIN_LOGIN_MOBILE');
+  },
+  set superAdminLoginMobile(value: string) {
+    if (value === undefined || value === null || value === '') delete process.env.SUPERADMIN_LOGIN_MOBILE;
+    else process.env.SUPERADMIN_LOGIN_MOBILE = String(value);
+  },
+  get superAdminLoginOtp() {
+    return envString('SUPERADMIN_LOGIN_OTP');
+  },
+  set superAdminLoginOtp(value: string) {
+    if (value === undefined || value === null || value === '') delete process.env.SUPERADMIN_LOGIN_OTP;
+    else process.env.SUPERADMIN_LOGIN_OTP = String(value);
+  },
   otpRequestRateLimitPer10Min: optionalInt('OTP_REQUEST_RATE_LIMIT_PER_10_MIN', 5),
   /** OTP sends per identifier per hour, from any IP (stops IP rotation buying fresh codes). */
   otpIdentifierRateLimitPerHour: optionalInt('OTP_IDENTIFIER_RATE_LIMIT_PER_HOUR', 10),
