@@ -1,0 +1,96 @@
+/* Form step on the page surface (the 60): no card, no corners. Blocks are split by M3 dividers
+   (outline-variant) and spacing only. */
+.form-panel {
+  display: grid;
+  color: var(--md-sys-color-on-surface);
+}
+
+.form-panel > * {
+  padding-block: 24px;
+}
+
+.form-panel > :first-child {
+  padding-block-start: 0;
+}
+
+.form-panel > * + * {
+  border-block-start: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.form-panel__head {
+  display: grid;
+  gap: 4px;
+}
+
+.form-panel__heading,
+.form-panel__intro,
+.form-panel__note {
+  margin: 0;
+}
+
+.form-panel__intro,
+.form-panel__note {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.form-panel__section {
+  display: grid;
+  gap: 12px;
+}
+
+.form-panel__section-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.form-panel__section-icon {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  inline-size: 40px;
+  block-size: 40px;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background-color: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.form-panel__section-title {
+  flex: 1;
+  margin: 0;
+}
+
+.form-panel__section-action {
+  margin-inline-start: auto;
+}
+
+/* Content under an icon head lines up with the title, not the icon. */
+.form-panel__section-head:has(.form-panel__section-icon) ~ * {
+  padding-inline-start: 52px;
+}
+
+.form-panel__footer {
+  display: grid;
+  gap: 12px;
+}
+
+.form-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 12px;
+}
+
+@media (max-width: 599px) {
+  .form-panel > * {
+    padding-block: 20px;
+  }
+
+  .form-panel__section-head:has(.form-panel__section-icon) ~ * {
+    padding-inline-start: 0;
+  }
+
+  .form-panel__actions > * {
+    flex: 1 1 auto;
+  }
+}

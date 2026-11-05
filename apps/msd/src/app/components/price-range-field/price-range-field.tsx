@@ -14,12 +14,13 @@ export interface PriceRangeFieldProps {
   copy: { min: string; max: string; minLabel: string; maxLabel: string };
 }
 
+const clampTo = (n: number, bounds: { min: number; max: number }) => Math.min(Math.max(n, bounds.min), bounds.max);
+
 /** Clamps into `bounds`, keeps min <= max (clamping min down to max, never raising max), and
  *  sends `undefined` for a value equal to its bound (an unset filter). */
 function normalize(min: number, max: number, bounds: { min: number; max: number }): PriceRange {
-  const clamp = (n: number) => Math.min(Math.max(n, bounds.min), bounds.max);
-  let lo = clamp(min);
-  const hi = clamp(max);
+  let lo = clampTo(min, bounds);
+  const hi = clampTo(max, bounds);
   if (lo > hi) lo = hi;
   return {
     min: lo === bounds.min ? undefined : lo,
@@ -30,8 +31,10 @@ function normalize(min: number, max: number, bounds: { min: number; max: number 
 /** Price range filter: a labeled min/max range slider paired with editable number fields. Raw
  *  M3 elements (not the shared-ui React wrappers) so tests can drive them directly. */
 export function PriceRangeField({ bounds, value, onChange, copy }: PriceRangeFieldProps) {
-  const min = value.min ?? bounds.min;
-  const max = value.max ?? bounds.max;
+  // A URL price can fall outside bounds that narrowed with the facets (ST-25): show it clamped,
+  // with min never above max. The next change sends the clamped range.
+  const max = clampTo(value.max ?? bounds.max, bounds);
+  const min = Math.min(clampTo(value.min ?? bounds.min, bounds), max);
   // md-slider's handle names are properties (ariaLabelStart/End), not aria-* attributes; set them
   // directly so React's aria-prop validator never sees them.
   const sliderRef = useRef<HTMLElement & { ariaLabelStart?: string; ariaLabelEnd?: string }>(null);

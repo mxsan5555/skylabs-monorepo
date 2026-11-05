@@ -45,7 +45,7 @@ describe('llmsTxt', () => {
   it('lists categories and pages', () => {
     expect(txt).toContain(`## Categories\n\n- [Massage](${site}/category/massage)`);
     expect(txt).toContain('## Pages');
-    for (const p of ['/', '/explore', '/how-it-works', '/about', '/contact', '/become-vendor']) expect(txt).toContain(`(${site}${p})`);
+    for (const p of ['/', '/explore', '/how-it-works', '/about', '/contact', '/become-member']) expect(txt).toContain(`(${site}${p})`);
   });
 });
 

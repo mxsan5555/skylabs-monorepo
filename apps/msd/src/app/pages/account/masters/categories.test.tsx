@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Category } from '../../../../api/rbac/categories';
 import { ApiRequestError } from '../../../../api/rbac/client';
+import { CategoryManagement } from './categories';
 
 let grantedPermissions: Set<string>;
 
@@ -30,7 +31,6 @@ vi.mock('../../../../api/rbac/categories', async () => {
   };
 });
 
-import { CategoryManagement } from './categories';
 
 const TOP_CATEGORY: Category = {
   id: 'cat-1',

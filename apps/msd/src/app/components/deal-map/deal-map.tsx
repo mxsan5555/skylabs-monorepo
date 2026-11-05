@@ -14,10 +14,21 @@ const Engine = lazy(() =>
   resolveMapProvider(import.meta.env.VITE_MAP_PROVIDER) === 'google' ? import('./google-map') : import('./leaflet-map'),
 );
 
-/** Deal locations as price markers. The map engine loads only when this renders (browser only). */
-export function DealMap({ points, ariaLabel, loadingLabel }: { points: DealMapPoint[]; ariaLabel: string; loadingLabel: string }) {
+/** Deal locations as price markers. The map engine loads only when this renders (browser only).
+ *  `compact` is the short variant for a single place (deal page Location panel). */
+export function DealMap({
+  points,
+  ariaLabel,
+  loadingLabel,
+  compact = false,
+}: {
+  points: DealMapPoint[];
+  ariaLabel: string;
+  loadingLabel: string;
+  compact?: boolean;
+}) {
   return (
-    <div className="deal-map" role="region" aria-label={ariaLabel}>
+    <div className={compact ? 'deal-map deal-map--compact' : 'deal-map'} role="region" aria-label={ariaLabel}>
       <Suspense
         fallback={
           <div className="deal-map__loading">

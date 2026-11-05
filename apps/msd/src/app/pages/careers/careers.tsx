@@ -1,121 +1,71 @@
-import { useEffect, useState } from 'react';
-import { Icon } from '@skylabs-monorepo/shared-ui/react';
-import { getCatalogCareers, type CatalogCareers } from '../../../api/catalog';
-import { ApiRequestError } from '../../../api/rbac/client';
-import './careers.css';
+import { createElement } from 'react';
+import { getCatalogCareers } from '../../../api/catalog';
+import { useCmsContent } from '../../../hooks/use-cms-content';
+import { CardGrid } from '../../components/card-grid/card-grid';
+import { PageSection } from '../../components/page-section/page-section';
+import { SectionHead } from '../../components/section-head/section-head';
+import { StaticPage, StaticPageLoading } from '../../components/static-page/static-page';
+import { fillTemplate } from '../../../utils/format';
+import content from '../../../content.json';
 
-/** Public Careers page — `GET /catalog/careers` on mount. Renders the singleton
- *  `CareersPageContent` row's hero copy plus every `PUBLISHED` `CareersJobListing`, as saved from
- *  the CMS admin page (`pages/account/cms/careers.tsx`). Each job card shows an "Apply now" link
- *  when `applyUrl` is set, otherwise falls back to the freeform `applyInstructions` text — never
- *  both, matching how the admin form treats them as alternatives. */
+const t = content.careers;
+
+/** Careers: CMS hero and every published job (`GET /catalog/careers`). A job shows an Apply now
+ *  link when it has `applyUrl`, otherwise its `applyInstructions` text. */
 export function Careers() {
-  const [careers, setCareers] = useState<CatalogCareers | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError('');
-    getCatalogCareers()
-      .then(({ data }) => {
-        if (!cancelled) setCareers(data);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof ApiRequestError ? err.message : 'Could not load this page.');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (loading) {
-    return (
-      <main className="careers">
-        <title>Careers · MSD</title>
-        <p className="loading-state">Loading…</p>
-      </main>
-    );
-  }
-
-  if (error || !careers) {
-    return (
-      <main className="careers">
-        <title>Careers · MSD</title>
-        <p className="error-state" role="alert">{error || 'This page is not available right now.'}</p>
-      </main>
-    );
-  }
-
-  const { content, jobs } = careers;
-  const heading = content.heroTitle || 'Careers';
+  const { data, loading } = useCmsContent(getCatalogCareers);
+  const jobs = data?.jobs ?? [];
 
   return (
-    <main className="careers">
-      <title>{content.metaTitle || `${heading} · MSD`}</title>
-      <meta
-        name="description"
-        content={content.metaDescription || content.heroSubtitle || 'Explore open roles at MySpaDeal.'}
-      />
-      <article>
-        <header className="careers__hero">
-          <h1>{heading}</h1>
-          {content.heroSubtitle && <p className="careers__subtitle">{content.heroSubtitle}</p>}
-        </header>
-
-        {jobs.length === 0 ? (
-          <p className="empty-state">There are no open roles right now — check back soon.</p>
+    <StaticPage
+      path={t.path}
+      title={data?.content.heroTitle || t.title}
+      breadcrumb={t.breadcrumb}
+      description={data?.content.heroSubtitle || t.description}
+      metaTitle={data?.content.metaTitle}
+      metaDescription={data?.content.metaDescription}
+      cta={t.cta}
+    >
+      <PageSection tone="tint" aria-labelledby="careers-jobs">
+        <SectionHead id="careers-jobs" heading={t.jobsHeading} />
+        {loading ? (
+          <StaticPageLoading />
+        ) : jobs.length === 0 ? (
+          <p className="body-large text-muted">{t.empty}</p>
         ) : (
-          <section aria-label="Open roles">
-            <ul className="careers__list">
-              {jobs.map((job) => (
-                <li key={job.id}>
-                  <sky-card variant="outlined">
-                    <article className="job-card">
-                      <h2 className="job-card__title">{job.jobTitle}</h2>
-                      <p className="job-card__meta">
-                        <span className="job-card__meta-item">
-                          <Icon aria-hidden="true">apartment</Icon>
-                          {job.department}
-                        </span>
-                        <span className="job-card__meta-item">
-                          <Icon aria-hidden="true">location_on</Icon>
-                          {job.location}
-                        </span>
-                        <span className="job-card__meta-item">
-                          <Icon aria-hidden="true">work</Icon>
-                          {job.employmentType}
-                        </span>
-                      </p>
-                      <p className="job-card__description">{job.description}</p>
-                      {job.applyUrl ? (
-                        <a
-                          className="job-card__apply"
-                          href={job.applyUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <Icon aria-hidden="true">open_in_new</Icon>
-                          Apply now
-                        </a>
-                      ) : (
-                        job.applyInstructions && (
-                          <p className="job-card__apply-instructions">{job.applyInstructions}</p>
-                        )
-                      )}
-                    </article>
-                  </sky-card>
-                </li>
-              ))}
-            </ul>
-          </section>
+          <CardGrid layout="list">
+            {jobs.map((job) => (
+              <sky-card key={job.id} variant="outlined">
+                <article className="prose body-large" aria-labelledby={`job-${job.id}`}>
+                  <h3 id={`job-${job.id}`}>{job.jobTitle}</h3>
+                  <p className="body-medium text-muted">
+                    {[job.department, job.location, job.employmentType].filter(Boolean).join(' · ')}
+                  </p>
+                  <p>{job.description}</p>
+                  {job.responsibilities && (
+                    <>
+                      <h4>{t.responsibilities}</h4>
+                      <p>{job.responsibilities}</p>
+                    </>
+                  )}
+                  {job.requirements && (
+                    <>
+                      <h4>{t.requirements}</h4>
+                      <p>{job.requirements}</p>
+                    </>
+                  )}
+                  {job.applyUrl ? (
+                    createElement('md-filled-button', { href: job.applyUrl, 'aria-label': fillTemplate(t.applyLabel, { title: job.jobTitle }) }, t.apply)
+                  ) : (
+                    job.applyInstructions && <p>{job.applyInstructions}</p>
+                  )}
+                </article>
+              </sky-card>
+            ))}
+          </CardGrid>
         )}
-      </article>
-    </main>
+      </PageSection>
+    </StaticPage>
   );
 }
 

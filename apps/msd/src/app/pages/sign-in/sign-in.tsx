@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FilledButton, OutlinedButton, OutlinedTextField, Tabs, PrimaryTab, Icon, } from '@skylabs-monorepo/shared-ui/react';
 import content from '../../../content.json';
+import { Seo } from '../../seo/seo';
 import { googleSignInUrl, requestOtp } from '../../../api/rbac/auth';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { extractReturnUrl } from '../../../auth/role-routing';
-import logo from '../../../assets/logo.jpg';
-import logo2 from '../../../assets/logo2.jpg';
+import { LOGO_SRC as logo, LOGO_COMPACT_SRC as logo2 } from '../../../brand';
 import { validateEmail, validatePhone } from '../../../utils/validation';
 type Method = 'email' | 'phone';
 
@@ -68,8 +68,7 @@ export function SignIn() {
 
   return (
     <div className="auth-screen">
-      <title>{auth.pageTitle}</title>
-      <meta name="robots" content="noindex, nofollow" />
+      <Seo title={auth.pageTitle} description={content.meta.signIn.description} path={content.meta.signIn.path} noindex />
       <div className="auth-brand">
         <div className="auth-brand__logo">
           <img
@@ -83,8 +82,6 @@ export function SignIn() {
             className="auth-brand__logo-image auth-brand__logo-image--mobile"
           />
         </div>
-        <h1 className="auth-brand__title">{auth.brand.title}</h1>
-        <p className="auth-brand__subtitle">{auth.brand.subtitle}</p>
       </div>
 
       <div className="auth-card">

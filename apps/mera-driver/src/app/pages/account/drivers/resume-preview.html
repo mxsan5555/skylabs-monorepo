@@ -1,0 +1,24 @@
+<main class="resume-page">
+  <a [routerLink]="own?'/driver/profile':['/account/drivers',routeId,'details']">Back to {{own?'My Profile':'Driver Details'}}</a>
+  <header class="toolbar"><div><h1>Driver Resume</h1><p>A concise professional resume using saved facts.</p></div><div class="actions">@if(snapshot() && canDownload()){<button (click)="download()">Download PDF</button>}@if(snapshot() && canEdit()){<button (click)="editing.set(!editing())">{{editing()?'Hide editor':'Review / edit resume facts'}}</button>}<button (click)="reload()">Reload preview</button></div></header>
+  @if(error()){<p class="error" role="alert">{{error()}}</p>}
+  @if(snapshot();as resume){
+    @if(!own && resume.missing.length){<details class="notice"><summary>Missing source fields ({{resume.missing.length}})</summary>@for(field of resume.missing;track field){<p>{{field}}: Not provided</p>}<p>Missing lines and empty sections are omitted from the shareable PDF.</p></details>}
+    @if(editing() && canEdit()){
+      <form class="editor" (ngSubmit)="save()"><h2>Resume-specific facts</h2><p>Use confirmed facts only. These additions do not change KYC, onboarding or payment status. Identity, licence, selected vehicle types, qualification and languages come from the existing profile forms.</p>
+        <label>Professional summary (optional override)<textarea name="summary" maxlength="700" [(ngModel)]="profile.summary"></textarea></label>
+        <h3>Work experience</h3>
+        @for(entry of profile.workExperience;track $index;let i=$index){<fieldset><legend>Employment {{i+1}}</legend><div class="grid"><label>Job title<input [name]="'title'+i" required maxlength="160" [(ngModel)]="entry.jobTitle"></label><label>Employer<input [name]="'employer'+i" required maxlength="160" [(ngModel)]="entry.employer"></label><label>Location<input [name]="'location'+i" maxlength="160" [(ngModel)]="entry.location"></label><label>Start date<input [name]="'start'+i" type="month" [(ngModel)]="entry.startDate"></label><label>End date<input [name]="'end'+i" type="month" [disabled]="entry.current" [(ngModel)]="entry.endDate"></label><label class="check"><input [name]="'current'+i" type="checkbox" [(ngModel)]="entry.current" (ngModelChange)="currentChanged(i)">Current employment</label></div><label>Actual responsibilities (one per line; up to 6)<textarea [name]="'responsibilities'+i" [(ngModel)]="responsibilityTexts[i]"></textarea></label><button type="button" (click)="removeExperience(i)">Remove employment</button></fieldset>}
+        <button type="button" [disabled]="profile.workExperience.length>=6" (click)="addExperience()">Add employment</button>
+        <label>Additional key skills (one per line; up to 12)<textarea name="skills" [(ngModel)]="skillsText"></textarea></label>
+        <div class="checks">@for(skill of ['Manual','Automatic'];track skill){<label class="check"><input type="checkbox" [name]="skill" [ngModel]="hasTransmission(skill)" (ngModelChange)="setTransmission(skill,$event)">{{skill}}</label>}</div>
+        <h3>Education details</h3><div class="grid"><label>Institution<input name="institution" maxlength="160" [(ngModel)]="profile.education.institution"></label><label>Education location<input name="educationLocation" maxlength="160" [(ngModel)]="profile.education.location"></label><label>Year<input name="educationYear" pattern="[0-9]{4}|" maxlength="4" [(ngModel)]="profile.education.year"></label></div>
+        <label>Working availability<input name="availability" maxlength="180" [(ngModel)]="profile.availability"></label>
+        <div class="checks">@for(preference of ['Local','Outstation','Long-term'];track preference){<label class="check"><input type="checkbox" [name]="preference" [ngModel]="hasPreference(preference)" (ngModelChange)="setPreference(preference,$event)">{{preference}}</label>}</div>
+        <div class="checks"><label class="check"><input name="sharePhone" type="checkbox" [(ngModel)]="profile.sharePhone">Include saved contact number</label><label class="check"><input name="shareEmail" type="checkbox" [(ngModel)]="profile.shareEmail">Include saved email</label></div>
+        <label>Reason for this update<input name="reason" required minlength="3" maxlength="500" [(ngModel)]="reason"></label><div class="actions"><button type="submit" [disabled]="saving()">Save facts & refresh preview</button><button type="button" (click)="cancel()">Cancel</button></div>
+      </form>
+    }
+    <div class="paper"><iframe sandbox="allow-same-origin" title="Driver resume preview" [srcdoc]="preview()" (load)="resizePreview($event)"></iframe></div>
+  }@else{<p>Loading resume…</p>}
+</main>

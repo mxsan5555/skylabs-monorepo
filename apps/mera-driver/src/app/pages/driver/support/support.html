@@ -1,4 +1,4 @@
-<md-admin-page title="Support" subtitle="Need help? Here's how to reach us.">
+<md-admin-page title="Help & Support" subtitle="Need help? Here's how to reach us.">
   <section class="account-card">
     <div class="account-card__head">
       <h2>Get in touch</h2>
@@ -8,9 +8,49 @@
       driver account, please reach out to the staff member who onboarded you, or contact
       our office directly.
     </p>
-    <p class="otp-muted">
-      In-app support tickets aren't available yet — this page will let you raise and track a
-      request directly once that's ready.
-    </p>
+  </section>
+
+  <section class="account-card">
+    <div class="account-card__head">
+      <h2>Raise a request</h2>
+    </div>
+    @if (error()) {
+      <p class="otp-muted" role="alert">{{ error() }}</p>
+    }
+    @if (sent()) {
+      <p class="otp-muted" role="status">Request sent. We'll follow up here.</p>
+    }
+    <div class="address-form">
+      <md-outlined-text-field label="Subject" [value]="subject" (input)="subject = $any($event.target).value"></md-outlined-text-field>
+      <md-outlined-text-field label="Details" type="textarea" [value]="body" (input)="body = $any($event.target).value" class="span-2"></md-outlined-text-field>
+    </div>
+    <div>
+      <md-filled-button [disabled]="sending() || !subject.trim() || !body.trim()" (click)="submit()">
+        {{ sending() ? 'Sending…' : 'Send request' }}
+      </md-filled-button>
+    </div>
+  </section>
+
+  <section class="account-card">
+    <div class="account-card__head">
+      <h2>Your requests</h2>
+    </div>
+    @if (loading()) {
+      <p class="otp-muted">Loading…</p>
+    } @else if (tickets().length === 0) {
+      <p class="otp-muted">No support requests yet.</p>
+    } @else {
+      <ul class="driver-doc-list">
+        @for (t of tickets(); track t.id) {
+          <li class="driver-doc-card">
+            <div>
+              <div>{{ t.subject }}</div>
+              <div class="driver-doc-card__meta">{{ t.body }}</div>
+              <div class="driver-doc-card__meta">{{ t.createdAt | date: 'medium' }}</div>
+            </div>
+          </li>
+        }
+      </ul>
+    }
   </section>
 </md-admin-page>

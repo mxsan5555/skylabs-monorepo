@@ -9,6 +9,30 @@
   overflow-y: auto;
 }
 
+.rider-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.rider-chip {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  background-color: var(--md-sys-color-surface, #fff);
+  color: var(--md-sys-color-on-surface);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.rider-chip.selected {
+  border-color: var(--md-sys-color-primary, #33618d);
+  background-color: var(--md-sys-color-primary-container, #d0e4ff);
+  color: var(--md-sys-color-on-primary-container, #001d36);
+}
+
 /* Driver card — a selectable button row with photo, details and bookmark. */
 .driver-card {
   display: flex;
@@ -44,6 +68,13 @@
   border-radius: 50%;
   object-fit: cover;
   background-color: var(--md-sys-color-surface-container-high, #e7e8ee);
+}
+
+.driver-card__photo--placeholder {
+  display: grid;
+  place-items: center;
+  color: var(--md-sys-color-on-surface-variant, #44474a);
+  --md-icon-size: 28px;
 }
 
 .driver-card__body {

@@ -12,7 +12,7 @@ import {
   type SocialMediaLinkInput,
 } from '../../../../api/rbac/social-media';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { useToast } from '../../../../toast/toast-context';
+import { showSnackbar } from '../../../../snackbar/snackbar';
 import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { SocialMediaFormDialog } from './social-media-form-dialog';
 
@@ -41,7 +41,6 @@ const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 10, search: '' };
 export function SocialMediaList() {
   const { token, can } = useAuth();
   const { confirm, ConfirmDialog } = useConfirmDialog();
-  const { showToast } = useToast();
   const canCreate = can('cms.social-media', 'create');
   const canEdit = can('cms.social-media', 'edit');
   const canDelete = can('cms.social-media', 'delete');
@@ -83,13 +82,13 @@ export function SocialMediaList() {
     if (existing) {
       const { data } = await updateSocialMediaLink(token, existing.id, input);
       setLinks((prev) => prev.map((l) => (l.id === data.id ? data : l)));
-      showToast('Social media link updated.');
+      showSnackbar('Social media link updated.', { variant: 'success' });
       return data;
     }
     const { data } = await createSocialMediaLink(token, input);
     setLinks((prev) => [...prev, data]);
     setTotal((t) => t + 1);
-    showToast('Social media link created.');
+    showSnackbar('Social media link created.', { variant: 'success' });
     return data;
   };
 
@@ -98,11 +97,11 @@ export function SocialMediaList() {
     try {
       const { data } = await updateSocialMediaLink(token, link.id, { isActive: !link.isActive });
       setLinks((prev) => prev.map((l) => (l.id === data.id ? data : l)));
-      showToast(data.isActive ? 'Link activated.' : 'Link deactivated.');
+      showSnackbar(data.isActive ? 'Link activated.' : 'Link deactivated.', { variant: 'success' });
     } catch (err) {
       const msg = err instanceof ApiRequestError ? err.message : 'Could not change status.';
       setError(msg);
-      showToast(msg, 'error');
+      showSnackbar(msg, { variant: 'error' });
     }
   };
 
@@ -113,11 +112,11 @@ export function SocialMediaList() {
       await deleteSocialMediaLink(token, link.id);
       setLinks((prev) => prev.filter((l) => l.id !== link.id));
       setTotal((t) => t - 1);
-      showToast('Social media link deleted.');
+      showSnackbar('Social media link deleted.', { variant: 'success' });
     } catch (err) {
       const msg = err instanceof ApiRequestError ? err.message : 'Could not delete social media link.';
       setError(msg);
-      showToast(msg, 'error');
+      showSnackbar(msg, { variant: 'error' });
     }
   };
 

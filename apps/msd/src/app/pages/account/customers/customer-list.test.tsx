@@ -1,7 +1,7 @@
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import type { Customer } from '../../../../api/rbac/customers';
-import { CustomerList, customerStatusLabel } from './customer-list';
+import { CustomerList, customerDisplayName, customerStatusLabel } from './customer-list';
 
 const ACTIVE_CUSTOMER: Customer = {
   id: 'customer-1',
@@ -11,6 +11,9 @@ const ACTIVE_CUSTOMER: Customer = {
   status: 'active',
   createdAt: '2026-01-01T00:00:00Z',
   _count: { orders: 3 },
+  netPaid: 4500,
+  awaitingPayment: 0,
+  lastOrderAt: '2026-02-01T00:00:00Z',
 };
 
 function table(): HTMLElement {
@@ -65,6 +68,26 @@ describe('CustomerList', () => {
     expect(customerStatusLabel('active')).toBe('Active');
     expect(customerStatusLabel('inactive')).toBe('Inactive');
     expect(customerStatusLabel('blocked')).toBe('Suspended');
+  });
+
+  /**
+   * Feature: "Name not added" fallback — a brand-new OTP signup has no name-collection step, so
+   * `User.name` is seeded from the raw phone/email identifier itself (see msd-api's
+   * `auth.service.ts`, `name: identifier`). Showing that verbatim would just repeat the adjacent
+   * "Contact" line.
+   */
+  it('customerDisplayName falls back to "Name not added" when name duplicates phone or email, or is empty', () => {
+    expect(customerDisplayName({ name: '+919876543210', phone: '+919876543210', email: null })).toBe('Name not added');
+    expect(customerDisplayName({ name: 'priya@example.com', phone: null, email: 'priya@example.com' })).toBe('Name not added');
+    expect(customerDisplayName({ name: '', phone: null, email: null })).toBe('Name not added');
+    expect(customerDisplayName({ name: 'Priya Sharma', phone: '+919876543210', email: null })).toBe('Priya Sharma');
+  });
+
+  it('renders the "Customer / Contact" composite cell with the display-name fallback applied', () => {
+    renderList({ customers: [{ ...ACTIVE_CUSTOMER, name: ACTIVE_CUSTOMER.phone as string }] });
+    const rows = JSON.parse(table().getAttribute('rows') ?? '[]') as { Customer: string; 'Contact Detail': string }[];
+    expect(rows[0].Customer).toBe('Name not added');
+    expect(rows[0]['Contact Detail']).toContain(ACTIVE_CUSTOMER.phone);
   });
 
   it('hides the status-change actions entirely when canChangeStatus is false (default) — only "View" shows', () => {

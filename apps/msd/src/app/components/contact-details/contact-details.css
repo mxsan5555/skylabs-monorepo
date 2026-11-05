@@ -1,0 +1,39 @@
+/* Contact rows: tonal icon chip (30) + label + value; links use the global `.text-link`. */
+.contact-details {
+  font-style: normal;
+}
+.contact-details__list {
+  display: grid;
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.contact-details__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.contact-details__icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  inline-size: 48px;
+  block-size: 48px;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background-color: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+.contact-details__text {
+  display: grid;
+  gap: 2px;
+  min-inline-size: 0;
+  padding-block-start: 2px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.contact-details__value {
+  overflow-wrap: anywhere;
+}
+.contact-details__value:not(a) {
+  color: var(--md-sys-color-on-surface);
+}

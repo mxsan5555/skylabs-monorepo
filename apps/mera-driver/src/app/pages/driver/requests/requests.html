@@ -1,0 +1,37 @@
+<md-admin-page title="Trip Requests" subtitle="Pending trip offers awaiting your response.">
+  @if (loading()) {
+    <p class="otp-muted">Loading…</p>
+  } @else {
+    @if (error()) {
+      <p class="otp-muted" role="alert">{{ error() }}</p>
+    }
+    @if (offers().length === 0) {
+      <section class="account-card">
+        <p class="otp-muted">No pending trip requests right now.</p>
+      </section>
+    } @else {
+      @for (offer of offers(); track offer.id) {
+        <section class="account-card">
+          <div class="account-card__head">
+            <h2>{{ offer.booking.bookingCode }}</h2>
+            @if (offer.expiresAt) {
+              <span class="otp-muted">Respond by {{ offer.expiresAt | date: 'short' }}</span>
+            }
+          </div>
+          <p>Pickup: {{ offer.booking.pickupAddress ?? 'Not provided' }}</p>
+          <p>Drop: {{ offer.booking.dropAddress ?? 'Not provided' }}</p>
+          <p>Scheduled: {{ offer.booking.startsAt ? (offer.booking.startsAt | date: 'medium') : 'Not scheduled' }}</p>
+          @if (offer.booking.startsAt && offer.booking.endsAt) {
+            <p>Duration: {{ offer.booking.startsAt | date: 'shortTime' }} – {{ offer.booking.endsAt | date: 'shortTime' }}</p>
+          }
+          <p>Fare: {{ money(offer.booking.farePaise) }} · Your share: {{ money(offer.booking.driverSharePaise) }}</p>
+          <p class="otp-muted">Payment: {{ offer.booking.paymentMode ?? 'Not specified' }} · {{ offer.booking.paymentStatus ?? 'Pending' }}</p>
+          <div style="display:flex;gap:10px;">
+            <md-filled-button [disabled]="!!responding()" (click)="respond(offer, true)">{{ responding() === offer.id ? 'Accepting…' : 'Accept' }}</md-filled-button>
+            <md-outlined-button [disabled]="!!responding()" (click)="respond(offer, false)">Decline</md-outlined-button>
+          </div>
+        </section>
+      }
+    }
+  }
+</md-admin-page>

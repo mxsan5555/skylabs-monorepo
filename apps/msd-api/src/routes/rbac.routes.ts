@@ -1,31 +1,43 @@
 import { Router } from 'express';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { authenticate } from '../middleware/authenticate';
 import { requirePermission } from '../middleware/requirePermission';
 import { validateBody, validateParams, validateQuery } from '../middleware/validate';
+import { z } from 'zod';
 import { UuidParamSchema, PaginationQuerySchema } from '../schemas/common.schema';
 import {
-  RoleCreateSchema,
   RoleUpdateSchema,
   RoleStatusUpdateSchema,
-  RoleCloneSchema,
   RolePermissionsUpdateSchema,
   RoleWidgetsUpdateSchema,
   DashboardWidgetCreateSchema,
   UserListQuerySchema,
   UserCreateSchema,
   UserUpdateSchema,
+  MyAddressSchema,
   UserStatusUpdateSchema,
+  UserRoleSetSchema,
+  RoleConflictResolveSchema,
   ImpersonateRequestSchema,
 } from '../schemas/rbac.schema';
 import * as roleService from '../services/role.service';
 import * as widgetService from '../services/dashboard-widget.service';
 import * as userService from '../services/user.service';
+import {
+  assertCanAssignRole,
+  assertCanEditRole,
+  assertCanManageUser,
+  assertNotLastSuperAdmin,
+} from '../services/super-admin-guard.service';
 import { startImpersonation } from '../services/impersonation.service';
 import { getBootstrap } from '../services/bootstrap.service';
 import { writeAuditLog } from '../services/audit.service';
 import { prisma } from '../lib/prisma';
-import { sendData } from '../lib/http';
+import { sendData, sendError, ApiError } from '../lib/http';
+import { invalidatePermissionCache, isSuperAdminRoleSet, resolveGrantedPermissions } from '../services/permission-resolver.service';
+import { scopeFor } from '@skylabs-monorepo/shared-permissions';
+
+const UserRoleParamsSchema = UuidParamSchema;
 
 const router = Router();
 router.use(authenticate);
@@ -55,27 +67,16 @@ router.get('/roles', requirePermission('rbac.roles', 'view'), async (_req, res, 
   }
 });
 
-router.post(
-  '/roles',
-  requirePermission('rbac.roles', 'create'),
-  validateBody(RoleCreateSchema),
-  async (req, res, next) => {
-    try {
-      const role = await roleService.createRole(req.body);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'role.create',
-        targetType: 'Role',
-        targetId: role.id,
-        after: role,
-        ...requestMeta(req),
-      });
-      sendData(res, role, { status: 201 });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
+/**
+ * R1 (PLANNING §1, P2-15): the seven roles are fixed. Creating, cloning and deleting a role are
+ * refused for everyone who passes the permission check; a role's name, status and grants stay
+ * editable below.
+ */
+function roleManagementLocked(_req: Request, res: Response) {
+  sendError(res, 'ROLE_MANAGEMENT_LOCKED', 'Roles are fixed. Change what a role can do in its permissions instead.');
+}
+
+router.post('/roles', requirePermission('rbac.roles', 'create'), roleManagementLocked);
 
 router.patch(
   '/roles/:id',
@@ -85,6 +86,7 @@ router.patch(
   async (req, res, next) => {
     try {
       const before = await roleService.getRole(req.params.id);
+      await assertCanEditRole(req.user!.sub, req.params.id);
       const role = await roleService.updateRole(req.params.id, req.body);
       await writeAuditLog({
         actorUserId: req.user!.sub,
@@ -102,52 +104,9 @@ router.patch(
   },
 );
 
-router.delete(
-  '/roles/:id',
-  requirePermission('rbac.roles', 'delete'),
-  validateParams(UuidParamSchema),
-  async (req, res, next) => {
-    try {
-      const before = await roleService.getRole(req.params.id);
-      await roleService.deleteRole(req.params.id);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'role.delete',
-        targetType: 'Role',
-        targetId: req.params.id,
-        before,
-        ...requestMeta(req),
-      });
-      sendData(res, null);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
+router.delete('/roles/:id', requirePermission('rbac.roles', 'delete'), roleManagementLocked);
 
-router.post(
-  '/roles/:id/clone',
-  requirePermission('rbac.roles', 'create'),
-  validateParams(UuidParamSchema),
-  validateBody(RoleCloneSchema),
-  async (req, res, next) => {
-    try {
-      const clone = await roleService.cloneRole(req.params.id, req.body.key, req.body.name);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'role.clone',
-        targetType: 'Role',
-        targetId: clone.id,
-        before: { sourceRoleId: req.params.id },
-        after: clone,
-        ...requestMeta(req),
-      });
-      sendData(res, clone, { status: 201 });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
+router.post('/roles/:id/clone', requirePermission('rbac.roles', 'create'), roleManagementLocked);
 
 router.patch(
   '/roles/:id/status',
@@ -156,6 +115,7 @@ router.patch(
   validateBody(RoleStatusUpdateSchema),
   async (req, res, next) => {
     try {
+      await assertCanEditRole(req.user!.sub, req.params.id);
       const role = await roleService.setRoleStatus(req.params.id, req.body.isActive);
       await writeAuditLog({
         actorUserId: req.user!.sub,
@@ -165,6 +125,9 @@ router.patch(
         after: { isActive: role.isActive },
         ...requestMeta(req),
       });
+      // `resolveGrantedPermissionKeys` filters on `role.isActive` — a deactivated role's grants
+      // must stop applying immediately, not up to CACHE_TTL_MS later.
+      invalidatePermissionCache();
       sendData(res, role);
     } catch (err) {
       next(err);
@@ -186,13 +149,19 @@ router.get(
   validateParams(UuidParamSchema),
   async (req, res, next) => {
     try {
-      const permissionIds = await roleService.getRolePermissionIds(req.params.id);
-      sendData(res, { permissionIds });
+      const data =
+        await roleService.getRolePermissions(
+          req.params.id,
+        );
+
+      sendData(res, data);
     } catch (err) {
       next(err);
     }
   },
 );
+
+
 
 router.put(
   '/roles/:id/permissions',
@@ -201,21 +170,30 @@ router.put(
   validateBody(RolePermissionsUpdateSchema),
   async (req, res, next) => {
     try {
-      const result = await roleService.setRolePermissions(req.params.id, req.body.permissionIds);
+      const { permissions } = req.body;
+      await assertCanEditRole(req.user!.sub, req.params.id);
+      const result = await roleService.setRolePermissions(req.params.id, permissions);
+
       await writeAuditLog({
         actorUserId: req.user!.sub,
         action: 'role.permissions.set',
         targetType: 'Role',
         targetId: req.params.id,
-        after: { permissionIds: req.body.permissionIds },
+        after: { permissions },
         ...requestMeta(req),
       });
+      // Same reasoning as DELETE /roles/:id and PATCH /roles/:id/status just above — without
+      // this, every already-signed-in holder of this role (or anyone who signs in within the
+      // next CACHE_TTL_MS) keeps resolving the pre-save grant set from the resolver's cache,
+      // even though the Role Permission Matrix UI already shows the saved result as current.
+      invalidatePermissionCache();
       sendData(res, result);
-    } catch (err) {
-      next(err);
+    } catch (error) {
+      next(error);
     }
   },
 );
+
 
 router.get(
   '/roles/:id/widgets',
@@ -238,6 +216,7 @@ router.put(
   validateBody(RoleWidgetsUpdateSchema),
   async (req, res, next) => {
     try {
+      await assertCanEditRole(req.user!.sub, req.params.id);
       const result = await roleService.setRoleWidgets(req.params.id, req.body.widgets);
       await writeAuditLog({
         actorUserId: req.user!.sub,
@@ -283,7 +262,13 @@ router.post(
 router.get('/users', requirePermission('rbac.users', 'view'), validateQuery(UserListQuerySchema), async (req, res, next) => {
   try {
     const { page, pageSize, search, roleKey } = req.validatedQuery as ReturnType<typeof UserListQuerySchema.parse>;
-    const { items, total } = await userService.listUsers(page, pageSize, { search, roleKey });
+    const viewerIsSuperAdmin = await isSuperAdminRoleSet(req.user!.roles);
+    const { items, total } = await userService.listUsers(page, pageSize, {
+      search,
+      roleKey,
+      viewerId: req.user!.sub,
+      viewerIsSuperAdmin,
+    });
     sendData(res, items, { meta: { total, page, pageSize } });
   } catch (err) {
     next(err);
@@ -324,7 +309,24 @@ router.post(
 router.get('/users/me', async (req, res, next) => {
   try {
     const user = await userService.getUserOrThrow(req.user!.sub);
-    sendData(res, userService.serializeUser(user));
+    sendData(res, userService.serializeMe(user));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Item 2.2 (D37): the caller's own saved delivery address, pre-filled at checkout.
+router.put('/users/me/address', validateBody(MyAddressSchema), async (req, res, next) => {
+  try {
+    const user = await userService.saveMyAddress(req.user!.sub, req.body);
+    await writeAuditLog({
+      actorUserId: req.user!.sub,
+      action: 'user.address.update',
+      targetType: 'User',
+      targetId: user.id,
+      ...requestMeta(req),
+    });
+    sendData(res, user);
   } catch (err) {
     next(err);
   }
@@ -347,6 +349,22 @@ router.patch('/users/me', validateBody(UserUpdateSchema), async (req, res, next)
   }
 });
 
+router.get(
+  '/users/:id',
+  requirePermission('rbac.users', 'view'),
+  validateParams(UuidParamSchema),
+  async (req, res, next) => {
+    try {
+      await userService.assertStaffUserOrThrow(req.params.id);
+      const user = await userService.getUserOrThrow(req.params.id);
+      const viewerIsSuperAdmin = await isSuperAdminRoleSet(req.user!.roles);
+      sendData(res, userService.serializeUser(user, { includeLastLogin: viewerIsSuperAdmin || user.id === req.user!.sub }));
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 router.patch(
   '/users/:id',
   requirePermission('rbac.users', 'edit'),
@@ -354,6 +372,7 @@ router.patch(
   validateBody(UserUpdateSchema),
   async (req, res, next) => {
     try {
+      await assertCanManageUser(req.user!.sub, req.params.id);
       const user = await userService.updateUser(req.params.id, req.body);
       await writeAuditLog({
         actorUserId: req.user!.sub,
@@ -376,6 +395,8 @@ router.delete(
   validateParams(UuidParamSchema),
   async (req, res, next) => {
     try {
+      await assertCanManageUser(req.user!.sub, req.params.id);
+      await assertNotLastSuperAdmin(req.params.id);
       await userService.softDeleteUser(req.params.id);
       await writeAuditLog({
         actorUserId: req.user!.sub,
@@ -398,6 +419,8 @@ router.patch(
   validateBody(UserStatusUpdateSchema),
   async (req, res, next) => {
     try {
+      await assertCanManageUser(req.user!.sub, req.params.id);
+      if (req.body.status !== 'active') await assertNotLastSuperAdmin(req.params.id);
       const user = await userService.setUserStatus(req.params.id, req.body.status);
       await writeAuditLog({
         actorUserId: req.user!.sub,
@@ -414,42 +437,76 @@ router.patch(
   },
 );
 
-router.post(
-  '/users/:id/roles/:roleId',
+// Atomic single-role replace — the ONLY staff role-change endpoint (replaces the old
+// POST/DELETE /users/:id/roles/:roleId pair, which could leave a user holding more than one role
+// since assign/unassign were independent calls). `setStaffUserRole` rejects Customer/Member and
+// inactive roles server-side; `assertStaffUserOrThrow` keeps this from ever reaching an excluded
+// account. Cache invalidation matches every other role-affecting mutation in this file.
+router.put(
+  '/users/:id/role',
   requirePermission('rbac.users', 'assign'),
+  validateParams(UserRoleParamsSchema),
+  validateBody(UserRoleSetSchema),
   async (req, res, next) => {
     try {
-      await userService.assignRole(req.params.id, req.params.roleId);
+      await assertCanManageUser(req.user!.sub, req.params.id);
+      const givesSuperAdmin = await assertCanAssignRole(req.user!.sub, req.body.roleId);
+      if (!givesSuperAdmin) await assertNotLastSuperAdmin(req.params.id);
+      const before = await userService.getUserOrThrow(req.params.id);
+      const user = await userService.setStaffUserRole(req.params.id, req.body.roleId);
       await writeAuditLog({
         actorUserId: req.user!.sub,
-        action: 'user.role.assign',
+        action: 'user.role.set',
         targetType: 'User',
         targetId: req.params.id,
-        after: { roleId: req.params.roleId },
+        before: { roleIds: before.roles.map((r: { role: { id: string } }) => r.role.id) },
+        after: { roleId: req.body.roleId },
         ...requestMeta(req),
       });
-      sendData(res, { assigned: true });
+      invalidatePermissionCache();
+      sendData(res, user);
     } catch (err) {
       next(err);
     }
   },
 );
 
-router.delete(
-  '/users/:id/roles/:roleId',
+// ─── Role Conflicts (legacy multi-role accounts awaiting manual review) ──────────────────────
+// Gated the same as staff role assignment (`rbac.users:assign`) — resolving a flagged account IS
+// a role assignment, just not restricted to "eligible staff roles" since the correct resolution
+// may genuinely be Customer or Member (see `resolveAccountRoleConflict`'s own doc comment).
+
+router.get('/role-conflicts', requirePermission('rbac.users', 'assign'), async (_req, res, next) => {
+  try {
+    sendData(res, await userService.listRoleConflicts());
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put(
+  '/role-conflicts/:id',
   requirePermission('rbac.users', 'assign'),
+  validateParams(UserRoleParamsSchema),
+  validateBody(RoleConflictResolveSchema),
   async (req, res, next) => {
     try {
-      await userService.unassignRole(req.params.id, req.params.roleId);
+      await assertCanManageUser(req.user!.sub, req.params.id);
+      await assertCanAssignRole(req.user!.sub, req.body.roleId);
+      await assertNotLastSuperAdmin(req.params.id);
+      const before = await userService.getUserOrThrow(req.params.id);
+      const user = await userService.resolveAccountRoleConflict(req.params.id, req.body.roleId);
       await writeAuditLog({
         actorUserId: req.user!.sub,
-        action: 'user.role.unassign',
+        action: 'user.role_conflict.resolve',
         targetType: 'User',
         targetId: req.params.id,
-        before: { roleId: req.params.roleId },
+        before: { roleIds: before.roles.map((r: { role: { id: string } }) => r.role.id) },
+        after: { roleId: req.body.roleId },
         ...requestMeta(req),
       });
-      sendData(res, { assigned: false });
+      invalidatePermissionCache();
+      sendData(res, user);
     } catch (err) {
       next(err);
     }
@@ -462,6 +519,7 @@ router.post(
   validateParams(UuidParamSchema),
   async (req, res, next) => {
     try {
+      await assertCanManageUser(req.user!.sub, req.params.id);
       await userService.revokeAllSessionsForUser(req.params.id);
       await writeAuditLog({
         actorUserId: req.user!.sub,
@@ -483,6 +541,7 @@ router.post(
   validateParams(UuidParamSchema),
   async (req, res, next) => {
     try {
+      await assertCanManageUser(req.user!.sub, req.params.id);
       await userService.resetOtpForUser(req.params.id);
       await writeAuditLog({
         actorUserId: req.user!.sub,
@@ -498,6 +557,21 @@ router.post(
   },
 );
 
+// "Logs (login history)" — every authenticated role (Customer/Vendor/Superadmin included) can
+// always see their OWN login history, the same "own:VE"-style universal-self-access as My
+// Profile — never gated on `rbac.users:*`, so Marketing/Sales/Support/Member (who hold none of
+// that) still reach this. Registered before the `:id` variant below for the same Express
+// route-ordering reason as `/users/me` vs `/users/:id`.
+router.get('/users/me/login-history', validateQuery(PaginationQuerySchema), async (req, res, next) => {
+  try {
+    const { page, pageSize } = req.validatedQuery as ReturnType<typeof PaginationQuerySchema.parse>;
+    const { items, total } = await userService.getLoginHistory(req.user!.sub, page, pageSize);
+    sendData(res, items, { meta: { total, page, pageSize } });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get(
   '/users/:id/login-history',
   requirePermission('rbac.users', 'view'),
@@ -505,6 +579,15 @@ router.get(
   validateQuery(PaginationQuerySchema),
   async (req, res, next) => {
     try {
+      await userService.assertStaffUserOrThrow(req.params.id);
+      // Admin's Staff Users:view is deliberately "own login history only" (see the Logs row of
+      // the permission matrix) — only an actual Superadmin may read a DIFFERENT user's login
+      // history through this admin-on-behalf route; everyone else gets the same genuine
+      // not-found a non-existent id would, never a tell-tale 403 (don't leak "this id exists but
+      // you can't see it").
+      if (req.params.id !== req.user!.sub && !(await isSuperAdminRoleSet(req.user!.roles))) {
+        throw new ApiError('NOT_FOUND', 'User not found');
+      }
       const { page, pageSize } = req.validatedQuery as ReturnType<typeof PaginationQuerySchema.parse>;
       const { items, total } = await userService.getLoginHistory(req.params.id, page, pageSize);
       sendData(res, items, { meta: { total, page, pageSize } });
@@ -520,6 +603,7 @@ router.get(
   validateParams(UuidParamSchema),
   async (req, res, next) => {
     try {
+      await userService.assertStaffUserOrThrow(req.params.id);
       sendData(res, await userService.getSessions(req.params.id));
     } catch (err) {
       next(err);
@@ -529,11 +613,22 @@ router.get(
 
 // ─── Audit logs ──────────────────────────────────────────────────────────────
 
+/**
+ * PLANNING.md §1.2's Logs row: `V A` for Super Admin, `V O` (own actions only) for everyone
+ * else. `rbac.audit-logs:view`'s scope is resolved per-caller (see `SCOPE_ENFORCED_PERMISSION_
+ * KEYS` in role.service.ts — this is the one key it's real for today) rather than hardcoded to
+ * a role-name check.
+ */
 router.get('/audit-logs', requirePermission('rbac.audit-logs', 'view'), validateQuery(PaginationQuerySchema), async (req, res, next) => {
   try {
     const targetUserId = typeof req.query.targetUserId === 'string' ? req.query.targetUserId : undefined;
     const { page, pageSize } = req.validatedQuery as ReturnType<typeof PaginationQuerySchema.parse>;
-    const where = targetUserId ? { targetType: 'User', targetId: targetUserId } : {};
+    const { scopes } = await resolveGrantedPermissions(req.user!.roles);
+    const ownScopeOnly = scopeFor(scopes, 'rbac.audit-logs', 'view') === 'OWN';
+    const where = {
+      ...(targetUserId ? { targetType: 'User', targetId: targetUserId } : {}),
+      ...(ownScopeOnly ? { actorUserId: req.user!.sub } : {}),
+    };
     const [items, total] = await Promise.all([
       prisma.auditLog.findMany({
         where,

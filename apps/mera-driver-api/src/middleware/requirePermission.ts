@@ -19,7 +19,7 @@ export function requirePermission(menuKey: string, action: PermissionAction = 'v
     }
 
     try {
-      const granted = await resolveEffectivePermissionsForUser(req.user.sub, req.user.roles);
+      const granted = await resolveEffectivePermissionsForUser(req.user.sub, req.user.roles, keys => { req.user!.roles = keys; });
       if (!can(granted, menuKey, action)) {
         res.status(403).json({
           data: null,

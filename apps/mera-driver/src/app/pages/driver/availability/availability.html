@@ -1,0 +1,44 @@
+<md-admin-page title="Availability" subtitle="Go online to start receiving trip requests.">
+  @if (loading()) {
+    <p class="otp-muted">Loading…</p>
+  } @else {
+    @if (error()) {
+      <p class="otp-muted" role="alert">{{ error() }}</p>
+    }
+    <section class="account-card">
+      <div class="account-card__head">
+        <h2>Status</h2>
+        <sky-badge [variant]="online() ? 'primary' : 'secondary'">{{ online() ? 'Online' : 'Offline' }}</sky-badge>
+      </div>
+      <div>
+        <md-filled-button [disabled]="toggling()" (click)="toggle()">
+          {{ toggling() ? 'Updating…' : online() ? 'Go offline' : 'Go online' }}
+        </md-filled-button>
+      </div>
+      @if (online()) {
+        @if (locationStatus() === 'sharing') {
+          <p class="otp-muted">Sharing your live location with customers on active trips@if (lastLocationSentAt()) { · last sent {{ lastLocationSentAt() | date: 'shortTime' }} }.</p>
+        } @else if (locationStatus() === 'denied') {
+          <p class="otp-muted" role="alert">Location access was denied — customers won't see your live position. Enable location access for this site to share it.</p>
+        } @else if (locationStatus() === 'unsupported') {
+          <p class="otp-muted">Live location isn't supported on this device/browser.</p>
+        }
+      }
+    </section>
+
+    <section class="account-card">
+      <div class="account-card__head">
+        <h2>Trip eligibility</h2>
+        <sky-badge [variant]="eligible() ? 'primary' : 'error'">{{ eligible() ? 'Ready' : 'Not Ready' }}</sky-badge>
+      </div>
+      @if (!eligible()) {
+        <p class="otp-muted">Going online does not bypass these requirements — you still won't receive trip requests until they're resolved.</p>
+        <ul class="driver-completion__list">
+          @for (reason of blockers(); track reason) { <li>{{ reason }}</li> }
+        </ul>
+      } @else {
+        <p class="otp-muted">No blockers — you're eligible to receive trip requests while online.</p>
+      }
+    </section>
+  }
+</md-admin-page>

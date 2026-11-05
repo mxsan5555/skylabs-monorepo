@@ -17,7 +17,7 @@ import {
   type HowItWorksStepInput,
 } from '../../../../api/rbac/how-it-works';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { useToast } from '../../../../toast/toast-context';
+import { showSnackbar } from '../../../../snackbar/snackbar';
 import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { extractHowItWorksStepFieldErrors, extractSiteContentFieldErrors, type HowItWorksStepFieldKey } from './field-errors';
 
@@ -140,7 +140,6 @@ function StepFormDialog({
 export function HowItWorksPage() {
   const { token, can } = useAuth();
   const { confirm, ConfirmDialog } = useConfirmDialog();
-  const { showToast } = useToast();
   const canEdit = can('cms.how-it-works', 'edit');
   const canCreate = can('cms.how-it-works', 'create');
   const canDelete = can('cms.how-it-works', 'delete');
@@ -214,7 +213,7 @@ export function HowItWorksPage() {
     try {
       const { data } = await updateHowItWorksContent(token, payload);
       setContent(data);
-      showToast('How It Works content saved.');
+      showSnackbar('How It Works content saved.', { variant: 'success' });
     } catch (err) {
       const fields = extractSiteContentFieldErrors<ContentFieldKey>(err);
       if (fields) {
@@ -223,7 +222,7 @@ export function HowItWorksPage() {
       } else {
         const msg = err instanceof ApiRequestError ? err.message : 'Could not save How It Works content.';
         setContentError(msg);
-        showToast(msg, 'error');
+        showSnackbar(msg, { variant: 'error' });
       }
     } finally {
       contentSubmittingRef.current = false;
@@ -235,12 +234,12 @@ export function HowItWorksPage() {
     if (existing) {
       const { data } = await updateHowItWorksStep(token, existing.id, input);
       setSteps((prev) => prev.map((s) => (s.id === data.id ? data : s)));
-      showToast('Step updated.');
+      showSnackbar('Step updated.', { variant: 'success' });
       return data;
     }
     const { data } = await createHowItWorksStep(token, input);
     setSteps((prev) => [...prev, data]);
-    showToast('Step added.');
+    showSnackbar('Step added.', { variant: 'success' });
     return data;
   };
 
@@ -250,11 +249,11 @@ export function HowItWorksPage() {
     try {
       await deleteHowItWorksStep(token, step.id);
       setSteps((prev) => prev.filter((s) => s.id !== step.id));
-      showToast('Step deleted.');
+      showSnackbar('Step deleted.', { variant: 'success' });
     } catch (err) {
       const msg = err instanceof ApiRequestError ? err.message : 'Could not delete step.';
       setStepsError(msg);
-      showToast(msg, 'error');
+      showSnackbar(msg, { variant: 'error' });
     }
   };
 
@@ -270,7 +269,7 @@ export function HowItWorksPage() {
       setSteps(steps); // revert on failure
       const msg = err instanceof ApiRequestError ? err.message : 'Could not reorder steps.';
       setStepsError(msg);
-      showToast(msg, 'error');
+      showSnackbar(msg, { variant: 'error' });
     }
   };
 

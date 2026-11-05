@@ -1,98 +1,94 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ApiRequestError } from '../../../api/rbac/client';
 import type { CatalogWebsitePage } from '../../../api/catalog';
+import { WebsitePage } from './website-page';
+import content from '../../../content.json';
 
-const getCatalogPageMock = vi.fn();
+const { getCatalogPageMock } = vi.hoisted(() => ({ getCatalogPageMock: vi.fn() }));
 
 vi.mock('../../../api/catalog', async () => {
   const actual = await vi.importActual<typeof import('../../../api/catalog')>('../../../api/catalog');
-  return {
-    ...actual,
-    getCatalogPage: (...args: unknown[]) => getCatalogPageMock(...args),
-  };
+  return { ...actual, getCatalogPage: getCatalogPageMock };
 });
-
-import { WebsitePage } from './website-page';
 
 const PAGE: CatalogWebsitePage = {
   id: 'page-1',
-  slug: 'privacy-policy',
-  title: 'Privacy Policy',
+  slug: 'privacy',
+  title: 'Privacy Policy (CMS)',
   content: [
     { type: 'heading', text: 'Introduction' },
     { type: 'paragraph', text: 'We respect your privacy.' },
   ],
   metaTitle: null,
   metaDescription: null,
+  updatedAt: '2026-10-14T09:56:03.148Z',
 };
+
+const firstFallbackHeading = (key: 'privacy' | 'terms') => (content.legalPages[key].body[0] as { text: string }).text;
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 /**
- * Feature: public legal page (one reusable component for privacy/terms/accessibility/cookies)
- * Scenario: `GET /catalog/pages/:slug` on mount + slug change, rendering the title and
- * `content: BlogBlock[]` body exactly as saved from the CMS admin Legal Pages screen.
- *
- * Given: a mocked `getCatalogPage` response
- * When: the page mounts with a given `slug` prop
- * Then: `getCatalogPage` is called with that slug and the title/body render
+ * Feature: one public legal page for privacy / terms / accessibility / cookies (StaticPage frame)
+ * Scenario: `GET /catalog/pages/:slug` (slug = page key) on mount and page change; the CMS body
+ * wins once an admin writes one, otherwise the content.json default renders.
  *
  * Edge cases:
- * - a page with empty `content` renders an empty-state message, not a blank body
- * - an unknown/draft slug (404 NOT_FOUND) renders a distinct "could not be found" message
- * - a non-404 fetch failure renders its own error message
+ * - the seeded "Content coming soon." placeholder counts as no content
+ * - a 404 or network failure renders the default, never an error
  */
-describe('WebsitePage (public page)', () => {
+describe('WebsitePage (legal pages)', () => {
   it('renders a loading state before the fetch resolves', () => {
-    getCatalogPageMock.mockReturnValue(new Promise(() => {})); // never resolves
-    render(<WebsitePage slug="privacy-policy" />);
+    getCatalogPageMock.mockReturnValue(new Promise(vi.fn()));
+    render(<MemoryRouter><WebsitePage page="privacy" /></MemoryRouter>);
 
-    expect(screen.getByText('Loading…')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toBe(content.staticPage.loading);
   });
 
-  it('fetches by slug and renders the title and body blocks on successful load', async () => {
+  it('fetches by page key and renders the CMS title, body and last-updated date', async () => {
     getCatalogPageMock.mockResolvedValue({ data: PAGE });
-    render(<WebsitePage slug="privacy-policy" />);
+    render(<MemoryRouter><WebsitePage page="privacy" /></MemoryRouter>);
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' })).toBeTruthy();
-    expect(getCatalogPageMock).toHaveBeenCalledWith('privacy-policy');
-    expect(screen.getByRole('heading', { level: 2, name: 'Introduction' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 2, name: 'Introduction' })).toBeTruthy();
+    expect(getCatalogPageMock).toHaveBeenCalledWith('privacy');
+    expect(screen.getByRole('heading', { level: 1, name: 'Privacy Policy (CMS)' })).toBeTruthy();
     expect(screen.getByText('We respect your privacy.')).toBeTruthy();
+    expect(document.querySelector('time')?.getAttribute('dateTime')).toBe(PAGE.updatedAt);
   });
 
-  it('re-fetches when the slug prop changes', async () => {
-    getCatalogPageMock.mockResolvedValue({ data: PAGE });
-    const { rerender } = render(<WebsitePage slug="privacy-policy" />);
-    await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' });
+  it('renders the default body when the CMS row only holds the seeded placeholder', async () => {
+    getCatalogPageMock.mockResolvedValue({
+      data: { ...PAGE, content: [{ type: 'paragraph', text: content.legalPages.placeholder }] },
+    });
+    render(<MemoryRouter><WebsitePage page="privacy" /></MemoryRouter>);
 
-    getCatalogPageMock.mockResolvedValue({ data: { ...PAGE, slug: 'terms-of-service', title: 'Terms of Service', content: [] } });
-    rerender(<WebsitePage slug="terms-of-service" />);
-
-    expect(await screen.findByRole('heading', { level: 1, name: 'Terms of Service' })).toBeTruthy();
-    expect(getCatalogPageMock).toHaveBeenLastCalledWith('terms-of-service');
+    expect(await screen.findByRole('heading', { level: 2, name: firstFallbackHeading('privacy') })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 1, name: content.legalPages.privacy.title })).toBeTruthy();
+    expect(screen.queryByText(content.legalPages.placeholder)).toBeNull();
+    expect(document.querySelector('time')).toBeNull();
   });
 
-  it('renders an empty-state message when the page has no content yet (empty state)', async () => {
-    getCatalogPageMock.mockResolvedValue({ data: { ...PAGE, content: [] } });
-    render(<WebsitePage slug="privacy-policy" />);
-
-    expect(await screen.findByText('This page has no content yet.')).toBeTruthy();
-  });
-
-  it('renders a distinct "could not be found" message for a 404 NOT_FOUND (unknown or draft slug)', async () => {
+  it('renders the default body for a 404 instead of an error', async () => {
     getCatalogPageMock.mockRejectedValue(new ApiRequestError('NOT_FOUND', 'Page not found', 404));
-    render(<WebsitePage slug="does-not-exist" />);
+    render(<MemoryRouter><WebsitePage page="terms" /></MemoryRouter>);
 
-    expect(await screen.findByText('This page could not be found.')).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 2, name: firstFallbackHeading('terms') })).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  it('renders a generic error message instead of crashing for a non-404 failure (error state)', async () => {
-    getCatalogPageMock.mockRejectedValue(new Error('network down'));
-    render(<WebsitePage slug="privacy-policy" />);
+  it('re-fetches when the page changes', async () => {
+    getCatalogPageMock.mockResolvedValue({ data: PAGE });
+    const { rerender } = render(<MemoryRouter><WebsitePage page="privacy" /></MemoryRouter>);
+    await screen.findByRole('heading', { level: 1, name: 'Privacy Policy (CMS)' });
 
-    expect(await screen.findByRole('alert')).toBeTruthy();
+    getCatalogPageMock.mockResolvedValue({ data: { ...PAGE, slug: 'terms', title: 'Terms (CMS)' } });
+    rerender(<MemoryRouter><WebsitePage page="terms" /></MemoryRouter>);
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Terms (CMS)' })).toBeTruthy();
+    expect(getCatalogPageMock).toHaveBeenLastCalledWith('terms');
   });
 });

@@ -5,6 +5,7 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { isDualRoleUser, resolvePostLoginPath, setExperienceMode } from '../../../auth/role-routing';
 import './choose-experience.css';
 import content from '../../../content.json';
+import { Seo } from '../../seo/seo';
 /**
  * "Continue as" chooser — the only place a user who holds both `customer` and `vendor` roles
  * (self-registering as a vendor adds the role, it never removes `customer`, so this is the
@@ -37,8 +38,12 @@ export function ChooseExperience() {
   if (loading || !bootstrap || !isDualRoleUser(bootstrap)) return null;
   return (
     <div className="auth-screen">
-      <title>{content.chooseExperience.pageTitle}</title>
-      <meta name="robots" content="noindex, nofollow" />
+      <Seo
+        title={content.chooseExperience.pageTitle}
+        description={content.meta.chooseExperience.description}
+        path={content.meta.chooseExperience.path}
+        noindex
+      />
       <div className="auth-brand">
         <div className="auth-brand__logo">
           <Icon aria-hidden="true">spa</Icon>

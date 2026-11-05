@@ -2,14 +2,22 @@ import { Router } from 'express';
 import { passport } from '../lib/passport';
 import { authenticate } from '../middleware/authenticate';
 import { validateBody } from '../middleware/validate';
-import { otpRequestRateLimiter } from '../middleware/rateLimiter';
+import {
+  otpDummyIdentifierVerifyRateLimiter,
+  otpDummyVerifyRateLimiter,
+  otpIdentifierRateLimiter,
+  otpRequestRateLimiter,
+} from '../middleware/rateLimiter';
 import { OtpRequestSchema, OtpVerifySchema, RefreshRequestSchema } from '../schemas/auth.schema';
 import { requestOtp, verifyOtp } from '../services/otp.service';
 import { loginWithIdentifier } from '../services/auth.service';
 import { normalizeIdentifier } from '../lib/normalizeIdentifier';
 import { rotateRefreshToken, revokeRefreshToken, revokeAllRefreshTokens } from '../services/token.service';
 import { signAccessToken } from '../lib/jwt';
-import { sendData } from '../lib/http';
+import { sendData, ApiError } from '../lib/http';
+import { prisma } from '../lib/prisma';
+import { getMemberAccessState } from '../services/member-access.service';
+import { suspendedMessage } from '../lib/member-messages';
 
 const router = Router();
 
@@ -17,7 +25,22 @@ function requestMeta(req: import('express').Request) {
   return { ip: req.ip, userAgent: req.headers['user-agent'] };
 }
 
-router.post('/otp/request', otpRequestRateLimiter, validateBody(OtpRequestSchema), async (req, res, next) => {
+/** Same bar `authenticate.ts`/`auth.service.ts#assertUserMayLogIn` already enforce at request
+ *  time and at login — re-checked here too so a suspended/deactivated account can't silently
+ *  regain a working access token through a refresh it's still technically able to call (the
+ *  refresh route runs before `authenticate`, since it has no access token to verify yet). */
+async function assertRefreshedUserMayContinue(userId: string): Promise<void> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { status: true, deletedAt: true } });
+  if (!user || user.deletedAt || user.status !== 'active') {
+    throw new ApiError('FORBIDDEN', 'This account has been disabled. Please contact support.');
+  }
+  const access = await getMemberAccessState(userId);
+  if (access.kind === 'blocked') {
+    throw new ApiError('MEMBER_SUSPENDED', suspendedMessage(access.reason));
+  }
+}
+
+router.post('/otp/request', otpRequestRateLimiter, otpIdentifierRateLimiter, validateBody(OtpRequestSchema), async (req, res, next) => {
   try {
     const { purpose } = req.body as { identifier: string; purpose: 'login' | 'signup' | 'change_phone' | 'change_email' };
     const identifier = normalizeIdentifier(req.body.identifier as string);
@@ -29,7 +52,12 @@ router.post('/otp/request', otpRequestRateLimiter, validateBody(OtpRequestSchema
   }
 });
 
-router.post('/otp/verify', validateBody(OtpVerifySchema), async (req, res, next) => {
+router.post(
+  '/otp/verify',
+  otpDummyVerifyRateLimiter,
+  otpDummyIdentifierVerifyRateLimiter,
+  validateBody(OtpVerifySchema),
+  async (req, res, next) => {
   try {
     const { otp } = req.body as { identifier: string; otp: string };
     const identifier = normalizeIdentifier(req.body.identifier as string);
@@ -39,7 +67,8 @@ router.post('/otp/verify', validateBody(OtpVerifySchema), async (req, res, next)
   } catch (err) {
     next(err);
   }
-});
+  },
+);
 
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'], session: false }));
 
@@ -63,6 +92,13 @@ router.post('/refresh', validateBody(RefreshRequestSchema), async (req, res, nex
   try {
     const { refreshToken } = req.body as { refreshToken: string };
     const rotated = await rotateRefreshToken(refreshToken, requestMeta(req));
+    try {
+      await assertRefreshedUserMayContinue(rotated.userId);
+    } catch (err) {
+      // The session we just rotated to is for a now-blocked account — don't leave it live.
+      await revokeAllRefreshTokens(rotated.userId);
+      throw err;
+    }
     const accessToken = signAccessToken({ sub: rotated.userId, roles: rotated.roles, app: 'msd' });
     sendData(res, { accessToken, refreshToken: rotated.token });
   } catch (err) {

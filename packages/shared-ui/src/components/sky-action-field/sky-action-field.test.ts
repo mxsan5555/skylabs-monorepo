@@ -94,4 +94,38 @@ describe('sky-action-field', () => {
     expect(input(el).disabled).toBe(true);
     expect(el.shadowRoot?.querySelector('md-filled-button')?.hasAttribute('disabled')).toBe(true);
   });
+
+  it('renders no clear button and no combobox role by default', async () => {
+    const el = await create({ value: 'spa' });
+    expect(el.shadowRoot?.querySelector('md-icon-button')).toBeNull();
+    expect(input(el).hasAttribute('role')).toBe(false);
+    expect(input(el).hasAttribute('aria-expanded')).toBe(false);
+  });
+
+  it('clearable: shows a named clear button only with a value; clearing fires input and refocuses', async () => {
+    const el = await create({ clearable: true, clearLabel: 'Clear search' });
+    expect(el.shadowRoot?.querySelector('md-icon-button')).toBeNull();
+    el.value = 'spa';
+    await el.updateComplete;
+    const clear = el.shadowRoot?.querySelector('md-icon-button') as HTMLElement;
+    expect(clear.getAttribute('aria-label')).toBe('Clear search');
+    const onInput = vi.fn();
+    el.addEventListener('input', onInput);
+    clear.click();
+    await el.updateComplete;
+    expect(el.value).toBe('');
+    expect(onInput).toHaveBeenCalledTimes(1);
+    expect(el.shadowRoot?.activeElement).toBe(input(el));
+    expect(el.shadowRoot?.querySelector('md-icon-button')).toBeNull();
+  });
+
+  it('combobox: exposes the input as a list combobox that follows expanded', async () => {
+    const el = await create({ combobox: true });
+    expect(input(el).getAttribute('role')).toBe('combobox');
+    expect(input(el).getAttribute('aria-autocomplete')).toBe('list');
+    expect(input(el).getAttribute('aria-expanded')).toBe('false');
+    el.expanded = true;
+    await el.updateComplete;
+    expect(input(el).getAttribute('aria-expanded')).toBe('true');
+  });
 });

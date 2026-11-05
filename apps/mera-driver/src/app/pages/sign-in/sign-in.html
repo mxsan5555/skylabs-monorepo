@@ -30,6 +30,7 @@
       >
         <md-icon aria-hidden="true">badge</md-icon> Driver
       </button>
+      <button type="button" class="auth-role__btn" [class.active]="role() === 'staff'" [attr.aria-pressed]="role() === 'staff'" (click)="setRole('staff')"><md-icon aria-hidden="true">admin_panel_settings</md-icon> Staff</button>
     </div>
 
     <h2>{{ role() === 'driver' ? 'Driver sign in' : 'Sign in' }}</h2>

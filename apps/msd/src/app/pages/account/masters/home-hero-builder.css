@@ -1,0 +1,206 @@
+/* Home hero slider builder (PLANNING §7, D28): ordered slides beside the Add panel. Tokens only. */
+.hero-builder__back {
+  margin-inline-start: -12px;
+}
+
+.hero-builder__progress {
+  display: grid;
+  gap: 8px;
+  max-inline-size: 640px;
+  margin-block-end: 24px;
+}
+
+.hero-builder__progress-label {
+  margin: 0;
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-sys-typescale-title-small-size, 0.875rem);
+  font-weight: 500;
+}
+
+.hero-builder__progress-note {
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-small-size, 0.75rem);
+}
+
+.hero-builder__tabs {
+  margin-block-end: 16px;
+}
+
+.hero-builder__panes {
+  display: grid;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .hero-builder__panes {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+  }
+
+  .hero-builder__add {
+    position: sticky;
+    inset-block-start: 16px;
+  }
+}
+
+.hero-builder__pane {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  min-inline-size: 0;
+  padding: 20px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-large);
+  background-color: var(--md-sys-color-surface-container-low);
+}
+
+.hero-builder__pane-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.hero-builder__pane-head h2 {
+  margin: 0;
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-sys-typescale-title-medium-size, 1rem);
+  font-weight: 500;
+}
+
+.hero-builder__hint {
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-small-size, 0.75rem);
+}
+
+.slide-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.slide-card {
+  display: grid;
+  grid-template-columns: auto 1.5rem 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 4px;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background-color: var(--md-sys-color-surface);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--md-sys-color-shadow) 14%, transparent);
+  transition:
+    box-shadow 150ms cubic-bezier(0.2, 0, 0, 1),
+    opacity 150ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.slide-card--off .slide-card__text,
+.slide-card--off .item-thumb {
+  opacity: 0.55;
+}
+
+.slide-card--dragging {
+  opacity: 0.4;
+}
+
+.slide-card--over {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
+.slide-card__handle {
+  display: grid;
+  place-items: center;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: grab;
+}
+
+.slide-card__handle:active {
+  cursor: grabbing;
+}
+
+.slide-card__pos {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-label-large-size, 0.875rem);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.slide-card__text {
+  display: grid;
+  gap: 2px;
+  min-inline-size: 0;
+}
+
+.slide-card__title {
+  overflow: hidden;
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-sys-typescale-title-small-size, 0.875rem);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slide-card__meta {
+  overflow: hidden;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-small-size, 0.75rem);
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slide-card__reason {
+  color: var(--md-sys-color-error);
+  font-size: var(--md-sys-typescale-body-small-size, 0.75rem);
+}
+
+.slide-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.slide-card__actions md-switch {
+  margin-inline-end: 8px;
+}
+
+.slide-list__empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 40px 16px;
+  border: 1px dashed var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-medium);
+  color: var(--md-sys-color-on-surface-variant);
+  text-align: center;
+}
+
+.slide-list__empty p {
+  margin: 0;
+  max-inline-size: 40ch;
+}
+
+@media (max-width: 600px) {
+  .slide-card {
+    grid-template-columns: auto 48px minmax(0, 1fr);
+  }
+
+  .slide-card__pos {
+    display: none;
+  }
+
+  .slide-card__actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide-card {
+    transition: none;
+  }
+}

@@ -15,6 +15,8 @@ declare global {
       // versions and can't be reassigned in place). Callers cast this to the specific
       // schema's inferred shape, e.g. `req.validatedQuery as ReturnType<typeof FooSchema.parse>`.
       validatedQuery?: unknown;
+      /** Set by middleware/requestLogger.ts; also sent back as `X-Request-Id`. */
+      requestId?: string;
     }
   }
 }

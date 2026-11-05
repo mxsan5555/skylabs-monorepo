@@ -1,5 +1,5 @@
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { isCustomerUser, isStaffUser } from '../../../auth/role-routing';
+import { isCustomerAccountUser } from '../../../auth/role-routing';
 import { useHydrated } from '../../../hooks/use-hydrated';
 import content from '../../../content.json';
 
@@ -16,11 +16,11 @@ export function countLabel(label: string, count: number): string {
 export function useAccountLinks() {
   const { isAuthenticated, bootstrap } = useAuth();
   const signedIn = useHydrated() && isAuthenticated;
-  const isCustomer = signedIn && !!bootstrap && isCustomerUser(bootstrap) && !isStaffUser(bootstrap);
+  const isCustomer = signedIn && !!bootstrap && isCustomerAccountUser(bootstrap);
   return {
     isAuthenticated: signedIn,
     isCustomer,
-    accountPath: !signedIn ? '/sign-in' : isCustomer ? '/my-account' : '/account/dashboard',
+    accountPath: !signedIn ? '/sign-in' : isCustomer ? '/my-dashboard' : '/account/dashboard',
   };
 }
 

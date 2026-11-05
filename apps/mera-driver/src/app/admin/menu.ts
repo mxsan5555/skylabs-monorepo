@@ -24,5 +24,8 @@ export function flattenMenu(nodes: readonly MenuNode[]): MenuNode[] {
 /** Finds the menu node whose account-prefixed route matches the current URL, for the breadcrumb. */
 export function findMenuNodeByUrl(menu: readonly MenuNode[] | undefined, url: string): MenuNode | undefined {
   if (!menu) return undefined;
-  return flattenMenu(menu).find((node) => accountPath(node) === url);
+  const current=new URL(url,'http://menu.local');const nodes=flattenMenu(menu);return nodes.find(node=>{const path=accountPath(node);if(!path?.includes('?'))return false;const expected=new URL(path,'http://menu.local');return expected.pathname===current.pathname&&Array.from(expected.searchParams).every(([key,value])=>current.searchParams.get(key)===value);})??nodes.find(node=>accountPath(node)===current.pathname);
 }
+
+/** Preserve existing filtered workflow parameters when rendering sidebar links. */
+export function accountQueryParams(node:Pick<MenuNode,'route'>):Record<string,string>{const params:Record<string,string>={};if(node.route)new URL(node.route,'http://menu.local').searchParams.forEach((value,key)=>params[key]=value);return params;}

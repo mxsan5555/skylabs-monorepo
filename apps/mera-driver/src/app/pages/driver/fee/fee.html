@@ -1,0 +1,55 @@
+<md-admin-page title="Registration Fee" subtitle="Your registration fee policy, payment status and history.">
+  @if (loading()) {
+    <p class="otp-muted">Loading…</p>
+  } @else if (overview(); as o) {
+    @if (error()) {
+      <p class="otp-muted" role="alert">{{ error() }}</p>
+    }
+    <section class="account-card">
+      <div class="account-card__head">
+        <h2>{{ o.driver.registrationFeeRequired ? 'Required' : 'Optional' }} registration fee</h2>
+        <sky-badge [variant]="o.fee === 'Paid' || o.fee === 'Waived' ? 'primary' : o.fee === 'Failed' ? 'error' : 'secondary'">{{ o.fee }}</sky-badge>
+      </div>
+      <p>Configured amount: <strong>{{ money(o.driver.registrationFeePaise) }}</strong></p>
+      @if (canPay()) {
+        <div>
+          <md-filled-button [disabled]="paying()" (click)="pay()">{{ paying() ? 'Opening payment…' : 'Pay now' }}</md-filled-button>
+        </div>
+      } @else if (!o.driver.registrationFeeRequired) {
+        <p class="otp-muted">This registration fee is optional for your account — trip eligibility does not depend on it.</p>
+      }
+    </section>
+
+    <section class="account-card">
+      <div class="account-card__head">
+        <h2>Receipt</h2>
+      </div>
+      @if (receipt(); as r) {
+        <p>{{ r.fileName ?? 'Registration Fee Receipt' }}</p>
+        <a routerLink="/driver/documents" [queryParams]="{ category: 'personal' }">View receipt in Documents</a>
+      } @else {
+        <p class="otp-muted">No receipt on file yet.</p>
+      }
+    </section>
+
+    <section class="account-card">
+      <div class="account-card__head">
+        <h2>Payment history</h2>
+      </div>
+      @if (movements().length === 0) {
+        <p class="otp-muted">No registration fee transactions yet.</p>
+      } @else {
+        <ul class="driver-doc-list">
+          @for (m of movements(); track m.id) {
+            <li class="driver-doc-card">
+              <div>
+                <div>{{ movementLabel(m.kind) }}</div>
+                <div class="driver-doc-card__meta">{{ money(m.amountPaise) }} · {{ m.method }} · {{ m.createdAt | date: 'medium' }}</div>
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  }
+</md-admin-page>

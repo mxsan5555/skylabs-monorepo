@@ -4,9 +4,9 @@ interface CategoryLike {
 }
 
 /**
- * Shared cascade math for a flat, granted-categories list (top-level rows + their subcategories
- * AND Type-tier grandchildren, all in one array — see `listCategories({ type, vendorId })`'s own
- * doc comment in `vendor-pipeline.tsx`) used by the Deal/Product creation dialogs' Category →
+ * Shared cascade math for a flat categories list (top-level rows + their subcategories AND
+ * Type-tier grandchildren, all in one array — see `listCategories({ type })` in
+ * `api/rbac/vendors.ts`) used by the Deal/Product creation dialogs' Category →
  * Subcategory → (optional) Type cascade.
  *
  * `subcategoryId` here is whatever the form currently holds as the deepest picked node — it may

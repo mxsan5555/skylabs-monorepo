@@ -31,9 +31,9 @@ import { listAllDeals, listAllTherapists, type Deal, type CrossVendorTherapist }
 import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { extractFieldErrors } from '../../../../utils/field-errors';
 import { listProducts, type Product } from '../../../../api/rbac/products';
+import { ApiRequestError } from '../../../../api/rbac/client';
 
 type TagFieldKey = 'name' | 'slug';
-import { ApiRequestError } from '../../../../api/rbac/client';
 
 const COLUMNS = JSON.stringify([
   { key: 'Name', label: 'Name' },

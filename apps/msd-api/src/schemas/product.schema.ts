@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { PaginationQuerySchema } from './common.schema';
+import { PaginationQuerySchema, richTextField } from './common.schema';
 
 extendZodWithOpenApi(z);
 
@@ -30,12 +30,15 @@ const ProductFieldsSchema = z.object({
   brand: z.string().max(150).optional(),
   categoryId: z.string().uuid(),
   subcategoryId: z.string().uuid().optional(),
-  description: z.string().max(5000).optional(),
+  description: richTextField(5000),
+  /** Plain text, deliberately NOT rich-text — the fallback source for `<meta
+   *  name="description">` on the public Product page (see product-detail.tsx), which can't
+   *  contain formatting markup (same reasoning as Deal's `shortDescription`). */
   summary: z.string().max(2000).optional(),
   benefits: z.array(z.string().max(300)).optional(),
   howToUse: z.array(z.string().max(300)).optional(),
   ingredients: z.string().max(3000).optional(),
-  returnPolicy: z.string().max(2000).optional(),
+  returnPolicy: richTextField(2000),
   image: z.string().url().optional(),
   gallery: z.array(z.string().url()).optional(),
   imageAlt: z.string().max(300).optional(),

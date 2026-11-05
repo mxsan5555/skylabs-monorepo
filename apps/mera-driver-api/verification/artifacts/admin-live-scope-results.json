@@ -1,0 +1,9 @@
+{
+  "mode": "Real API and database; signed existing-account session fixtures; password/OTP login not tested",
+  "mutations": false,
+  "results": [
+    "Two real linked driver accounts resolve their own profile despite a foreign driverId query; foreign admin details/PDF denied.",
+    "Two active linked customer accounts not available; customer cross-account probe blocked.",
+    "Real KYC verifier list is assigned-only; administrative list/assignment picker denied. No foreign review exists for the additional existing-record probe."
+  ]
+}
