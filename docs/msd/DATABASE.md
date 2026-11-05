@@ -23,8 +23,7 @@ PostgreSQL database `msd`, schema `apps/msd-api/prisma/schema.prisma` (68 models
   "Deactivate it instead"; `deletedAt` exists only on `User`. Orders, payments and customers are
   never deleted.
 - **Migrations:** one reversible change each, reviewed SQL, a `down.sql` for every new migration,
-  rehearsed on a copy of the Neon data before production. Create PostgreSQL extensions such as
-  `pg_trgm` before any indexes that use their operator classes. An applied migration is never edited.
+  rehearsed on a copy of the Neon data before production. An applied migration is never edited.
 - **Expand, then code, then contract:** add columns and tables first, ship code that writes both,
   drop old columns one release later (P3-16, P12-10).
 - **Local database:** PostgreSQL 16 on `localhost:5432` (database name in
@@ -376,7 +375,7 @@ No tables (GA4 holds the data).
 | S21 | `DealFaq` table | written (same migration) |
 | S22 | Branch: `addressLine2`; report and fix rows whose `state` or `city` is not in the India list, then `NOT NULL` | done 2026-10-27 (DL-02): column in `20261026100000_deal_page_fields`; report script `prisma/report-branch-locations.ts` (0 bad rows locally); `NOT NULL` in `20261027100000_branch_location_required` (stops with a clear message if a row lacks state or city); Neon run with DL-01 |
 | S23 | Backfill: `policy` → `cancellationNote`; `publishedAt` = `updatedAt` for ACTIVE deals; every deal `approvalStatus = APPROVED` (D6). Existing slugs are kept; new deals get `{title}-{member}-{city}` | written (same migration) |
-| S24 | `pg_trgm` + GIN trigram indexes on `Deal.title` and `Vendor.businessName` | written (indexes declared in `schema.prisma`; initial migration creates the extension first) |
+| S24 | `pg_trgm` + GIN trigram indexes on `Deal.title` and `Vendor.businessName` | written (same migration; indexes declared in `schema.prisma`, extension in SQL) |
 | S25 | User: `address`, `city`, `state`, `pincode` (nullable), the saved delivery address (D37, item 2.2) | written 2026-10-29 (`20261029130000_user_saved_address`, `down.sql` drops them); apply locally, then Neon with DL-01 |
 | - | Contract: drop `kycStatus`, `kycRejectionReason`, legacy GST/PAN/`kycDocuments`, `approvalStatus`, `approvalRejectionReason`, `Deal.images`, `Deal.policy`, category-grant tables, `Member.offersService`/`offersProduct`/`offersTherapy` | after one release without readers (P3-16) |
 
