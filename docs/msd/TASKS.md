@@ -420,7 +420,6 @@ Removed 2026-10-24: ST-17 (therapist city filter is in ST-40; products are not l
 | [ ] | P12-08 | QA | UAT with 7 role accounts using the matrix as the checklist | M | P10-42 | Signed UAT sheet |
 | [ ] | P12-09 | OPS | Production release and smoke test | M | P12-08 | Smoke list passes |
 | [ ] | P12-10 | OPS | One release later: remove `/vendors*` aliases, old menu keys and legacy columns (P3-16) | M | P12-09 | No traffic on aliases for 14 days |
-| [x] | P12-11 | DB | Ensure the initial migration creates `pg_trgm` before its GIN trigram indexes | S | - | SQL ordering verified; fresh-database apply remains part of P11-08 |
 | [ ] | X-01 | OPS | Attach the bought custom domain to each Vercel project Production (`main`) deploy | S | - | Domain serves production |
 | [ ] | X-02 | OPS | Add the CI check as a required status check in branch protection | S | - | PR cannot merge red |
 | [ ] | X-03 | SEC | Rotate the secrets that were once committed (Gmail app password, ConnectExpress SMS key, Razorpay keys, `JWT_SECRET`); they remain in git history | S | - | All rotated at the provider |
