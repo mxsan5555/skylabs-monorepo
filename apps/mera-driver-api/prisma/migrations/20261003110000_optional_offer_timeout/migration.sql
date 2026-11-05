@@ -1,0 +1,1 @@
+ALTER TABLE "TripOffer" ALTER COLUMN "expiresAt" DROP NOT NULL;

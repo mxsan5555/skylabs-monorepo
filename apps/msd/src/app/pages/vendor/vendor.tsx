@@ -1,3 +1,4 @@
+import { JsonLd } from '../../seo/json-ld';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { FilledButton, OutlinedIconButton, Icon, Divider, Radio, ChipSet, FilterChip, SuggestionChip, Tabs, PrimaryTab, OutlinedTextField, } from '@skylabs-monorepo/shared-ui/react';
@@ -7,23 +8,22 @@ import { getCatalogVendor, listCatalogDeals, listCatalogProducts, type CatalogVe
 import { ApiRequestError } from '../../../api/rbac/client';
 import { addCartItem } from '../../../api/cart';
 import { useWishlist } from '../../../wishlist/wishlist-context';
-import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
-import { SkyProductCardWC } from '../../components/sky-product-card-wc';
+import { useVisitorLocation } from '../../../location/location-context';
+import { haversineKm, type Coordinates } from '../../../location/geo';
+import { lowestPackagePrice } from '../../components/therapist-card/therapist-card';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { DurationPackageSelector } from '../../components/duration-package-selector';
-import { TherapistPackageSelector } from '../../components/therapist-package-selector';
 import { useDealPurchaseSelection } from '../../../hooks/use-deal-purchase-selection';
 import { useTherapistPurchaseSelection } from '../../../hooks/use-therapist-purchase-selection';
-import { formatINR, pluralize, formatTime12h } from '../../../utils/format';
-import { resolveDealMedia, resolveProductMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
-import { useToast } from '../../../toast/toast-context';
+import { formatINR, pluralize, formatTime12h, formatStreetAddress } from '../../../utils/format';
+import { resolveDealMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
+import { showSnackbar } from '../../../snackbar/snackbar';
 import './vendor.css';
 import content from '../../../content.json';
-
+import { OfferCard } from '../../components/offer-card/offer-card';
 const vendorContent = content.vendor;
 const SITE_URL: string = (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
 const TIME_SLOTS = content.category.timeSlots;
-
 const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
 const DAY_LABELS = vendorContent.days;
 
@@ -41,30 +41,25 @@ function buildOpeningHoursSpecification(hours: CatalogOpeningHours) {
       closes: hours[day]!.end,
     }));
 }
-
 // ── Deal grouping: Category → Sub-category → one Deal per Service ─────────────
 //
 // Each Service now maps to exactly ONE Deal (DealPackage is the child table holding every
 // duration/price option — see DealPackage's schema doc comment in msd-api; the old
 // sibling-Deal-rows-per-duration pattern no longer exists). This grouping exists purely to build
 // Category/Sub-category section headers for display.
-
 interface ServiceGroup {
   id: string;
   name: string;
   deal: CatalogDeal;
 }
-
 interface SubcategoryGroup {
   name: string | null;
   services: ServiceGroup[];
 }
-
 interface CategoryGroup {
   name: string;
   subcategories: SubcategoryGroup[];
 }
-
 function getOrCreate<K, V>(map: Map<K, V>, key: K, create: () => V): V {
   const existing = map.get(key);
   if (existing) return existing;
@@ -72,7 +67,6 @@ function getOrCreate<K, V>(map: Map<K, V>, key: K, create: () => V): V {
   map.set(key, created);
   return created;
 }
-
 function groupServiceDeals(deals: CatalogDeal[]): CategoryGroup[] {
   const categories = new Map<string, Map<string, Map<string, ServiceGroup>>>();
   for (const deal of deals) {
@@ -80,8 +74,6 @@ function groupServiceDeals(deals: CatalogDeal[]): CategoryGroup[] {
     const subKey = deal.subcategory?.name ?? '';
     const subMap = getOrCreate(categories, categoryName, () => new Map());
     const serviceMap = getOrCreate(subMap, subKey, () => new Map());
-    // Keyed by the deal's own id — each Deal is its own offering now, no shared Service row to
-    // dedupe against.
     getOrCreate(serviceMap, deal.id, () => ({ id: deal.id, name: deal.title, deal }));
   }
   return Array.from(categories.entries()).map(([name, subMap]) => ({
@@ -92,46 +84,25 @@ function groupServiceDeals(deals: CatalogDeal[]): CategoryGroup[] {
     })),
   }));
 }
-
 /** Cheapest active package's price, for a listing card's "From ₹X" line — falls back to the
  *  Deal's own synced salePrice when it has no packages yet (a legacy/safety-net deal). */
 function dealFromPrice(deal: CatalogDeal): number {
   if (deal.packages.length === 0) return Number(deal.salePrice);
   return Math.min(...deal.packages.map((p) => Number(p.sellingPrice)));
 }
-
-function therapistFromPrice(therapist: CatalogVendorTherapist): number | null {
-  if (therapist.packages.length === 0) return null;
-  return Math.min(...therapist.packages.map((p) => Number(p.sellingPrice)));
-}
-
 type VendorSection = 'deals' | 'products' | 'therapies';
-
-/** Great-circle distance in kilometers — mirrors msd-api's own `haversineKm` (catalog.service.ts).
- *  Kept as an independent client-side copy rather than a shared package, per this app's "app-local
- *  logic, never shared between frontend and backend" convention. */
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const earthRadiusKm = 6371;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return earthRadiusKm * 2 * Math.asin(Math.sqrt(a));
-}
-
-/** The customer's "serviceable branch" — always the nearest branch to their browser-geolocation
- *  coordinates (no radius cutoff), falling back to the vendor's first active branch when
- *  coordinates are unavailable (denied/unsupported) or no branch has coordinates set yet. The
+/** The customer's "serviceable branch" — always the nearest branch to the visitor's location
+ *  (`useVisitorLocation`: saved, browser or IP; no radius cutoff), falling back to the vendor's
+ *  first active branch when there is no location or no branch has coordinates set yet. The
  *  customer never picks a branch manually — see this page's removed branch-tabs selector. */
-function resolveBranch(branches: CatalogVendorBranch[], coords: { latitude: number; longitude: number } | null): CatalogVendorBranch | null {
+export function resolveBranch(branches: CatalogVendorBranch[], coords: Coordinates | null): CatalogVendorBranch | null {
   if (branches.length === 0) return null;
   if (!coords) return branches[0];
   let nearest: CatalogVendorBranch | null = null;
   let nearestDistance = Infinity;
   for (const branch of branches) {
     if (branch.latitude == null || branch.longitude == null) continue;
-    const distance = haversineKm(coords.latitude, coords.longitude, Number(branch.latitude), Number(branch.longitude));
+    const distance = haversineKm(coords, { latitude: Number(branch.latitude), longitude: Number(branch.longitude) });
     if (distance < nearestDistance) {
       nearestDistance = distance;
       nearest = branch;
@@ -139,43 +110,25 @@ function resolveBranch(branches: CatalogVendorBranch[], coords: { latitude: numb
   }
   return nearest ?? branches[0];
 }
-
-// ── Page ──────────────────────────────────────────────────────────────────────
-
 export function VendorPage() {
   const { slug = '' } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated } = useAuth();
   const { has: isWishlisted, toggle: toggleWishlist, isPending: wishlistPending } = useWishlist();
-  const { showToast } = useToast();
-
-  const { coords } = useCurrentLocation();
-
+  const { coords } = useVisitorLocation();
   const [vendor, setVendor] = useState<CatalogVendorDetail | null>(null);
   const [vendorLoading, setVendorLoading] = useState(true);
   const [vendorError, setVendorError] = useState('');
-
   const [activeSection, setActiveSection] = useState<VendorSection>('deals');
-
   const [serviceDeals, setServiceDeals] = useState<CatalogDeal[]>([]);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [dealsLoading, setDealsLoading] = useState(true);
   const [dealsError, setDealsError] = useState('');
   const [productsLoading, setProductsLoading] = useState(true);
-
   const [activeCategoryName, setActiveCategoryName] = useState('all');
-  // Exactly one of these is ever set — selecting a Deal clears the Therapist selection and vice
-  // versa (same "one selection, one side panel" flow for both — see #8 of this app's UX rules).
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [selectedTherapistCardId, setSelectedTherapistCardId] = useState<string | null>(null);
-
-  const [productActionMessage, setProductActionMessage] = useState('');
-  const [productActionError, setProductActionError] = useState('');
-
-  const { token } = useAuth();
-
-  // ── Fetch vendor by slug ─────────────────────────────────────────────────
   useEffect(() => {
     setVendorLoading(true);
     setVendorError('');
@@ -184,7 +137,6 @@ export function VendorPage() {
     getCatalogVendor(slug)
       .then(({ data }) => setVendor(data))
       .catch((err) => {
-        // A 404 here just means "unknown/inactive vendor slug" — render as not-found, not an error banner.
         if (err instanceof ApiRequestError && err.status === 404) {
           setVendor(null);
         } else {
@@ -193,31 +145,22 @@ export function VendorPage() {
       })
       .finally(() => setVendorLoading(false));
   }, [slug]);
-
   const selectedBranch = useMemo(
     () => resolveBranch(vendor?.branches ?? [], coords),
     [vendor, coords],
   );
-
   const resetSelection = () => {
     setActiveCategoryName('all');
     setSelectedServiceId(null);
     setSelectedTherapistCardId(null);
-    setProductActionError('');
-    setProductActionMessage('');
   };
-
   const handleSectionSelect = (section: VendorSection) => {
     setActiveSection(section);
     resetSelection();
   };
-
-  // ── Fetch service deals for the selected branch ──────────────────────────
   useEffect(() => {
     if (!vendor) return;
     if (!selectedBranch) {
-      // No active branch at all (e.g. vendor has none) — nothing to fetch, show the empty state
-      // immediately rather than spinning forever.
       setServiceDeals([]);
       setDealsLoading(false);
       return;
@@ -229,9 +172,6 @@ export function VendorPage() {
       .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : vendorContent.errors.loadServicesProducts))
       .finally(() => setDealsLoading(false));
   }, [vendor, selectedBranch?.id]);
-
-  // ── Fetch products for the vendor — Product has no branchId (see msd-api's Product schema
-  // doc comment), so this is vendor-scoped, not re-fetched on branch switch. ────────────────
   useEffect(() => {
     if (!vendor) return;
     setProductsLoading(true);
@@ -240,7 +180,6 @@ export function VendorPage() {
       .catch(() => setProducts([]))
       .finally(() => setProductsLoading(false));
   }, [vendor]);
-
   const categoryGroups = useMemo(() => groupServiceDeals(serviceDeals), [serviceDeals]);
   const categoryNames = useMemo(() => categoryGroups.map((c) => c.name), [categoryGroups]);
   const displayedCategoryGroups = activeCategoryName === 'all'
@@ -250,55 +189,32 @@ export function VendorPage() {
     () => categoryGroups.flatMap((c) => c.subcategories.flatMap((s) => s.services)),
     [categoryGroups],
   );
-
   const activeGroup = allServiceGroups.find((g) => g.id === selectedServiceId) ?? null;
   const activeTherapist = selectedBranch?.therapists.find((t) => t.id === selectedTherapistCardId) ?? null;
-
   const handleCategoryFilter = (name: string) => {
     setActiveCategoryName(name);
     setSelectedServiceId(null);
   };
-
   const handleServiceSelect = (group: ServiceGroup) => {
     setSelectedServiceId(group.id);
     setSelectedTherapistCardId(null);
   };
-
   const handleTherapistSelect = (therapistId: string) => {
     setSelectedTherapistCardId(therapistId);
     setSelectedServiceId(null);
   };
-
   const requireAuthOrRedirect = () => {
     if (isAuthenticated) return true;
     navigate(signInPathWithReturnTo(location));
     return false;
   };
-
   const toggleFavorite = (deal: CatalogDeal) => {
     if (!requireAuthOrRedirect()) return;
     void toggleWishlist(deal.id);
   };
-
-  const addProductToCart = async (product: CatalogProduct) => {
-    if (!requireAuthOrRedirect()) return;
-    setProductActionError('');
-    setProductActionMessage('');
-    try {
-      await addCartItem(token, { productId: product.id, quantity: 1 });
-      setProductActionMessage(`Added "${product.name}" to your cart.`);
-      showToast(`Added to cart\n${product.name}`);
-    } catch (err) {
-      const message = err instanceof ApiRequestError ? err.message : 'Unable to add item to cart.';
-      setProductActionError(message);
-      showToast(message, 'error');
-    }
-  };
-
   if (vendorLoading) {
     return <p className="loading-state"> {vendorContent.loading.vendor}</p>;
   }
-
   if (vendorError || !vendor) {
     return (
       <div className="vendor-page vendor-page--empty">
@@ -312,11 +228,9 @@ export function VendorPage() {
       </div>
     );
   }
-
   const canonicalUrl = `${SITE_URL}/vendor/${vendor.slug}`;
   const metaDescription = vendor.businessDescription
     ?? `Book deals at ${vendor.businessName}${vendor.city ? `, ${vendor.city}` : ''}.`;
-
   return (
     <div id="main-content" className="vendor-page">
       <title>{`${vendor.businessName} | MSD`}</title>
@@ -331,45 +245,37 @@ export function VendorPage() {
       <meta name="twitter:title" content={`${vendor.businessName} | MSD`} />
       <meta name="twitter:description" content={metaDescription.slice(0, 155)} />
       {vendor.logoUrl && <meta name="twitter:image" content={vendor.logoUrl} />}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'LocalBusiness',
-            name: vendor.businessName,
-            description: vendor.businessDescription ?? undefined,
-            image: vendor.logoUrl ?? undefined,
-            url: canonicalUrl,
-            address: {
-              '@type': 'PostalAddress',
-              streetAddress: selectedBranch?.address ?? vendor.address ?? undefined,
-              addressLocality: selectedBranch?.city ?? vendor.city ?? undefined,
-              addressRegion: selectedBranch?.state ?? vendor.state ?? undefined,
-              addressCountry: 'IN',
-            },
-            openingHoursSpecification: selectedBranch?.openingHours
-              ? buildOpeningHoursSpecification(selectedBranch.openingHours)
-              : undefined,
-          }),
+      <JsonLd
+        data={{
+          '@context': 'https://schema.org',
+          '@type': 'LocalBusiness',
+          name: vendor.businessName,
+          description: vendor.businessDescription ?? undefined,
+          image: vendor.logoUrl ?? undefined,
+          url: canonicalUrl,
+          address: {
+            '@type': 'PostalAddress',
+            streetAddress: selectedBranch?.address ?? vendor.address ?? undefined,
+            addressLocality: selectedBranch?.city ?? vendor.city ?? undefined,
+            addressRegion: selectedBranch?.state ?? vendor.state ?? undefined,
+            addressCountry: 'IN',
+          },
+          openingHoursSpecification: selectedBranch?.openingHours
+            ? buildOpeningHoursSpecification(selectedBranch.openingHours)
+            : undefined,
         }}
       />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'BreadcrumbList',
-            itemListElement: [
-              { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE_URL}/` },
-              { '@type': 'ListItem', position: 2, name: 'Explore', item: `${SITE_URL}/explore` },
-              { '@type': 'ListItem', position: 3, name: vendor.businessName, item: canonicalUrl },
-            ],
-          }),
+      <JsonLd
+        data={{
+          '@context': 'https://schema.org',
+          '@type': 'BreadcrumbList',
+          itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE_URL}/` },
+            { '@type': 'ListItem', position: 2, name: 'Explore', item: `${SITE_URL}/explore` },
+            { '@type': 'ListItem', position: 3, name: vendor.businessName, item: canonicalUrl },
+          ],
         }}
       />
-
-      {/* Breadcrumb */}
       <Breadcrumb
         className="vendor-page__breadcrumb"
         items={[
@@ -378,19 +284,11 @@ export function VendorPage() {
           { label: vendor.businessName },
         ]}
       />
-
-      {/* Hero — full-bleed background image, gradient fallback when no logo */}
       <div className={`vendor-page__hero${vendor.logoUrl ? '' : ' vendor-page__hero--placeholder'}`} aria-hidden="true">
         {vendor.logoUrl && <img src={vendor.logoUrl} alt="" />}
       </div>
-
-      {/* Two-panel body overlapping the hero — full-width when the Products tab has no aside */}
       <div className={`vendor-page__body${activeSection === 'products' ? ' vendor-page__body--full-width' : ''}`}>
-
-        {/* ── Left: main content card ──────────────────────────────────────── */}
         <div className="vendor-page__main-card">
-
-          {/* Company header */}
           <div className="vendor-page__company-row">
             <div className="vendor-page__company-info">
               <h1 className="vendor-page__company-name">{vendor.businessName}</h1>
@@ -401,9 +299,7 @@ export function VendorPage() {
                 {(selectedBranch?.address || selectedBranch?.city || vendor.city) && (
                   <span className="vendor-page__location-row">
                     <Icon aria-hidden="true" className="vendor-page__meta-icon">location_on</Icon>
-                    {[selectedBranch?.address, selectedBranch?.city ?? vendor.city, selectedBranch?.state ?? vendor.state]
-                      .filter(Boolean)
-                      .join(', ')}
+                    {formatStreetAddress([selectedBranch?.address, selectedBranch?.city ?? vendor.city, selectedBranch?.state ?? vendor.state])}
                   </span>
                 )}
               </div>
@@ -462,267 +358,227 @@ export function VendorPage() {
               <PrimaryTab active={activeSection === 'therapies'}>{vendorContent.tabs.therapies}</PrimaryTab>
             </Tabs>
           </div>
-
-          {/* Select Service */}
           {activeSection === 'deals' && (
-          <section className="vendor-page__section" aria-label={vendorContent.accessibility.services}>
-            <h2 className="vendor-page__section-title"> {vendorContent.labels.selectService}</h2>
-
-            {categoryNames.length > 1 && (
-              <ChipSet aria-label={vendorContent.filters.filterByServiceCategory}>
-                <FilterChip
-                  label={vendorContent.filters.all}
-                  selected={activeCategoryName === 'all'}
-                  onClick={() => handleCategoryFilter('all')}
-                />
-                {categoryNames.map((name) => (
+            <section className="vendor-page__section" aria-label={vendorContent.accessibility.services}>
+              <h2 className="vendor-page__section-title"> {vendorContent.labels.selectService}</h2>
+              {categoryNames.length > 1 && (
+                <ChipSet aria-label={vendorContent.filters.filterByServiceCategory}>
                   <FilterChip
-                    key={name}
-                    label={name}
-                    selected={activeCategoryName === name}
-                    onClick={() => handleCategoryFilter(name)}
+                    label={vendorContent.filters.all}
+                    selected={activeCategoryName === 'all'}
+                    onClick={() => handleCategoryFilter('all')}
                   />
-                ))}
-              </ChipSet>
-            )}
-
-            {dealsLoading ? (
-              <p className="loading-state">{vendorContent.loading.services}</p>
-            ) : dealsError ? (
-              <p className="error-state" role="alert">{dealsError}</p>
-            ) : displayedCategoryGroups.length === 0 ? (
-              <p className="vendor-page__deal-empty"> {vendorContent.empty.noServices}</p>
-            ) : (
-              <div className="vendor-page__deal-groups">
-                {displayedCategoryGroups.map((cat) => {
-                  const CategoryHeading = categoryNames.length > 1 ? 'h3' : null;
-                  const SubHeading = CategoryHeading ? 'h4' : 'h3';
-                  return (
-                    <div key={cat.name} className="vendor-page__category-group">
-                      {CategoryHeading && (
-                        <CategoryHeading className="vendor-page__category-heading">{cat.name}</CategoryHeading>
-                      )}
-                      {cat.subcategories.map((sub) => (
-                        <div key={sub.name ?? '__none__'} className="vendor-page__subcategory-group">
-                          {sub.name && (
-                            <SubHeading className="vendor-page__subcategory-heading">{sub.name}</SubHeading>
-                          )}
-                          <div
-                            className="vendor-page__deal-list"
-                            role="radiogroup"
-                            aria-label={`${sub.name ?? cat.name} services`}
-                          >
-                            {sub.services.map((group) => {
-                              const isSelected = group.id === selectedServiceId;
-                              const deal = group.deal;
-                              const fromPrice = dealFromPrice(deal);
-                              const thumb = primaryImage(resolveDealMedia(deal));
-                              return (
-                                <label
-                                  key={group.id}
-                                  htmlFor={`deal-${group.id}`}
-                                  className={`vendor-page__deal-card${isSelected ? ' vendor-page__deal-card--selected' : ''}`}
-                                >
-                                  <Radio
-                                    id={`deal-${group.id}`}
-                                    name="deal-selection"
-                                    value={group.id}
-                                    checked={isSelected}
-                                    onChange={() => handleServiceSelect(group)}
-                                  />
-
-                                  {thumb && (
-                                    <img
-                                      className="vendor-page__deal-card-img"
-                                      src={thumb}
-                                      alt={deal.title}
-                                      loading="lazy"
-                                      width={120}
-                                      height={80}
-                                    />
-                                  )}
-
-                                  <div className="vendor-page__deal-card-body">
-                                    <div className="vendor-page__deal-card-title">{group.name}</div>
-                                    {deal.shortDescription && (
-                                      <div className="vendor-page__deal-card-desc">{deal.shortDescription}</div>
-                                    )}
-                                    <div className="vendor-page__deal-card-meta">
-                                      <ChipSet>
-                                        {deal.packages.length > 1 && (
-                                          <SuggestionChip label={`${deal.packages.length} packages`} />
-                                        )}
-                                      </ChipSet>
-                                      <span className="vendor-page__deal-price">From {formatINR(fromPrice)}</span>
-                                    </div>
-                                  </div>
-                                  <span
-                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  {categoryNames.map((name) => (
+                    <FilterChip
+                      key={name}
+                      label={name}
+                      selected={activeCategoryName === name}
+                      onClick={() => handleCategoryFilter(name)}
+                    />
+                  ))}
+                </ChipSet>
+              )}
+              {dealsLoading ? (
+                <p className="loading-state">{vendorContent.loading.services}</p>
+              ) : dealsError ? (
+                <p className="error-state" role="alert">{dealsError}</p>
+              ) : displayedCategoryGroups.length === 0 ? (
+                <p className="vendor-page__deal-empty"> {vendorContent.empty.noServices}</p>
+              ) : (
+                <div className="vendor-page__deal-groups">
+                  {displayedCategoryGroups.map((cat) => {
+                    const CategoryHeading = categoryNames.length > 1 ? 'h3' : null;
+                    const SubHeading = CategoryHeading ? 'h4' : 'h3';
+                    return (
+                      <div key={cat.name} className="vendor-page__category-group">
+                        {CategoryHeading && (
+                          <CategoryHeading className="vendor-page__category-heading">{cat.name}</CategoryHeading>
+                        )}
+                        {cat.subcategories.map((sub) => (
+                          <div key={sub.name ?? '__none__'} className="vendor-page__subcategory-group">
+                            {sub.name && (
+                              <SubHeading className="vendor-page__subcategory-heading">{sub.name}</SubHeading>
+                            )}
+                            <div
+                              className="vendor-page__deal-list"
+                              role="radiogroup"
+                              aria-label={`${sub.name ?? cat.name} services`}
+                            >
+                              {sub.services.map((group) => {
+                                const isSelected = group.id === selectedServiceId;
+                                const deal = group.deal;
+                                const fromPrice = dealFromPrice(deal);
+                                const thumb = primaryImage(resolveDealMedia(deal));
+                                return (
+                                  <label
+                                    key={group.id}
+                                    htmlFor={`deal-${group.id}`}
+                                    className={`vendor-page__deal-card${isSelected ? ' vendor-page__deal-card--selected' : ''}`}
                                   >
-                                    <OutlinedIconButton
-                                      aria-label={isWishlisted(deal.id) ? 'Remove from wishlist' : 'Save to wishlist'}
-                                      aria-pressed={isWishlisted(deal.id)}
-                                      disabled={wishlistPending(deal.id)}
-                                      onClick={() => toggleFavorite(deal)}
+                                    <Radio
+                                      id={`deal-${group.id}`}
+                                      name="deal-selection"
+                                      value={group.id}
+                                      checked={isSelected}
+                                      onChange={() => handleServiceSelect(group)}
+                                    />
+                                    {thumb && (
+                                      <img
+                                        className="vendor-page__deal-card-img"
+                                        src={thumb}
+                                        alt={deal.title}
+                                        loading="lazy"
+                                        width={120}
+                                        height={80}
+                                      />
+                                    )}
+                                    <div className="vendor-page__deal-card-body">
+                                      <div className="vendor-page__deal-card-title">{group.name}</div>
+                                      {deal.shortDescription && (
+                                        <div className="vendor-page__deal-card-desc">{deal.shortDescription}</div>
+                                      )}
+                                      <div className="vendor-page__deal-card-meta">
+                                        <ChipSet>
+                                          {deal.packages.length > 1 && (
+                                            <SuggestionChip label={`${deal.packages.length} packages`} />
+                                          )}
+                                        </ChipSet>
+                                        <span className="vendor-page__deal-price">From {formatINR(fromPrice)}</span>
+                                      </div>
+                                    </div>
+                                    <span
+                                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
                                     >
-                                      <Icon aria-hidden="true">{isWishlisted(deal.id) ? 'favorite' : 'favorite_border'}</Icon>
-                                    </OutlinedIconButton>
-                                  </span>
-                                </label>
-                              );
-                            })}
+                                      <OutlinedIconButton
+                                        aria-label={isWishlisted(deal.id) ? 'Remove from wishlist' : 'Save to wishlist'}
+                                        aria-pressed={isWishlisted(deal.id)}
+                                        disabled={wishlistPending(deal.id)}
+                                        onClick={() => toggleFavorite(deal)}
+                                      >
+                                        <Icon aria-hidden="true">{isWishlisted(deal.id) ? 'favorite' : 'favorite_border'}</Icon>
+                                      </OutlinedIconButton>
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          )}
+          {activeSection === 'products' && (
+            <section className="vendor-page__section" aria-label={vendorContent.accessibility.products} >
+              <h2 className="vendor-page__section-title">Products</h2>
+              {productsLoading ? (
+                <p className="loading-state">{vendorContent.loading.products}</p>
+              ) : products.length === 0 ? (
+                <p className="vendor-page__deal-empty">{vendorContent.empty.noProducts}</p>
+              ) : (
+                <ul className="vendor-page__product-grid">
+                  {products.map((product) => (
+                    <li key={product.id}>
+                      <OfferCard
+                        item={{ type: 'product', product }}
+                        variant="outlined"
+                        layout="vertical"
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
+          {activeSection === 'therapies' && (
+            <section className="vendor-page__section" aria-label={vendorContent.accessibility.therapists}>
+              <h2 className="vendor-page__section-title">Meet Our Therapists</h2>
+              {selectedBranch && selectedBranch.therapists.length > 0 ? (
+                <div className="vendor-page__deal-list" role="radiogroup" aria-label="Available therapists">
+                  {selectedBranch.therapists.map((t) => {
+                    const isSelected = t.id === selectedTherapistCardId;
+                    const fromPrice = lowestPackagePrice(t.packages);
+                    return (
+                      <label
+                        key={t.id}
+                        htmlFor={`therapist-${t.id}`}
+                        className={`vendor-page__deal-card${isSelected ? ' vendor-page__deal-card--selected' : ''}`}
+                      >
+                        <Radio
+                          id={`therapist-${t.id}`}
+                          name="therapist-selection"
+                          value={t.id}
+                          checked={isSelected}
+                          onChange={() => handleTherapistSelect(t.id)}
+                        />
+                        {primaryImage(resolveTherapistMedia(t)) && (
+                          <img
+                            className="vendor-page__deal-card-img"
+                            src={primaryImage(resolveTherapistMedia(t))}
+                            alt=""
+                            loading="lazy"
+                            width={120}
+                            height={80}
+                          />
+                        )}
+                        <div className="vendor-page__deal-card-body">
+                          <div className="vendor-page__deal-card-title">{t.therapistType}</div>
+                          <div className="vendor-page__deal-card-desc">
+                            {t.personName}
+                            {t.specialization ? ` · ${t.specialization}` : ''}
+                            {t.experienceYears != null ? ` · ${t.experienceYears} ${pluralize(t.experienceYears, 'year')} experience` : ''}
+                          </div>
+                          <div className="vendor-page__deal-card-meta">
+                            <ChipSet>
+                              {t.packages.length > 1 && (
+                                <SuggestionChip label={`${t.packages.length} packages`} />
+                              )}
+                            </ChipSet>
+                            <span className="vendor-page__deal-price">
+                              {fromPrice != null ? `From ${formatINR(fromPrice)}` : 'Contact for pricing'}
+                            </span>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-          )}
-
-          {/* Products */}
-          {activeSection === 'products' && (
-          <section className="vendor-page__section" aria-label={vendorContent.accessibility.products}>
-            <h2 className="vendor-page__section-title">Products</h2>
-            {productActionMessage && <p className="field-hint" role="status">{productActionMessage}</p>}
-            {productActionError && <p className="error-state" role="alert">{productActionError}</p>}
-            {productsLoading ? (
-              <p className="loading-state">{vendorContent.loading.products}</p>
-            ) : products.length === 0 ? (
-              <p className="vendor-page__deal-empty">{vendorContent.empty.noProducts}</p>
-            ) : (
-              <ul className="vendor-page__product-grid">
-                {products.map((product) => (
-                  <li key={product.id}>
-                    <SkyProductCardWC
-                      variant="outlined"
-                      badge={vendorContent.labels.products}
-                      eyebrow={product.brand ?? undefined}
-                      heading={product.name}
-                      image={primaryImage(resolveProductMedia(product))}
-                      imageAlt={product.imageAlt ?? undefined}
-                      price={formatINR(Number(product.price))}
-                      originalPrice={
-                        product.originalPrice && Number(product.originalPrice) !== Number(product.price)
-                          ? formatINR(Number(product.originalPrice))
-                          : undefined
-                      }
-                      discount={product.discount ? `-${product.discount}%` : undefined}
-                      href={`/products/${product.id}`}
-                    >
-                      <div onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
-                        <FilledButton onClick={() => addProductToCart(product)}>
-                          <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
-                          {vendorContent.actions.addToCart}
-                        </FilledButton>
-                      </div>
-                    </SkyProductCardWC>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-          )}
-
-          {/* Therapists */}
-          {activeSection === 'therapies' && (
-          <section className="vendor-page__section" aria-label={vendorContent.accessibility.therapists}>
-            <h2 className="vendor-page__section-title">Meet Our Therapists</h2>
-            {selectedBranch && selectedBranch.therapists.length > 0 ? (
-              <div className="vendor-page__deal-list" role="radiogroup" aria-label="Available therapists">
-                {selectedBranch.therapists.map((t) => {
-                  const isSelected = t.id === selectedTherapistCardId;
-                  const fromPrice = therapistFromPrice(t);
-                  return (
-                    <label
-                      key={t.id}
-                      htmlFor={`therapist-${t.id}`}
-                      className={`vendor-page__deal-card${isSelected ? ' vendor-page__deal-card--selected' : ''}`}
-                    >
-                      <Radio
-                        id={`therapist-${t.id}`}
-                        name="therapist-selection"
-                        value={t.id}
-                        checked={isSelected}
-                        onChange={() => handleTherapistSelect(t.id)}
-                      />
-
-                      {primaryImage(resolveTherapistMedia(t)) && (
-                        <img
-                          className="vendor-page__deal-card-img"
-                          src={primaryImage(resolveTherapistMedia(t))}
-                          alt=""
-                          loading="lazy"
-                          width={120}
-                          height={80}
-                        />
-                      )}
-
-                      <div className="vendor-page__deal-card-body">
-                        {/* Type/service label and the actual staff member are always shown
-                            separately, never merged into one field. */}
-                        <div className="vendor-page__deal-card-title">{t.therapistType}</div>
-                        <div className="vendor-page__deal-card-desc">
-                          {t.personName}
-                          {t.specialization ? ` · ${t.specialization}` : ''}
-                          {t.experienceYears != null ? ` · ${t.experienceYears} ${pluralize(t.experienceYears, 'year')} experience` : ''}
-                        </div>
-                        <div className="vendor-page__deal-card-meta">
-                          <ChipSet>
-                            {t.packages.length > 1 && (
-                              <SuggestionChip label={`${t.packages.length} packages`} />
-                            )}
-                          </ChipSet>
-                          <span className="vendor-page__deal-price">
-                            {fromPrice != null ? `From ${formatINR(fromPrice)}` : 'Contact for pricing'}
-                          </span>
-                        </div>
-                      </div>
-                    </label>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="vendor-page__deal-empty">{vendorContent.empty.noTherapists}</p>
-            )}
-          </section>
+                      </label>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="vendor-page__deal-empty">{vendorContent.empty.noTherapists}</p>
+              )}
+            </section>
           )}
         </div>
-
-        {/* ── Right: Your selection card — Deals/Therapies only, Products uses its own inline
-            Add to Cart per card ─────────────────────────────────────────────── */}
         {activeSection !== 'products' && (
-        <aside className="vendor-page__selection-card" aria-label={vendorContent.accessibility.yourSelection}>
-          <h2 className="vendor-page__selection-title"> {vendorContent.labels.yourSelection}</h2>
-
-          {activeGroup ? (
-            <DealSelectionPanel
-              key={activeGroup.id}
-              group={activeGroup}
-              requireAuthOrRedirect={requireAuthOrRedirect}
-            />
-          ) : activeTherapist ? (
-            <TherapistSelectionPanel
-              key={activeTherapist.id}
-              therapist={activeTherapist}
-              requireAuthOrRedirect={requireAuthOrRedirect}
-            />
-          ) : (
-            <div className="vendor-page__selection-empty">
-              <Icon aria-hidden="true" className="vendor-page__empty-icon">spa</Icon>
-              <p>Select a deal or therapist to see packages and pricing.</p>
-            </div>
-          )}
-        </aside>
+          <aside className="vendor-page__selection-card" aria-label={vendorContent.accessibility.yourSelection}>
+            <h2 className="vendor-page__selection-title"> {vendorContent.labels.yourSelection}</h2>
+            {activeGroup ? (
+              <DealSelectionPanel
+                key={activeGroup.id}
+                group={activeGroup}
+                requireAuthOrRedirect={requireAuthOrRedirect}
+              />
+            ) : activeTherapist ? (
+              <TherapistSelectionPanel
+                key={activeTherapist.id}
+                therapist={activeTherapist}
+                requireAuthOrRedirect={requireAuthOrRedirect}
+              />
+            ) : (
+              <div className="vendor-page__selection-empty">
+                <Icon aria-hidden="true" className="vendor-page__empty-icon">spa</Icon>
+                <p>Select a deal or therapist to see packages and pricing.</p>
+              </div>
+            )}
+          </aside>
         )}
-
       </div>
     </div>
   );
 }
-
 /**
  * The stateful "package/price → Add to Cart" panel for one selected Deal — driven entirely by
  * the canonical `useDealPurchaseSelection` hook + `DurationPackageSelector` UI (the same ones
@@ -740,17 +596,13 @@ function DealSelectionPanel({
   requireAuthOrRedirect: () => boolean;
 }) {
   const { token } = useAuth();
-  const { showToast } = useToast();
   const selection = useDealPurchaseSelection(group.deal);
   const { activePackage, unitPrice, missingSelection } = selection;
-
   const [qty, setQty] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
-
   const total = activePackage ? unitPrice * qty : 0;
-
   const addToCart = async () => {
     if (!requireAuthOrRedirect()) return;
     if (missingSelection || !activePackage) {
@@ -769,20 +621,17 @@ function DealSelectionPanel({
       });
       const durationLabel = ` — ${activePackage.durationMinutes} Minutes`;
       setActionMessage(`Added "${group.name}" to your cart.`);
-      // Only fires after the API call above has actually resolved — never claims success early.
-      showToast(`Added to cart\n${group.name}${durationLabel}`);
+      showSnackbar(`Added to cart: ${group.name}${durationLabel}`, { variant: 'success' });
     } catch (err) {
       const message = err instanceof ApiRequestError ? err.message : 'Unable to add item to cart.';
       setActionError(message);
-      showToast(message, 'error');
+      showSnackbar(message, { variant: 'error' });
     } finally {
       setSubmitting(false);
     }
   };
-
   return (
     <>
-      {/* Selected deal preview */}
       <div className="vendor-page__selected-deal">
         {primaryImage(resolveDealMedia(group.deal)) && (
           <img
@@ -798,14 +647,9 @@ function DealSelectionPanel({
           <div className="vendor-page__selected-name">{group.name}</div>
         </div>
       </div>
-
       <Divider />
-
       <DurationPackageSelector selection={selection} />
-
       <Divider />
-
-      {/* Quantity */}
       <div className="vendor-page__stepper-row" role="group" aria-label="Quantity">
         <span className="vendor-page__stepper-label">Quantity</span>
         <div className="vendor-page__stepper-controls">
@@ -816,9 +660,7 @@ function DealSelectionPanel({
           >
             <Icon aria-hidden="true">remove</Icon>
           </OutlinedIconButton>
-          <span className="vendor-page__qty" aria-live="polite" aria-atomic="true">
-            {qty}
-          </span>
+          <span className="vendor-page__qty" aria-live="polite" aria-atomic="true">{qty}</span>
           <OutlinedIconButton
             onClick={() => setQty((q) => q + 1)}
             aria-label="Increase quantity"
@@ -827,18 +669,13 @@ function DealSelectionPanel({
           </OutlinedIconButton>
         </div>
       </div>
-
-      {/* Total */}
       <div className="vendor-page__total-row">
         <span>Total</span>
         <strong className="vendor-page__total-amount">{formatINR(total)}</strong>
       </div>
-
       {missingSelection && <p className="field-hint" role="status">{missingSelection}</p>}
       {actionError && <p className="error-state" role="alert">{actionError}</p>}
       {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
-
-      {/* CTA */}
       <div className="vendor-page__cta-row">
         <FilledButton
           onClick={addToCart}
@@ -849,8 +686,6 @@ function DealSelectionPanel({
           {submitting ? 'Adding…' : 'Add to Cart'}
         </FilledButton>
       </div>
-
-      {/* Details accordion — only what the API actually returns, nothing fabricated */}
       {(group.deal.shortDescription || group.deal.description) && (
         <>
           <Divider />
@@ -869,13 +704,12 @@ function DealSelectionPanel({
     </>
   );
 }
-
 /**
  * The stateful "package/price → Add to Cart" panel for one selected Therapist, added directly —
  * no Deal involved at all (see msd-api's CartItem "exactly one of three shapes" doc comment).
  * Mirrors `DealSelectionPanel` exactly (same layout, same CTA row) but sources its packages from
  * the Therapist's own `packages`, via the same `useTherapistPurchaseSelection`/
- * `TherapistPackageSelector` pair every other Therapist purchase entry point uses. A Therapist is
+ * `DurationPackageSelector` pair every other Therapist purchase entry point uses. A Therapist is
  * a normal purchasable OrderItem exactly like a Deal or Product — there is no Book Now path.
  */
 function TherapistSelectionPanel({
@@ -886,18 +720,14 @@ function TherapistSelectionPanel({
   requireAuthOrRedirect: () => boolean;
 }) {
   const { token } = useAuth();
-  const { showToast } = useToast();
   const selection = useTherapistPurchaseSelection(therapist.packages);
   const { activePackage, unitPrice, missingSelection } = selection;
-
   const [qty, setQty] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
-
   const displayName = `${therapist.therapistType} — ${therapist.personName}`;
   const total = activePackage ? unitPrice * qty : 0;
-
   const addToCart = async () => {
     if (!requireAuthOrRedirect()) return;
     if (missingSelection || !activePackage) {
@@ -915,21 +745,18 @@ function TherapistSelectionPanel({
         quantity: qty,
       });
       setActionMessage(`Added "${displayName}" to your cart.`);
-      // Only fires after the API call above has actually resolved — never claims success early.
       const label = `${therapist.personName} — ${activePackage.durationMinutes} Minutes`;
-      showToast(`Added to cart\n${label}`);
+      showSnackbar(`Added to cart: ${label}`, { variant: 'success' });
     } catch (err) {
       const message = err instanceof ApiRequestError ? err.message : 'Unable to add item to cart.';
       setActionError(message);
-      showToast(message, 'error');
+      showSnackbar(message, { variant: 'error' });
     } finally {
       setSubmitting(false);
     }
   };
-
   return (
     <>
-      {/* Selected therapist preview */}
       <div className="vendor-page__selected-deal">
         {primaryImage(resolveTherapistMedia(therapist)) && (
           <img
@@ -945,14 +772,9 @@ function TherapistSelectionPanel({
           <div className="vendor-page__selected-name">{displayName}</div>
         </div>
       </div>
-
       <Divider />
-
-      <TherapistPackageSelector selection={selection} />
-
+      <DurationPackageSelector selection={selection} emptyText={content.therapistDetail.noPackages} />
       <Divider />
-
-      {/* Quantity */}
       <div className="vendor-page__stepper-row" role="group" aria-label="Quantity">
         <span className="vendor-page__stepper-label">Quantity</span>
         <div className="vendor-page__stepper-controls">
@@ -974,18 +796,13 @@ function TherapistSelectionPanel({
           </OutlinedIconButton>
         </div>
       </div>
-
-      {/* Total */}
       <div className="vendor-page__total-row">
         <span>Total</span>
         <strong className="vendor-page__total-amount">{formatINR(total)}</strong>
       </div>
-
       {missingSelection && <p className="field-hint" role="status">{missingSelection}</p>}
       {actionError && <p className="error-state" role="alert">{actionError}</p>}
       {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
-
-      {/* CTA */}
       <div className="vendor-page__cta-row">
         <FilledButton
           onClick={addToCart}
@@ -996,8 +813,6 @@ function TherapistSelectionPanel({
           {submitting ? 'Adding…' : 'Add to Cart'}
         </FilledButton>
       </div>
-
-      {/* Details — only what the API actually returns, nothing fabricated */}
       {(therapist.specialization || therapist.bio) && (
         <>
           <Divider />
@@ -1014,5 +829,4 @@ function TherapistSelectionPanel({
     </>
   );
 }
-
 export default VendorPage;

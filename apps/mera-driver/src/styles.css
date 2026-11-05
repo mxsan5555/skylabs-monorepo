@@ -1164,3 +1164,17 @@ md-ride-confirmed {
   margin: 0;
   color: var(--md-sys-color-on-surface);
 }
+
+/* Keep admin pages within the existing shell while using all available width. */
+.admin-content { max-width: none; width: 100%; box-sizing: border-box; }
+
+.admin-layout .admin-content .admin-page { max-width: none !important; width: 100%; }
+
+.md-sidebar-mobile-close { display: none; }
+@media (max-width: 767px) { .md-sidebar-mobile-close { display: block; position: absolute; top: 12px; right: 12px; z-index: 2; } }
+
+/* Driver portal: the persistent sidebar (`.admin-layout`, reused as-is) replaces the bottom
+ * tab bar's reason to exist on wider viewports — keep it for mobile thumb access only. */
+@media (min-width: 768px) {
+  .driver-rider-nav { display: none; }
+}

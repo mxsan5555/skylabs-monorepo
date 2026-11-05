@@ -1,0 +1,130 @@
+{
+  "before": {
+    "drivers": 7,
+    "customers": 2,
+    "bookings": 1,
+    "users": 12
+  },
+  "after": {
+    "drivers": 7,
+    "customers": 2,
+    "bookings": 1,
+    "users": 12
+  },
+  "evidence": [
+    {
+      "action": "Save & Next",
+      "path": "/drivers",
+      "httpStatus": 201,
+      "payload": {
+        "firstName": "Preference Add Fixture",
+        "lastName": "",
+        "fatherName": "",
+        "motherName": "",
+        "phone": "",
+        "dob": "",
+        "maritalStatus": "Unmarried",
+        "gender": "Male",
+        "language": "Hindi",
+        "vehicle": "",
+        "stepCompleted": 1,
+        "subStepCompleted": 0
+      }
+    },
+    {
+      "action": "Save draft",
+      "path": "/drivers/613b8a00-4b60-4692-b623-a3b4272729b5",
+      "httpStatus": 200,
+      "payload": {
+        "email": "preference-fixture@example.invalid",
+        "phone": "9876543210",
+        "emergencyNumber": "",
+        "state": "Maharashtra",
+        "pincode": "",
+        "address": "",
+        "city": "Pune",
+        "stepCompleted": 1,
+        "subStepCompleted": 1,
+        "completeStep": false
+      }
+    },
+    {
+      "action": "Save draft",
+      "path": "/drivers/613b8a00-4b60-4692-b623-a3b4272729b5",
+      "httpStatus": 200,
+      "payload": {
+        "driverType": "Ambulance",
+        "sourceType": "",
+        "avatar": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a4V8AAAAASUVORK5CYII=",
+        "jobType": "Full Time, Part Time",
+        "jobChoices": [
+          "Office Work",
+          "Personal Driver"
+        ],
+        "workLocation": "Other States",
+        "workStates": [
+          "Maharashtra",
+          "Delhi"
+        ],
+        "experience": "1 Year",
+        "stepCompleted": 1,
+        "subStepCompleted": 3,
+        "completeStep": false
+      }
+    },
+    {
+      "action": "Save draft",
+      "path": "/drivers/613b8a00-4b60-4692-b623-a3b4272729b5",
+      "httpStatus": 200,
+      "payload": {
+        "licenseDetails": "LMV",
+        "vehicleType": "Sedan, Preference vehicle fixture",
+        "dlNo": "",
+        "dlIssueDate": "",
+        "dlExpiryDate": "",
+        "stepCompleted": 3,
+        "subStepCompleted": 0,
+        "completeStep": false
+      }
+    },
+    {
+      "action": "Save Changes",
+      "path": "/drivers/613b8a00-4b60-4692-b623-a3b4272729b5",
+      "httpStatus": 200,
+      "payload": {
+        "preferredPaymentMode": "Bank Account",
+        "amount": "500",
+        "paymentReceiptDate": "",
+        "stepCompleted": 4,
+        "subStepCompleted": 1
+      }
+    },
+    {
+      "flow": "Add -> Edit/resume -> Details, multiple master selections, inactive historical value, registration save separate from KYC/fee Paid",
+      "verified": true
+    },
+    {
+      "flow": "Super Admin full queue / verifier own queue / unassigned and issues / reassign reason/history",
+      "verified": true,
+      "adminTotal": 10,
+      "ownTotal": 1
+    },
+    {
+      "flow": "Customer deactivation acknowledgement, audit, old booking retained and new booking denied",
+      "verified": true
+    },
+    {
+      "flow": "Paged compact Dispatch, work state/job/vehicle matching, eligible picker and audited assignment",
+      "verified": true
+    },
+    {
+      "flow": "Unconfigured address provider shows explicit error and preserves manual input; no browser key",
+      "verified": true
+    }
+  ],
+  "limitations": [
+    "Isolated local fixture records; signed local role tokens",
+    "No paid location/IDSPay/payment request",
+    "Eligibility fixtures have saved approved status; existing connected smoke covers human final approval and concurrent acceptance"
+  ]
+}

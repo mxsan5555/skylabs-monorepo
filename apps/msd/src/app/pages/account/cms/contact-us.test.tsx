@@ -1,8 +1,9 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ToastProvider } from '../../../../toast/toast-context';
+import { SnackbarHost } from '../../../../snackbar/snackbar';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import type { ContactUsContent } from '../../../../api/rbac/site-content';
+import { ContactUsPage } from './contact-us';
 
 let canEditContactUs = true;
 
@@ -25,12 +26,11 @@ vi.mock('../../../../api/rbac/site-content', async () => {
   };
 });
 
-import { ContactUsPage } from './contact-us';
 
 const SAVED: ContactUsContent = {
   id: 'singleton',
   address: '123 Main St',
-  phone: '555-0100',
+  phone: '9876543210',
   email: 'hello@skylabs.dev',
   mapEmbedUrl: 'https://maps.example.com/embed',
   socialLinks: [{ platform: 'Instagram', url: 'https://instagram.com/skylabs' }],
@@ -53,9 +53,10 @@ const EMPTY_DEFAULTS: ContactUsContent = {
 
 function renderPage() {
   return render(
-    <ToastProvider>
+    <>
       <ContactUsPage />
-    </ToastProvider>,
+      <SnackbarHost />
+    </>,
   );
 }
 
@@ -72,7 +73,7 @@ beforeEach(() => {
 
 /**
  * Feature: Contact Us singleton admin form
- * Scenario: same GET-on-mount/PATCH-on-save/toast/field-error shape as About Us (no media —
+ * Scenario: same GET-on-mount/PATCH-on-save/snackbar/field-error shape as About Us (no media —
  * `ContactUsContent` has no gallery, see msd-api's schema doc comment).
  *
  * Given: the admin Contact Us screen
@@ -110,7 +111,7 @@ describe('ContactUsPage', () => {
     expect(await screen.findByText('Could not load Contact Us content.')).toBeTruthy();
   });
 
-  it('Save calls updateContactUs with the loaded content (unmodified) and shows a success toast', async () => {
+  it('Save calls updateContactUs with the loaded content (unmodified) and shows a success snackbar', async () => {
     getContactUsMock.mockResolvedValue({ data: SAVED });
     updateContactUsMock.mockResolvedValue({ data: SAVED });
     renderPage();

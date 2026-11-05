@@ -90,8 +90,9 @@ export function Reports() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    listVendors(token, { pageSize: 100 }).then(({ data }) => setVendors(data)).catch(() => {});
-    listAllBranches(token, { pageSize: 100 }).then(({ data }) => setBranches(data)).catch(() => {});
+    // Filter options only: on failure the filters stay empty and the reports still load.
+    listVendors(token, { pageSize: 100 }).then(({ data }) => setVendors(data)).catch(() => setVendors([]));
+    listAllBranches(token, { pageSize: 100 }).then(({ data }) => setBranches(data)).catch(() => setBranches([]));
   }, [token]);
 
   const load = useCallback((filters: ReportFilters) => {

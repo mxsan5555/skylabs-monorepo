@@ -1,0 +1,67 @@
+directions_car
+mera-driver
+Driver console
+dashboard
+Dashboard
+people
+Customers
+sports_motorsports
+Drivers
+directions_car
+Vehicles
+route
+TRIPS & BOOKINGS
+expand_more
+route
+Admin Dispatch
+sell
+Pricing
+event_available
+Attendance
+account_balance
+ACCOUNTS
+expand_more
+local_offer
+PROMOTIONS
+expand_more
+quiz
+FAQs
+rate_review
+Feedback
+insights
+Reports
+category
+DRIVER MASTERS
+expand_more
+admin_panel_settings
+ADMINISTRATION
+expand_more
+fact_check
+KYC Assignments
+settings
+Settings
+list
+Job Types
+list
+Job Choices
+list
+Work States
+list
+Driver Statuses
+S
+Super Admin
+9889259224
+person
+logout
+dock_to_right
+Account
+KYC Assignments
+KYC Assignments
+
+Permission-scoped KYC assignments and current review state.
+
+All
+Unassigned (0)
+Assigned (3)
+Issues Raised (2)
+Completed (5)

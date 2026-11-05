@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiRequestError } from '../api/rbac/client';
 import { HOME_DEALS_PAGE_SIZE, HOME_RAIL_SIZE } from '../app/pages/home/home-data';
-import { loadCategoryData, loadHomeData, loadShellData } from './loaders';
+import { loadCategoryData, loadHomeData, loadShellData, loadSitemapSlugs } from './loaders';
 
 const m = vi.hoisted(() => ({
   categories: vi.fn(),
@@ -55,6 +55,26 @@ describe('loadShellData', () => {
     const data = await loadShellData();
     expect(data.locations).toEqual([]);
     expect(data.categories).toEqual([{ id: 'c1' }]);
+  });
+});
+
+describe('loadSitemapSlugs', () => {
+  it('uses each record\'s slug, falling back to id only when slug is missing', async () => {
+    m.deals.mockResolvedValue({ data: [{ id: 'd1', slug: 'deep-tissue-massage' }, { id: 'd2', slug: null }] });
+    m.products.mockResolvedValue({ data: [{ id: 'p1', slug: 'herbal-oil' }] });
+    m.therapists.mockResolvedValue({ data: [{ id: 't1', slug: 'amit-verma' }] });
+    expect(await loadSitemapSlugs()).toEqual({
+      deals: ['deep-tissue-massage', 'd2'],
+      products: ['herbal-oil'],
+      therapists: ['amit-verma'],
+    });
+  });
+
+  it('a failing catalog list yields [] for that catalog only', async () => {
+    m.products.mockRejectedValue(new Error('down'));
+    const result = await loadSitemapSlugs();
+    expect(result.products).toEqual([]);
+    expect(result.deals).toEqual(['d1']);
   });
 });
 

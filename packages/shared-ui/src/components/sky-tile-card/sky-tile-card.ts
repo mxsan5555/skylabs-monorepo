@@ -33,7 +33,8 @@ import {
  * as an SEO escape hatch when crawlers must see a real link; omit `href` then, since the slotted
  * link is the tile's link. In that case the consumer supplies the stretched-link CSS themselves
  * (a light-DOM `a::after { position: absolute; inset: 0; }` works because `.surface` is the
- * containing block) and loses the `md-ripple`/`md-focus-ring` state layer that `href` gets.
+ * containing block) and the focus ring. A slotted headline that holds a link gets the same M3
+ * hover/press state layer `href` gets (CSS, no ripple animation).
  * Prefer `href` when crawlability of the link itself isn't a requirement.
  *
  * With `href` and a slotted headline, the stretched link's `aria-labelledby` points at the
@@ -57,6 +58,7 @@ export class SkyTileCard extends LitElement {
     iconShape: { type: String, reflect: true, attribute: 'icon-shape' },
     align: { type: String, reflect: true },
     slottedHeadline: { state: true },
+    linkedHeadline: { state: true },
   };
 
   declare icon?: string;
@@ -70,6 +72,7 @@ export class SkyTileCard extends LitElement {
   declare iconShape: SkyShape;
   declare align: 'start' | 'center';
   declare slottedHeadline: boolean;
+  declare linkedHeadline: boolean;
 
   constructor() {
     super();
@@ -80,6 +83,7 @@ export class SkyTileCard extends LitElement {
     this.iconShape = 'medium';
     this.align = 'start';
     this.slottedHeadline = false;
+    this.linkedHeadline = false;
   }
 
   static override styles = css`
@@ -103,11 +107,34 @@ export class SkyTileCard extends LitElement {
     .icon {
       margin-block-end: 12px;
     }
+    /* M3 hover/press state layer for a tile whose slotted headline is its link. */
+    .surface.linked::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background-color: var(--_on);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity var(--md-sys-motion-duration-short2) linear;
+    }
+    :host(:hover) .surface.linked::before {
+      opacity: var(--md-sys-state-hover-state-layer-opacity);
+    }
+    :host(:active) .surface.linked::before {
+      opacity: var(--md-sys-state-pressed-state-layer-opacity);
+    }
     :host([align='center']) .surface {
       align-items: center;
       text-align: center;
     }
   `;
+
+  private onHeadlineSlotChange = (e: Event) => {
+    const assigned = (e.target as HTMLSlotElement).assignedElements();
+    this.slottedHeadline = assigned.length > 0;
+    this.linkedHeadline = assigned.some((el) => el.matches('a[href]') || el.querySelector('a[href]') !== null);
+  };
 
   protected override render() {
     // Only reference ids that actually exist in the rendered tree, so aria-labelledby never
@@ -118,13 +145,12 @@ export class SkyTileCard extends LitElement {
       .join(' ');
 
     return html`
-      <article class="surface">
+      <article class=${this.linkedHeadline ? 'surface linked' : 'surface'}>
         ${this.icon ? html`<span class="icon"><md-icon aria-hidden="true">${this.icon}</md-icon></span>` : nothing}
         <slot
           name="headline"
           id="headline"
-          @slotchange=${(e: Event) =>
-            (this.slottedHeadline = (e.target as HTMLSlotElement).assignedElements().length > 0)}
+          @slotchange=${this.onHeadlineSlotChange}
         >
           ${this.headline ? html`<h3 class="title-medium">${this.headline}</h3>` : nothing}
         </slot>

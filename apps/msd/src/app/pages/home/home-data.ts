@@ -14,7 +14,7 @@ import {
 import { ApiRequestError } from '../../../api/rbac/client';
 import type { Coordinates } from '../../../location/geo';
 import { type DealCardDeal } from '../../components/deal-card';
-import { resolveDealMedia } from '../../../utils/media';
+import { resolveDealMedia, resolveProductMedia, } from '../../../utils/media';
 import content from '../../../content.json';
 import { usePrerenderedData } from '../../../prerender-data/prerender-data';
 import type { HomeData } from '../../../prerender-data/loaders';
@@ -25,7 +25,7 @@ const { home } = content;
  * Adapts a real `CatalogDeal` into the shape `DealCard` renders. Real deals carry no
  * rating/reviews (no such fields exist on the real `Deal` model), so those stay `undefined`
  * rather than fabricated. `distance` is the real Haversine `distanceKm` computed server-side only
- * when the caller's coordinates were sent (see `useCurrentLocation`).
+ * when the caller's coordinates were sent (see `useVisitorLocation`).
  */
 export function toDealCardDeal(deal: CatalogDeal): DealCardDeal {
   const salePrice = Number(deal.salePrice);
@@ -33,6 +33,7 @@ export function toDealCardDeal(deal: CatalogDeal): DealCardDeal {
   const media = resolveDealMedia(deal);
   return {
     id: deal.id,
+    slug: deal.slug,
     title: deal.title,
     image: media.images[0] ?? '',
     imageAlt: deal.title,
@@ -49,18 +50,30 @@ export function toDealCardDeal(deal: CatalogDeal): DealCardDeal {
   };
 }
 
+
 export function toProductCardDeal(product: CatalogProduct): DealCardDeal {
   const price = Number(product.price);
-  const originalPrice = product.originalPrice != null ? Number(product.originalPrice) : undefined;
+  const originalPrice =
+    product.originalPrice != null
+      ? Number(product.originalPrice)
+      : undefined;
+
+  const media = resolveProductMedia(product);
+
   return {
     id: product.id,
+    slug: product.slug,
     title: product.name,
-    image: product.image ?? '',
+    image: media.images[0] ?? '',
     imageAlt: product.imageAlt ?? product.name,
+    gallery: media.images.length > 0 ? media.images : undefined,
     providerName: product.vendor?.businessName ?? undefined,
     location: product.vendor?.city ?? undefined,
     price,
-    originalPrice: originalPrice != null && originalPrice !== price ? originalPrice : undefined,
+    originalPrice:
+      originalPrice != null && originalPrice !== price
+        ? originalPrice
+        : undefined,
     discount: product.discount ?? undefined,
     priceNote: home.ui.labels.product,
     tag: product.popularTags?.[0]?.name,
@@ -93,8 +106,22 @@ export function useHomeCatalog(coords: Coordinates | null | undefined): HomeCata
   const prerendered = !!initial;
   const [state, setState] = useState<Omit<HomeCatalog, 'faqs'>>(() =>
     initial
-      ? { status: 'ready', error: '', deals: initial.deals, products: initial.products, therapists: initial.therapists }
-      : { status: 'loading', error: '', deals: [], products: [], therapists: [] },
+      ? {
+        status: 'ready',
+        error: '',
+        deals: initial.deals,
+        products: initial.products,
+        therapists: initial.therapists,
+        popularTreatments: initial.popularTreatments ?? [],
+      }
+      : {
+        status: 'loading',
+        error: '',
+        deals: [],
+        products: [],
+        therapists: [],
+        popularTreatments: [],
+      }
   );
   const [faqs, setFaqs] = useState<CatalogFaq[]>(() => initial?.faqs ?? []);
   const [popularTreatments, setPopularTreatments] = useState<CatalogPopularTreatmentGroup[]>(
@@ -121,8 +148,16 @@ export function useHomeCatalog(coords: Coordinates | null | undefined): HomeCata
     ])
       .then(([deals, products, therapists]) => {
         if (cancelled) return;
+
         hasLoadedRef.current = true;
-        setState({ status: 'ready', error: '', deals: deals.data ?? [], products: products.data ?? [], therapists: therapists.data ?? [] });
+        setState((previous) => ({
+          ...previous,
+          status: 'ready',
+          error: '',
+          deals: deals.data ?? [],
+          products: products.data ?? [],
+          therapists: therapists.data ?? [],
+        }));
       })
       .catch((err) => {
         // Stale-while-revalidate: once data has loaded, a failed refetch keeps it on screen.

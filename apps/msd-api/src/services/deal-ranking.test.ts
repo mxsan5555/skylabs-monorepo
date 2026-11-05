@@ -93,3 +93,28 @@ describe('computeDealFacets', () => {
     expect(computeDealFacets([], { vendorIds: [], branchIds: [] }).price).toBeNull();
   });
 });
+
+describe('computeDealFacets tags (ST-40)', () => {
+  const rows = [row('a', 1, { tag: 'hot' }), row('b', 1, { tag: 'hot', vendorId: 'v2' }), row('c', 1, { tag: 'new' }), row('d', 1, { tag: null })];
+
+  it('counts every tag in rule order, zeros included, ignoring its own selection', () => {
+    const facets = computeDealFacets(rows, { vendorIds: [], branchIds: [], tags: ['new'] });
+    expect(facets.tags).toEqual([
+      { tag: 'expire_soon', count: 0 },
+      { tag: 'hot', count: 2 },
+      { tag: 'new', count: 1 },
+      { tag: 'deal', count: 0 },
+    ]);
+  });
+
+  it('applies the tag selection to the other facets', () => {
+    const facets = computeDealFacets(rows, { vendorIds: [], branchIds: [], tags: ['new'] });
+    expect(facets.vendors.find((v) => v.id === 'v1')?.count).toBe(1);
+    expect(facets.vendors.find((v) => v.id === 'v2')?.count).toBe(0);
+  });
+
+  it('leaves rows without a price out of the price range', () => {
+    const facets = computeDealFacets([row('a', 1, { salePrice: 'NaN' }), row('b', 1, { salePrice: '250' })], { vendorIds: [], branchIds: [] });
+    expect(facets.price).toEqual({ min: 250, max: 250 });
+  });
+});

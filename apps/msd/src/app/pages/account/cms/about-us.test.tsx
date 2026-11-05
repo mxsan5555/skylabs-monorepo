@@ -1,8 +1,9 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ToastProvider } from '../../../../toast/toast-context';
+import { SnackbarHost } from '../../../../snackbar/snackbar';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import type { AboutUsContent } from '../../../../api/rbac/site-content';
+import { AboutUsPage } from './about-us';
 
 let canEditAboutUs = true;
 
@@ -38,7 +39,6 @@ vi.mock('../../../../api/media', async () => {
   };
 });
 
-import { AboutUsPage } from './about-us';
 
 const SAVED: AboutUsContent = {
   id: 'singleton',
@@ -66,9 +66,10 @@ const EMPTY_DEFAULTS: AboutUsContent = {
 
 function renderPage() {
   return render(
-    <ToastProvider>
+    <>
       <AboutUsPage />
-    </ToastProvider>,
+      <SnackbarHost />
+    </>,
   );
 }
 
@@ -126,7 +127,7 @@ describe('AboutUsPage', () => {
     expect(await screen.findByText('Could not load About Us content.')).toBeTruthy();
   });
 
-  it('Save calls updateAboutUs with the loaded content (unmodified) and shows a success toast', async () => {
+  it('Save calls updateAboutUs with the loaded content (unmodified) and shows a success snackbar', async () => {
     getAboutUsMock.mockResolvedValue({ data: SAVED });
     updateAboutUsMock.mockResolvedValue({ data: SAVED });
     renderPage();

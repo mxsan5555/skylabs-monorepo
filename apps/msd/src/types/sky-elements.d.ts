@@ -5,9 +5,11 @@
  * in main.tsx. This file only teaches TSX about the tags and their props so raw
  * `<sky-*>` tags type-check without `any`.
  *
- * React 19 passes unknown camelCase props as DOM properties, which LIT reads
- * natively — so prop names here match the LIT class property names (camelCase),
- * not the HTML attribute names (kebab-case).
+ * Prop names here match the LIT class property names. On the client React 19
+ * sets them as DOM properties, but server rendering writes them as attributes and
+ * hydration does not set them again, so `priceFirst` is lost as `pricefirst`.
+ * In JSX write any option whose attribute is kebab-case in that form
+ * (`price-first`, `image-alt`); `src/sky-element-props.test.ts` enforces it.
  */
 import type { DetailedHTMLProps, HTMLAttributes } from 'react';
 
@@ -39,6 +41,13 @@ type SkyFeatureProps = SkySurface &
     'cta-href'?: string;
     'cta-icon'?: string;
     layout?: 'vertical' | 'horizontal';
+    /** Button role (CTA banners); default is the card's accent. */
+    ctaColor?: 'primary' | 'secondary' | 'tertiary' | 'inverse';
+    'cta-color'?: 'primary' | 'secondary' | 'tertiary' | 'inverse';
+    /** Leading media; without alt text the image is decorative. */
+    image?: string;
+    imageAlt?: string;
+    'image-alt'?: string;
   };
 
 declare module 'react' {
@@ -49,6 +58,8 @@ declare module 'react' {
       'sky-badge': SkyEl<{
         variant?: 'primary' | 'secondary' | 'tertiary' | 'error' | string;
         size?: 'small' | 'medium' | 'large' | string;
+        /** Tonal status chip; replaces `variant`. */
+        status?: 'success' | 'warning' | 'error' | 'info' | 'neutral';
       }>;
 
       // ── sky-card ───────────────────────────────────────────────────────────
@@ -62,13 +73,25 @@ declare module 'react' {
         imageAlt?: string;
         gallery?: string[];
         variant?: 'plain' | 'outlined';
+        /** M3 colour role (same vocabulary as sky-feature-card); unset keeps the default look. */
+        color?: 'none' | 'surface' | 'surface-high' | 'primary' | 'secondary' | 'tertiary' | 'inverse';
         badge?: string;
+        /** Theme role for the badge (sky-badge variant); unset keeps the default primary pill. */
+        badgeColor?: 'primary' | 'secondary' | 'tertiary' | 'error';
+        /** `tonal`: the role's container colours (default: filled). */
+        badgeTone?: 'filled' | 'tonal';
         favorite?: boolean;
         favoriteActive?: boolean;
         tag?: string;
         tagIcon?: string;
         eyebrow?: string;
         heading?: string;
+        /** Supporting text under the heading. */
+        description?: string;
+        /** Offer order: price + rating row first, member and location after the text. */
+        priceFirst?: boolean;
+        /** With priceFirst: divider, then member and place on one line each. */
+        divided?: boolean;
         location?: string;
         distance?: string;
         rating?: number;
@@ -148,6 +171,12 @@ declare module 'react' {
         dense?: boolean;
         required?: boolean;
         disabled?: boolean;
+        clearable?: boolean;
+        clearLabel?: string;
+        combobox?: boolean;
+        expanded?: boolean;
+        controlsElement?: globalThis.Element | null;
+        activeOption?: globalThis.Element | null;
         /** React 19 attaches on<event> props on custom elements as listeners. */
         'onsky-submit'?: (event: CustomEvent<{ value: string }>) => void;
       }>;
@@ -196,6 +225,34 @@ declare module 'react' {
       // ── sky-feature-card / sky-cta-banner ──────────────────────────────────
       'sky-feature-card': SkyEl<SkyFeatureProps>;
       'sky-cta-banner': SkyEl<SkyFeatureProps>;
+
+      // ── sky-rich-text-editor (opt-in: @skylabs-monorepo/shared-ui/editor) ──
+      'sky-rich-text-editor': SkyEl<{
+        value?: string;
+        placeholder?: string;
+        label?: string;
+        readOnly?: boolean;
+        /** React 19 attaches on<event> props on custom elements as listeners. */
+        'onsky-change'?: (event: CustomEvent<{ html: string; text: string }>) => void;
+      }>;
+
+      // ── sky-snackbar ─────────────────────────────────────────────────────
+      'sky-snackbar': SkyEl<{
+        variant?: 'neutral' | 'success' | 'warning' | 'error' | 'info';
+        actionLabel?: string;
+        /** Attribute form of `actionLabel`; survives server rendering / prerendering. */
+        'action-label'?: string;
+        closable?: boolean;
+        'close-label'?: string;
+        duration?: number;
+        icon?: string;
+        open?: boolean;
+        /** React 19 attaches on<event> props on custom elements as listeners. */
+        'onsky-action'?: (event: CustomEvent<void>) => void;
+        'onsky-closed'?: (
+          event: CustomEvent<{ reason: 'timeout' | 'action' | 'close' | 'manual' }>,
+        ) => void;
+      }>;
     }
   }
 }

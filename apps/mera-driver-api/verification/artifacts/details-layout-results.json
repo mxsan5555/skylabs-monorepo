@@ -1,0 +1,25 @@
+{
+  "uploadedPhoto": true,
+  "replacedPhotoVersion": 2,
+  "missingAndDamagedFallback": true,
+  "allFieldsPreserved": true,
+  "documents": 4,
+  "inlinePdf": true,
+  "protectedOriginalDownload": true,
+  "readOnlyStaffPermissions": true,
+  "mobileNoOverflow": true,
+  "baseline": {
+    "drivers": 7,
+    "users": 14,
+    "roles": 13
+  },
+  "after": {
+    "drivers": 7,
+    "users": 14,
+    "roles": 13
+  },
+  "limitations": [
+    "Local signed tokens; password login not exercised",
+    "Approved screenshot was not available"
+  ]
+}

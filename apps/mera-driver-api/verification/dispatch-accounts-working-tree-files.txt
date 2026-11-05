@@ -1,0 +1,236 @@
+ M apps/mera-driver-api/.env.example
+ M apps/mera-driver-api/prisma/schema.prisma
+ M apps/mera-driver-api/src/app.ts
+ M apps/mera-driver-api/src/config/load-env.ts
+ M apps/mera-driver-api/src/lib/resolveOwnCustomer.ts
+ M apps/mera-driver-api/src/lib/resolveOwnDriver.ts
+ M apps/mera-driver-api/src/main.ts
+ M apps/mera-driver-api/src/routes/driverSelf.routes.test.ts
+ M apps/mera-driver-api/src/routes/driverSelf.routes.ts
+ M apps/mera-driver-api/src/routes/drivers.routes.test.ts
+ M apps/mera-driver-api/src/routes/drivers.routes.ts
+ D apps/mera-driver-api/src/routes/payments.routes.ts
+ M apps/mera-driver-api/src/schemas/business.schema.ts
+ M apps/mera-driver-api/src/services/booking.service.ts
+ M apps/mera-driver-api/src/services/bootstrap.service.ts
+ M apps/mera-driver-api/src/services/customer.service.test.ts
+ M apps/mera-driver-api/src/services/customer.service.ts
+ M apps/mera-driver-api/src/services/driver.service.test.ts
+ M apps/mera-driver-api/src/services/driver.service.ts
+ M apps/mera-driver-api/src/services/user.service.test.ts
+ M apps/mera-driver-api/src/services/user.service.ts
+ M apps/mera-driver-api/src/test-utils/prisma-mock.ts
+ M apps/mera-driver/src/app/app.routes.spec.ts
+ M apps/mera-driver/src/app/app.routes.ts
+ M apps/mera-driver/src/app/core/auth/admin-area.guard.ts
+ M apps/mera-driver/src/app/core/booking/booking.service.ts
+ M apps/mera-driver/src/app/core/drivers/driver-self-api.service.ts
+ M apps/mera-driver/src/app/core/drivers/drivers-api.service.ts
+ M apps/mera-driver/src/app/layouts/customer-layout/customer-layout.ts
+ M apps/mera-driver/src/app/layouts/driver-layout/driver-layout.ts
+ M apps/mera-driver/src/app/pages/account/administration/users/users.spec.ts
+ M apps/mera-driver/src/app/pages/account/drivers/drivers.html
+ M apps/mera-driver/src/app/pages/account/drivers/drivers.spec.ts
+ M apps/mera-driver/src/app/pages/account/drivers/drivers.ts
+ M apps/mera-driver/src/app/pages/account/kyc-assignments/kyc-assignments.html
+ M apps/mera-driver/src/app/pages/account/kyc-assignments/kyc-assignments.ts
+ D apps/mera-driver/src/app/pages/account/payments/driver-payouts/driver-payouts.html
+ D apps/mera-driver/src/app/pages/account/payments/driver-payouts/driver-payouts.ts
+ D apps/mera-driver/src/app/pages/account/payments/payments.html
+ D apps/mera-driver/src/app/pages/account/payments/payments.ts
+ D apps/mera-driver/src/app/pages/account/payments/wallet-transactions/wallet-transactions.html
+ D apps/mera-driver/src/app/pages/account/payments/wallet-transactions/wallet-transactions.ts
+ M apps/mera-driver/src/app/pages/account/trips/bookings/bookings.ts
+ M apps/mera-driver/src/app/pages/customer/dashboard/dashboard.html
+ M apps/mera-driver/src/app/pages/customer/dashboard/dashboard.ts
+ M apps/mera-driver/src/app/pages/driver/dashboard/dashboard.html
+ M apps/mera-driver/src/app/pages/driver/dashboard/dashboard.ts
+ M apps/mera-driver/src/app/pages/driver/documents/documents.html
+ M apps/mera-driver/src/app/pages/driver/documents/documents.ts
+ M apps/mera-driver/src/app/pages/driver/kyc/kyc.html
+ M apps/mera-driver/src/app/pages/driver/kyc/kyc.ts
+ M apps/mera-driver/src/app/pages/driver/profile-completion.spec.ts
+ M apps/mera-driver/src/app/pages/driver/profile/profile.html
+ M apps/mera-driver/src/app/pages/driver/profile/profile.ts
+ M apps/mera-driver/src/app/pages/ride/options/options.ts
+ M apps/mera-driver/src/app/pages/ride/payment/payment.html
+ M apps/mera-driver/src/app/pages/ride/payment/payment.ts
+?? apps/mera-driver-api/DISPATCH-ACCOUNTS-SCALE-REPORT.md
+?? apps/mera-driver-api/DRIVER-DETAILS-REPORT.md
+?? apps/mera-driver-api/DRIVER-LIST-LAYOUT-REPORT.md
+?? apps/mera-driver-api/DRIVER-RESUME-REPORT.md
+?? apps/mera-driver-api/ONBOARDING-SAVE-FIX-REPORT.md
+?? apps/mera-driver-api/PAYMENT-COD-ROUTE-FIX-REPORT.md
+?? apps/mera-driver-api/WORKFLOW-IMPLEMENTATION-REPORT.md
+?? apps/mera-driver-api/prisma/migrations/20260930100000_driver_pill_review/migration.sql
+?? apps/mera-driver-api/prisma/migrations/20260930120000_connected_workflow/migration.sql
+?? apps/mera-driver-api/prisma/migrations/20260930130000_payment_intents/migration.sql
+?? apps/mera-driver-api/prisma/migrations/20260930140000_workflow_integrity/migration.sql
+?? apps/mera-driver-api/prisma/migrations/20261001100000_driver_resume_profile/migration.sql
+?? apps/mera-driver-api/prisma/migrations/20261001130000_fare_driver_skill/migration.sql
+?? apps/mera-driver-api/src/middleware/authorizeDriverUpload.test.ts
+?? apps/mera-driver-api/src/middleware/authorizeDriverUpload.ts
+?? apps/mera-driver-api/src/providers/idspay/dl.provider.test.ts
+?? apps/mera-driver-api/src/providers/idspay/dl.provider.ts
+?? apps/mera-driver-api/src/providers/idspay/dl.response.test.ts
+?? apps/mera-driver-api/src/providers/idspay/dl.response.ts
+?? apps/mera-driver-api/src/routes/workflow.routes.test.ts
+?? apps/mera-driver-api/src/routes/workflow.routes.ts
+?? apps/mera-driver-api/src/schemas/driver-resume.schema.ts
+?? apps/mera-driver-api/src/services/accounts-pagination.service.test.ts
+?? apps/mera-driver-api/src/services/accounts.service.ts
+?? apps/mera-driver-api/src/services/booking-invoice.service.ts
+?? apps/mera-driver-api/src/services/document-history.service.test.ts
+?? apps/mera-driver-api/src/services/driver-approval.service.test.ts
+?? apps/mera-driver-api/src/services/driver-details.service.test.ts
+?? apps/mera-driver-api/src/services/driver-details.service.ts
+?? apps/mera-driver-api/src/services/driver-dl.service.test.ts
+?? apps/mera-driver-api/src/services/driver-dl.service.ts
+?? apps/mera-driver-api/src/services/driver-list.service.test.ts
+?? apps/mera-driver-api/src/services/driver-list.service.ts
+?? apps/mera-driver-api/src/services/driver-onboarding.service.test.ts
+?? apps/mera-driver-api/src/services/driver-onboarding.service.ts
+?? apps/mera-driver-api/src/services/driver-pdf.service.ts
+?? apps/mera-driver-api/src/services/driver-pill.service.test.ts
+?? apps/mera-driver-api/src/services/driver-pill.service.ts
+?? apps/mera-driver-api/src/services/driver-readiness-sql.ts
+?? apps/mera-driver-api/src/services/driver-report.service.test.ts
+?? apps/mera-driver-api/src/services/driver-report.service.ts
+?? apps/mera-driver-api/src/services/driver-resume.service.test.ts
+?? apps/mera-driver-api/src/services/driver-resume.service.ts
+?? apps/mera-driver-api/src/services/licence-policy.service.test.ts
+?? apps/mera-driver-api/src/services/licence-policy.service.ts
+?? apps/mera-driver-api/src/services/payment-provider.service.test.ts
+?? apps/mera-driver-api/src/services/payment-provider.service.ts
+?? apps/mera-driver-api/src/services/trip-workflow.service.ts
+?? apps/mera-driver-api/src/services/workflow-menu.ts
+?? apps/mera-driver-api/src/services/workflow.service.test.ts
+?? apps/mera-driver-api/verification/.gitignore
+?? apps/mera-driver-api/verification/artifacts/accounts-booking-payments.png
+?? apps/mera-driver-api/verification/artifacts/accounts-commissions.png
+?? apps/mera-driver-api/verification/artifacts/accounts-driver-payouts.png
+?? apps/mera-driver-api/verification/artifacts/accounts-overview.png
+?? apps/mera-driver-api/verification/artifacts/accounts-refunds-adjustments.png
+?? apps/mera-driver-api/verification/artifacts/accounts-registration-fees.png
+?? apps/mera-driver-api/verification/artifacts/accounts-reports.png
+?? apps/mera-driver-api/verification/artifacts/accounts-verified-totals.png
+?? apps/mera-driver-api/verification/artifacts/admin-dispatch.png
+?? apps/mera-driver-api/verification/artifacts/booking-invoice.pdf
+?? apps/mera-driver-api/verification/artifacts/connected-failure-0.png
+?? apps/mera-driver-api/verification/artifacts/connected-failure-0.txt
+?? apps/mera-driver-api/verification/artifacts/connected-failure-1.png
+?? apps/mera-driver-api/verification/artifacts/connected-failure-1.txt
+?? apps/mera-driver-api/verification/artifacts/connected-failure-2.png
+?? apps/mera-driver-api/verification/artifacts/connected-failure-2.txt
+?? apps/mera-driver-api/verification/artifacts/connected-failure-3.png
+?? apps/mera-driver-api/verification/artifacts/connected-failure-3.txt
+?? apps/mera-driver-api/verification/artifacts/connected-failure-4.png
+?? apps/mera-driver-api/verification/artifacts/connected-failure-4.txt
+?? apps/mera-driver-api/verification/artifacts/connected-results.json
+?? apps/mera-driver-api/verification/artifacts/customer-assigned-driver.png
+?? apps/mera-driver-api/verification/artifacts/customer-booking.png
+?? apps/mera-driver-api/verification/artifacts/customer-finding-driver.png
+?? apps/mera-driver-api/verification/artifacts/customer-mobile.png
+?? apps/mera-driver-api/verification/artifacts/details-layout-complete.png
+?? apps/mera-driver-api/verification/artifacts/details-layout-damaged.png
+?? apps/mera-driver-api/verification/artifacts/details-layout-missing.png
+?? apps/mera-driver-api/verification/artifacts/details-layout-mobile.png
+?? apps/mera-driver-api/verification/artifacts/details-layout-results.json
+?? apps/mera-driver-api/verification/artifacts/dispatch-accounts-failure-0.png
+?? apps/mera-driver-api/verification/artifacts/dispatch-accounts-failure-0.txt
+?? apps/mera-driver-api/verification/artifacts/dispatch-accounts-failure-1.png
+?? apps/mera-driver-api/verification/artifacts/dispatch-accounts-failure-1.txt
+?? apps/mera-driver-api/verification/artifacts/dispatch-accounts-failure-2.png
+?? apps/mera-driver-api/verification/artifacts/dispatch-accounts-failure-2.txt
+?? apps/mera-driver-api/verification/artifacts/dispatch-accounts-failure-3.png
+?? apps/mera-driver-api/verification/artifacts/dispatch-accounts-failure-3.txt
+?? apps/mera-driver-api/verification/artifacts/dispatch-accounts-failure-4.png
+?? apps/mera-driver-api/verification/artifacts/dispatch-accounts-failure-4.txt
+?? apps/mera-driver-api/verification/artifacts/dispatch-accounts-results.json
+?? apps/mera-driver-api/verification/artifacts/driver-complete-browser.pdf
+?? apps/mera-driver-api/verification/artifacts/driver-complete-with-trips.pdf
+?? apps/mera-driver-api/verification/artifacts/driver-complete.pdf
+?? apps/mera-driver-api/verification/artifacts/driver-detail-complete.png
+?? apps/mera-driver-api/verification/artifacts/driver-detail-mobile.png
+?? apps/mera-driver-api/verification/artifacts/driver-detail.png
+?? apps/mera-driver-api/verification/artifacts/driver-details-inline-pdf.png
+?? apps/mera-driver-api/verification/artifacts/driver-list-download.pdf
+?? apps/mera-driver-api/verification/artifacts/driver-list.png
+?? apps/mera-driver-api/verification/artifacts/driver-partial.pdf
+?? apps/mera-driver-api/verification/artifacts/driver-profile.png
+?? apps/mera-driver-api/verification/artifacts/driver-resume-complete.pdf
+?? apps/mera-driver-api/verification/artifacts/driver-resume-partial.pdf
+?? apps/mera-driver-api/verification/artifacts/driver-scale-plan.json
+?? apps/mera-driver-api/verification/artifacts/drivers-list-desktop.png
+?? apps/mera-driver-api/verification/artifacts/drivers-list-failure.png
+?? apps/mera-driver-api/verification/artifacts/drivers-list-mobile.png
+?? apps/mera-driver-api/verification/artifacts/drivers-list-results.json
+?? apps/mera-driver-api/verification/artifacts/failure-0.png
+?? apps/mera-driver-api/verification/artifacts/failure-0.txt
+?? apps/mera-driver-api/verification/artifacts/failure-1.png
+?? apps/mera-driver-api/verification/artifacts/failure-1.txt
+?? apps/mera-driver-api/verification/artifacts/failure-2.png
+?? apps/mera-driver-api/verification/artifacts/failure-2.txt
+?? apps/mera-driver-api/verification/artifacts/failure-3.png
+?? apps/mera-driver-api/verification/artifacts/failure-3.txt
+?? apps/mera-driver-api/verification/artifacts/finance-pages-results.json
+?? apps/mera-driver-api/verification/artifacts/financial-links-results.json
+?? apps/mera-driver-api/verification/artifacts/manual-kyc-approved.png
+?? apps/mera-driver-api/verification/artifacts/onboarding-save-after.json
+?? apps/mera-driver-api/verification/artifacts/onboarding-save-after.png
+?? apps/mera-driver-api/verification/artifacts/onboarding-save-before.json
+?? apps/mera-driver-api/verification/artifacts/onboarding-save-before.png
+?? apps/mera-driver-api/verification/artifacts/onboarding-save-failure.png
+?? apps/mera-driver-api/verification/artifacts/payment-webhook-fixture-results.json
+?? apps/mera-driver-api/verification/artifacts/pdf-results.json
+?? apps/mera-driver-api/verification/artifacts/professional-resume-full-page-1.bmp
+?? apps/mera-driver-api/verification/artifacts/professional-resume-full-page-2.bmp
+?? apps/mera-driver-api/verification/artifacts/professional-resume-full.pdf
+?? apps/mera-driver-api/verification/artifacts/professional-resume-own-page-1.bmp
+?? apps/mera-driver-api/verification/artifacts/professional-resume-own-page-2.bmp
+?? apps/mera-driver-api/verification/artifacts/professional-resume-own.pdf
+?? apps/mera-driver-api/verification/artifacts/professional-resume-partial-page-1.bmp
+?? apps/mera-driver-api/verification/artifacts/professional-resume-partial.pdf
+?? apps/mera-driver-api/verification/artifacts/professional-resume-pdf-results.json
+?? apps/mera-driver-api/verification/artifacts/professional-resume-snapshot.json
+?? apps/mera-driver-api/verification/artifacts/razorpay-test-checkout-results.json
+?? apps/mera-driver-api/verification/artifacts/razorpay-test-checkout.png
+?? apps/mera-driver-api/verification/artifacts/results.json
+?? apps/mera-driver-api/verification/artifacts/resume-failure.png
+?? apps/mera-driver-api/verification/artifacts/resume-full-preview.png
+?? apps/mera-driver-api/verification/artifacts/resume-mobile-preview.png
+?? apps/mera-driver-api/verification/artifacts/resume-partial-preview.png
+?? apps/mera-driver-api/verification/artifacts/resume-results.json
+?? apps/mera-driver-api/verification/changed-files.txt
+?? apps/mera-driver-api/verification/checkout-test-mode.cjs
+?? apps/mera-driver-api/verification/connected-smoke.cjs
+?? apps/mera-driver-api/verification/details-layout-smoke.cjs
+?? apps/mera-driver-api/verification/dispatch-accounts-smoke.cjs
+?? apps/mera-driver-api/verification/driver-scale-plan.cjs
+?? apps/mera-driver-api/verification/drivers-list-smoke.cjs
+?? apps/mera-driver-api/verification/finance-pages-smoke.cjs
+?? apps/mera-driver-api/verification/financial-links-smoke.cjs
+?? apps/mera-driver-api/verification/inspect-pdfs.py
+?? apps/mera-driver-api/verification/inspect-resume-pdfs.py
+?? apps/mera-driver-api/verification/migration-check.cjs
+?? apps/mera-driver-api/verification/onboarding-save-smoke.cjs
+?? apps/mera-driver-api/verification/payment-webhook-fixtures.cjs
+?? apps/mera-driver-api/verification/render-pdfs.ps1
+?? apps/mera-driver-api/verification/resume-smoke.cjs
+?? apps/mera-driver-api/verification/ui-smoke.cjs
+?? apps/mera-driver/src/app/core/auth/admin-area.guard.spec.ts
+?? apps/mera-driver/src/app/core/drivers/pill-review-api.service.ts
+?? apps/mera-driver/src/app/core/http-error.spec.ts
+?? apps/mera-driver/src/app/core/http-error.ts
+?? apps/mera-driver/src/app/pages/account/drivers/driver-details.css
+?? apps/mera-driver/src/app/pages/account/drivers/driver-details.html
+?? apps/mera-driver/src/app/pages/account/drivers/driver-details.spec.ts
+?? apps/mera-driver/src/app/pages/account/drivers/driver-details.ts
+?? apps/mera-driver/src/app/pages/account/drivers/resume-preview.css
+?? apps/mera-driver/src/app/pages/account/drivers/resume-preview.html
+?? apps/mera-driver/src/app/pages/account/drivers/resume-preview.spec.ts
+?? apps/mera-driver/src/app/pages/account/drivers/resume-preview.ts
+?? apps/mera-driver/src/app/pages/account/kyc-assignments/pill-review.ts
+?? apps/mera-driver/src/app/pages/workflow/workflow.html
+?? apps/mera-driver/src/app/pages/workflow/workflow.spec.ts
+?? apps/mera-driver/src/app/pages/workflow/workflow.ts

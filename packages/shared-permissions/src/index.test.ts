@@ -187,11 +187,11 @@ describe('filterMenuByPermissions', () => {
       id: 'vendors',
       title: 'Vendor',
       icon: 'storefront',
-      permissionKey: 'vendors',
+      permissionKey: 'members',
       parent: null,
       order: 3,
       children: [
-        { id: 'vendor-list', title: 'Vendor List', route: '/account/vendors', permissionKey: 'vendors', parent: 'vendors', order: 1 },
+        { id: 'vendor-list', title: 'Vendor List', route: '/account/vendors', permissionKey: 'members', parent: 'vendors', order: 1 },
       ],
     },
     {
@@ -227,8 +227,8 @@ describe('filterMenuByPermissions', () => {
     { id: 'rbac.users', title: 'User', route: '/account/administration/users', permissionKey: 'rbac.users', parent: null, order: 2 },
   ];
 
-  it("a vendor's granted set (dashboard:view, vendors:custom, vendor-portal:view) sees ONLY the Business group with all 7 self-service items", () => {
-    const granted = ['dashboard:view', 'vendors:custom', 'vendor-portal:view'];
+  it("a vendor's granted set (dashboard:view, members:custom, vendor-portal:view) sees ONLY the Business group with all 7 self-service items", () => {
+    const granted = ['dashboard:view', 'members:custom', 'vendor-portal:view'];
     const result = filterMenuByPermissions(msdVendorIsolationMenu, granted);
     expect(result.map((n) => n.id)).toEqual(['business']);
     expect(result[0].children?.map((c) => c.id)).toEqual([
@@ -243,7 +243,7 @@ describe('filterMenuByPermissions', () => {
   });
 
   it("a vendor never sees Vendor List, the Customers directory, User Management, or the admin Orders/Products nodes", () => {
-    const granted = ['dashboard:view', 'vendors:custom', 'vendor-portal:view'];
+    const granted = ['dashboard:view', 'members:custom', 'vendor-portal:view'];
     const result = filterMenuByPermissions(msdVendorIsolationMenu, granted);
     expect(result.find((n) => n.id === 'vendors')).toBeUndefined();
     expect(result.find((n) => n.id === 'customers')).toBeUndefined();
@@ -253,7 +253,7 @@ describe('filterMenuByPermissions', () => {
   });
 
   it("an admin's granted set sees Vendor/Customers/Orders/Products/User Management but never the vendor-only Business group", () => {
-    const granted = ['vendors:view', 'customers:view', 'orders:view', 'products:view', 'rbac.users:view'];
+    const granted = ['members:view', 'customers:view', 'orders:view', 'products:view', 'rbac.users:view'];
     const result = filterMenuByPermissions(msdVendorIsolationMenu, granted);
     expect(result.map((n) => n.id).sort()).toEqual(['customers', 'orders', 'products', 'rbac.users', 'vendors']);
     expect(result.find((n) => n.id === 'business')).toBeUndefined();

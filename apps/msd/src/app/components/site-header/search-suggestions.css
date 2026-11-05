@@ -1,51 +1,241 @@
-.search-suggestions {
+/* Header search panel. Colours: M3 roles only (surface-container popup, primary for prices and
+   the one action, secondary-container for the active row); shape/type/elevation from shared-ui
+   theme/base.css. A flex column so the location row and the footer stay put while the results
+   scroll between them. */
+.search-panel {
+  /* Tallest the panel grows on larger screens. */
+  --search-panel-max-size: min(72dvh, 680px);
+  /* Phones: viewport top to the panel (brand row + search row + gap), with a small margin. */
+  --search-panel-phone-top: 136px;
   position: absolute;
   inset-inline: 0;
-  inset-block-start: calc(100% + 4px);
+  inset-block-start: calc(100% + 6px);
   z-index: 60;
-  max-block-size: 70vh;
-  overflow-y: auto;
-  padding: 8px 0;
-  border-radius: var(--md-sys-shape-corner-medium);
-  background-color: var(--md-sys-color-surface-container-high);
-  box-shadow: var(--sky-elevation-2);
-}
-.search-suggestions__status {
-  margin: 0;
-  padding: 12px 16px;
-  color: var(--md-sys-color-on-surface-variant);
-}
-.search-suggestions__group + .search-suggestions__group {
-  border-block-start: 1px solid var(--md-sys-color-outline-variant);
-  margin-block-start: 4px;
-  padding-block-start: 4px;
-}
-.search-suggestions__heading {
-  margin: 0;
-  padding: 8px 16px 4px;
-  color: var(--md-sys-color-on-surface-variant);
-}
-.search-suggestions__item {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  inline-size: 100%;
-  padding: 8px 16px;
-  border: 0;
-  background: transparent;
+  max-block-size: var(--search-panel-max-size);
+  overflow: hidden;
+  border-radius: var(--md-sys-shape-corner-large);
+  background-color: var(--md-sys-color-surface-container);
   color: var(--md-sys-color-on-surface);
-  text-align: start;
+  box-shadow: var(--sky-elevation-3);
+  transform-origin: top center;
+  animation: search-panel-in var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-emphasized-decelerate, ease-out);
+}
+@keyframes search-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scaleY(0.98);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .search-panel {
+    animation: none;
+  }
+}
+
+/* Location row: one line, the city as the anchor, Change as a text action. */
+.search-panel__location {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 12px 4px;
+  padding: 4px 4px 4px 12px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background-color: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface-variant);
+  --md-icon-size: 20px;
+}
+.search-panel__location-text {
+  flex: 1;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--md-sys-color-on-surface);
+}
+.search-panel__change {
+  flex-shrink: 0;
+  min-block-size: 40px;
+  padding-inline: 16px;
+  border: 0;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: transparent;
+  color: var(--md-sys-color-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
   cursor: pointer;
 }
-.search-suggestions__item:hover,
-.search-suggestions__item--active {
+.search-panel__change:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--md-sys-color-primary) calc(var(--md-sys-state-hover-state-layer-opacity) * 100%),
+    transparent
+  );
+}
+
+.search-panel__scroll {
+  flex: 1;
+  min-block-size: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--md-sys-color-outline-variant) transparent;
+}
+.search-panel__list {
+  padding-block: 4px 8px;
+}
+.search-panel__group + .search-panel__group {
+  margin-block-start: 8px;
+}
+.search-panel__heading {
+  margin: 0;
+  padding: 12px 24px 4px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Rows: full-width options with an M3 state layer; the active one takes secondary-container. */
+.search-panel__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  inline-size: calc(100% - 16px);
+  margin-inline: 8px;
+  min-block-size: 48px;
+  padding: 6px 16px;
+  border: 0;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: transparent;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+  --md-icon-size: 20px;
+}
+.search-panel__row--rich {
+  align-items: flex-start;
+  gap: 16px;
+  padding: 8px;
+}
+.search-panel__row:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--md-sys-color-on-surface) calc(var(--md-sys-state-hover-state-layer-opacity) * 100%),
+    transparent
+  );
+}
+.search-panel__row--active,
+.search-panel__row--active:hover {
   background-color: var(--md-sys-color-secondary-container);
   color: var(--md-sys-color-on-secondary-container);
 }
-.search-suggestions__item-sublabel {
+.search-panel__icon {
+  flex-shrink: 0;
   color: var(--md-sys-color-on-surface-variant);
 }
-.search-suggestions__item--active .search-suggestions__item-sublabel,
-.search-suggestions__item:hover .search-suggestions__item-sublabel {
+.search-panel__media {
+  flex-shrink: 0;
+  inline-size: 72px;
+}
+.search-panel__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-inline-size: 0;
+}
+.search-panel__row--rich .search-panel__title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+.search-panel__match {
+  background: none;
   color: inherit;
+  font-weight: 700;
+}
+.search-panel__meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.search-panel__price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  margin-block-start: 2px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.search-panel__current {
+  color: var(--md-sys-color-primary);
+  font-weight: 700;
+}
+.search-panel__discount {
+  color: var(--md-sys-color-primary);
+}
+.search-panel__distance {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-inline-start: auto;
+  font-variant-numeric: tabular-nums;
+  --md-icon-size: 16px;
+}
+.search-panel__row--active :is(.search-panel__meta, .search-panel__price, .search-panel__icon) {
+  color: inherit;
+}
+
+.search-panel__status {
+  margin: 0;
+  padding: 0 24px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.search-panel__status:not(:empty) {
+  padding-block: 16px;
+}
+
+.search-panel__footer {
+  padding: 12px;
+  border-block-start: 1px solid var(--md-sys-color-outline-variant);
+}
+.search-panel__all {
+  inline-size: 100%;
+}
+
+/* Location step. */
+.search-panel__step-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 16px 0 4px;
+}
+.search-panel__step-title {
+  margin: 0;
+}
+.search-panel__step-body {
+  overflow-y: auto;
+  padding: 8px 16px 16px;
+}
+
+.search-panel :is(button):focus-visible {
+  outline: 3px solid var(--md-sys-color-primary);
+  outline-offset: -3px;
+}
+
+@media (max-width: 599px) {
+  .search-panel {
+    /* Stops above the bottom tab bar. */
+    max-block-size: calc(100dvh - var(--search-panel-phone-top) - var(--tab-bar-size, 0px));
+  }
+  .search-panel__media {
+    inline-size: 64px;
+  }
+}
+.search-panel__note {
+  margin: 0;
+  padding: 0 24px 4px;
+  color: var(--md-sys-color-on-surface-variant);
 }

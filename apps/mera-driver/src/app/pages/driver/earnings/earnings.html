@@ -1,0 +1,44 @@
+<md-admin-page title="Earnings" subtitle="Payouts, commission and COD collections.">
+  @if (loading()) {
+    <p class="otp-muted">Loading…</p>
+  } @else {
+    <div class="driver-dash-grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));">
+      <section class="account-card">
+        <h2>Pending payout</h2>
+        <p style="font-size:1.5rem;font-weight:700;">{{ money(pendingPayoutPaise()) }}</p>
+      </section>
+      <section class="account-card">
+        <h2>Paid payouts</h2>
+        <p style="font-size:1.5rem;font-weight:700;">{{ money(payoutsPaid()) }}</p>
+      </section>
+      <section class="account-card">
+        <h2>COD collected</h2>
+        <p style="font-size:1.5rem;font-weight:700;">{{ money(codCollected()) }}</p>
+      </section>
+      <section class="account-card">
+        <h2>Commission deducted</h2>
+        <p style="font-size:1.5rem;font-weight:700;">{{ money(commission()) }}</p>
+      </section>
+    </div>
+
+    <section class="account-card">
+      <div class="account-card__head">
+        <h2>Transaction history</h2>
+      </div>
+      @if (transactions().length === 0) {
+        <p class="otp-muted">No earnings transactions yet.</p>
+      } @else {
+        <ul class="driver-doc-list">
+          @for (m of transactions(); track m.id) {
+            <li class="driver-doc-card">
+              <div>
+                <div>{{ movementLabel(m.kind) }}</div>
+                <div class="driver-doc-card__meta">{{ money(m.amountPaise) }} · {{ m.method }} · {{ m.createdAt | date: 'medium' }}</div>
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  }
+</md-admin-page>

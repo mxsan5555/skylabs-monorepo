@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { HttpError } from '../../middleware/errorHandler';
+import { otpDeliveryError, transportFailure } from '../otp-delivery-error';
 
 /**
  * ConnectExpress SMS gateway — same real request shape as msd-api's provider (method/
@@ -24,12 +26,12 @@ export async function sendOtp(phone: string, otp: string): Promise<boolean> {
 
   if (missing.length > 0) {
     console.error(`[sms:connectExpress] cannot send — missing env var(s): ${missing.join(', ')}`);
-    return false;
+    throw otpDeliveryError('SMS', 'configuration');
   }
 
   if (!template.includes('{otp}')) {
     console.error('[sms:connectExpress] cannot send — SMS_OTP_TEMPLATE does not contain the {otp} placeholder');
-    return false;
+    throw otpDeliveryError('SMS', 'configuration');
   }
 
   const message = template.replace('{otp}', otp);
@@ -50,21 +52,24 @@ export async function sendOtp(phone: string, otp: string): Promise<boolean> {
     const durationMs = Date.now() - startedAt;
     const ok = isProviderSuccess(response.data);
     console.info(
-      `[sms:connectExpress] ${ok ? 'sent' : 'send reported failure'} to=${maskPhone(phone)} durationMs=${durationMs} httpStatus=${response.status} response=${safeStringify(response.data)}`,
+      `[sms:connectExpress] ${ok ? 'accepted' : 'rejected'} durationMs=${durationMs} httpStatus=${response.status}`,
     );
-    return ok;
+    if (!ok) throw otpDeliveryError('SMS', 'rejected');
+    return true;
   } catch (err) {
     const durationMs = Date.now() - startedAt;
+    if (err instanceof HttpError) throw err;
     if (axios.isAxiosError(err)) {
       console.error(
-        `[sms:connectExpress] request FAILED to=${maskPhone(phone)} durationMs=${durationMs} code=${err.code ?? 'n/a'} httpStatus=${err.response?.status ?? 'n/a'} response=${safeStringify(err.response?.data)} message=${err.message}`,
+        `[sms:connectExpress] request FAILED durationMs=${durationMs} failure=${transportFailure(err.code, err.response?.status)} httpStatus=${err.response?.status ?? 'n/a'}`,
       );
+      throw otpDeliveryError('SMS', transportFailure(err.code, err.response?.status));
     } else {
       console.error(
-        `[sms:connectExpress] request FAILED to=${maskPhone(phone)} durationMs=${durationMs} error=${(err as Error).message}`,
+        `[sms:connectExpress] request FAILED durationMs=${durationMs} failure=unavailable`,
       );
     }
-    return false;
+    throw otpDeliveryError('SMS', 'unavailable');
   }
 }
 
@@ -79,18 +84,4 @@ function isProviderSuccess(data: unknown): boolean {
   }
   if (typeof d.success === 'boolean') return d.success;
   return false;
-}
-
-function maskPhone(phone: string): string {
-  return phone.length > 4
-    ? `${phone.slice(0, 2)}${'*'.repeat(phone.length - 4)}${phone.slice(-2)}`
-    : phone;
-}
-
-function safeStringify(data: unknown): string {
-  try {
-    return JSON.stringify(data);
-  } catch {
-    return String(data);
-  }
 }

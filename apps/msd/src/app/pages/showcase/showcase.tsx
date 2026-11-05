@@ -1,6 +1,6 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './showcase.css';
-import logo from '../../../assets/logo.jpg';
+import { LOGO_SRC as logo } from '../../../brand';
 // Opt-in: registers <swiper-container> / <swiper-slide> for the carousel demos.
 import '@skylabs-monorepo/shared-ui/carousel';
 import {
@@ -48,6 +48,15 @@ import {
 } from '@skylabs-monorepo/shared-ui/react';
 // sky-* components are raw LIT web component tags — no React adapter needed.
 // They are registered globally via main.tsx → import '@skylabs-monorepo/shared-ui'.
+import type { SkyColor, SkySnackbar } from '@skylabs-monorepo/shared-ui';
+import { CardGrid } from '../../components/card-grid/card-grid';
+import { ListingToolbar } from '../../components/listing-toolbar/listing-toolbar';
+import { ViewSwitch } from '../../components/view-switch/view-switch';
+import { ChipNav } from '../../components/chip-nav/chip-nav';
+import { listCatalogDeals, listCatalogProducts } from '../../../api/catalog';
+import { OfferCard, type OfferItem, type OfferTag } from '../../components/offer-card/offer-card';
+import { useVisitorLocation } from '../../../location/location-context';
+import { resolveDealMedia, resolveProductMedia } from '../../../utils/media';
 
 // ── Data table demo ──────────────────────────────────────────────────────────
 
@@ -341,38 +350,189 @@ function ShowcaseNav() {
 
   useEffect(() => {
     const sections = Array.from(document.querySelectorAll<HTMLElement>('.showcase__card[id]'));
-    setItems(sections.map((s) => ({ id: s.id, label: s.querySelector('h2')?.textContent ?? s.id })));
-    const observer = new IntersectionObserver(
-      (entries) => entries.forEach((e) => e.isIntersecting && setActive(e.target.id)),
-      { rootMargin: '-20% 0px -70% 0px' },
-    );
-    sections.forEach((s) => observer.observe(s));
-    return () => observer.disconnect();
+    const next = sections.map((s) => ({ id: s.id, label: s.querySelector('h2')?.textContent ?? s.id }));
+    next.sort((a, b) => a.label.localeCompare(b.label));
+    setItems(next);
+
+    // Deterministic scroll-spy: the active section is the last one (in document
+    // order) whose top has crossed the trigger line. IntersectionObserver was
+    // flickering here — its callback batches can report several short/adjacent
+    // `.showcase__card` sections as intersecting in the same frame in an
+    // unspecified order, and blindly taking "whichever entry came last in that
+    // batch" made `active` jump to the wrong section and snap back on the next
+    // tick. Reading live geometry removes that ambiguity entirely.
+    const TRIGGER_RATIO = 0.2;
+    let frame = 0;
+    const recompute = () => {
+      frame = 0;
+      const triggerY = window.innerHeight * TRIGGER_RATIO;
+      let current = sections[0]?.id ?? '';
+      for (const section of sections) {
+        if (section.getBoundingClientRect().top <= triggerY) current = section.id;
+        else break;
+      }
+      setActive(current);
+    };
+    const onScrollOrResize = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(recompute);
+    };
+
+    recompute();
+    window.addEventListener('scroll', onScrollOrResize, { passive: true });
+    window.addEventListener('resize', onScrollOrResize);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', onScrollOrResize);
+      window.removeEventListener('resize', onScrollOrResize);
+    };
   }, []);
 
   return (
     <nav className="showcase-nav" aria-label="Components">
-      <ul>
-        {items.map((item) => (
-          <li key={item.id}>
-            <a
-              className="showcase-nav__link"
-              href={`/showcase#${item.id}`}
-              aria-current={active === item.id ? 'location' : undefined}
-              onClick={(e) => {
-                // In-page jump: <base href="/"> would otherwise resolve a bare #hash against "/".
-                e.preventDefault();
-                const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-                document.getElementById(item.id)?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' });
-                window.history.replaceState(null, '', `${window.location.pathname}#${item.id}`);
-              }}
-            >
-              {item.label}
-            </a>
-          </li>
-        ))}
-      </ul>
+      {items.map((item) => (
+        <TextButton
+          key={item.id}
+          href={`/showcase#${item.id}`}
+          aria-current={active === item.id ? 'location' : undefined}
+          onClick={(e: React.MouseEvent) => {
+            // In-page jump: <base href="/"> would otherwise resolve a bare #hash against "/".
+            e.preventDefault();
+            const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            document.getElementById(item.id)?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' });
+            window.history.replaceState(null, '', `${window.location.pathname}#${item.id}`);
+          }}
+        >
+          {item.label}
+        </TextButton>
+      ))}
     </nav>
+  );
+}
+
+// ── Offer card demo (OfferCard = sky-product-card price-first) ───────────────
+// Two real deals and two real products, so the whole card opens the detail page, Add to cart adds
+// the item (a deal asks for its package first) and the heart saves it to the wishlist. Tags and
+// rating are demo values: there is no review system yet.
+
+const OFFER_VIEWS = [
+  { value: 'grid', label: 'Grid view', icon: 'grid_view' },
+  { value: 'list', label: 'List view', icon: 'view_list' },
+];
+
+/** `color` options to try (the sky-feature-card vocabulary); Default leaves the attribute off. */
+const OFFER_COLORS: { value: SkyColor | ''; label: string }[] = [
+  { value: '', label: 'Default' },
+  { value: 'none', label: 'None' },
+  { value: 'surface', label: 'Surface' },
+  { value: 'surface-high', label: 'Surface high' },
+  { value: 'primary', label: 'Primary' },
+  { value: 'secondary', label: 'Secondary' },
+  { value: 'tertiary', label: 'Tertiary' },
+  { value: 'inverse', label: 'Inverse' },
+];
+
+const OFFER_RATINGS = {
+  deal: { rating: 4.7, reviews: 4273 },
+  product: { rating: 4.5, reviews: 312 },
+};
+
+/** Offer tags: theme role and filled or tonal look. Filled and tonal alternate so the four tags
+ *  stay apart even where the roles are close in hue. */
+const OFFER_TAGS: OfferTag[] = [
+  { label: 'New', color: 'tertiary', tone: 'tonal' },
+  { label: 'Deal', color: 'primary' },
+  { label: 'Hot', color: 'error' },
+  { label: 'Expire soon', color: 'error', tone: 'tonal' },
+];
+
+/** Demo only: local data has one image per item, so each card also borrows the other demo items'
+ *  images (after its own) to show the image slider. Live pages use each item's real gallery. */
+function withDemoGallery(items: OfferItem[]): OfferItem[] {
+  const own = (item: OfferItem) =>
+    item.type === 'deal' ? resolveDealMedia(item.deal).images : resolveProductMedia(item.product).images;
+  const pool = items.flatMap(own);
+  const gallery = (item: OfferItem) => [...own(item), ...pool.filter((url) => !own(item).includes(url))];
+  // Legacy URL fields (`images` / `gallery`) take the demo set; mediaImages would win over them.
+  return items.map((item) =>
+    item.type === 'deal'
+      ? { ...item, deal: { ...item.deal, mediaImages: [], images: gallery(item) } }
+      : { ...item, product: { ...item.product, mediaImages: [], gallery: gallery(item) } as typeof item.product },
+  );
+}
+
+function OfferCardDemo() {
+  const [view, setView] = useState('grid');
+  const [color, setColor] = useState<SkyColor | ''>('');
+  const [slider, setSlider] = useState(true);
+  const [items, setItems] = useState<OfferItem[]>([]);
+  // The visitor's coordinates make the API return each deal's distance (as on the home page).
+  const { status: locationStatus, coords } = useVisitorLocation();
+  const latitude = coords?.latitude;
+  const longitude = coords?.longitude;
+  const list = view === 'list';
+
+  useEffect(() => {
+    if (locationStatus === 'locating') return;
+    let cancelled = false;
+    Promise.all([listCatalogDeals({ pageSize: 2, latitude, longitude }), listCatalogProducts({ pageSize: 2 })])
+      .then(([deals, products]) => {
+        if (cancelled) return;
+        setItems(
+          withDemoGallery([
+            ...deals.data.slice(0, 2).map((deal) => ({ type: 'deal' as const, deal })),
+            ...products.data.slice(0, 2).map((product) => ({ type: 'product' as const, product })),
+          ]),
+        );
+      })
+      .catch(() => setItems([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [locationStatus, latitude, longitude]);
+
+  return (
+    <>
+      <p className="demo-label">
+        OfferCard (sky-product-card price-first): tag (New tertiary tonal, Deal primary, Hot error,
+        Expire soon error tonal), image, price, old price, discount, rating and headline (two lines).
+        Services: no description; a divider, then the member and the place with distance, one line
+        each. Products: a two-line description. Add to cart and wishlist; the whole card opens the
+        detail page. Image slider (`slider`): previous / next buttons and dots when an item has more
+        than one image. The home hero uses it with color surface-high, variant plain.
+      </p>
+      <ListingToolbar
+        ariaLabel="Offer card view"
+        start={
+          <ChipNav
+            ariaLabel="Card colour"
+            items={OFFER_COLORS}
+            value={color}
+            onSelect={(value) => setColor(value as SkyColor | '')}
+          />
+        }
+        end={
+          <>
+            <FilterChip label="Image slider" selected={slider} onClick={() => setSlider((on) => !on)} />
+            <ViewSwitch label="Card view" options={OFFER_VIEWS} value={view} onChange={setView} />
+          </>
+        }
+      />
+      <CardGrid layout={list ? 'list' : 'grid'}>
+        {items.map((item, index) => (
+          <OfferCard
+            key={item.type === 'deal' ? item.deal.id : item.product.id}
+            item={item}
+            tag={OFFER_TAGS[index % OFFER_TAGS.length]}
+            {...(color ? { color } : {})}
+            variant="outlined"
+            layout={list ? 'horizontal' : 'vertical'}
+            rating={OFFER_RATINGS[item.type]}
+            slider={slider}
+          />
+        ))}
+      </CardGrid>
+    </>
   );
 }
 
@@ -382,6 +542,12 @@ function ShowcaseNav() {
  * toggle calls applyTheme() to switch the <html> theme class live.
  */
 export function Showcase() {
+  // Opt-in, browser only: registers <sky-rich-text-editor> (Quill-backed) for the editor demo.
+  // Quill reads `document` when imported, so a static import would break the server render
+  // (prerender, entry-server.test.tsx); the element upgrades once the module loads.
+  useEffect(() => {
+    void import('./register-editor');
+  }, []);
   const [mode, setMode] = useState<ThemeMode>('light');
   const [menuOpen, setMenuOpen] = useState(false);
   const dialogRef = useRef<
@@ -397,6 +563,9 @@ export function Showcase() {
   // Demos 8 & 9 use object params, applied imperatively (see useSwiperParams).
   const dynamicRef = useSwiperParams(PAGINATION_DYNAMIC);
   const fractionRef = useSwiperParams(PAGINATION_FRACTION);
+
+  const snackbarRef = useRef<SkySnackbar>(null);
+  const [snackbarLog, setSnackbarLog] = useState('');
 
   const dt = useDealTable();
   const dtRef = useRef<HTMLElement>(null);
@@ -465,7 +634,7 @@ export function Showcase() {
   return (
     <div className="showcase-shell">
     <ShowcaseNav />
-    <main className="showcase">
+    <div className="showcase">
       <title>Component showcase · MSD</title>
       <header className="showcase__bar">
         <div className="showcase__title">
@@ -477,6 +646,33 @@ export function Showcase() {
           <Switch selected={mode === 'dark'} onChange={toggleMode} />
         </label>
       </header>
+
+      <section className="showcase__card" id="accordion">
+        <h2>Accordion</h2>
+        <sky-accordion>
+          <sky-accordion-item header="Accordion 1" open>
+            {LOREM}
+          </sky-accordion-item>
+          <sky-accordion-item header="Accordion 2" open>
+            {LOREM}
+          </sky-accordion-item>
+          <sky-accordion-item header="Accordion Actions">
+            {LOREM}
+          </sky-accordion-item>
+        </sky-accordion>
+      </section>
+
+      <section className="showcase__card" id="action-field">
+        <h2>Action field</h2>
+        <p className="demo-label">Text input + action button: search, newsletter, coupon, pincode</p>
+        <div className="demo-stack">
+          <sky-action-field role="search" type="search" enterkeyhint="search" icon="search" label="Search spas and treatments" placeholder="Search spas, treatments, locations" action-label="Search" />
+          <sky-action-field type="email" autocomplete="email" icon="mail" variant="outlined" label="Email address" placeholder="Your email address" action-label="Subscribe" required />
+          <sky-action-field dense icon="sell" label="Coupon code" placeholder="Enter coupon code" action-label="Apply" shape="small" />
+          <sky-action-field dense icon="location_on" label="Check availability by pincode" placeholder="Pincode" action-icon="arrow_forward" variant="outlined" />
+          <sky-action-field label="Disabled field" placeholder="Disabled" action-label="Send" action-icon="send" disabled />
+        </div>
+      </section>
 
       <section className="showcase__card" id="buttons">
         <h2>Buttons</h2>
@@ -492,316 +688,12 @@ export function Showcase() {
         </div>
       </section>
 
-      <section className="showcase__card" id="chips">
-        <h2>Chips</h2>
-        <ChipSet>
-          <AssistChip label="Assist">
-            <Icon slot="icon" aria-hidden="true">event</Icon>
-          </AssistChip>
-          <FilterChip label="Filter" selected />
-          <FilterChip label="Another filter" />
-          <InputChip label="Input" />
-          <SuggestionChip label="Suggestion" />
-        </ChipSet>
-      </section>
-
-      <section className="showcase__card" id="icon-buttons">
-        <h2>Icon buttons</h2>
-        <div className="showcase__row">
-          <IconButton aria-label="Settings">
-            <Icon>settings</Icon>
-          </IconButton>
-          <FilledIconButton aria-label="Favorite">
-            <Icon>favorite</Icon>
-          </FilledIconButton>
-          <FilledTonalIconButton aria-label="Bookmark">
-            <Icon>bookmark</Icon>
-          </FilledTonalIconButton>
-          <OutlinedIconButton aria-label="Share">
-            <Icon>share</Icon>
-          </OutlinedIconButton>
-          <FilledIconButton aria-label="Toggle favorite" toggle>
-            <Icon>favorite_border</Icon>
-            <Icon slot="selected">favorite</Icon>
-          </FilledIconButton>
-        </div>
-      </section>
-
-      <section className="showcase__card" id="fab-and-extended-fab">
-        <h2>FAB &amp; extended FAB</h2>
-        <div className="showcase__row">
-          <Fab size="small" aria-label="Add">
-            <Icon slot="icon">add</Icon>
-          </Fab>
-          <Fab aria-label="Edit" variant="primary">
-            <Icon slot="icon">edit</Icon>
-          </Fab>
-          <Fab size="large" aria-label="Navigate">
-            <Icon slot="icon">navigation</Icon>
-          </Fab>
-          <Fab label="Compose" variant="primary">
-            <Icon slot="icon">edit</Icon>
-          </Fab>
-          <BrandedFab label="Create" aria-label="Create">
-            <Icon slot="icon">add</Icon>
-          </BrandedFab>
-        </div>
-      </section>
-
-      <section className="showcase__card" id="selection">
-        <h2>Selection</h2>
-        <div className="showcase__row">
-          <label className="showcase__inline">
-            <Checkbox checked /> Checked
-          </label>
-          <label className="showcase__inline">
-            <Checkbox indeterminate /> Indeterminate
-          </label>
-          <label className="showcase__inline">
-            <Checkbox /> Unchecked
-          </label>
-        </div>
-        <div className="showcase__row" role="radiogroup" aria-label="Plan">
-          <label className="showcase__inline">
-            <Radio name="plan" value="a" checked /> Basic
-          </label>
-          <label className="showcase__inline">
-            <Radio name="plan" value="b" /> Pro
-          </label>
-          <label className="showcase__inline">
-            <Radio name="plan" value="c" /> Max
-          </label>
-        </div>
-        <div className="showcase__row">
-          <label className="showcase__inline">
-            <Switch /> Off
-          </label>
-          <label className="showcase__inline">
-            <Switch selected /> On
-          </label>
-          <label className="showcase__inline">
-            <Switch selected icons /> With icons
-          </label>
-        </div>
-      </section>
-
-      <section className="showcase__card" id="text-fields">
-        <h2>Text fields</h2>
-        <div className="fields-grid">
-          <FilledTextField label="Filled" value="Hello" />
-          <OutlinedTextField label="Outlined" placeholder="Type here" />
-          <OutlinedTextField label="With icons" placeholder="Search">
-            <Icon slot="leading-icon" aria-hidden="true">search</Icon>
-            <Icon slot="trailing-icon" aria-hidden="true">close</Icon>
-          </OutlinedTextField>
-          <FilledTextField
-            label="Amount"
-            type="number"
-            prefixText="$"
-            suffixText=".00"
-          />
-          <OutlinedTextField
-            label="Email"
-            type="email"
-            supportingText="We'll never share it"
-          />
-          <FilledTextField label="Password" type="password" value="secret" />
-          <OutlinedTextField label="Bio (textarea)" type="textarea" rows={3} />
-          <FilledTextField label="With counter" maxLength={20} value="Count me" />
-          <OutlinedTextField
-            label="Required"
-            required
-            error
-            errorText="This field is required"
-          />
-        </div>
-      </section>
-
-      <section className="showcase__card" id="select">
-        <h2>Select</h2>
-        <div className="showcase__row">
-          <FilledSelect label="Filled" value="apple">
-            <SelectOption value="apple">
-              <div slot="headline">Apple</div>
-            </SelectOption>
-            <SelectOption value="banana">
-              <div slot="headline">Banana</div>
-            </SelectOption>
-            <SelectOption value="cherry">
-              <div slot="headline">Cherry</div>
-            </SelectOption>
-          </FilledSelect>
-          <OutlinedSelect label="Outlined" value="banana">
-            <SelectOption value="apple">
-              <div slot="headline">Apple</div>
-            </SelectOption>
-            <SelectOption value="banana">
-              <div slot="headline">Banana</div>
-            </SelectOption>
-            <SelectOption value="cherry">
-              <div slot="headline">Cherry</div>
-            </SelectOption>
-          </OutlinedSelect>
-        </div>
-      </section>
-
-      <section className="showcase__card" id="slider">
-        <h2>Slider</h2>
-        <p className="demo-label">Continuous</p>
-        <Slider value={50} aria-label="Continuous value" />
-        <p className="demo-label">Discrete (ticks + labeled)</p>
-        <Slider value={3} min={0} max={10} step={1} ticks labeled aria-label="Discrete value" />
-        <p className="demo-label">Range</p>
-        <Slider range valueStart={20} valueEnd={70} aria-label="Range value" />
-      </section>
-
-      <section className="showcase__card" id="menu">
-        <h2>Menu</h2>
-        <span className="menu-anchor-wrap">
-          <FilledButton
-            id="msd-menu-anchor"
-            onClick={() => setMenuOpen((o) => !o)}
-          >
-            Open menu
-          </FilledButton>
-          <Menu
-            anchor="msd-menu-anchor"
-            open={menuOpen}
-            positioning="popover"
-            onClosed={() => setMenuOpen(false)}
-          >
-            <MenuItem>
-              <div slot="headline">Profile</div>
-            </MenuItem>
-            <MenuItem>
-              <div slot="headline">Settings</div>
-            </MenuItem>
-            <Divider role="separator" />
-            <SubMenu>
-              <MenuItem slot="item">
-                <div slot="headline">More tools</div>
-                <Icon slot="end" aria-hidden="true">chevron_right</Icon>
-              </MenuItem>
-              <Menu slot="menu">
-                <MenuItem>
-                  <div slot="headline">Import</div>
-                </MenuItem>
-                <MenuItem>
-                  <div slot="headline">Export</div>
-                </MenuItem>
-              </Menu>
-            </SubMenu>
-            <Divider role="separator" />
-            <MenuItem>
-              <div slot="headline">Sign out</div>
-            </MenuItem>
-          </Menu>
-        </span>
-      </section>
-
-      <section className="showcase__card" id="tabs">
-        <h2>Tabs</h2>
-        <p className="demo-label">Primary</p>
-        <Tabs>
-          <PrimaryTab>
-            <Icon slot="icon" aria-hidden="true">dashboard</Icon>
-            Overview
-          </PrimaryTab>
-          <PrimaryTab>
-            <Icon slot="icon" aria-hidden="true">timeline</Icon>
-            Activity
-          </PrimaryTab>
-          <PrimaryTab>
-            <Icon slot="icon" aria-hidden="true">settings</Icon>
-            Settings
-          </PrimaryTab>
-        </Tabs>
-        <p className="demo-label">Secondary</p>
-        <Tabs>
-          <SecondaryTab>Flights</SecondaryTab>
-          <SecondaryTab>Hotels</SecondaryTab>
-          <SecondaryTab>Cars</SecondaryTab>
-        </Tabs>
-      </section>
-
-      <section className="showcase__card" id="progress">
-        <h2>Progress</h2>
-        <p className="demo-label">Linear</p>
-        <div className="progress-stack">
-          <LinearProgress value={0.6} aria-label="Determinate" />
-          <LinearProgress indeterminate aria-label="Indeterminate" />
-        </div>
-        <p className="demo-label">Circular</p>
-        <div className="showcase__row">
-          <CircularProgress value={0.6} aria-label="Determinate" />
-          <CircularProgress indeterminate aria-label="Indeterminate" />
-          <CircularProgress indeterminate fourColor aria-label="Four color" />
-        </div>
-      </section>
-
-      <section className="showcase__card" id="ripple">
-        <h2>Ripple</h2>
-        <button type="button" className="ripple-surface">
-          <Ripple />
-          Press me
-        </button>
-      </section>
-
-      <section className="showcase__card" id="dialog">
-        <h2>Dialog</h2>
-        <FilledButton onClick={() => dialogRef.current?.show()}>
-          Open dialog
-        </FilledButton>
-        <Dialog ref={dialogRef}>
-          <div slot="headline">Themed dialog</div>
-          <div slot="content">
-            This dialog and every control on this page share msd's green M3
-            theme.
-          </div>
-          <div slot="actions">
-            <TextButton onClick={() => dialogRef.current?.close()}>
-              Got it
-            </TextButton>
-          </div>
-        </Dialog>
-      </section>
-
-      <section className="showcase__card" id="list">
-        <h2>List</h2>
-        <List>
-          <ListItem>
-            <Icon slot="start" aria-hidden="true">label</Icon>
-            <div slot="headline">Default with start icon</div>
-          </ListItem>
-          <Divider />
-          <ListItem>
-            <div slot="headline">Cucumber</div>
-            <div slot="supporting-text">
-              Cucumbers are long green fruits that are just as long as this
-              multi-line description
-            </div>
-            <Icon slot="end" aria-hidden="true">check</Icon>
-          </ListItem>
-          <ListItem
-            type="link"
-            href="https://google.com/search?q=buy+kiwis&tbm=shop"
-            target="_blank"
-          >
-            <div slot="headline">Shop for Kiwis</div>
-            <div slot="supporting-text">
-              This will link you out in a new tab
-            </div>
-            <Icon slot="end" aria-hidden="true">open_in_new</Icon>
-          </ListItem>
-        </List>
-      </section>
-
       <section className="showcase__card" id="cards">
         <h2>Cards</h2>
         <div className="cards-grid">
           <sky-product-card
             image="https://picsum.photos/seed/spa/600/400"
-            imageAlt="Massage therapy"
+            image-alt="Massage therapy"
             badge="Popular Gift"
             favorite
             eyebrow="Just Relax Spa"
@@ -810,36 +702,36 @@ export function Showcase() {
             distance="11 mi"
             rating={4.7}
             reviews={783}
-            originalPrice="$220"
+            original-price="$220"
             price="$159"
             discount="-28%"
-            priceNote="$119.25 with code SUMMER"
+            price-note="$119.25 with code SUMMER"
           />
           <sky-product-card
             variant="outlined"
             image="https://picsum.photos/seed/grandhotel/600/400"
-            imageAlt="The Grand Hotel at night"
+            image-alt="The Grand Hotel at night"
             favorite
             tag="Hotel"
-            tagIcon="hotel"
+            tag-icon="hotel"
             heading="The Grand Hotel at the Grand Canyon"
             location="Tusayan, United States"
             score={8.5}
-            scoreLabel="Very Good"
+            score-label="Very Good"
             reviews={4798}
-            pricePrefix="Starting from"
-            originalPrice="$215"
+            price-prefix="Starting from"
+            original-price="$215"
             price="$172"
           />
           <sky-image-card
             image="https://picsum.photos/seed/cottages/600/800"
-            imageAlt="Children playing in a cottage garden"
+            image-alt="Children playing in a cottage garden"
             label="Cottages"
             href="#cottages"
           />
           <sky-category-card
             image="https://picsum.photos/seed/losangeles/600/600"
-            imageAlt="Los Angeles hills"
+            image-alt="Los Angeles hills"
             heading="Los Angeles"
             subheading="4,781 properties"
             href="#los-angeles"
@@ -851,101 +743,89 @@ export function Showcase() {
             subheading="We're always here to help"
           />
         </div>
-      </section>
 
-      <section className="showcase__card" id="action-field">
-        <h2>Action field</h2>
-        <p className="demo-label">Text input + action button: search, newsletter, coupon, pincode</p>
-        <div className="demo-stack">
-          <sky-action-field role="search" type="search" enterkeyhint="search" icon="search" label="Search spas and treatments" placeholder="Search spas, treatments, locations" actionLabel="Search" />
-          <sky-action-field type="email" autocomplete="email" icon="mail" variant="outlined" label="Email address" placeholder="Your email address" actionLabel="Subscribe" required />
-          <sky-action-field dense icon="sell" label="Coupon code" placeholder="Enter coupon code" actionLabel="Apply" shape="small" />
-          <sky-action-field dense icon="location_on" label="Check availability by pincode" placeholder="Pincode" actionIcon="arrow_forward" variant="outlined" />
-          <sky-action-field label="Disabled field" placeholder="Disabled" actionLabel="Send" actionIcon="send" disabled />
-        </div>
-      </section>
-
-      <section className="showcase__card" id="image">
-        <h2>Image</h2>
-        <p className="demo-label">Logo (contain, outlined, linked), photo, round, placeholder, broken source</p>
-        <div className="demo-grid demo-grid--images">
-          <sky-image src={logo} alt="My Spa Deal" label="My Spa Deal home" href="/showcase#image" fit="contain" ratio="3 / 2" variant="outlined" color="surface-high" />
-          <sky-image src="https://picsum.photos/seed/sky-spa-room/600/400" alt="Candle-lit spa treatment room" href="/showcase#image" ratio="3 / 2" shape="extra-large" />
-          <sky-image src="https://picsum.photos/seed/sky-therapist/400/400" alt="Therapist portrait" shape="full" />
-          <sky-image alt="Photo coming soon" ratio="3 / 2" />
-          <sky-image src="/broken-image.jpg" alt="Broken source falls back" ratio="3 / 2" variant="outlined" color="none" placeholderIcon="broken_image" />
-        </div>
-      </section>
-
-      <section className="showcase__card" id="tile-card">
-        <h2>Tile card</h2>
-        <p className="demo-label">Variants and colors (linked tiles show the M3 state layer)</p>
-        <div className="demo-grid">
-          <sky-tile-card icon="healing" headline="Therapy" text="12 deals" href="/showcase#tile-card" />
-          <sky-tile-card icon="self_improvement" headline="Massage" text="48 deals" variant="filled" color="surface-high" href="/showcase#tile-card" />
-          <sky-tile-card icon="hot_tub" headline="Spa & retreats" text="9 deals" variant="elevated" href="/showcase#tile-card" />
-          <sky-tile-card icon="spa" headline="Wellness" text="21 deals" variant="filled" color="primary" iconStyle="surface" href="/showcase#tile-card" />
-          <sky-tile-card icon="content_cut" headline="Hair & nails" text="17 deals" variant="filled" color="secondary" iconStyle="surface" iconShape="full" />
-          <sky-tile-card icon="face_retouching_natural" headline="Skin & beauty" text="30 deals" variant="filled" color="tertiary" iconStyle="surface" />
-        </div>
-        <p className="demo-label">Icon styles, icon shapes, shapes, alignment, no icon</p>
-        <div className="demo-grid">
-          <sky-tile-card icon="favorite" headline="Tonal icon" text="icon-style tonal" iconStyle="tonal" />
-          <sky-tile-card icon="favorite" headline="Plain icon" text="icon-style plain" iconStyle="plain" />
-          <sky-tile-card icon="favorite" headline="Round icon" text="icon-shape full" iconShape="full" />
-          <sky-tile-card icon="favorite" headline="Square corners" text="shape small" shape="small" iconShape="small" />
-          <sky-tile-card icon="favorite" headline="Centered" text="align center" align="center" />
-          <sky-tile-card headline="No icon" text="Text only, no background" color="none" />
-          <sky-tile-card icon="nightlight" headline="Inverse" text="color inverse" variant="filled" color="inverse" iconStyle="tonal" />
-        </div>
-      </section>
-
-      <section className="showcase__card" id="feature-card">
-        <h2>Feature card</h2>
-        <p className="demo-label">Container colors with a CTA</p>
-        <div className="demo-grid demo-grid--wide">
-          <sky-feature-card color="primary" icon="card_giftcard" iconStyle="surface" headline="Give the gift of wellness" text="Gift a spa day. Redeemable at 200+ partner spas across India." ctaLabel="Buy gift card" ctaHref="/showcase#feature-card" />
-          <sky-feature-card color="surface-high" icon="payments" iconStyle="surface" headline="Unlock member-only pricing" text="Sign in to save deals, track bookings and see exclusive rates." ctaLabel="Sign in" ctaHref="/showcase#feature-card" />
-          <sky-feature-card color="secondary" icon="event_available" iconStyle="surface" headline="Book in 30 seconds" text="Pick a slot, pay online and get instant confirmation." ctaLabel="Browse deals" ctaHref="/showcase#feature-card" ctaIcon="arrow_forward" />
-          <sky-feature-card color="tertiary" icon="verified" iconStyle="surface" headline="Verified partners" text="Every spa is checked for hygiene, licensing and reviews." />
-          <sky-feature-card color="inverse" icon="support_agent" iconStyle="tonal" iconShape="full" headline="Talk to a wellness expert" text="Not sure what to book? We will help you choose." ctaLabel="Chat with us" ctaHref="/showcase#feature-card" />
-        </div>
-        <p className="demo-label">No background, outlined, elevated, no icon, custom actions slot</p>
-        <div className="demo-grid demo-grid--wide">
-          <sky-feature-card color="none" variant="outlined" icon="spa" iconStyle="tonal" headline="Outlined, no fill" text="variant outlined, color none" ctaLabel="Learn more" ctaHref="/showcase#feature-card" />
-          <sky-feature-card variant="elevated" icon="spa" iconStyle="plain" headline="Elevated, plain icon" text="variant elevated, icon-style plain" />
-          <sky-feature-card shape="medium" headline="No icon" text="Headline and text only, medium shape.">
-            <div slot="actions">
-              <FilledButton>Primary</FilledButton>
-              <TextButton>Secondary</TextButton>
+        <p className="demo-label">
+          Product card with an Add to cart action (sky-product-card's default slot — same pattern as
+          category.tsx's product grid): plain vs outlined, grid layout
+        </p>
+        <div className="cards-grid">
+          <sky-product-card
+            image="https://picsum.photos/seed/giftset/600/400"
+            image-alt="Aromatherapy diffuser gift set"
+            badge="Best Seller"
+            eyebrow="Serenity Co."
+            heading="Aromatherapy Diffuser Gift Set"
+            href="/showcase#cards"
+            original-price="$89"
+            price="$64"
+            discount="-28%"
+          >
+            <div onClick={(e) => e.stopPropagation()}>
+              <FilledButton onClick={() => console.log('Added to cart')}>
+                <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
+                Add to cart
+              </FilledButton>
             </div>
-          </sky-feature-card>
+          </sky-product-card>
+          <sky-product-card
+            variant="outlined"
+            image="https://picsum.photos/seed/saltlamp/600/400"
+            image-alt="Himalayan salt lamp"
+            eyebrow="Serenity Co."
+            heading="Himalayan Salt Lamp"
+            href="/showcase#cards"
+            price="$38"
+          >
+            <div onClick={(e) => e.stopPropagation()}>
+              <FilledButton onClick={() => console.log('Added to cart')}>
+                <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
+                Add to cart
+              </FilledButton>
+            </div>
+          </sky-product-card>
         </div>
-      </section>
 
-      <section className="showcase__card" id="cta-banner">
-        <h2>CTA banner</h2>
+        <p className="demo-label">List layout</p>
         <div className="demo-stack">
-          <sky-cta-banner color="inverse" icon="card_giftcard" iconStyle="tonal" iconShape="full" headline="Give the gift of wellness" text="Gift cards work at 200+ partner spas across India." ctaLabel="Buy gift card" ctaHref="/showcase#cta-banner" />
-          <sky-cta-banner color="primary" icon="percent" iconStyle="surface" headline="Flat 40% off your first booking" text="New members only. Applied at checkout." ctaLabel="Browse deals" ctaHref="/showcase#cta-banner" ctaIcon="arrow_forward" />
-          <sky-cta-banner color="none" variant="outlined" icon="storefront" iconStyle="tonal" headline="Own a spa?" text="List your services and reach customers near you." ctaLabel="Partner with us" ctaHref="/showcase#cta-banner" />
-          <sky-cta-banner color="tertiary" headline="No icon, tertiary container" text="Every option from the feature card works here." ctaLabel="See options" ctaHref="/showcase#feature-card" />
+          <sky-product-card
+            layout="horizontal"
+            image="https://picsum.photos/seed/candleset/600/400"
+            image-alt="Scented candle trio"
+            eyebrow="Serenity Co."
+            heading="Scented Candle Trio — Lavender, Sandalwood, Citrus"
+            href="/showcase#cards"
+            price="$42"
+          >
+            <div onClick={(e) => e.stopPropagation()}>
+              <FilledButton onClick={() => console.log('Added to cart')}>
+                <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
+                Add to cart
+              </FilledButton>
+            </div>
+          </sky-product-card>
+          <sky-product-card
+            variant="outlined"
+            layout="horizontal"
+            image="https://picsum.photos/seed/saltlamp2/600/400"
+            image-alt="Himalayan salt lamp, bedside"
+            eyebrow="Serenity Co."
+            heading="Himalayan Salt Lamp — Bedside Edition"
+            href="/showcase#cards"
+            price="$45"
+          >
+            <div onClick={(e) => e.stopPropagation()}>
+              <FilledButton onClick={() => console.log('Added to cart')}>
+                <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
+                Add to cart
+              </FilledButton>
+            </div>
+          </sky-product-card>
         </div>
       </section>
 
-      <section className="showcase__card" id="accordion">
-        <h2>Accordion</h2>
-        <sky-accordion>
-          <sky-accordion-item header="Accordion 1" open>
-            {LOREM}
-          </sky-accordion-item>
-          <sky-accordion-item header="Accordion 2" open>
-            {LOREM}
-          </sky-accordion-item>
-          <sky-accordion-item header="Accordion Actions">
-            {LOREM}
-          </sky-accordion-item>
-        </sky-accordion>
+      <section className="showcase__card" id="offer-card">
+        <h2>Offer card</h2>
+        <OfferCardDemo />
       </section>
 
       <section className="showcase__card" id="carousel-swiper-element">
@@ -1040,6 +920,29 @@ export function Showcase() {
         </swiper-container>
       </section>
 
+      <section className="showcase__card" id="chips">
+        <h2>Chips</h2>
+        <ChipSet>
+          <AssistChip label="Assist">
+            <Icon slot="icon" aria-hidden="true">event</Icon>
+          </AssistChip>
+          <FilterChip label="Filter" selected />
+          <FilterChip label="Another filter" />
+          <InputChip label="Input" />
+          <SuggestionChip label="Suggestion" />
+        </ChipSet>
+      </section>
+
+      <section className="showcase__card" id="cta-banner">
+        <h2>CTA banner</h2>
+        <div className="demo-stack">
+          <sky-cta-banner color="inverse" icon="card_giftcard" icon-style="tonal" icon-shape="full" headline="Give the gift of wellness" text="Gift cards work at 200+ partner spas across India." cta-label="Buy gift card" cta-href="/showcase#cta-banner" />
+          <sky-cta-banner color="primary" icon="percent" icon-style="surface" headline="Flat 40% off your first booking" text="New members only. Applied at checkout." cta-label="Browse deals" cta-href="/showcase#cta-banner" cta-icon="arrow_forward" />
+          <sky-cta-banner color="none" variant="outlined" icon="storefront" icon-style="tonal" headline="Own a spa?" text="List your services and reach customers near you." cta-label="Partner with us" cta-href="/showcase#cta-banner" />
+          <sky-cta-banner color="tertiary" headline="No icon, tertiary container" text="Every option from the feature card works here." cta-label="See options" cta-href="/showcase#feature-card" />
+        </div>
+      </section>
+
       <section className="showcase__card" id="data-table">
         <h2>Data Table</h2>
         <p className="demo-label">
@@ -1087,6 +990,21 @@ export function Showcase() {
         />
       </section>
 
+      <section className="showcase__card" id="data-table-minimal-sort-only">
+        <h2>Data Table — Minimal (sort only)</h2>
+        <p className="demo-label">
+          5 records · sort only — no search, no filter, no export, no row selection, no actions
+        </p>
+        <sky-data-table
+          ref={tsRef as React.RefObject<HTMLElement>}
+          caption="Top Services"
+          columns={TS_COLUMNS}
+          rows={JSON.stringify(tsRows)}
+          total={TOP_SERVICES.length}
+          page-size={10}
+        />
+      </section>
+
       <section className="showcase__card" id="data-table-pdf-export-no-filter-dropdown">
         <h2>Data Table — PDF Export (no filter dropdown)</h2>
         <p className="demo-label">
@@ -1106,21 +1024,459 @@ export function Showcase() {
         />
       </section>
 
-      <section className="showcase__card" id="data-table-minimal-sort-only">
-        <h2>Data Table — Minimal (sort only)</h2>
+      <section className="showcase__card" id="dialog">
+        <h2>Dialog</h2>
+        <FilledButton onClick={() => dialogRef.current?.show()}>
+          Open dialog
+        </FilledButton>
+        <Dialog ref={dialogRef}>
+          <div slot="headline">Themed dialog</div>
+          <div slot="content">
+            This dialog and every control on this page share msd's green M3
+            theme.
+          </div>
+          <div slot="actions">
+            <TextButton onClick={() => dialogRef.current?.close()}>
+              Got it
+            </TextButton>
+          </div>
+        </Dialog>
+      </section>
+
+      <section className="showcase__card" id="fab-and-extended-fab">
+        <h2>FAB &amp; extended FAB</h2>
+        <div className="showcase__row">
+          <Fab size="small" aria-label="Add">
+            <Icon slot="icon">add</Icon>
+          </Fab>
+          <Fab aria-label="Edit" variant="primary">
+            <Icon slot="icon">edit</Icon>
+          </Fab>
+          <Fab size="large" aria-label="Navigate">
+            <Icon slot="icon">navigation</Icon>
+          </Fab>
+          <Fab label="Compose" variant="primary">
+            <Icon slot="icon">edit</Icon>
+          </Fab>
+          <BrandedFab label="Create" aria-label="Create">
+            <Icon slot="icon">add</Icon>
+          </BrandedFab>
+        </div>
+      </section>
+
+      <section className="showcase__card" id="feature-card">
+        <h2>Feature card</h2>
+        <p className="demo-label">Container colors with a CTA</p>
+        <div className="demo-grid demo-grid--wide">
+          <sky-feature-card color="primary" icon="card_giftcard" icon-style="surface" headline="Give the gift of wellness" text="Gift a spa day. Redeemable at 200+ partner spas across India." cta-label="Buy gift card" cta-href="/showcase#feature-card" />
+          <sky-feature-card color="surface-high" icon="payments" icon-style="surface" headline="Unlock member-only pricing" text="Sign in to save deals, track bookings and see exclusive rates." cta-label="Sign in" cta-href="/showcase#feature-card" />
+          <sky-feature-card color="secondary" icon="event_available" icon-style="surface" headline="Book in 30 seconds" text="Pick a slot, pay online and get instant confirmation." cta-label="Browse deals" cta-href="/showcase#feature-card" cta-icon="arrow_forward" />
+          <sky-feature-card color="tertiary" icon="verified" icon-style="surface" headline="Verified partners" text="Every spa is checked for hygiene, licensing and reviews." />
+          <sky-feature-card color="inverse" icon="support_agent" icon-style="tonal" icon-shape="full" headline="Talk to a wellness expert" text="Not sure what to book? We will help you choose." cta-label="Chat with us" cta-href="/showcase#feature-card" />
+        </div>
+        <p className="demo-label">No background, outlined, elevated, no icon, custom actions slot</p>
+        <div className="demo-grid demo-grid--wide">
+          <sky-feature-card color="none" variant="outlined" icon="spa" icon-style="tonal" headline="Outlined, no fill" text="variant outlined, color none" cta-label="Learn more" cta-href="/showcase#feature-card" />
+          <sky-feature-card variant="elevated" icon="spa" icon-style="plain" headline="Elevated, plain icon" text="variant elevated, icon-style plain" />
+          <sky-feature-card shape="medium" headline="No icon" text="Headline and text only, medium shape.">
+            <div slot="actions">
+              <FilledButton>Primary</FilledButton>
+              <TextButton>Secondary</TextButton>
+            </div>
+          </sky-feature-card>
+        </div>
+      </section>
+
+      <section className="showcase__card" id="icon-buttons">
+        <h2>Icon buttons</h2>
+        <div className="showcase__row">
+          <IconButton aria-label="Settings">
+            <Icon>settings</Icon>
+          </IconButton>
+          <FilledIconButton aria-label="Favorite">
+            <Icon>favorite</Icon>
+          </FilledIconButton>
+          <FilledTonalIconButton aria-label="Bookmark">
+            <Icon>bookmark</Icon>
+          </FilledTonalIconButton>
+          <OutlinedIconButton aria-label="Share">
+            <Icon>share</Icon>
+          </OutlinedIconButton>
+          <FilledIconButton aria-label="Toggle favorite" toggle>
+            <Icon>favorite_border</Icon>
+            <Icon slot="selected">favorite</Icon>
+          </FilledIconButton>
+        </div>
+      </section>
+
+      <section className="showcase__card" id="image">
+        <h2>Image</h2>
+        <p className="demo-label">Logo (contain, outlined, linked), photo, round, placeholder, broken source</p>
+        <div className="demo-grid demo-grid--images">
+          <sky-image src={logo} alt="My Spa Deal" label="My Spa Deal home" href="/showcase#image" fit="contain" ratio="3 / 2" variant="outlined" color="surface-high" />
+          <sky-image src="https://picsum.photos/seed/sky-spa-room/600/400" alt="Candle-lit spa treatment room" href="/showcase#image" ratio="3 / 2" shape="extra-large" />
+          <sky-image src="https://picsum.photos/seed/sky-therapist/400/400" alt="Therapist portrait" shape="full" />
+          <sky-image alt="Photo coming soon" ratio="3 / 2" />
+          <sky-image src="/broken-image.jpg" alt="Broken source falls back" ratio="3 / 2" variant="outlined" color="none" placeholder-icon="broken_image" />
+        </div>
+      </section>
+
+      <section className="showcase__card" id="list">
+        <h2>List</h2>
+        <List>
+          <ListItem>
+            <Icon slot="start" aria-hidden="true">label</Icon>
+            <div slot="headline">Default with start icon</div>
+          </ListItem>
+          <Divider />
+          <ListItem>
+            <div slot="headline">Cucumber</div>
+            <div slot="supporting-text">
+              Cucumbers are long green fruits that are just as long as this
+              multi-line description
+            </div>
+            <Icon slot="end" aria-hidden="true">check</Icon>
+          </ListItem>
+          <ListItem
+            type="link"
+            href="https://google.com/search?q=buy+kiwis&tbm=shop"
+            target="_blank"
+          >
+            <div slot="headline">Shop for Kiwis</div>
+            <div slot="supporting-text">
+              This will link you out in a new tab
+            </div>
+            <Icon slot="end" aria-hidden="true">open_in_new</Icon>
+          </ListItem>
+        </List>
+      </section>
+
+      <section className="showcase__card" id="menu">
+        <h2>Menu</h2>
+        <span className="menu-anchor-wrap">
+          <FilledButton
+            id="msd-menu-anchor"
+            onClick={() => setMenuOpen((o) => !o)}
+          >
+            Open menu
+          </FilledButton>
+          <Menu
+            anchor="msd-menu-anchor"
+            open={menuOpen}
+            positioning="popover"
+            onClosed={() => setMenuOpen(false)}
+          >
+            <MenuItem>
+              <div slot="headline">Profile</div>
+            </MenuItem>
+            <MenuItem>
+              <div slot="headline">Settings</div>
+            </MenuItem>
+            <Divider role="separator" />
+            <SubMenu>
+              <MenuItem slot="item">
+                <div slot="headline">More tools</div>
+                <Icon slot="end" aria-hidden="true">chevron_right</Icon>
+              </MenuItem>
+              <Menu slot="menu">
+                <MenuItem>
+                  <div slot="headline">Import</div>
+                </MenuItem>
+                <MenuItem>
+                  <div slot="headline">Export</div>
+                </MenuItem>
+              </Menu>
+            </SubMenu>
+            <Divider role="separator" />
+            <MenuItem>
+              <div slot="headline">Sign out</div>
+            </MenuItem>
+          </Menu>
+        </span>
+      </section>
+
+      <section className="showcase__card" id="progress">
+        <h2>Progress</h2>
+        <p className="demo-label">Linear</p>
+        <div className="progress-stack">
+          <LinearProgress value={0.6} aria-label="Determinate" />
+          <LinearProgress indeterminate aria-label="Indeterminate" />
+        </div>
+        <p className="demo-label">Circular</p>
+        <div className="showcase__row">
+          <CircularProgress value={0.6} aria-label="Determinate" />
+          <CircularProgress indeterminate aria-label="Indeterminate" />
+          <CircularProgress indeterminate fourColor aria-label="Four color" />
+        </div>
+      </section>
+
+      <section className="showcase__card" id="rich-text-editor">
+        <h2>Rich text editor</h2>
         <p className="demo-label">
-          5 records · sort only — no search, no filter, no export, no row selection, no actions
+          Quill-backed WYSIWYG for CMS body text (blog posts, FAQ answers, pages) — bold, italic,
+          headings, lists, quote, link, image, clear formatting. Renders into light DOM (not a
+          shadow root) since Quill needs real document-level selection.
         </p>
-        <sky-data-table
-          ref={tsRef as React.RefObject<HTMLElement>}
-          caption="Top Services"
-          columns={TS_COLUMNS}
-          rows={JSON.stringify(tsRows)}
-          total={TOP_SERVICES.length}
-          page-size={10}
+        <div className="demo-stack">
+          <sky-rich-text-editor
+            label="Blog body"
+            placeholder="Write the post…"
+            value="<p>Enjoy a <strong>90-minute</strong> deep tissue massage at our top-rated downtown spa.</p>"
+            onsky-change={(e) => console.log('sky-rich-text-editor change', e.detail)}
+          />
+          <p className="demo-label">Read-only</p>
+          <sky-rich-text-editor
+            label="Read-only preview"
+            readOnly
+            value="<p>This content is <em>locked</em> for preview.</p>"
+          />
+        </div>
+      </section>
+
+      <section className="showcase__card" id="ripple">
+        <h2>Ripple</h2>
+        <button type="button" className="ripple-surface">
+          <Ripple />
+          Press me
+        </button>
+      </section>
+
+      <section className="showcase__card" id="select">
+        <h2>Select</h2>
+        <div className="showcase__row">
+          <FilledSelect label="Filled" value="apple">
+            <SelectOption value="apple">
+              <div slot="headline">Apple</div>
+            </SelectOption>
+            <SelectOption value="banana">
+              <div slot="headline">Banana</div>
+            </SelectOption>
+            <SelectOption value="cherry">
+              <div slot="headline">Cherry</div>
+            </SelectOption>
+          </FilledSelect>
+          <OutlinedSelect label="Outlined" value="banana">
+            <SelectOption value="apple">
+              <div slot="headline">Apple</div>
+            </SelectOption>
+            <SelectOption value="banana">
+              <div slot="headline">Banana</div>
+            </SelectOption>
+            <SelectOption value="cherry">
+              <div slot="headline">Cherry</div>
+            </SelectOption>
+          </OutlinedSelect>
+        </div>
+      </section>
+
+      <section className="showcase__card" id="selection">
+        <h2>Selection</h2>
+        <div className="showcase__row">
+          <label className="showcase__inline">
+            <Checkbox checked /> Checked
+          </label>
+          <label className="showcase__inline">
+            <Checkbox indeterminate /> Indeterminate
+          </label>
+          <label className="showcase__inline">
+            <Checkbox /> Unchecked
+          </label>
+        </div>
+        <div className="showcase__row" role="radiogroup" aria-label="Plan">
+          <label className="showcase__inline">
+            <Radio name="plan" value="a" checked /> Basic
+          </label>
+          <label className="showcase__inline">
+            <Radio name="plan" value="b" /> Pro
+          </label>
+          <label className="showcase__inline">
+            <Radio name="plan" value="c" /> Max
+          </label>
+        </div>
+        <div className="showcase__row">
+          <label className="showcase__inline">
+            <Switch /> Off
+          </label>
+          <label className="showcase__inline">
+            <Switch selected /> On
+          </label>
+          <label className="showcase__inline">
+            <Switch selected icons /> With icons
+          </label>
+        </div>
+      </section>
+
+      <section className="showcase__card" id="slider">
+        <h2>Slider</h2>
+        <p className="demo-label">Continuous</p>
+        <Slider value={50} aria-label="Continuous value" />
+        <p className="demo-label">Discrete (ticks + labeled)</p>
+        <Slider value={3} min={0} max={10} step={1} ticks labeled aria-label="Discrete value" />
+        <p className="demo-label">Range</p>
+        <Slider range valueStart={20} valueEnd={70} aria-label="Range value" />
+      </section>
+
+      <section className="showcase__card" id="snackbar">
+        <h2>Snackbar</h2>
+        <p className="demo-label">
+          M3 snackbar — one instance driven imperatively via show()/hide() (only one should be
+          visible at a time per M3 guidance). Auto-dismiss pauses on hover/focus. Error uses
+          role="alert"/aria-live="assertive"; the rest use role="status"/aria-live="polite".
+        </p>
+        <div className="showcase__row">
+          <OutlinedButton
+            onClick={() => {
+              const el = snackbarRef.current;
+              if (!el) return;
+              el.variant = 'neutral';
+              el.closable = true;
+              el.actionLabel = undefined;
+              el.show('Link copied to clipboard.');
+            }}
+          >
+            Neutral
+          </OutlinedButton>
+          <OutlinedButton
+            onClick={() => {
+              const el = snackbarRef.current;
+              if (!el) return;
+              el.variant = 'success';
+              el.closable = false;
+              el.actionLabel = 'Undo';
+              el.show('Booking confirmed.');
+            }}
+          >
+            Success (+ action)
+          </OutlinedButton>
+          <OutlinedButton
+            onClick={() => {
+              const el = snackbarRef.current;
+              if (!el) return;
+              el.variant = 'warning';
+              el.closable = true;
+              el.actionLabel = undefined;
+              el.show('Your session expires in 2 minutes.');
+            }}
+          >
+            Warning
+          </OutlinedButton>
+          <OutlinedButton
+            onClick={() => {
+              const el = snackbarRef.current;
+              if (!el) return;
+              el.variant = 'error';
+              el.closable = true;
+              el.actionLabel = 'Retry';
+              el.show('Payment failed. Please try again.');
+            }}
+          >
+            Error (+ action)
+          </OutlinedButton>
+          <OutlinedButton
+            onClick={() => {
+              const el = snackbarRef.current;
+              if (!el) return;
+              el.variant = 'info';
+              el.closable = true;
+              el.actionLabel = undefined;
+              el.duration = 0;
+              el.show('New deals are available nearby.');
+            }}
+          >
+            Info (no auto-dismiss)
+          </OutlinedButton>
+        </div>
+        <p className="demo-label" role="status">
+          {snackbarLog || 'Trigger a snackbar above — events log here.'}
+        </p>
+        <sky-snackbar
+          ref={snackbarRef as React.RefObject<HTMLElement>}
+          duration={4000}
+          onsky-action={() => setSnackbarLog('sky-action fired')}
+          onsky-closed={(e) => setSnackbarLog(`sky-closed: reason="${e.detail.reason}"`)}
         />
       </section>
-    </main>
+
+      <section className="showcase__card" id="tabs">
+        <h2>Tabs</h2>
+        <p className="demo-label">Primary</p>
+        <Tabs>
+          <PrimaryTab>
+            <Icon slot="icon" aria-hidden="true">dashboard</Icon>
+            Overview
+          </PrimaryTab>
+          <PrimaryTab>
+            <Icon slot="icon" aria-hidden="true">timeline</Icon>
+            Activity
+          </PrimaryTab>
+          <PrimaryTab>
+            <Icon slot="icon" aria-hidden="true">settings</Icon>
+            Settings
+          </PrimaryTab>
+        </Tabs>
+        <p className="demo-label">Secondary</p>
+        <Tabs>
+          <SecondaryTab>Flights</SecondaryTab>
+          <SecondaryTab>Hotels</SecondaryTab>
+          <SecondaryTab>Cars</SecondaryTab>
+        </Tabs>
+      </section>
+
+      <section className="showcase__card" id="text-fields">
+        <h2>Text fields</h2>
+        <div className="fields-grid">
+          <FilledTextField label="Filled" value="Hello" />
+          <OutlinedTextField label="Outlined" placeholder="Type here" />
+          <OutlinedTextField label="With icons" placeholder="Search">
+            <Icon slot="leading-icon" aria-hidden="true">search</Icon>
+            <Icon slot="trailing-icon" aria-hidden="true">close</Icon>
+          </OutlinedTextField>
+          <FilledTextField
+            label="Amount"
+            type="number"
+            prefixText="$"
+            suffixText=".00"
+          />
+          <OutlinedTextField
+            label="Email"
+            type="email"
+            supportingText="We'll never share it"
+          />
+          <FilledTextField label="Password" type="password" value="secret" />
+          <OutlinedTextField label="Bio (textarea)" type="textarea" rows={3} />
+          <FilledTextField label="With counter" maxLength={20} value="Count me" />
+          <OutlinedTextField
+            label="Required"
+            required
+            error
+            errorText="This field is required"
+          />
+        </div>
+      </section>
+
+      <section className="showcase__card" id="tile-card">
+        <h2>Tile card</h2>
+        <p className="demo-label">Variants and colors (linked tiles show the M3 state layer)</p>
+        <div className="demo-grid">
+          <sky-tile-card icon="healing" headline="Therapy" text="12 deals" href="/showcase#tile-card" />
+          <sky-tile-card icon="self_improvement" headline="Massage" text="48 deals" variant="filled" color="surface-high" href="/showcase#tile-card" />
+          <sky-tile-card icon="hot_tub" headline="Spa & retreats" text="9 deals" variant="elevated" href="/showcase#tile-card" />
+          <sky-tile-card icon="spa" headline="Wellness" text="21 deals" variant="filled" color="primary" icon-style="surface" href="/showcase#tile-card" />
+          <sky-tile-card icon="content_cut" headline="Hair & nails" text="17 deals" variant="filled" color="secondary" icon-style="surface" icon-shape="full" />
+          <sky-tile-card icon="face_retouching_natural" headline="Skin & beauty" text="30 deals" variant="filled" color="tertiary" icon-style="surface" />
+        </div>
+        <p className="demo-label">Icon styles, icon shapes, shapes, alignment, no icon</p>
+        <div className="demo-grid">
+          <sky-tile-card icon="favorite" headline="Tonal icon" text="icon-style tonal" icon-style="tonal" />
+          <sky-tile-card icon="favorite" headline="Plain icon" text="icon-style plain" icon-style="plain" />
+          <sky-tile-card icon="favorite" headline="Round icon" text="icon-shape full" icon-shape="full" />
+          <sky-tile-card icon="favorite" headline="Square corners" text="shape small" shape="small" icon-shape="small" />
+          <sky-tile-card icon="favorite" headline="Centered" text="align center" align="center" />
+          <sky-tile-card headline="No icon" text="Text only, no background" color="none" />
+          <sky-tile-card icon="nightlight" headline="Inverse" text="color inverse" variant="filled" color="inverse" icon-style="tonal" />
+        </div>
+      </section>
+    </div>
     </div>
   );
 }

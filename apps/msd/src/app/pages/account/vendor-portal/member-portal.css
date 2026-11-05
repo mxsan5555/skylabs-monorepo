@@ -1,0 +1,64 @@
+/* Member workflow layout. Shared UI owns surfaces, typography tokens, controls and tables. */
+.member-portal {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+.member-portal > .page-head { margin-bottom: 0; }
+.member-portal .section-title { margin: 0 0 12px; }
+.member-portal .admin-tabs-wrap { margin-bottom: 0; }
+.member-portal .admin-tab-panel { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.member-portal .admin-tab-panel > .admin-page { padding: 0; margin: 0; width: 100%; min-width: 0; }
+.member-payment-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.member-card-label { margin: 0; font-size: 0.875rem; font-weight: 600; color: var(--md-sys-color-on-surface-variant); }
+.member-card-amount { margin: 10px 0 6px; font-size: 1.75rem; font-weight: 700; color: var(--md-sys-color-primary); overflow-wrap: anywhere; }
+.member-portal .field-hint { margin: 4px 0; }
+.member-payment-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
+.member-summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.member-summary-grid > *, .member-portal .summary-layout > * { min-width: 0; }
+.member-facts { margin: 0; display: flex; flex-direction: column; gap: 12px; }
+.member-facts > div { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+.member-facts dt { color: var(--md-sys-color-on-surface-variant); }
+.member-facts dd { margin: 0; text-align: right; overflow-wrap: anywhere; min-width: 0; }
+/* Checkout adds its own card padding and full-width actions; these summaries are already in sky-card. */
+.member-portal .cart-summary { padding: 0; gap: 12px; }
+.member-portal .cart-summary__row { gap: 16px; }
+.member-portal .cart-summary__row > :last-child { text-align: right; overflow-wrap: anywhere; min-width: 0; }
+.member-portal .cart-summary__actions { flex-direction: row; flex-wrap: wrap; gap: 8px; }
+.member-portal .cart-summary__actions > * { width: auto; }
+.member-portal .voucher-lookup-row { margin-bottom: 0; }
+.member-action-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.member-action-row md-outlined-text-field { width: min(100%, 320px); min-width: 0; flex: 0 1 320px; }
+.member-action-row md-filled-button, .member-action-row md-outlined-button { flex: 0 0 auto; }
+.member-next-action { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.member-next-action > .panel { padding: 0; width: 100%; }
+.member-portal .wizard-steps { padding: 0; margin: 0; gap: 8px; }
+.member-portal .wizard-steps__item { cursor: default; min-height: 40px; padding: 6px 12px; box-sizing: border-box; }
+.member-disclosure { padding: 16px 20px; border: 1px solid var(--md-sys-color-outline-variant); border-radius: var(--md-sys-shape-corner-large); }
+.member-disclosure > summary { font-weight: 600; cursor: pointer; }
+.member-disclosure[open] > summary { margin-bottom: 12px; }
+@media (max-width: 1100px) {
+  .member-payment-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  .member-summary-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 480px) {
+  .member-portal { gap: 16px; }
+  .member-payment-cards { gap: 12px; }
+  .member-payment-cards sky-card { padding: 14px; }
+  .member-portal .page-head__actions { width: 100%; }
+  .member-facts > div { flex-wrap: wrap; gap: 4px 12px; }
+}
+@media (max-width: 340px) {
+  .member-payment-cards { grid-template-columns: minmax(0, 1fr); }
+}
+.member-items-card { padding: 0; overflow: hidden; }
+.member-table-scroll { overflow-x: auto; }
+.member-items-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.875rem; }
+.member-items-table th { background: var(--md-sys-color-surface-container-low); font-weight: 600; }
+.member-items-table th, .member-items-table td { padding: 14px 16px; border-bottom: 1px solid var(--md-sys-color-outline-variant); vertical-align: middle; }
+.member-items-table tbody tr:last-child td { border-bottom: 0; }
+.member-items-table a { color: var(--md-sys-color-primary); white-space: nowrap; font-weight: 500; }
+.member-table-secondary { display: block; margin-top: 4px; color: var(--md-sys-color-on-surface-variant); }

@@ -1,0 +1,24 @@
+directions_car
+mera-driver
+Driver console
+dashboard
+Dashboard
+fact_check
+KYC Assignments
+C
+Connected verification c07b9a85-85e6-43e8-a3fb-de4e96313b40
+dd8f1954-244a-4743-9d39-1846cdae0904@example.invalid
+person
+logout
+dock_to_right
+Account
+KYC Assignments
+KYC Assignments
+
+Permission-scoped KYC assignments and current review state.
+
+All
+Unassigned (0)
+Assigned (0)
+Issues Raised (0)
+Completed (2)

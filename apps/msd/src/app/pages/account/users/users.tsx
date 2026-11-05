@@ -1,83 +1,115 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FilledButton, OutlinedButton, OutlinedTextField, OutlinedSelect, SelectOption, Icon } from '@skylabs-monorepo/shared-ui/react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { OutlinedSelect, SelectOption } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import type { UserStatus, LoginHistoryEntry, DeviceSession } from '@skylabs-monorepo/shared-types';
-import { assignRole, getLoginHistory, getSessions, listUsers, resetOtp, revokeAllSessions, setUserStatus, unassignRole, updateUser, type UserRecord, } from '../../../../api/rbac/users';
+import { listUsers, type UserRecord } from '../../../../api/rbac/users';
 import { listRoles, type Role } from '../../../../api/rbac/roles';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { UserList } from './user-list';
-import { RoleAssignment } from './role-assignment';
-import { LoginHistoryPanel } from './login-history-panel';
-import { SessionsPanel } from './sessions-panel';
 import { CreateUserDialog } from './create-user-dialog';
-import { useConfirmDialog } from '../../../components/confirm-dialog';
-import content from '../../../../content.json';
-import { validateEmail, validatePhone } from '../../../../utils/validation';
-const PAGE_SIZE = 20;
 
+interface UserTableParams {
+  page: number;
+  pageSize: number;
+  search: string;
+}
+
+const DEFAULT_PARAMS: UserTableParams = { page: 1, pageSize: 20, search: '' };
+
+/**
+ * Internal Staff directory (`/account/administration/users`, `rbac.users:view`) — list only;
+ * each row opens that user's own full page (`/account/administration/users/:userId`, see
+ * `user-detail-page.tsx`), same List -> Details split as Member Management and Customer
+ * Management. Staff-only by construction: the backend (`user.service.ts#listUsers`) already
+ * excludes customer-only and Vendor-owner accounts from every call here, so this page never has
+ * to filter them out client-side.
+ *
+ * List page/pageSize/search/role are all mirrored into the URL
+ * (`?page=&pageSize=&search=&role=`) — same reason as `customers.tsx` — the browser's Back
+ * button restores this exact querystring after a staff member's detail page has fully unmounted
+ * this component.
+ */
 export function UserManagement() {
-  const { token, can, loginAsUser } = useAuth();
-  const { confirm, ConfirmDialog } = useConfirmDialog();
+  const { token, can } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const canCreate = can('rbac.users', 'create');
+  const canAssign = can('rbac.users', 'assign');
 
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [usersLoading, setUsersLoading] = useState(true);
-  const [usersError, setUsersError] = useState('');
-  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [listError, setListError] = useState('');
+  const [allRoles, setAllRoles] = useState<Role[]>([]);
+
+  const params = useMemo<UserTableParams>(
+    () => ({
+      page: Number(searchParams.get('page')) || DEFAULT_PARAMS.page,
+      pageSize: Number(searchParams.get('pageSize')) || DEFAULT_PARAMS.pageSize,
+      search: searchParams.get('search') ?? DEFAULT_PARAMS.search,
+    }),
+    [searchParams],
+  );
   /** '' = All. Superadmin itself is never offered here — that role is excluded from this list
    *  server-side (see `user.service.ts#listUsers`'s own doc comment), so filtering by it would
    *  always return zero rows. */
-  const [roleFilter, setRoleFilter] = useState('');
+  const roleFilter = searchParams.get('role') ?? '';
 
-  const [allRoles, setAllRoles] = useState<Role[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const setParams = useCallback(
+    (next: UserTableParams) => {
+      setSearchParams(
+        (prev) => {
+          const usp = new URLSearchParams(prev);
+          usp.set('page', String(next.page));
+          usp.set('pageSize', String(next.pageSize));
+          if (next.search) usp.set('search', next.search);
+          else usp.delete('search');
+          return usp;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
 
-  const [loginHistory, setLoginHistory] = useState<LoginHistoryEntry[]>([]);
-  const [loginHistoryLoading, setLoginHistoryLoading] = useState(false);
-  const [loginHistoryError, setLoginHistoryError] = useState('');
-
-  const [sessions, setSessions] = useState<DeviceSession[]>([]);
-  const [sessionsLoading, setSessionsLoading] = useState(false);
-  const [sessionsError, setSessionsError] = useState('');
-
-  const [detailForm, setDetailForm] = useState({ name: '', email: '', phone: '' });
-  const [savingDetails, setSavingDetails] = useState(false);
-  const [roleBusyId, setRoleBusyId] = useState<string | null>(null);
-  const [actionMessage, setActionMessage] = useState('');
-  const [actionError, setActionError] = useState('');
-
-  const canEdit = can('rbac.users', 'edit');
-  const canAssign = can('rbac.users', 'assign');
-  const canStatusChange = can('rbac.users', 'status_change');
-  const canCreate = can('rbac.users', 'create');
-  const canImpersonate = can('rbac.users', 'custom');
-
-  const selectedUser = useMemo(() => users.find((u) => u.id === selectedUserId) ?? null, [users, selectedUserId]);
+  const setRoleFilter = useCallback(
+    (role: string) => {
+      setSearchParams(
+        (prev) => {
+          const usp = new URLSearchParams(prev);
+          if (role) usp.set('role', role);
+          else usp.delete('role');
+          usp.set('page', '1');
+          return usp;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
 
   const loadUsers = useCallback(async () => {
-    setUsersLoading(true);
-    setUsersError('');
+    setLoading(true);
+    setListError('');
     try {
-      const { data, meta } = await listUsers(token, page, PAGE_SIZE, roleFilter || undefined);
+      const { data, meta } = await listUsers(token, {
+        page: params.page,
+        pageSize: params.pageSize,
+        search: params.search || undefined,
+        roleKey: roleFilter || undefined,
+      });
       setUsers(data);
       setTotal(meta?.total ?? data.length);
     } catch (err) {
-      setUsersError(err instanceof ApiRequestError ? err.message : 'Could not load users.');
+      setListError(err instanceof ApiRequestError ? err.message : 'Could not load staff users.');
     } finally {
-      setUsersLoading(false);
+      setLoading(false);
     }
-  }, [token, page, roleFilter]);
+  }, [token, params, roleFilter]);
 
   useEffect(() => {
     loadUsers();
   }, [loadUsers]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [roleFilter]);
 
   useEffect(() => {
     listRoles(token)
@@ -85,154 +117,7 @@ export function UserManagement() {
       .catch(() => setAllRoles([]));
   }, [token]);
 
-  useEffect(() => {
-    if (selectedUser) {
-      setDetailForm({ name: selectedUser.name, email: selectedUser.email ?? '', phone: selectedUser.phone ?? '' });
-    }
-    setActionMessage('');
-    setActionError('');
-  }, [selectedUser]);
-
-  useEffect(() => {
-    if (!selectedUserId) return;
-    setLoginHistoryLoading(true);
-    setLoginHistoryError('');
-    getLoginHistory(token, selectedUserId)
-      .then(({ data }) => setLoginHistory(data))
-      .catch((err) => setLoginHistoryError(err instanceof ApiRequestError ? err.message : 'Could not load login history.'))
-      .finally(() => setLoginHistoryLoading(false));
-
-    setSessionsLoading(true);
-    setSessionsError('');
-    getSessions(token, selectedUserId)
-      .then(({ data }) => setSessions(data))
-      .catch((err) => setSessionsError(err instanceof ApiRequestError ? err.message : 'Could not load sessions.'))
-      .finally(() => setSessionsLoading(false));
-  }, [token, selectedUserId]);
-
-  const filteredUsers = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return users;
-    return users.filter(
-      (u) => u.name.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q) || u.phone?.includes(q),
-    );
-  }, [users, search]);
-
-  const assignedRoleIds = useMemo(() => new Set((selectedUser?.roles ?? []).map((r) => r.id)), [selectedUser]);
-
-  const saveDetails = async () => {
-    if (!selectedUser) return;
-
-    setActionError('');
-    setActionMessage('');
-
-    const email = detailForm.email.trim();
-    const phone = detailForm.phone.trim();
-
-    if (email && !validateEmail(email)) {
-      setActionError(content.validation.email.invalid);
-      return;
-    }
-
-    if (phone && !validatePhone(phone)) {
-      setActionError(content.validation.phone.invalid);
-      return;
-    }
-
-    setSavingDetails(true);
-
-    try {
-      const { data } = await updateUser(token, selectedUser.id, {
-        name: detailForm.name,
-        email: email || undefined,
-        phone: phone || undefined,
-      });
-
-      setUsers((prev) =>
-        prev.map((u) => (u.id === data.id ? data : u))
-      );
-
-      setActionMessage('User details saved.');
-    } catch (err) {
-      setActionError(
-        err instanceof ApiRequestError
-          ? err.message
-          : 'Could not save user details.'
-      );
-    } finally {
-      setSavingDetails(false);
-    }
-  };
-  const changeStatus = async (status: UserStatus) => {
-    if (!selectedUser) return;
-    try {
-      const { data } = await setUserStatus(token, selectedUser.id, status);
-      setUsers((prev) => prev.map((u) => (u.id === data.id ? data : u)));
-    } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : 'Could not change user status.');
-    }
-  };
-
-  const toggleUserRole = async (roleId: string, nowAssigned: boolean) => {
-    if (!selectedUser) return;
-    setRoleBusyId(roleId);
-    setActionError('');
-    try {
-      if (nowAssigned) {
-        await assignRole(token, selectedUser.id, roleId);
-      } else {
-        await unassignRole(token, selectedUser.id, roleId);
-      }
-      const role = allRoles.find((r) => r.id === roleId);
-      setUsers((prev) =>
-        prev.map((u) => {
-          if (u.id !== selectedUser.id) return u;
-          const roles = nowAssigned
-            ? [...u.roles, ...(role ? [{ id: role.id, key: role.key, name: role.name }] : [])]
-            : u.roles.filter((r) => r.id !== roleId);
-          return { ...u, roles };
-        }),
-      );
-    } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : 'Could not update role assignment.');
-    } finally {
-      setRoleBusyId(null);
-    }
-  };
-
-  const doRevokeSessions = async () => {
-    if (!selectedUser) return;
-    if (!(await confirm(`Revoke every active session for ${selectedUser.name}? They'll be signed out everywhere.`))) return;
-    try {
-      await revokeAllSessions(token, selectedUser.id);
-      setActionMessage('All sessions revoked.');
-      const { data } = await getSessions(token, selectedUser.id);
-      setSessions(data);
-    } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : 'Could not revoke sessions.');
-    }
-  };
-
-  const doResetOtp = async () => {
-    if (!selectedUser) return;
-    try {
-      await resetOtp(token, selectedUser.id);
-      setActionMessage('Pending OTP challenges invalidated.');
-    } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : 'Could not reset OTP.');
-    }
-  };
-
-  const doLoginAs = async (userId: string) => {
-    try {
-      await loginAsUser(userId);
-      navigate('/account/dashboard');
-    } catch {
-      setActionError('Could not start preview session.');
-    }
-  };
-
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const openUser = useCallback((id: string) => navigate(`/account/administration/users/${id}`), [navigate]);
 
   return (
     <div className="admin-page admin-page--wide">
@@ -240,164 +125,41 @@ export function UserManagement() {
       <header className="page-head">
         <div>
           <h1>User Management</h1>
-          <p>Search staff and customer accounts, manage their roles and access.</p>
+          <p>Internal staff accounts — search, roles, and account status.</p>
         </div>
         <div className="page-head__actions">
+          {canAssign && <Link to="/account/administration/role-conflicts">Role Conflicts</Link>}
           {canCreate && (
-            <CreateUserDialog roles={allRoles} onCreated={(user) => setUsers((prev) => [user, ...prev])} />
+            <CreateUserDialog roles={allRoles} onCreated={() => loadUsers()} />
           )}
         </div>
       </header>
 
-      <div className="two-pane">
-        <section className="panel" aria-label="Users">
-          <h2>Users</h2>
-          <OutlinedTextField
-            className="admin-sidebar__search"
-            label="Search this page"
-            value={search}
-            onInput={(e: Event) => setSearch((e.target as HTMLInputElement).value)}
-          />
-          <OutlinedSelect
-            label="Role"
-            value={roleFilter}
-            onChange={(e: Event) => setRoleFilter((e.target as HTMLSelectElement).value)}
-          >
-            <SelectOption value="">
-              <div slot="headline">All</div>
-            </SelectOption>
-            {allRoles
-              .filter((r) => !r.isSuperAdmin)
-              .map((r) => (
-                <SelectOption key={r.id} value={r.key}>
-                  <div slot="headline">{r.name}</div>
-                </SelectOption>
-              ))}
-          </OutlinedSelect>
-          {usersLoading ? (
-            <p className="loading-state">Loading users…</p>
-          ) : usersError ? (
-            <p className="error-state">{usersError}</p>
-          ) : (
-            <>
-              <UserList users={filteredUsers} selectedId={selectedUserId} onSelect={setSelectedUserId} />
-              <div className="form-actions">
-                <OutlinedButton disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-                  Previous
-                </OutlinedButton>
-                <span className="field-hint">
-                  Page {page} of {totalPages}
-                </span>
-                <OutlinedButton disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
-                  Next
-                </OutlinedButton>
-              </div>
-            </>
-          )}
-        </section>
-
-        <section className="panel" aria-label="User details">
-          {!selectedUser ? (
-            <p className="empty-state">Select a user to view their profile, roles, and history.</p>
-          ) : (
-            <>
-              <div className="page-head">
-                <div>
-                  <h2>{selectedUser.name}</h2>
-                  <p className="field-hint">Last login: {selectedUser.lastLoginAt ? new Date(selectedUser.lastLoginAt).toLocaleString() : 'Never'}</p>
-                </div>
-                <div className="page-head__actions">
-                  {canImpersonate && (
-                    <OutlinedButton onClick={() => doLoginAs(selectedUser.id)}>
-                      <Icon slot="icon" aria-hidden="true">visibility</Icon>
-                      Login as
-                    </OutlinedButton>
-                  )}
-                </div>
-              </div>
-
-              {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
-              {actionError && <p className="error-state" role="alert">{actionError}</p>}
-
-              <div className="form-grid">
-                <OutlinedTextField
-                  label="Name"
-                  value={detailForm.name}
-                  disabled={!canEdit}
-                  onInput={(e: Event) => setDetailForm((f) => ({ ...f, name: (e.target as HTMLInputElement).value }))}
-                />
-                <OutlinedTextField
-                  label="Email"
-                  type="email"
-                  value={detailForm.email}
-                  disabled={!canEdit}
-                  onInput={(e: Event) => setDetailForm((f) => ({ ...f, email: (e.target as HTMLInputElement).value }))}
-                />
-                <OutlinedTextField
-                  label="Phone"
-                  type="tel"
-                  value={detailForm.phone}
-                  disabled={!canEdit}
-                  onInput={(e: Event) => setDetailForm((f) => ({ ...f, phone: (e.target as HTMLInputElement).value }))}
-                />
-                {canStatusChange && (
-                  <OutlinedSelect
-                    label="Status"
-                    value={selectedUser.status}
-                    onChange={(e: Event) => changeStatus((e.target as HTMLSelectElement).value as UserStatus)}
-                  >
-                    <SelectOption value="active">
-                      <div slot="headline">Active</div>
-                    </SelectOption>
-                    <SelectOption value="inactive">
-                      <div slot="headline">Inactive</div>
-                    </SelectOption>
-                    <SelectOption value="blocked">
-                      <div slot="headline">Blocked</div>
-                    </SelectOption>
-                  </OutlinedSelect>
-                )}
-                {canEdit && (
-                  <div className="form-actions">
-                    <FilledButton onClick={saveDetails} disabled={savingDetails}>
-                      {savingDetails ? 'Saving…' : 'Save details'}
-                    </FilledButton>
-                  </div>
-                )}
-              </div>
-
-              {canEdit && (
-                <div className="page-head__actions">
-                  <OutlinedButton onClick={doRevokeSessions}>
-                    <Icon slot="icon" aria-hidden="true">lock_reset</Icon>
-                    Revoke all sessions
-                  </OutlinedButton>
-                  <OutlinedButton onClick={doResetOtp}>
-                    <Icon slot="icon" aria-hidden="true">password</Icon>
-                    Reset OTP
-                  </OutlinedButton>
-                </div>
-              )}
-
-              <h2 className="section-title">Roles</h2>
-              <RoleAssignment
-                allRoles={allRoles}
-                assignedRoleIds={assignedRoleIds}
-                onToggle={toggleUserRole}
-                disabled={!canAssign}
-                busyRoleId={roleBusyId}
-              />
-
-              <h2 className="section-title">Login history</h2>
-              <LoginHistoryPanel entries={loginHistory} loading={loginHistoryLoading} error={loginHistoryError} />
-
-              <h2 className="section-title">Sessions</h2>
-              <SessionsPanel sessions={sessions} loading={sessionsLoading} error={sessionsError} />
-            </>
-          )}
-        </section>
-      </div>
-      {ConfirmDialog}
+      <section className="panel" aria-label="Staff users">
+        <h2>Staff users ({total})</h2>
+        <OutlinedSelect label="Role" value={roleFilter} onChange={(e: Event) => setRoleFilter((e.target as HTMLSelectElement).value)}>
+          <SelectOption value="">
+            <div slot="headline">All</div>
+          </SelectOption>
+          {allRoles
+            .filter((r) => !r.isSuperAdmin)
+            .map((r) => (
+              <SelectOption key={r.id} value={r.key}>
+                <div slot="headline">{r.name}</div>
+              </SelectOption>
+            ))}
+        </OutlinedSelect>
+        {listError && <p className="error-state" role="alert">{listError}</p>}
+        <UserList
+          users={users}
+          total={total}
+          page={params.page}
+          pageSize={params.pageSize}
+          loading={loading}
+          onSelect={openUser}
+          onParamsChange={setParams}
+        />
+      </section>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { render, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import * as RouterDom from 'react-router-dom';
 import { Otp } from './otp';
+import content from '../../../content.json';
 
 // Material-web custom text fields don't render their shadow-DOM internals under this app's
 // jsdom test setup (no `installMaterialJsdomPolyfills`, unlike shared-ui's own suite — see
@@ -67,5 +68,14 @@ describe('Otp — returnUrl preserved when bouncing back to /sign-in', () => {
     const backButton = container.querySelector('.otp-back') as HTMLElement;
     fireEvent.click(backButton);
     expect(navigateMock).toHaveBeenCalledWith('/sign-in');
+  });
+});
+
+describe('Otp head tags (ST-08)', () => {
+  it('has the page title, a meta description and noindex, nofollow', () => {
+    renderOtp({ identifier: '9876543210', method: 'phone' });
+    expect(document.title).toBe(content.auth.otp.pageTitle);
+    expect(document.querySelector('meta[name="description"]')?.getAttribute('content')).toBe(content.meta.otp.description);
+    expect(document.querySelector('meta[name="robots"]')?.getAttribute('content')).toBe('noindex, nofollow');
   });
 });

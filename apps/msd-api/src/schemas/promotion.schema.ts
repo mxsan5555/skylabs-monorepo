@@ -20,57 +20,66 @@ export const PROMOTION_ROUTE_ALLOW_LIST = [
   '/how-it-works',
 ] as const;
 
+export const BANNER_SLOTS = ['HOME_AFTER_DEALS', 'HOME_AFTER_PRODUCTS', 'CATEGORY_TOP', 'EXPLORE_TOP', 'DEAL_BOTTOM', 'PRODUCT_BOTTOM'] as const;
+export const BANNER_COLOR_ROLES = ['PRIMARY', 'SECONDARY', 'TERTIARY', 'SURFACE', 'SURFACE_HIGH', 'INVERSE'] as const;
+/** Buttons take a strong fill only, so the button keeps 3:1 against any banner background. */
+export const BANNER_BUTTON_ROLES = ['PRIMARY', 'SECONDARY', 'TERTIARY', 'INVERSE'] as const;
+const DESTINATION_TYPES = ['ROUTE', 'CATEGORY', 'DEAL', 'PRODUCT'] as const;
+
+/** `state` omitted = every banner, `__global__` = Global/Default only, a name = that state. */
 export const PromotionListQuerySchema = PaginationQuerySchema.extend({
   search: z.string().max(200).optional(),
+  state: z.string().max(100).optional(),
 });
 
-const PromotionFieldsSchema = z
-  .object({
-    title: z.string().min(1).max(150),
-    description: z.string().max(2000).optional().nullable(),
-    buttonLabel: z.string().max(60).optional().nullable(),
-    destinationType: z.enum(['ROUTE', 'CATEGORY', 'DEAL']),
-    destinationRoute: z.enum(PROMOTION_ROUTE_ALLOW_LIST).optional().nullable(),
-    categoryId: z.string().uuid().optional().nullable(),
-    dealId: z.string().uuid().optional().nullable(),
-    sortOrder: z.number().int().min(0).optional(),
-    startDate: z.coerce.date().optional().nullable(),
-    endDate: z.coerce.date().optional().nullable(),
-  })
-  .refine((data) => data.destinationType !== 'ROUTE' || Boolean(data.destinationRoute), {
-    message: 'destinationRoute is required when destinationType is ROUTE',
-    path: ['destinationRoute'],
-  })
-  .refine((data) => data.destinationType !== 'CATEGORY' || Boolean(data.categoryId), {
-    message: 'categoryId is required when destinationType is CATEGORY',
-    path: ['categoryId'],
-  })
-  .refine((data) => data.destinationType !== 'DEAL' || Boolean(data.dealId), {
-    message: 'dealId is required when destinationType is DEAL',
-    path: ['dealId'],
-  })
-  .refine((data) => !data.startDate || !data.endDate || data.startDate <= data.endDate, {
-    message: 'startDate must be on or before endDate',
-    path: ['endDate'],
-  });
+const bannerFields = {
+  title: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(300).optional().nullable(),
+  buttonLabel: z.string().trim().min(1).max(40),
+  state: z.string().trim().min(1).max(100).optional().nullable(),
+  backgroundRole: z.enum(BANNER_COLOR_ROLES),
+  buttonRole: z.enum(BANNER_BUTTON_ROLES),
+  placements: z.array(z.enum(BANNER_SLOTS)).min(1).max(BANNER_SLOTS.length),
+  destinationType: z.enum(DESTINATION_TYPES),
+  destinationRoute: z.enum(PROMOTION_ROUTE_ALLOW_LIST).optional().nullable(),
+  categoryId: z.string().uuid().optional().nullable(),
+  dealId: z.string().uuid().optional().nullable(),
+  productId: z.string().uuid().optional().nullable(),
+  sortOrder: z.number().int().min(0).max(999).optional(),
+  startDate: z.coerce.date().optional().nullable(),
+  endDate: z.coerce.date().optional().nullable(),
+};
 
-export const PromotionCreateSchema = PromotionFieldsSchema.openapi('PromotionCreate');
-// `.partial()` isn't available directly on a `ZodEffects` (the `.refine()` chain above) — an
-// update re-validates the same cross-field rules against the MERGED (existing + patch) record in
-// the service layer instead (see `promotion.service.ts#updatePromotion`), so this only needs to
-// validate each field's own shape here, individually optional.
-export const PromotionUpdateSchema = z
-  .object({
-    title: z.string().min(1).max(150).optional(),
-    description: z.string().max(2000).optional().nullable(),
-    buttonLabel: z.string().max(60).optional().nullable(),
-    destinationType: z.enum(['ROUTE', 'CATEGORY', 'DEAL']).optional(),
-    destinationRoute: z.enum(PROMOTION_ROUTE_ALLOW_LIST).optional().nullable(),
-    categoryId: z.string().uuid().optional().nullable(),
-    dealId: z.string().uuid().optional().nullable(),
-    sortOrder: z.number().int().min(0).optional(),
-    startDate: z.coerce.date().optional().nullable(),
-    endDate: z.coerce.date().optional().nullable(),
+/** The field each destination type needs. */
+const DESTINATION_FIELD = {
+  ROUTE: 'destinationRoute',
+  CATEGORY: 'categoryId',
+  DEAL: 'dealId',
+  PRODUCT: 'productId',
+} as const;
+
+export const PromotionCreateSchema = z
+  .object(bannerFields)
+  .strict()
+  .superRefine((data, ctx) => {
+    const field = DESTINATION_FIELD[data.destinationType];
+    if (!data[field]) {
+      ctx.addIssue({ code: 'custom', message: `${field} is required when destinationType is ${data.destinationType}`, path: [field] });
+    }
+    if (data.startDate && data.endDate && data.startDate > data.endDate) {
+      ctx.addIssue({ code: 'custom', message: 'startDate must be on or before endDate', path: ['endDate'] });
+    }
   })
-  .openapi('PromotionUpdate');
+  .openapi('PromotionCreate');
+
+/** Every field optional; the service re-checks the destination rules against the merged record. */
+export const PromotionUpdateSchema = z.object(bannerFields).partial().strict().openapi('PromotionUpdate');
 export const PromotionStatusUpdateSchema = z.object({ isActive: z.boolean() }).openapi('PromotionStatusUpdate');
+
+/** Public `GET /catalog/banners`. */
+export const PublicBannerQuerySchema = z
+  .object({
+    slot: z.enum(BANNER_SLOTS),
+    state: z.string().max(100).optional(),
+  })
+  .strict();

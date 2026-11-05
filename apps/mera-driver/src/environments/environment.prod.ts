@@ -6,4 +6,5 @@
 export const environment = {
   production: true,
   apiUrl: 'https://mera-driver-api-production.up.railway.app',
+  googleMapsApiKey: 'AIzaSyCc0KQ40uWG_mnZOcmqYw324z9MXCjm28c',
 };

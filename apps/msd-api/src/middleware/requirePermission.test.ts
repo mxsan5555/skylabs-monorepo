@@ -20,6 +20,7 @@ vi.mock('../lib/prisma', () => ({ prisma: createPrismaMock() }));
 import app from '../app';
 import { bearerFor } from '../test-utils/auth-test-utils';
 import { resolveGrantedPermissionKeys } from '../services/permission-resolver.service';
+import { requirePermission } from './requirePermission';
 
 const resolveMock = vi.mocked(resolveGrantedPermissionKeys);
 
@@ -68,5 +69,15 @@ describe('requirePermission (via GET /api/v1/inventory, a stub route gated on in
       .set('Authorization', bearerFor({ roles: ['admin'] }));
     expect(res.status).toBe(500);
     expect(res.body.error.code).toBe('SERVER_ERROR');
+  });
+});
+
+describe('requirePermission at boot (X-05)', () => {
+  it('writes nothing to the console when a route registers its gate', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(vi.fn());
+    requirePermission('inventory', 'view');
+    requirePermission('members', 'edit');
+    expect(log).not.toHaveBeenCalled();
+    log.mockRestore();
   });
 });

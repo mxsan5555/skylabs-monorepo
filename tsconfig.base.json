@@ -22,6 +22,9 @@
       "@skylabs-monorepo/shared-ui/carousel": [
         "packages/shared-ui/src/carousel.ts"
       ],
+      "@skylabs-monorepo/shared-ui/editor": [
+        "packages/shared-ui/src/editor.ts"
+      ],
       "@skylabs-monorepo/shared-ui/testing": [
         "packages/shared-ui/src/testing/index.ts"
       ],

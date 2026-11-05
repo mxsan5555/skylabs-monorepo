@@ -1,0 +1,18 @@
+/* Quantity stepper: outlined icon buttons (48dp targets) around a tabular value. */
+.quantity-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quantity-stepper__label {
+  color: var(--md-sys-color-on-surface-variant);
+  white-space: nowrap;
+}
+
+.quantity-stepper__value {
+  min-inline-size: 3ch;
+  color: var(--md-sys-color-on-surface);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}

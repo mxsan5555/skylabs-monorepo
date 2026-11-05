@@ -1,14 +1,13 @@
-import { Fragment, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { FilledButton, CircularProgress, OutlinedButton, Icon, Divider, } from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, CircularProgress, OutlinedButton, Icon, } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
+import { Seo } from '../../seo/seo';
 import { getMyOrder, type Order } from '../../../api/orders';
 import { ApiRequestError } from '../../../api/rbac/client';
-import { formatINR } from '../../../utils/format';
+import { InvoiceDocument } from '../../components/invoice-document';
 import content from '../../../content.json';
-import { groupOrderItemsByVendor } from '../../../utils/order-items';
 import './invoice.css';
-
 /**
  * Real, printable/downloadable invoice for a customer's own order — `GET /orders/me/:id`
  * (already ownership-scoped: 404s for another customer's order, same as every other `/me/*`
@@ -55,7 +54,7 @@ export function Invoice() {
   if (error || !order) {
     return (
       <div className="invoice-page invoice-page--empty">
-        <title>{invoice.notFound.metaTitle}</title>
+        <Seo title={invoice.notFound.metaTitle} description={content.meta.invoice.description} path={content.meta.invoice.pathTemplate.replace('{id}', id)} noindex="follow" />
         <sky-info-card
           icon="receipt_long"
           heading={invoice.notFound.heading}
@@ -65,14 +64,14 @@ export function Invoice() {
       </div>
     );
   }
-  const latestPayment = order.payments.length ? [...order.payments].sort((a, b) =>
-    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),)[0] : null;
-  const vendorGroups = groupOrderItemsByVendor(order.items);
-  const isMultiVendor = vendorGroups.length > 1;
   return (
     <div className="invoice-page">
-      <title>{invoice.metaTitleTemplate.replace('{id}', order.id)}</title>
-      <meta name="robots" content="noindex" />
+      <Seo
+        title={invoice.metaTitleTemplate.replace('{id}', order.id)}
+        description={content.meta.invoice.description}
+        path={content.meta.invoice.pathTemplate.replace('{id}', order.id)}
+        noindex="follow"
+      />
       <div className="invoice-page__actions">
         <OutlinedButton onClick={() => navigate(`/orders/${order.id}`)}>
           <Icon slot="icon" aria-hidden="true">arrow_back</Icon>{invoice.backToOrder}
@@ -81,97 +80,7 @@ export function Invoice() {
           <Icon slot="icon" aria-hidden="true">download</Icon>{invoice.downloadPrint}
         </FilledButton>
       </div>
-      <article className="invoice">
-        <header className="invoice__header">
-          <div>
-            <h1 className="invoice__vendor">
-              {isMultiVendor ? `${vendorGroups.length} Vendors` : order.vendorNameSnapshot}
-            </h1>
-            {!isMultiVendor && order.branchNameSnapshot && (<p className="invoice__branch">{order.branchNameSnapshot}</p>)}
-          </div>
-          <div className="invoice__meta">
-            <h2 className="invoice__title">{invoice.title}</h2>
-            <p>{invoice.labels.orderId} {order.id}</p>
-            <p>{invoice.labels.invoiceDate}{' '}{new Date(order.createdAt).toLocaleDateString()}</p>
-          </div>
-        </header>
-        <Divider />
-        <section className="invoice__parties">
-          <div><h3>{invoice.labels.billedTo}</h3>
-            <p>{order.contactName || '—'}</p>
-            {order.contactPhone && (<p>{order.contactPhone}</p>)}
-            {order.contactEmail && (<p>{order.contactEmail}</p>)}
-          </div>
-          {order.shippingAddress && (
-            <div>
-              <h3>{invoice.labels.shippingAddress}</h3>
-              <p>{order.shippingAddress}</p>
-              <p>{[order.shippingCity, order.shippingState, order.shippingPincode,].filter(Boolean).join(', ')}</p>
-            </div>
-          )}
-        </section>
-        <Divider />
-        <table className="invoice__items">
-          <thead>
-            <tr>
-              <th>{invoice.labels.item}</th>
-              <th>{invoice.labels.quantity}</th>
-              <th>{invoice.labels.unitPrice}</th>
-              <th>{invoice.labels.lineTotal}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {vendorGroups.map((group) => (
-              <Fragment key={group.vendorId}>
-                {isMultiVendor && (
-                  <tr className="invoice__items-vendor-row">
-                    <td colSpan={4}>
-                      {group.vendorName}
-                      {group.branchName ? ` · ${group.branchName}` : ''}
-                    </td>
-                  </tr>
-                )}
-                {group.items.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      {item.itemName}
-                      {item.durationMinutes ? ` (${item.durationMinutes} min)` : ''}
-                    </td>
-                    <td>{item.quantity}</td>
-                    <td>{formatINR(Number(item.unitPrice))}</td>
-                    <td>{formatINR(Number(item.lineTotal))}</td>
-                  </tr>
-                ))}
-              </Fragment>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr className="invoice__summary-row">
-              <td colSpan={3}>{invoice.labels.subtotal}</td>
-              <td>{formatINR(Number(order.subtotal))}</td>
-            </tr>
-            <tr className="invoice__summary-row invoice__summary-row--grand">
-              <td colSpan={3}>{invoice.labels.total}</td>
-              <td>{formatINR(Number(order.total))}</td>
-            </tr>
-          </tfoot>
-        </table>
-        <Divider />
-        <section className="invoice__payment">
-          <div>
-            <h3>{invoice.labels.paymentMethod}</h3>
-            <p>{latestPayment?.provider === 'COD' ? invoice.labels.cashOnDelivery : latestPayment?.provider ?? '—'}</p>
-          </div>
-          <div>
-            <h3>{invoice.labels.paymentStatus}</h3>
-            <sky-badge>{latestPayment?.status ?? '—'}</sky-badge>
-          </div>
-          <div>
-            <h3>{invoice.labels.orderStatus}</h3>
-            <sky-badge>{order.status}</sky-badge>
-          </div>
-        </section>
-      </article>
+      <InvoiceDocument order={order} />
     </div>
   );
 }

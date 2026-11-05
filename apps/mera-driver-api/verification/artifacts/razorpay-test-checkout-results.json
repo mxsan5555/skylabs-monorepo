@@ -1,0 +1,12 @@
+{
+  "results": [
+    "Real test-mode backend order and Razorpay checkout iframe opened; no payment submitted",
+    "Booking uses backend ₹10 quote, remains unpaid, zero ledger collection before any captured funds"
+  ],
+  "chargeSubmitted": false,
+  "preservedCounts": {
+    "drivers": 6,
+    "customers": 2,
+    "bookings": 1
+  }
+}

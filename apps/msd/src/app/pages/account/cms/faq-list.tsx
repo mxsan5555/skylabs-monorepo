@@ -13,7 +13,7 @@ import {
   type FaqInput,
 } from '../../../../api/rbac/faqs';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { useToast } from '../../../../toast/toast-context';
+import { showSnackbar } from '../../../../snackbar/snackbar';
 import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { FaqFormDialog } from './faq-form-dialog';
 
@@ -47,7 +47,6 @@ function excerpt(text: string, maxLength = 80): string {
 export function FaqList() {
   const { token, can } = useAuth();
   const { confirm, ConfirmDialog } = useConfirmDialog();
-  const { showToast } = useToast();
   const canCreate = can('cms.faq', 'create');
   const canEdit = can('cms.faq', 'edit');
   const canDelete = can('cms.faq', 'delete');
@@ -89,13 +88,13 @@ export function FaqList() {
     if (existing) {
       const { data } = await updateFaq(token, existing.id, input);
       setFaqs((prev) => prev.map((f) => (f.id === data.id ? data : f)));
-      showToast('FAQ updated.');
+      showSnackbar('FAQ updated.', { variant: 'success' });
       return data;
     }
     const { data } = await createFaq(token, input);
     setFaqs((prev) => [...prev, data]);
     setTotal((t) => t + 1);
-    showToast('FAQ created.');
+    showSnackbar('FAQ created.', { variant: 'success' });
     return data;
   };
 
@@ -104,11 +103,11 @@ export function FaqList() {
     try {
       const { data } = await setFaqStatus(token, faq.id, !faq.isActive);
       setFaqs((prev) => prev.map((f) => (f.id === data.id ? data : f)));
-      showToast(data.isActive ? 'FAQ activated.' : 'FAQ deactivated.');
+      showSnackbar(data.isActive ? 'FAQ activated.' : 'FAQ deactivated.', { variant: 'success' });
     } catch (err) {
       const msg = err instanceof ApiRequestError ? err.message : 'Could not change status.';
       setError(msg);
-      showToast(msg, 'error');
+      showSnackbar(msg, { variant: 'error' });
     }
   };
 
@@ -119,11 +118,11 @@ export function FaqList() {
       await deleteFaq(token, faq.id);
       setFaqs((prev) => prev.filter((f) => f.id !== faq.id));
       setTotal((t) => t - 1);
-      showToast('FAQ deleted.');
+      showSnackbar('FAQ deleted.', { variant: 'success' });
     } catch (err) {
       const msg = err instanceof ApiRequestError ? err.message : 'Could not delete FAQ.';
       setError(msg);
-      showToast(msg, 'error');
+      showSnackbar(msg, { variant: 'error' });
     }
   };
 

@@ -9,7 +9,7 @@ import { buildPopularSearches } from './popular-searches';
 import { socialIcon } from './social-icons';
 import { ThemeSwitch } from './theme-switch';
 import content from '../../../content.json';
-import logo from '../../../assets/logo.jpg';
+import { LOGO_SRC as logo } from '../../../brand';
 import './site-footer.css';
 
 const t = content.nav.footer;

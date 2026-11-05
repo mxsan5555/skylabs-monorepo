@@ -47,4 +47,10 @@ describe('SectionHead', () => {
     const desc = screen.getByTestId('desc');
     expect(desc.parentElement?.tagName).not.toBe('P');
   });
+
+  it('renders media in its own right-column wrapper', () => {
+    renderHead(<SectionHead id="h" heading="About" media={<img src="/logo.svg" alt="" />} />);
+    const img = document.querySelector('.section-head__media > img');
+    expect(img?.getAttribute('src')).toBe('/logo.svg');
+  });
 });
