@@ -590,6 +590,8 @@ IDOR suite across all 14 resources, mass-assignment suite (extra keys → 422), 
 (polyglot, wrong magic bytes, oversize, path traversal), PII scan of logs and responses for full
 Aadhaar or PAN, concurrency (double refund, double payout, parallel status changes), migration and
 rollback rehearsal (P11).
+- Fresh PostgreSQL database: the initial migration creates `pg_trgm` before either GIN trigram
+  index and completes successfully.
 
 ## 5. Security checklist (before each release)
 
