@@ -441,3 +441,9 @@ Two Cloudflare R2 buckets per environment, one folder per owner. Layout in
 - **Local development** uses its own two R2 buckets (`msd-media-dev`, `msd-private-dev`) with the
   same layout, not the local disk: the same code path runs everywhere, and the free tier (10 GB)
   covers it. Never point local development at the production buckets.
+
+### 12.4 Database migration prerequisites
+
+The initial Prisma migration provisions PostgreSQL extensions before creating indexes that depend
+on them. In particular, `pg_trgm` must exist before the GIN indexes using `gin_trgm_ops`; see
+[the initial migration](../../apps/msd-api/prisma/migrations/20261105070058_init/migration.sql).
