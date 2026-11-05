@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Order } from '../../../../api/rbac/orders';
 import { OrderManagement } from './orders';
@@ -130,7 +130,7 @@ describe('OrderManagement — reworked row mapping', () => {
     expect(row['Customer Phone']).toBe('9999999999');
     expect(row.Purchase).toBe('Swedish Massage');
     expect(row['Purchase Detail']).toBe('Deal Order · Zen Spa');
-    expect(row.Amount).toBe('₹1,000');
+    expect(row.Amount).toBe('₹1,000.00');
     expect(row.__orderId).toBe('order-1');
     expect(row.__customerId).toBe('cust-1');
   });

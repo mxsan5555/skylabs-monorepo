@@ -132,13 +132,13 @@ export function DealsListPage({ token, vendorId, canEdit, canDelete }: DealsList
 
       {error && <p className="error-state" role="alert">{error}</p>}
 
-      {!loading && branchCount === 0 ? (
+      {!loading && error ? null : !loading && branchCount === 0 ? (
         <p className="empty-state">
           Add a branch first: a deal is sold at one branch. <Link to={`/account/members/${vendorId}/branches/new`}>Add a branch</Link>
         </p>
       ) : !loading && deals.length === 0 ? (
         <p className="empty-state">No deals yet. Add one for a branch.</p>
-      ) : !loading && error ? null : (
+      ) : (
         <sky-data-table
           ref={tableRef as RefObject<HTMLElement>}
           caption="Deals"

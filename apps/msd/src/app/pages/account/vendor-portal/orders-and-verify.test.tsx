@@ -70,8 +70,13 @@ function enterVoucherCode(code: string) {
   setFieldValue(textFields()[0], code);
 }
 
+/** The result title is the status panel's `headline` attribute, not a text node. */
 async function findResultTitle(text: string) {
-  return screen.findByText(text, {}, LONG);
+  return waitFor(() => {
+    const el = document.querySelector(`[headline="${text}"]`);
+    expect(el).toBeTruthy();
+    return el;
+  }, LONG);
 }
 
 function serviceEntitlement(status: string) {

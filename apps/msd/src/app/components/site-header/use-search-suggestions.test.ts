@@ -200,7 +200,7 @@ describe('useSearchSuggestions', () => {
       id: 'p1',
       label: 'Massage Oil',
       sublabel: 'AromaCo',
-      href: '/products/p1',
+      href: '/products/massage-oil',
       price: '₹299',
     });
     expect(result.current.groups.find((g) => g.key === 'therapists')?.items[0]).toMatchObject({

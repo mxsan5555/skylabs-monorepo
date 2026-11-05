@@ -26,7 +26,7 @@ describe('Sidebar leaf matching', () => {
     expect(selected[0]).toHaveTextContent(title);
     expect(selected[0].getAttribute('aria-current')).toBe('page');
     expect(screen.getByRole('link', { name: title })).toBeTruthy();
-    expect(document.querySelectorAll('.admin-nav-group.open')).toHaveLength(2);
+    expect(document.querySelectorAll('.admin-nav-group__trigger[aria-expanded="true"]')).toHaveLength(2);
   });
   it('does not match a partial segment', () => {
     expect(activeMenuLeafId(menu, '/account/cms/blogging')).toBeUndefined();

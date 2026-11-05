@@ -560,6 +560,9 @@ function orderSearch(search: string, memberId?: string): Prisma.OrderWhereInput[
           { vendorNameSnapshot: contains },
           { branchNameSnapshot: contains },
           { items: { some: { vendorNameSnapshot: contains } } },
+          // Staff only: a member never searches a customer's contact details.
+          { customer: { is: { phone: { contains: search } } } },
+          { contactPhone: { contains: search } },
         ]),
   ];
 }
@@ -650,8 +653,8 @@ export async function getOrderOrThrow(callerUserId: string, scope: OrderScope, i
  * still included for every caller who can see the order at all, since Order.status/payment
  * events aren't vendor-split).
  */
-export async function getOrderActivityHistory(callerUserId: string, id: string) {
-  const order = await getOrderOrThrow(callerUserId, id);
+export async function getOrderActivityHistory(callerUserId: string, scope: OrderScope, id: string) {
+  const order = await getOrderOrThrow(callerUserId, scope, id);
   const itemIds = order.items.map((item) => item.id);
 
   const items = itemIds.length

@@ -1,7 +1,6 @@
 import { createElement, useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import '@skylabs-monorepo/shared-ui';
-import '@skylabs-monorepo/shared-ui/editor';
 import { FilledButton } from '@skylabs-monorepo/shared-ui/react';
 import {
   createVendorTherapist,
@@ -18,6 +17,7 @@ import {
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
 import { MediaUploader } from '../../../components/media-uploader';
+import { memberTrail } from './member-crumbs';
 
 interface TherapistFormPageProps {
   token: string | null;
@@ -119,6 +119,11 @@ const EMPTY_FORM = {
  *  same known dedup opportunity already flagged for `BranchFormPage`/`DealFormPage`. Renders raw
  *  M3 elements for the same testability reason those two pages do. */
 export function TherapistFormPage({ token }: TherapistFormPageProps) {
+  // Quill reads `document` on import, so load it in the browser only (see register-editor.ts).
+  useEffect(() => {
+    void import('../../showcase/register-editor');
+  }, []);
+
   const { vendorId, therapistId } = useParams<{ vendorId: string; therapistId?: string }>();
   const navigate = useNavigate();
   const isEdit = Boolean(therapistId);

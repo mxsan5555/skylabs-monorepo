@@ -103,7 +103,7 @@ async function getDummyLoginOtps(account: DummyLoginAccount | null): Promise<str
     throw new ApiError('FORBIDDEN', 'This account has been disabled. Please contact support.');
   }
   const roles = (account.roles ?? []).map(({ role }) => role.key);
-  const eligibleRoles = roles.filter((role) => Object.hasOwn(DUMMY_ROLE_OTP, role));
+  const eligibleRoles = roles.filter((role) => Object.prototype.hasOwnProperty.call(DUMMY_ROLE_OTP, role));
   if (eligibleRoles.length === 0) return null;
   const credentials = eligibleRoles.map((role) => DUMMY_ROLE_OTP[role]);
   const configured = credentials.filter(({ getValue }) => Boolean(getValue()));

@@ -32,6 +32,7 @@ import { MediaReorderSchema } from '../schemas/media.schema';
 import { imageUpload, videoUpload, documentUpload } from '../lib/media-upload.middleware';
 import type { VendorDocumentType } from '../generated/prisma-client';
 import * as vendorService from '../services/vendor.service';
+import * as dealService from '../services/deal.service';
 import { registerDealRoutes, memberDealSurface, staffDealSurface } from './vendor-deals.routes';
 import * as memberDocumentService from '../services/member-document.service';
 import * as productService from '../services/product.service';
@@ -1245,7 +1246,7 @@ router.post(
   async (req, res, next) => {
     try {
       if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
-      const image = await vendorService.addDealImage(req.params.vendorId, req.params.branchId, req.params.dealId, {
+      const image = await dealService.addDealImage(req.params.vendorId, req.params.branchId, req.params.dealId, {
         buffer: req.file.buffer,
         originalname: req.file.originalname,
       });
@@ -1268,7 +1269,7 @@ router.delete(
   requirePermission('vendors.deals', 'edit'),
   async (req, res, next) => {
     try {
-      await vendorService.deleteDealImage(req.params.vendorId, req.params.branchId, req.params.dealId, req.params.imageId);
+      await dealService.deleteDealImage(req.params.vendorId, req.params.branchId, req.params.dealId, req.params.imageId);
       await writeAuditLog({
         actorUserId: req.user!.sub,
         action: 'deal_image.delete',
@@ -1289,7 +1290,7 @@ router.patch(
   validateBody(MediaReorderSchema),
   async (req, res, next) => {
     try {
-      await vendorService.reorderDealImages(req.params.vendorId, req.params.branchId, req.params.dealId, req.body.imageIds);
+      await dealService.reorderDealImages(req.params.vendorId, req.params.branchId, req.params.dealId, req.body.imageIds);
       sendData(res, { reordered: true });
     } catch (err) {
       next(err);
@@ -1302,7 +1303,7 @@ router.patch(
   requirePermission('vendors.deals', 'edit'),
   async (req, res, next) => {
     try {
-      await vendorService.setDealPrimaryImage(req.params.vendorId, req.params.branchId, req.params.dealId, req.params.imageId);
+      await dealService.setDealPrimaryImage(req.params.vendorId, req.params.branchId, req.params.dealId, req.params.imageId);
       sendData(res, { primary: true });
     } catch (err) {
       next(err);
@@ -1317,7 +1318,7 @@ router.post(
   async (req, res, next) => {
     try {
       if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
-      const video = await vendorService.replaceDealVideo(req.params.vendorId, req.params.branchId, req.params.dealId, {
+      const video = await dealService.replaceDealVideo(req.params.vendorId, req.params.branchId, req.params.dealId, {
         buffer: req.file.buffer,
         originalname: req.file.originalname,
       });
@@ -1340,7 +1341,7 @@ router.delete(
   requirePermission('vendors.deals', 'edit'),
   async (req, res, next) => {
     try {
-      await vendorService.deleteDealVideo(req.params.vendorId, req.params.branchId, req.params.dealId);
+      await dealService.deleteDealVideo(req.params.vendorId, req.params.branchId, req.params.dealId);
       await writeAuditLog({
         actorUserId: req.user!.sub,
         action: 'deal_video.delete',

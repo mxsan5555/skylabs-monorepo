@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { AccountsOverview } from '../../../../api/rbac/accounts';
 import type { MemberSettlementRow } from '../../../../api/rbac/settlements';
+import { AccountsOverviewPage } from './accounts-overview';
 
 // Full-suite runs under worker-pool load can push jsdom async resolution past testing-library's
 // default 1000ms waitFor/findBy timeout even though every assertion here is otherwise correct —
@@ -26,7 +27,6 @@ vi.mock('../../../../api/rbac/settlements', async () => {
   return { ...actual, listMemberSettlements: (...args: unknown[]) => listMemberSettlementsMock(...args) };
 });
 
-import { AccountsOverviewPage } from './accounts-overview';
 
 /** A prop set on a sky-* element, or its attribute when jsdom has not upgraded the element —
  *  same convention `vendor-detail-page.test.tsx` already uses for these raw custom elements. */
@@ -140,7 +140,7 @@ describe('AccountsOverviewPage — populated state', () => {
     expect(readyBanner).toBeTruthy();
     expect(attr(readyBanner!, 'headline')).toBe('₹400 ready for payout');
     expect(attr(readyBanner!, 'text')).toContain('2 members eligible');
-    expect(attr(readyBanner!, 'ctaHref')).toBe('/account/accounts/member-settlements?status=ready');
+    expect(attr(readyBanner!, 'cta-href')).toBe('/account/accounts/member-settlements?status=ready');
   });
 
   it('shows the disputes-attention CTA banner, with copy clarifying the amount is already counted inside On Hold', async () => {
@@ -152,7 +152,7 @@ describe('AccountsOverviewPage — populated state', () => {
     expect(disputeBanner).toBeTruthy();
     expect(attr(disputeBanner!, 'headline')).toBe('3 open disputes');
     expect(attr(disputeBanner!, 'text')).toContain('already counted inside On Hold');
-    expect(attr(disputeBanner!, 'ctaHref')).toBe('/account/accounts/refunds-disputes');
+    expect(attr(disputeBanner!, 'cta-href')).toBe('/account/accounts/refunds-disputes');
   });
 });
 

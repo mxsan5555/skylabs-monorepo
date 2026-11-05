@@ -63,6 +63,7 @@ describe('POST /api/v1/auth/otp/request', () => {
 
   it('does not return or persist role OTP credentials in dummy mode', async () => {
     env.otpProvider = 'dummy';
+    env.adminLoginOtp = '222222';
     prismaMock.user.findFirst.mockResolvedValue({
       id: USER_ID,
       status: 'active',
@@ -133,7 +134,7 @@ describe('POST /api/v1/auth/otp/verify', () => {
 
     expect(res.status).toBe(200);
     expect(typeof res.body.data.accessToken).toBe('string');
-    expect(res.headers['set-cookie'].some((cookie: string) => cookie.startsWith('msd_refresh_token='))).toBe(true);
+    expect(typeof res.body.data.refreshToken).toBe('string');
     expect(res.body.data.user.email).toBe(identifier);
   });
 
@@ -212,12 +213,13 @@ describe('POST /api/v1/auth/otp/verify', () => {
 });
 
 describe('POST /api/v1/auth/refresh', () => {
-  it('returns 401 when the refresh session cookie is missing', async () => {
+  it('returns 422 when refreshToken is missing/too short', async () => {
     const res = await request(app).post('/api/v1/auth/refresh').send({ refreshToken: 'short' });
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(422);
   });
 
   it('returns 401 when the refresh token does not match any active session', async () => {
+    prismaMock.refreshSession.findFirst.mockResolvedValue(null);
     prismaMock.refreshSession.findMany.mockResolvedValue([]);
     const res = await request(app)
       .post('/api/v1/auth/refresh')

@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { OrderDetailRouteGuard } from './routes';
 
 /**
  * Feature: `/account/orders/:orderId` route guard — Bug 1 fix
@@ -29,7 +30,6 @@ vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
   }),
 }));
 
-import { OrderDetailRouteGuard } from './routes';
 
 function renderGuarded() {
   return render(

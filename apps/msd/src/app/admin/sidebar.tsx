@@ -6,6 +6,7 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { isDualRoleUser, setExperienceMode } from '../../auth/role-routing';
 import { LOGO_SRC as logo, LOGO_COMPACT_SRC as logo2 } from '../../brand';
 import { menuContainsRoute } from './menu-utils';
+import { activeMenuLeafId } from './sidebar-active';
 /**
  * Console navigation, built directly from `bootstrap.menu` — the server has
  * already pruned it down to what the caller's permissions allow, so this
@@ -28,6 +29,7 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const { pathname } = useLocation();
   const menu = bootstrap?.menu ?? [];
   const visibleMenu = isPreviewing ? menu.filter((node) => node.id !== 'administration') : menu;
+  const activeLeafId = activeMenuLeafId(visibleMenu, pathname);
   const initial = (bootstrap?.user.name ?? '?').charAt(0).toUpperCase();
   const dualRole = bootstrap ? isDualRoleUser(bootstrap) : false;
 
@@ -69,7 +71,7 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
         <ul className="admin-nav-list">
           {visibleMenu.map((node) => (
             <li key={node.id}>
-              <MenuNodeItem node={node} />
+              <MenuNodeItem node={node} activeLeafId={activeLeafId} />
             </li>
           ))}
           {dualRole && (
@@ -107,7 +109,7 @@ function NavItemLabel({ node }: { node: MenuNode }) {
   );
 }
 
-function MenuNodeItem({ node }: { node: MenuNode }) {
+function MenuNodeItem({ node, activeLeafId }: { node: MenuNode; activeLeafId?: string }) {
   const { pathname } = useLocation();
   const children = node.children ?? [];
   const childIsActive = children.some((child) => menuContainsRoute(child, pathname));
@@ -138,7 +140,7 @@ function MenuNodeItem({ node }: { node: MenuNode }) {
         <ul id={listId} className="admin-nav-group__children" hidden={!open}>
           {children.map((child) => (
             <li key={child.id}>
-              <MenuNodeItem node={child} />
+              <MenuNodeItem node={child} activeLeafId={activeLeafId} />
             </li>
           ))}
         </ul>
@@ -149,8 +151,12 @@ function MenuNodeItem({ node }: { node: MenuNode }) {
   if (!node.route) return null;
 
   return (
-    <NavLink to={node.route} className={({ isActive }) => `admin-nav-item${isActive ? ' active' : ''}`}>
+    <Link
+      to={node.route}
+      className={`admin-nav-item${node.id === activeLeafId ? ' active' : ''}`}
+      aria-current={node.id === activeLeafId ? 'page' : undefined}
+    >
       <NavItemLabel node={node} />
-    </NavLink>
+    </Link>
   );
 }

@@ -545,7 +545,7 @@ describe('GET /api/v1/catalog/products/:id', () => {
     expect(res.body.data.name).toBe('Face Cream');
     expect(prismaMock.product.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ OR: [{ id: PRODUCT_ID }, { slug: PRODUCT_ID }], isActive: true, vendor: { status: 'ACTIVE' } }),
+        where: expect.objectContaining({ id: PRODUCT_ID, isActive: true, vendor: { status: 'ACTIVE' } }),
       }),
     );
   });
@@ -556,7 +556,7 @@ describe('GET /api/v1/catalog/products/:id', () => {
     expect(res.status).toBe(200);
     expect(prismaMock.product.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ OR: [{ id: 'face-cream' }, { slug: 'face-cream' }] }),
+        where: expect.objectContaining({ slug: 'face-cream' }),
       }),
     );
   });
@@ -825,7 +825,7 @@ describe('GET /api/v1/catalog/therapists/:id', () => {
     expect(prismaMock.therapist.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          OR: [{ id: THERAPIST_ID }, { slug: THERAPIST_ID }],
+          id: THERAPIST_ID,
           isActive: true,
           vendor: { status: 'ACTIVE' },
           branch: { isActive: true },
@@ -847,7 +847,7 @@ describe('GET /api/v1/catalog/therapists/:id', () => {
     expect(res.status).toBe(200);
     expect(prismaMock.therapist.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ OR: [{ id: 'amit-verma' }, { slug: 'amit-verma' }] }),
+        where: expect.objectContaining({ slug: 'amit-verma' }),
       }),
     );
   });

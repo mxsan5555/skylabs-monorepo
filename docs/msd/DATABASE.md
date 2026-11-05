@@ -345,7 +345,7 @@ No tables (GA4 holds the data).
 | `PaymentProvider` | RAZORPAY, COD |
 | `PaymentStatus` | CREATED, PAID, FAILED, CANCELLED |
 | `NotificationRecipientType` | SUPERADMIN, VENDOR |
-| `NotificationType` | DEAL_PENDING_APPROVAL, ORDER_RECEIVED, VENDOR_PENDING_APPROVAL, MEMBER_SUSPENDED, DOCUMENT_APPROVED, DOCUMENT_REJECTED, MEMBER_REVIEW_FLAGGED |
+| `NotificationType` | DEAL_PENDING_APPROVAL, ORDER_RECEIVED, VENDOR_PENDING_APPROVAL, MEMBER_SUSPENDED, DOCUMENT_APPROVED, DOCUMENT_REJECTED, MEMBER_REVIEW_FLAGGED, DISPUTE_RAISED, PAYOUT_RECORDED |
 | `ReminderDelivery` | PENDING, SENT, FAILED |
 | `VendorDocumentType` | GST, PAN, AADHAAR |
 
@@ -370,6 +370,7 @@ No tables (GA4 holds the data).
 | S16 | Notification enums (`ADMIN`, `MEMBER` recipients; `REFUND_REQUESTED`, `PAYOUT_RELEASED`) | open (P4-09) |
 | S17 | Encrypt and mask `bankAccountNumber` | open (P5-13) |
 | S18 | Deal: highlights, eligibility, booking required, booking instructions (rename of `notes`), validity days, limit per customer, cancellation policy and note, previous slugs, published at; enum `DealCancellationPolicy` | written (`20261026100000_deal_page_fields`); apply and rehearse on a Neon copy open (DL-01) |
+| S19 | `NotificationType.DISPUTE_RAISED`, `PAYOUT_RECORDED` restored: `20261029073832` dropped them while disputes and payouts still send them | done (`20261105100000_restore_dispute_payout_notifications`) |
 | S19 | DealPackage: name, persons, inclusions; unique `(dealId, durationMinutes, persons)` | written (same migration) |
 | S20 | DealImage: `altText` | written (same migration) |
 | S21 | `DealFaq` table | written (same migration) |

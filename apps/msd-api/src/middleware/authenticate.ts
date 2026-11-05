@@ -62,7 +62,8 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     // A suspended or archived member loses an already-issued token; an inactive one reads only.
     if ((req.user.roles ?? []).some((role) => MEMBER_ROLE_KEYS.includes(role))) {
       const access = await getMemberAccessState(req.user.sub);
-      if (access.kind === 'blocked') {
+      // A Super Admin's preview may still open a blocked member, to see what they see.
+      if (access.kind === 'blocked' && !req.user.isPreview) {
         sendError(res, 'MEMBER_SUSPENDED', suspendedMessage(access.reason));
         return;
       }

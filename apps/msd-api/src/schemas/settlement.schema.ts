@@ -16,6 +16,7 @@ export const FinanceSettingsUpdateSchema = z
     completionOtpMaxAttempts: z.coerce.number().int().min(1).optional(),
     completionOtpResendCooldownSeconds: z.coerce.number().int().min(0).optional(),
   })
+  .strict()
   .openapi('FinanceSettingsUpdate');
 
 /** Per-vendor commission override — `null` clears the override back to the global default. */
@@ -23,6 +24,7 @@ export const VendorCommissionRateUpdateSchema = z
   .object({
     commissionRatePercent: z.coerce.number().min(0).max(100).nullable(),
   })
+  .strict()
   .openapi('VendorCommissionRateUpdate');
 
 export const CustomerPaymentsQuerySchema = PaginationQuerySchema.extend({
@@ -59,4 +61,5 @@ export const RecordPayoutSchema = z
     proofStorageKey: z.string().max(500).optional(),
     idempotencyKey: z.string().min(1).max(200).optional(),
   })
+  .strict()
   .openapi('RecordPayout');

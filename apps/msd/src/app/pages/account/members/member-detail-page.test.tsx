@@ -42,10 +42,30 @@ vi.mock('../../../../api/rbac/members', () => ({
   deleteMember: (...a: unknown[]) => deleteMemberMock(...a),
   sendMemberReminder: (...a: unknown[]) => sendReminderMock(...a),
 }));
-vi.mock('./branches-list-page', () => ({ BranchesListPage: () => <p>branches-tab</p> }));
-vi.mock('./deals-list-page', () => ({ DealsListPage: () => <p>deals-tab</p> }));
-vi.mock('./therapists-list-page', () => ({ TherapistsListPage: () => <p>therapists-tab</p> }));
-vi.mock('./products-list-page', () => ({ ProductsListPage: () => <p>products-tab</p> }));
+vi.mock('./branches-list-page', () => ({
+  BranchesListPage: (props: { canEdit: boolean }) => {
+    branchesProps(props);
+    return <p>branches-tab</p>;
+  },
+}));
+vi.mock('./deals-list-page', () => ({
+  DealsListPage: (props: { canEdit: boolean }) => {
+    dealsProps(props);
+    return <p>deals-tab</p>;
+  },
+}));
+vi.mock('./therapists-list-page', () => ({
+  TherapistsListPage: (props: { canEdit: boolean }) => {
+    therapistsProps(props);
+    return <p>therapists-tab</p>;
+  },
+}));
+vi.mock('./products-list-page', () => ({
+  ProductsListPage: (props: { canEdit: boolean }) => {
+    productsProps(props);
+    return <p>products-tab</p>;
+  },
+}));
 vi.mock('./vendor-customers', () => ({ VendorCustomers: (props: { vendorId?: string }) => <p>customers-tab {props.vendorId}</p> }));
 vi.mock('./vendor-profile-form', () => ({
   VendorProfileForm: (props: { canEdit: boolean }) => {

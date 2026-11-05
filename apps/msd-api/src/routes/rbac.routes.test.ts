@@ -485,7 +485,7 @@ describe('POST /api/v1/rbac/users', () => {
     const res = await request(app)
       .post('/api/v1/rbac/users')
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
-      .send({ key: 'hr', name: 'HR' });
+      .send({ name: 'HR', email: 'hr@example.com', roleId: ROLE_ID });
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('CONFLICT');
   });
@@ -500,7 +500,7 @@ describe('POST /api/v1/rbac/users', () => {
     const res = await request(app)
       .post('/api/v1/rbac/users')
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
-      .send({ key: 'hr', name: 'HR' });
+      .send({ name: 'HR', email: 'hr@example.com', roleId: ROLE_ID });
     expect(res.status).toBe(201);
     expect(res.body.data.id).toBe(TARGET_USER_ID);
   });
@@ -544,7 +544,7 @@ describe('POST /api/v1/rbac/users', () => {
     const res = await request(app)
       .post('/api/v1/rbac/users')
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
-      .send({ key: 'hr', name: 'HR' });
+      .send({ name: 'HR', email: 'hr@example.com', roleId: ROLE_ID });
     expect(res.status).toBe(422);
     expect(prismaMock.user.create).not.toHaveBeenCalled();
   });
@@ -569,7 +569,7 @@ describe('PUT /api/v1/rbac/users/:id/role — atomic single-role replace', () =>
   it('replaces the user\'s entire role set with exactly the new role (delete-then-create, never additive)', async () => {
     resolveMock.mockResolvedValue(['rbac.users:assign']);
     prismaMock.user.findFirst
-      .mockResolvedValueOnce({ id: TARGET_USER_ID }) // assertStaffUserOrThrow
+      .mockResolvedValueOnce({ id: TARGET_USER_ID, roles: [] }) // assertStaffUserOrThrow
       .mockResolvedValueOnce({ id: TARGET_USER_ID, roles: [{ role: { id: OTHER_ROLE_ID, key: 'sales', name: 'Sales' } }] }) // getUserOrThrow (before)
       .mockResolvedValueOnce({ id: TARGET_USER_ID, roles: [{ role: roleFixture }] }); // getUserOrThrow (after, inside setStaffUserRole)
     prismaMock.role.findUnique.mockResolvedValue(roleFixture);
@@ -1004,7 +1004,7 @@ describe('GET /api/v1/rbac/bootstrap', () => {
       .get('/api/v1/rbac/bootstrap')
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['vendor'] }));
     expect(res.status).toBe(403);
-    expect(res.body.error.message).toBe('Your member account is suspended. Please contact support.');
+    expect(res.body.error.message).toContain('Your member account is suspended');
   });
 
   it('does not 403 a SuperAdmin previewing a suspended Member (isPreview token)', async () => {
@@ -1114,21 +1114,23 @@ describe('Super Admin protection (PLANNING §1.3, §1.4)', () => {
     resolveMock.mockResolvedValue(['rbac.users:assign']);
     arrange({ superAdmins: [] });
     const res = await request(app)
-      .post(`/api/v1/rbac/users/${USER_ID}/roles/${SUPER_ROLE_ID}`)
-      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }));
+      .put(`/api/v1/rbac/users/${USER_ID}/role`)
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
+      .send({ roleId: SUPER_ROLE_ID });
     expect(res.status).toBe(403);
-    expect(prismaMock.userRole.upsert).not.toHaveBeenCalled();
+    expect(prismaMock.userRole.deleteMany).not.toHaveBeenCalled();
   });
 
   it('a Super Admin can give another user the Super Admin role', async () => {
     resolveMock.mockResolvedValue(['rbac.users:assign']);
     arrange({ superAdmins: [USER_ID] });
-    prismaMock.role.findUnique.mockResolvedValue({ id: SUPER_ROLE_ID });
+    prismaMock.role.findUnique.mockResolvedValue({ id: SUPER_ROLE_ID, key: 'super_admin', isActive: true });
     prismaMock.userRole.upsert.mockResolvedValue({});
     prismaMock.auditLog.create.mockResolvedValue({});
     const res = await request(app)
-      .post(`/api/v1/rbac/users/${TARGET_USER_ID}/roles/${SUPER_ROLE_ID}`)
-      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['super_admin'] }));
+      .put(`/api/v1/rbac/users/${TARGET_USER_ID}/role`)
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['super_admin'] }))
+      .send({ roleId: SUPER_ROLE_ID });
     expect(res.status).toBe(200);
   });
 
@@ -1136,8 +1138,9 @@ describe('Super Admin protection (PLANNING §1.3, §1.4)', () => {
     resolveMock.mockResolvedValue(['rbac.users:assign']);
     arrange({ superAdmins: [TARGET_USER_ID] });
     const res = await request(app)
-      .delete(`/api/v1/rbac/users/${TARGET_USER_ID}/roles/${SUPER_ROLE_ID}`)
-      .set('Authorization', bearerFor({ sub: TARGET_USER_ID, roles: ['super_admin'] }));
+      .put(`/api/v1/rbac/users/${TARGET_USER_ID}/role`)
+      .set('Authorization', bearerFor({ sub: TARGET_USER_ID, roles: ['super_admin'] }))
+      .send({ roleId: ROLE_ID });
     expect(res.status).toBe(409);
     expect(prismaMock.userRole.deleteMany).not.toHaveBeenCalled();
   });

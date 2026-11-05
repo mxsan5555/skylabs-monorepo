@@ -590,8 +590,8 @@ describe('GET /api/v1/orders/:id/activity', () => {
   // `vendors:custom` (never `orders:view`) can see its own order's activity, and the aggregate is
   // scoped to that vendor's own items (via `getOrderOrThrow`'s existing scoping), never a sibling
   // vendor's entitlement/dispute/refund ids on the same multi-vendor order.
-  it("a vendor caller holding only 'vendors:custom' (never 'orders:view') can see its own order's activity", async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
+  it("a vendor caller holding only 'members:custom' (never 'orders:view') can see its own order's activity", async () => {
+    resolveMock.mockResolvedValue(['members:custom']);
     prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_A_ID, ownerUserId: 'vendor-user-1' });
     prismaMock.order.findUnique.mockResolvedValue(orderFixture); // single-vendor order, all items VENDOR_A_ID
     prismaMock.orderItem.findMany.mockResolvedValue([{ id: 'oi-1', purchaseEntitlements: [], refunds: [] }]);

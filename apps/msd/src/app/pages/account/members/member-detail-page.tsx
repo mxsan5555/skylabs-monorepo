@@ -288,7 +288,7 @@ export function MemberDetailPage() {
             canDelete={can('vendors.therapists', 'delete')}
           />
         )}
-        {tab === 'products' && <ProductsListPage token={token} vendorId={member.id} canEdit={canEdit} canDelete={canDelete} />}
+        {tab === 'products' && <ProductsListPage token={token} vendorId={member.id} canEdit={can('vendors.products', 'edit')} canDelete={can('vendors.products', 'delete')} />}
 
         {tab === 'customers' && <VendorCustomers vendorId={member.id} />}
 

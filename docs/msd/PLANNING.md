@@ -777,6 +777,7 @@ expire after 5 minutes (ARCHITECTURE.md §12.3).
 | R9 | Support's only extra is `orders:custom`; documents show type and status only |
 | R10 | One member, one owner user |
 | R11 | Bootstrap scopes use the DB values `ALL` and `OWN` |
+| R12 | Staff users hold one role, set with `PUT /rbac/users/:id/role`; accounts that held several wait in Role Conflicts. Members and customers keep their own role flows |
 
 ### 13.3 Open decisions
 

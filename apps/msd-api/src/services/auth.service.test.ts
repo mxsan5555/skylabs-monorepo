@@ -132,8 +132,7 @@ describe('loginWithIdentifier — blocked account pre-check', () => {
     prismaMock.member.findUnique.mockResolvedValue({ status: 'SUSPENDED' });
 
     await expect(loginWithIdentifier('suspended-member@example.com')).rejects.toMatchObject({
-      code: 'FORBIDDEN',
-      message: 'Your member account is suspended. Please contact support.',
+      code: 'MEMBER_SUSPENDED',
     });
     expect(prismaMock.user.upsert).not.toHaveBeenCalled();
     expect(prismaMock.refreshSession.create).not.toHaveBeenCalled();
@@ -185,8 +184,7 @@ describe('loginWithGoogle — blocked account pre-check', () => {
     prismaMock.member.findUnique.mockResolvedValue({ status: 'SUSPENDED' });
 
     await expect(loginWithGoogle('google-sub-3', 'suspended-member@example.com', 'Suspended Member')).rejects.toMatchObject({
-      code: 'FORBIDDEN',
-      message: 'Your member account is suspended. Please contact support.',
+      code: 'MEMBER_SUSPENDED',
     });
     expect(prismaMock.user.update).not.toHaveBeenCalled();
   });

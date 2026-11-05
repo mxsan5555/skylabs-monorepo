@@ -697,8 +697,7 @@ export async function listPublicLocations() {
  * deals are a 404.
  */
 export async function getPublicDealOrThrow(idOrSlug: string) {
-  // `previousSlugs` is not present in the generated Prisma Deal model; resolve by UUID or current slug.
-  const match = UUID_RE.test(idOrSlug) ? { id: idOrSlug } : { slug: idOrSlug };
+  const match = UUID_RE.test(idOrSlug) ? { id: idOrSlug } : { OR: [{ slug: idOrSlug }, { previousSlugs: { has: idOrSlug } }] };
   const deal = await prisma.deal.findFirst({ where: { ...match, ...VISIBLE_DEAL_WHERE }, select: PUBLIC_DEAL_DETAIL_SELECT });
   if (!deal) throw new ApiError('NOT_FOUND', 'Deal not found');
 

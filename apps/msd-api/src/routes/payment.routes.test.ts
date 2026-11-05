@@ -221,6 +221,7 @@ describe('POST /api/v1/orders/me/:id/pay-cod', () => {
       // not voucher generation, so these are harmless no-op-shaped defaults.
       prismaMock.order.findUniqueOrThrow.mockResolvedValue({ customerId: CUSTOMER_ID });
       prismaMock.financeSettings.upsert.mockResolvedValue({ defaultCommissionRatePercent: '10' });
+      prismaMock.member.findMany.mockResolvedValue([]);
       prismaMock.purchaseEntitlement.findFirst.mockResolvedValue(null);
 
       const res = await request(app)
@@ -257,6 +258,7 @@ describe('POST /api/v1/orders/me/:id/pay-cod', () => {
       // not voucher generation, so these are harmless no-op-shaped defaults.
       prismaMock.order.findUniqueOrThrow.mockResolvedValue({ customerId: CUSTOMER_ID });
       prismaMock.financeSettings.upsert.mockResolvedValue({ defaultCommissionRatePercent: '10' });
+      prismaMock.member.findMany.mockResolvedValue([]);
       prismaMock.purchaseEntitlement.findFirst.mockResolvedValue(null);
 
       const res = await request(app)

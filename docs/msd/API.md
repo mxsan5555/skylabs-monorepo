@@ -114,8 +114,9 @@ and permissions in tokens continue to come from database relations, not request 
 | DELETE | `/api/v1/rbac/users/:id` | `rbac.users:delete` |
 | GET | `/api/v1/rbac/users/:id/login-history` | `rbac.users:view` |
 | POST | `/api/v1/rbac/users/:id/otp/reset` | `rbac.users:edit` |
-| POST | `/api/v1/rbac/users/:id/roles/:roleId` | `rbac.users:assign` |
-| DELETE | `/api/v1/rbac/users/:id/roles/:roleId` | `rbac.users:assign` |
+| PUT | `/api/v1/rbac/users/:id/role` | `rbac.users:assign`; only a Super Admin gives the Super Admin role, and the last active Super Admin keeps it (409) |
+| GET | `/api/v1/rbac/role-conflicts` | `rbac.users:assign` |
+| PUT | `/api/v1/rbac/role-conflicts/:id` | `rbac.users:assign` |
 | GET | `/api/v1/rbac/users/:id/sessions` | `rbac.users:view` |
 | POST | `/api/v1/rbac/users/:id/sessions/revoke-all` | `rbac.users:edit` |
 | PATCH | `/api/v1/rbac/users/:id/status` | `rbac.users:status_change` |

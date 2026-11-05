@@ -97,7 +97,7 @@ describe('resolveGrantedPermissionKeys', () => {
     expect(result).not.toContain('system-settings:delete');
     expect(result).not.toContain('system-settings:create');
     // Unaffected resources keep full VCED.
-    expect(result).toContain('vendors:delete');
+    expect(result).toContain('members:delete');
     expect(result).toContain('rbac.users:delete');
   });
 });

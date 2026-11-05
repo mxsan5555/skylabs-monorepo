@@ -192,9 +192,10 @@ describe('getOrderActivityHistory', () => {
     prismaMock.order.findUnique.mockResolvedValue(
       adminOrderFixture({
         items: [
-          { id: ITEM_ID, itemName: 'Mine', vendorId: 'vendor-1' },
-          { id: 'other-item', itemName: 'Not mine', vendorId: 'vendor-2' },
+          { id: ITEM_ID, itemName: 'Mine', vendorId: 'vendor-1', lineTotal: '100.00' },
+          { id: 'other-item', itemName: 'Not mine', vendorId: 'vendor-2', lineTotal: '50.00' },
         ],
+        payments: [],
       }) as never,
     );
     prismaMock.orderItem.findMany.mockResolvedValue([{ id: ITEM_ID, purchaseEntitlements: [], refunds: [] }] as never);
@@ -250,11 +251,23 @@ describe('getOrderCounts', () => {
  * snapshot, on top of the pre-existing vendor/branch/customer-name/item-name matches.
  */
 describe('listOrders — search extended to customer phone + contactPhone', () => {
+  it('never lets a member search by customer contact details', async () => {
+    prismaMock.member.findUnique.mockResolvedValue({ id: 'vendor-1' } as never);
+    prismaMock.order.findMany.mockResolvedValue([]);
+    prismaMock.order.count.mockResolvedValue(0);
+
+    await listOrders('vendor-owner-1', 'OWN', { page: 1, pageSize: 20, search: '9810099999' });
+
+    const searched = JSON.stringify(prismaMock.order.findMany.mock.calls[0][0]!.where!.OR);
+    expect(searched).not.toContain('contactPhone');
+    expect(searched).not.toContain('phone');
+  });
+
   it('includes customer.phone and Order.contactPhone as additional OR branches', async () => {
     prismaMock.order.findMany.mockResolvedValue([]);
     prismaMock.order.count.mockResolvedValue(0);
 
-    await listOrders(ADMIN_USER_ID, { page: 1, pageSize: 20, search: '9810099999' });
+    await listOrders(ADMIN_USER_ID, 'ALL', { page: 1, pageSize: 20, search: '9810099999' });
 
     expect(prismaMock.order.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -291,7 +304,7 @@ describe('listOrders / getOrderCounts — same-name customer isolation (customer
     prismaMock.order.findMany.mockResolvedValue([]);
     prismaMock.order.count.mockResolvedValue(0);
 
-    await listOrders(ADMIN_USER_ID, { page: 1, pageSize: 20, customerId: PRIYA_A_ID });
+    await listOrders(ADMIN_USER_ID, 'ALL', { page: 1, pageSize: 20, customerId: PRIYA_A_ID });
 
     const call = prismaMock.order.findMany.mock.calls[0][0] as { where: Record<string, unknown> };
     expect(call.where.customerId).toBe(PRIYA_A_ID);
@@ -304,7 +317,7 @@ describe('listOrders / getOrderCounts — same-name customer isolation (customer
     prismaMock.order.findMany.mockResolvedValue([]);
     prismaMock.order.count.mockResolvedValue(0);
 
-    await listOrders(ADMIN_USER_ID, { page: 1, pageSize: 20, customerId: PRIYA_A_ID, search: 'Priya Sharma' });
+    await listOrders(ADMIN_USER_ID, 'ALL', { page: 1, pageSize: 20, customerId: PRIYA_A_ID, search: 'Priya Sharma' });
 
     const call = prismaMock.order.findMany.mock.calls[0][0] as { where: Record<string, unknown> };
     // Both conditions are present on the SAME where object — Prisma ANDs top-level keys, so a
@@ -347,7 +360,7 @@ describe('listOrders — customerId linkage survives a customer name/phone edit'
     prismaMock.order.count.mockResolvedValue(0);
 
     // Simulates "before the edit": customerId filter only, no search.
-    await listOrders(ADMIN_USER_ID, { page: 1, pageSize: 20, customerId: CUSTOMER_ID_STABLE });
+    await listOrders(ADMIN_USER_ID, 'ALL', { page: 1, pageSize: 20, customerId: CUSTOMER_ID_STABLE });
     const beforeCall = prismaMock.order.findMany.mock.calls[0][0] as { where: Record<string, unknown> };
 
     vi.clearAllMocks();
@@ -357,7 +370,7 @@ describe('listOrders — customerId linkage survives a customer name/phone edit'
     // Simulates "after the edit" — same customerId, the only thing this function ever reads to
     // decide which orders belong to this customer. (The customer's name/phone changing happens
     // entirely in `User`, a table this function never queries at all.)
-    await listOrders(ADMIN_USER_ID, { page: 1, pageSize: 20, customerId: CUSTOMER_ID_STABLE });
+    await listOrders(ADMIN_USER_ID, 'ALL', { page: 1, pageSize: 20, customerId: CUSTOMER_ID_STABLE });
     const afterCall = prismaMock.order.findMany.mock.calls[0][0] as { where: Record<string, unknown> };
 
     expect(beforeCall.where).toEqual(afterCall.where);

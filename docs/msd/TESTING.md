@@ -61,8 +61,8 @@ Known failures at 2026-10-18 (msd recounted 2026-10-27: `india-locations` moved 
 
 | Project | Failing | Where |
 |---|---|---|
-| msd | 0 (2026-10-29) | P10-46 fixed every known failure: `permission-matrix`, `roles`, `contact-us`, `settings`, `widget-registry`, `app.spec`, `deal-card`, `media-uploader`, `site-footer`, `wishlist`, `entry-server`, and the OfferCard regressions in `home` (FAQ section restored, hearts are the card's icon button) and `category`. Only the flaky tests below can fail, and they pass alone |
-| msd-api | 0 | Fixed 2026-10-29 (P10-46): 1,299 pass. `rbac.routes` tests moved to the scoped permission contract, `GET /roles/:id/permissions` validates its id again, order item images keep the bare key when `R2_PUBLIC_URL` is unset |
+| msd | 0 (2026-11-05, X-07: 1,374 pass; `products-list-page` delete test failed once in a full run and passed 3 of 3 alone) | P10-46 fixed every known failure: `permission-matrix`, `roles`, `contact-us`, `settings`, `widget-registry`, `app.spec`, `deal-card`, `media-uploader`, `site-footer`, `wishlist`, `entry-server`, and the OfferCard regressions in `home` (FAQ section restored, hearts are the card's icon button) and `category`. Only the flaky tests below can fail, and they pass alone |
+| msd-api | 0 | 2026-11-05 (X-07): 1,715 pass. Fixed 2026-10-29 (P10-46): 1,299 pass. `rbac.routes` tests moved to the scoped permission contract, `GET /roles/:id/permissions` validates its id again, order item images keep the bare key when `R2_PUBLIC_URL` is unset |
 | shared-* | 0 | Fixed 2026-10-29 (P10-46): `shared-menu` tests follow the `/account/*` menu; every shared package has an `.eslintrc.json` (the root config ignores all files until a project opts in), so `nx run-many -t lint test` passes for all six |
 
 Type check: `npx nx run msd:typecheck` runs `tsconfig.app.json` and `tsconfig.prerender.json` (ST-14,

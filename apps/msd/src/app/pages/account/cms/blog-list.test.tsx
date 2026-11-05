@@ -5,8 +5,6 @@ import { SnackbarHost } from '../../../../snackbar/snackbar';
 import type { BlogPost } from '../../../../api/rbac/blog-posts';
 import { BlogList } from './blog-list';
 
-import { BlogList } from './blog-list';
-
 let grantedPermissions: Set<string>;
 
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({

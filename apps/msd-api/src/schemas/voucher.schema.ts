@@ -14,6 +14,7 @@ export const VoucherQueueQuerySchema = PaginationQuerySchema.extend({
 
 export const VoucherVerifySchema = z
   .object({ code: z.string().trim().min(1).max(64) })
+  .strict()
   .openapi('VoucherVerify');
 
 /** `purpose` is inferred server-side from the entitlement's own `fulfilmentKind` — never trusted
@@ -24,6 +25,7 @@ export const VoucherOtpRequestSchema = z.object({}).openapi('VoucherOtpRequest')
 
 export const VoucherCompleteSchema = z
   .object({ otp: z.string().regex(/^\d{6}$/, 'OTP must be 6 digits') })
+  .strict()
   .openapi('VoucherComplete');
 
 export const VoucherShipSchema = z
@@ -31,6 +33,7 @@ export const VoucherShipSchema = z
     carrier: z.string().trim().min(1).max(200),
     trackingNumber: z.string().trim().min(1).max(200),
   })
+  .strict()
   .openapi('VoucherShip');
 
 export const VoucherDeliveryEvidenceSchema = z
