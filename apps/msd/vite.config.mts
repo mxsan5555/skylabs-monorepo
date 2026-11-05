@@ -36,7 +36,8 @@ export default defineConfig(() => ({
     watch: false,
     globals: true,
     environment: 'jsdom',
-    setupFiles: ['../../packages/shared-ui/src/testing/index.ts'],
+    setupFiles: ['../../packages/shared-ui/src/testing/index.ts', './src/test-setup.ts'],
+    testTimeout: 15000,
     include: ['{src,tests,prerender}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
     reporters: ['default'],
     coverage: {

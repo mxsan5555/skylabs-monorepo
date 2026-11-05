@@ -14,7 +14,13 @@ export default defineConfig(() => ({
     watch: false,
     globals: true,
     environment: 'node',
-    include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}'],
+    env: {
+      DATABASE_URL: 'postgresql://test:test@localhost:5432/msd_test',
+      JWT_SECRET: 'test-only-jwt-secret-not-used-outside-vitest',
+      RAZORPAY_KEY_ID: 'rzp_test_key_id',
+      RAZORPAY_KEY_SECRET: 'test-only-razorpay-secret',
+    },
+    include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}', 'prisma/**/*.test.ts'],
     reporters: ['default'],
     coverage: {
       reportsDirectory: '../../coverage/apps/msd-api',

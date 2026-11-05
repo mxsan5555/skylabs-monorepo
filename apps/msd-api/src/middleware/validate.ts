@@ -2,8 +2,12 @@ import type { Request, Response, NextFunction } from 'express';
 import type { ZodSchema } from 'zod';
 import { sendError } from '../lib/http';
 
-export function validateBody(schema: ZodSchema) {
-  return (req: Request, res: Response, next: NextFunction): void => {
+/** A `validateBody` middleware, carrying its schema so a test can check every route's body
+ *  schema (P2-14, `body-schemas-strict.test.ts`). */
+export type BodyValidator = ((req: Request, res: Response, next: NextFunction) => void) & { bodySchema: ZodSchema };
+
+export function validateBody(schema: ZodSchema): BodyValidator {
+  const middleware = (req: Request, res: Response, next: NextFunction): void => {
     const result = schema.safeParse(req.body);
     if (!result.success) {
       sendError(res, 'VALIDATION_ERROR', 'Invalid request body', result.error.flatten());
@@ -12,6 +16,7 @@ export function validateBody(schema: ZodSchema) {
     req.body = result.data;
     next();
   };
+  return Object.assign(middleware, { bodySchema: schema });
 }
 
 export function validateQuery(schema: ZodSchema) {
@@ -40,4 +45,15 @@ export function validateParams(schema: ZodSchema) {
     req.params = result.data as typeof req.params;
     next();
   };
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** `router.param` hook: a malformed id is a 422, never a 500 from the database. */
+export function uuidParam(req: Request, res: Response, next: NextFunction, value: string, name: string): void {
+  if (!UUID_RE.test(value)) {
+    sendError(res, 'VALIDATION_ERROR', 'Invalid route parameters', { fieldErrors: { [name]: ['Invalid uuid'] } });
+    return;
+  }
+  next();
 }

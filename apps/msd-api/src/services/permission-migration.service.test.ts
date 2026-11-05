@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createPrismaMock } from '../test-utils/prisma-mock';
-import { migrateSharedKeySplitGrants } from './permission-migration.service';
+import { migrateSharedKeySplitGrants, applyPermissionMatrix } from './permission-migration.service';
 
 const prismaMock = createPrismaMock();
 
@@ -146,5 +146,113 @@ describe('migrateSharedKeySplitGrants — genuinely one-time (regression for the
     expect(prismaMock.rolePermission.findMany).toHaveBeenCalledTimes(1); // only for the pending split
     expect(prismaMock.rolePermission.createMany).toHaveBeenCalledTimes(1);
     expect(prismaMock.permission.deleteMany).toHaveBeenCalledTimes(1); // only the pending split's old rows
+  });
+});
+
+/**
+ * `applyPermissionMatrix` — the User Management permission matrix's idempotent, exact-state
+ * apply function (`prisma/permission-matrix.ts`). Proves: (1) only governed menuKeys are reset
+ * for a role, (2) a role absent from the grants map is left completely untouched, (3) a role
+ * named in the grants map but not present in `roles` (not yet created in this environment) is
+ * skipped rather than crashing, (4) an empty grant list for a role still clears its existing
+ * governed-key grants (a matrix row of all "-").
+ */
+describe('applyPermissionMatrix', () => {
+  const roles = new Map([
+    ['admin', { id: 'role-admin' }],
+    ['marketing', { id: 'role-marketing' }],
+  ]);
+  const permissionIdByKey = new Map([
+    ['orders:view', 'perm-orders-view'],
+    ['customers:view', 'perm-customers-view'],
+    ['vendors:delete', 'perm-vendors-delete'],
+  ]);
+  const governedMenuKeys = ['orders', 'customers', 'vendors'];
+
+  it('resets exactly the governed-key grant for a role named in the matrix', async () => {
+    await applyPermissionMatrix(
+      prismaMock as never,
+      roles,
+      permissionIdByKey,
+      { admin: ['orders:view', 'customers:view'] },
+      governedMenuKeys,
+    );
+
+    expect(prismaMock.rolePermission.deleteMany).toHaveBeenCalledExactlyOnceWith({
+      where: { roleId: 'role-admin', permission: { menuKey: { in: governedMenuKeys }, action: { not: 'custom' } } },
+    });
+    expect(prismaMock.rolePermission.createMany).toHaveBeenCalledExactlyOnceWith({
+      data: [
+        { roleId: 'role-admin', permissionId: 'perm-orders-view' },
+        { roleId: 'role-admin', permissionId: 'perm-customers-view' },
+      ],
+      skipDuplicates: true,
+    });
+  });
+
+  /**
+   * Regression for the real bug: `vendor-portal.*`-granted Member accounts suddenly failing
+   * every `/vendors/me/*` self-service request with "Missing permission vendors:custom" after a
+   * reseed. `vendors:custom` is a separate "special operation" plumbing gate (the vendor
+   * self-service switch), not a matrix-governed V/C/E/D grant — it happens to share the `vendors`
+   * menuKey with the matrix's "Members" admin-wide resource row, so a delete scoped by menuKey
+   * alone wiped it out even though no `PERMISSION_MATRIX_GRANTS` entry ever listed it. The delete
+   * must exclude the `custom` action regardless of menuKey, so a grant made by an earlier,
+   * non-matrix step (e.g. `grantStarterPermissions`'s `resetGrant('vendor', [...])`) survives.
+   */
+  it('never deletes a `custom`-action grant even when its menuKey is governed (vendors:custom survives)', async () => {
+    const roleIdByKey = new Map([['vendor', { id: 'role-vendor' }]]);
+    const permIds = new Map([['vendor-portal.profile:view', 'perm-profile-view']]);
+    await applyPermissionMatrix(
+      prismaMock as never,
+      roleIdByKey,
+      permIds,
+      { vendor: ['vendor-portal.profile:view'] },
+      ['vendors', 'vendor-portal.profile'],
+    );
+
+    expect(prismaMock.rolePermission.deleteMany).toHaveBeenCalledExactlyOnceWith({
+      where: {
+        roleId: 'role-vendor',
+        permission: { menuKey: { in: ['vendors', 'vendor-portal.profile'] }, action: { not: 'custom' } },
+      },
+    });
+  });
+
+  it('skips a role named in the grants map that does not exist in `roles` (not yet created here), without crashing', async () => {
+    await applyPermissionMatrix(
+      prismaMock as never,
+      roles,
+      permissionIdByKey,
+      { support: ['orders:view'] }, // not in `roles` map above
+      governedMenuKeys,
+    );
+
+    expect(prismaMock.rolePermission.deleteMany).not.toHaveBeenCalled();
+    expect(prismaMock.rolePermission.createMany).not.toHaveBeenCalled();
+  });
+
+  it('clears a role\'s governed grants down to nothing when its matrix row is an empty list', async () => {
+    await applyPermissionMatrix(prismaMock as never, roles, permissionIdByKey, { marketing: [] }, governedMenuKeys);
+
+    expect(prismaMock.rolePermission.deleteMany).toHaveBeenCalledExactlyOnceWith({
+      where: { roleId: 'role-marketing', permission: { menuKey: { in: governedMenuKeys }, action: { not: 'custom' } } },
+    });
+    expect(prismaMock.rolePermission.createMany).not.toHaveBeenCalled();
+  });
+
+  it('silently drops a permission key with no matching id, rather than crashing', async () => {
+    await applyPermissionMatrix(
+      prismaMock as never,
+      roles,
+      permissionIdByKey,
+      { admin: ['orders:view', 'orders:create'] }, // 'orders:create' has no entry in permissionIdByKey
+      governedMenuKeys,
+    );
+
+    expect(prismaMock.rolePermission.createMany).toHaveBeenCalledExactlyOnceWith({
+      data: [{ roleId: 'role-admin', permissionId: 'perm-orders-view' }],
+      skipDuplicates: true,
+    });
   });
 });

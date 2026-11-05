@@ -1,23 +1,10 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal, effect } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 import { AuthService } from '@skylabs-monorepo/shared-auth/angular';
 import { AccountApiService } from './account-api.service';
 import type { AccountProfile, Address } from '../../models';
 
 const ADDRESSES_STORAGE_KEY = 'mera_account_addresses';
-
-const SEED_ADDRESSES: Address[] = [
-  {
-    id: 'seed-1',
-    label: 'Home',
-    line1: '12 Ride St',
-    line2: 'Apt 4B',
-    city: 'Austin',
-    state: 'TX',
-    postalCode: '73301',
-    country: 'USA',
-  },
-];
 
 /**
  * Account store for mera-driver: the signed-in user's profile (name/email/phone) is
@@ -33,20 +20,27 @@ export class AccountService {
 
   private readonly _profile = signal<AccountProfile>({ name: '', email: '', phone: '' });
   private readonly _loading = signal<boolean>(true);
-  private readonly _addresses = signal<Address[]>(loadAddresses());
+  private readonly _addresses = signal<Address[]>([]);
 
   readonly profile = this._profile.asReadonly();
   readonly loading = this._loading.asReadonly();
   readonly addresses = computed(() => this._addresses());
 
   constructor() {
-    this.refresh();
+    effect(() => {
+      const id = this.auth.bootstrap()?.user.id ?? null;
+      this._profile.set({name:'',email:'',phone:''});
+      this._addresses.set(id ? loadAddresses(ADDRESSES_STORAGE_KEY + ':' + id) : []);
+      if(id) this.refresh(); else this._loading.set(false);
+    });
   }
 
   refresh(): void {
+    const userId = this.auth.bootstrap()?.user.id;
     this._loading.set(true);
     this.api.get().subscribe({
       next: (p) => {
+        if(this.auth.bootstrap()?.user.id !== userId) return;
         this._profile.set(p);
         this._loading.set(false);
       },
@@ -58,8 +52,10 @@ export class AccountService {
    *  patch — so it reflects exactly what was persisted), and refreshes the shared
    *  bootstrap so the sidebar's name/email stay in sync immediately. */
   updateProfile(patch: Partial<AccountProfile>): Observable<AccountProfile> {
+    const userId = this.auth.bootstrap()?.user.id;
     return this.api.update(patch).pipe(
       tap((p) => {
+        if(this.auth.bootstrap()?.user.id !== userId) return;
         this._profile.set(p);
         void this.auth.refreshBootstrap();
       }),
@@ -81,18 +77,19 @@ export class AccountService {
   private persistAddresses(next: Address[]): void {
     this._addresses.set(next);
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(ADDRESSES_STORAGE_KEY, JSON.stringify(next));
+      const id = this.auth.bootstrap()?.user.id;
+      if(id) localStorage.setItem(ADDRESSES_STORAGE_KEY + ':' + id, JSON.stringify(next));
     }
   }
 }
 
-function loadAddresses(): Address[] {
-  if (typeof localStorage === 'undefined') return SEED_ADDRESSES;
+function loadAddresses(key: string): Address[] {
+  if (typeof localStorage === 'undefined') return [];
   try {
-    const raw = localStorage.getItem(ADDRESSES_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Address[]) : SEED_ADDRESSES;
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as Address[]) : [];
   } catch {
-    return SEED_ADDRESSES;
+    return [];
   }
 }
 

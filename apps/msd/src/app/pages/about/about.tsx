@@ -1,185 +1,57 @@
-import { useEffect, useState } from 'react';
-import { getCatalogAboutUs, type CatalogAboutUs } from '../../../api/catalog';
-import { ApiRequestError } from '../../../api/rbac/client';
+import { getCatalogAboutUs } from '../../../api/catalog';
 import { resolveMediaUrl } from '../../../api/media';
-import { renderBlock } from '../blog-detail/blog-detail';
-import { Breadcrumb } from '../../components/breadcrumb';
-import './about.css';
+import { useCmsContent } from '../../../hooks/use-cms-content';
+import { CardGrid } from '../../components/card-grid/card-grid';
+import { PageSection } from '../../components/page-section/page-section';
+import { SectionHead } from '../../components/section-head/section-head';
+import { Prose, StaticPage } from '../../components/static-page/static-page';
+import { webPageJsonLd } from '../../seo/jsonld';
+import { absoluteUrl } from '../../seo/site-url';
+import content from '../../../content.json';
 
+const t = content.about;
+
+/** About us: CMS hero, mission and story (`GET /catalog/about-us`) over content.json defaults,
+ *  plus what customers can do and the partner prompt. */
 export function About() {
-  const [aboutUs, setAboutUs] = useState<CatalogAboutUs | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    let cancelled = false;
-
-    setLoading(true);
-    setError('');
-
-    getCatalogAboutUs()
-      .then(({ data }) => {
-        if (!cancelled) {
-          setAboutUs(data);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(
-            err instanceof ApiRequestError
-              ? err.message
-              : 'Could not load this page.',
-          );
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (loading) {
-    return (
-      <main className="about">
-        <title>About Us · MSD</title>
-
-        <div className="about__container">
-          <Breadcrumb
-            items={[
-              { label: 'Home', to: '/' },
-              { label: 'About Us' },
-            ]}
-          />
-
-          <div className="about__state">
-            <sky-info-card
-              icon="hourglass_empty"
-              heading="Loading About Us"
-              subheading="Please wait while we load the latest information."
-            />
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  if (error || !aboutUs) {
-    return (
-      <main className="about">
-        <title>About Us · MSD</title>
-
-        <div className="about__container">
-          <Breadcrumb
-            items={[
-              { label: 'Home', to: '/' },
-              { label: 'About Us' },
-            ]}
-          />
-
-          <div className="about__state">
-            <sky-info-card
-              icon="error_outline"
-              heading="About Us is unavailable"
-              subheading={
-                error || 'This page is not available right now.'
-              }
-            />
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  const heroImage =
-    aboutUs.mediaImages.find((img) => img.isPrimary) ??
-    aboutUs.mediaImages[0];
-
-  const heading = aboutUs.heroTitle || 'About Us';
+  const { data } = useCmsContent(getCatalogAboutUs);
+  const title = data?.heroTitle || t.title;
+  const description = data?.heroSubtitle || t.description;
+  const image = data?.mediaImages.find((m) => m.isPrimary) ?? data?.mediaImages[0];
+  const url = absoluteUrl(t.path);
 
   return (
-    <main className="about">
-      <title>{aboutUs.metaTitle || `${heading} · MSD`}</title>
-
-      <meta
-        name="description"
-        content={
-          aboutUs.metaDescription ||
-          aboutUs.heroSubtitle ||
-          aboutUs.missionStatement ||
-          'Learn more about MySpaDeal.'
-        }
-      />
-
-      <div className="about__container">
-        <Breadcrumb
-          items={[
-            { label: 'Home', to: '/' },
-            { label: 'About Us' },
-          ]}
-        />
-
-        {/* Hero */}
-        <section className="about__hero" aria-labelledby="about-title">
-          <div className="about__hero-content">
-            <p className="about__eyebrow">ABOUT MYSPADEAL</p>
-
-            <h1 id="about-title">{heading}</h1>
-
-            {aboutUs.heroSubtitle && (
-              <p className="about__subtitle">
-                {aboutUs.heroSubtitle}
-              </p>
-            )}
-          </div>
-
-          {heroImage && (
-            <sky-card className="about__hero-card">
-              <img
-                className="about__hero-image"
-                src={resolveMediaUrl(heroImage.storageKey)}
-                alt={heading}
-                width={1200}
-                height={480}
-              />
-            </sky-card>
-          )}
-        </section>
-
-        {/* Mission */}
-        {aboutUs.missionStatement && (
-          <section
-            className="about__mission"
-            aria-labelledby="about-mission-title"
-          >
-            <sky-tile-card
-              className="about__mission-card"
-              icon="spa"
-              headline="Our Mission"
-              text={aboutUs.missionStatement}
-            />
-          </section>
-        )}
-
-        {/* CMS Body */}
-        {aboutUs.body.length > 0 && (
-          <section
-            className="about__content"
-            aria-label="About MySpaDeal"
-          >
-            <sky-card className="about__content-card">
-              <div className="post__body about__body">
-                {aboutUs.body.map(renderBlock)}
-              </div>
-            </sky-card>
-          </section>
-        )}
-      </div>
-    </main>
+    <StaticPage
+      path={t.path}
+      title={title}
+      breadcrumb={t.breadcrumb}
+      description={description}
+      metaTitle={data?.metaTitle}
+      metaDescription={data?.metaDescription}
+      schema={url ? webPageJsonLd({ type: 'AboutPage', name: title, description, url }) : undefined}
+      cta={t.cta}
+    >
+      {image && (
+        <PageSection flush>
+          <sky-image src={resolveMediaUrl(image.storageKey)} alt="" ratio="21 / 9" fit="cover" shape="extra-large" />
+        </PageSection>
+      )}
+      <PageSection tone="tint" aria-labelledby="about-offer">
+        <SectionHead id="about-offer" heading={t.offer.heading} />
+        <CardGrid>
+          {t.offer.items.map((item) => (
+            <sky-tile-card key={item.heading} icon={item.icon} icon-style="tonal" headline={item.heading} text={item.text} color="surface" />
+          ))}
+        </CardGrid>
+      </PageSection>
+      {data && (data.missionStatement || data.body.length > 0) && (
+        <PageSection stack aria-labelledby="about-story">
+          <SectionHead id="about-story" heading={t.story} />
+          {data.missionStatement && <p className="prose title-large">{data.missionStatement}</p>}
+          {data.body.length > 0 && <Prose blocks={data.body} />}
+        </PageSection>
+      )}
+    </StaticPage>
   );
 }
 

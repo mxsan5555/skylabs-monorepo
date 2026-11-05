@@ -1,89 +1,87 @@
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { CatalogHowItWorks } from '../../../api/catalog';
+import { HowItWorks } from './how-it-works';
+import content from '../../../content.json';
 
-const getCatalogHowItWorksMock = vi.fn();
+const { getCatalogHowItWorksMock } = vi.hoisted(() => ({ getCatalogHowItWorksMock: vi.fn() }));
 
 vi.mock('../../../api/catalog', async () => {
   const actual = await vi.importActual<typeof import('../../../api/catalog')>('../../../api/catalog');
-  return {
-    ...actual,
-    getCatalogHowItWorks: (...args: unknown[]) => getCatalogHowItWorksMock(...args),
-  };
+  return { ...actual, getCatalogHowItWorks: getCatalogHowItWorksMock };
 });
 
-import { HowItWorks } from './how-it-works';
-
 const HOW_IT_WORKS: CatalogHowItWorks = {
-  content: {
-    heroTitle: 'How It Works',
-    heroSubtitle: 'Book in three easy steps',
-    metaTitle: null,
-    metaDescription: null,
-  },
+  content: { heroTitle: 'How It Works', heroSubtitle: 'Book in three easy steps', metaTitle: null, metaDescription: null },
   steps: [
     { id: 'step-1', title: 'Choose a Deal', description: 'Browse and pick the massage deal you want.', icon: 'search', sortOrder: 0 },
     { id: 'step-2', title: 'Book a Slot', description: 'Select your preferred date and time.', icon: null, sortOrder: 1 },
   ],
 };
 
+/** Reads a custom-element prop whether React set it as a property or an attribute. */
+const prop = (el: Element, name: string) => (el as unknown as Record<string, string>)[name] ?? el.getAttribute(name);
+
+const stepCards = () => Array.from(document.querySelectorAll('ol sky-tile-card'));
+
+const renderPage = () =>
+  render(
+    <MemoryRouter>
+      <HowItWorks />
+    </MemoryRouter>,
+  );
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 /**
- * Feature: public How It Works page
- * Scenario: renders the CMS-managed hero copy plus every active step, ordered, from
- * `GET /catalog/how-it-works` — a step falls back to its position number when it has no chosen
- * Material Symbols icon.
- *
- * Given: a mocked `getCatalogHowItWorks` response
- * When: the page mounts
- * Then: the hero and every step render, in order, with the correct icon/number fallback
+ * Feature: public How it works page (StaticPage frame)
+ * Scenario: CMS hero and ordered steps from `GET /catalog/how-it-works`, as an ordered list.
  *
  * Edge cases:
- * - zero steps renders an empty-state message, not an error
- * - a fetch failure renders an error message instead of crashing
+ * - a step without an icon uses the default step icon
+ * - zero CMS steps, or a failed fetch, shows the home page's default steps
  */
 describe('HowItWorks (public page)', () => {
   it('renders a loading state before the fetch resolves', () => {
-    getCatalogHowItWorksMock.mockReturnValue(new Promise(() => {})); // never resolves
-    render(<HowItWorks />);
+    getCatalogHowItWorksMock.mockReturnValue(new Promise(vi.fn()));
+    renderPage();
 
-    expect(screen.getByText('Loading…')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toBe(content.staticPage.loading);
   });
 
-  it('renders the hero copy and every step in order', async () => {
+  it('renders the CMS hero and every step in order inside an ordered list', async () => {
     getCatalogHowItWorksMock.mockResolvedValue({ data: HOW_IT_WORKS });
-    render(<HowItWorks />);
+    renderPage();
 
     expect(await screen.findByRole('heading', { level: 1, name: 'How It Works' })).toBeTruthy();
     expect(screen.getByText('Book in three easy steps')).toBeTruthy();
-    const stepTitles = Array.from(document.querySelectorAll('.how-it-works__step-title')).map((el) => el.textContent);
-    expect(stepTitles).toEqual(['Choose a Deal', 'Book a Slot']);
+    expect(stepCards().map((el) => prop(el, 'headline'))).toEqual(['Choose a Deal', 'Book a Slot']);
   });
 
-  it("falls back to the step's position number when it has no chosen icon", async () => {
+  it('uses the default icon for a step without one', async () => {
     getCatalogHowItWorksMock.mockResolvedValue({ data: HOW_IT_WORKS });
-    render(<HowItWorks />);
+    renderPage();
 
-    await screen.findByText('Book a Slot');
-    const icons = Array.from(document.querySelectorAll('.how-it-works__step-icon'));
-    // step-2 has no icon, so its span falls back to its 1-based position number ("2").
-    expect(icons[1].textContent).toBe('2');
+    await screen.findByRole('heading', { level: 1, name: 'How It Works' });
+    expect(prop(stepCards()[1], 'icon')).toBe(content.howItWorks.defaultStepIcon);
   });
 
-  it('renders an empty-state message when there are no steps yet (empty state)', async () => {
+  it('shows the default steps when the CMS has none', async () => {
     getCatalogHowItWorksMock.mockResolvedValue({ data: { ...HOW_IT_WORKS, steps: [] } });
-    render(<HowItWorks />);
+    renderPage();
 
-    expect(await screen.findByText('Steps are coming soon.')).toBeTruthy();
+    await screen.findByRole('heading', { level: 1, name: 'How It Works' });
+    expect(stepCards().map((el) => prop(el, 'headline'))).toEqual(content.home.howItWorks.steps.map((s) => s.title));
   });
 
-  it('renders an error message instead of crashing when the fetch fails (error state)', async () => {
+  it('falls back to the default copy when the fetch fails', async () => {
     getCatalogHowItWorksMock.mockRejectedValue(new Error('network down'));
-    render(<HowItWorks />);
+    renderPage();
 
-    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 1, name: content.howItWorks.title })).toBeTruthy();
+    expect(stepCards()).toHaveLength(content.home.howItWorks.steps.length);
   });
 });

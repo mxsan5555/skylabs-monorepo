@@ -95,4 +95,25 @@ describe('sky-tile-card', () => {
     const link = el.shadowRoot?.querySelector('a.stretch');
     expect(link?.hasAttribute('aria-labelledby')).toBe(false);
   });
+  async function slotHeadline(el: SkyTileCard, html: string): Promise<void> {
+    const h3 = document.createElement('h3');
+    h3.slot = 'headline';
+    h3.innerHTML = html;
+    el.appendChild(h3);
+    await el.updateComplete;
+    el.shadowRoot?.querySelector('slot[name="headline"]')?.dispatchEvent(new Event('slotchange'));
+    await el.updateComplete;
+  }
+
+  it('adds the hover state layer when the slotted headline carries a link', async () => {
+    const el = await create();
+    await slotHeadline(el, '<a href="/category/massage">Massage</a>');
+    expect(el.shadowRoot?.querySelector('.surface')?.classList.contains('linked')).toBe(true);
+  });
+
+  it('keeps the default (no state layer) for a slotted headline without a link', async () => {
+    const el = await create();
+    await slotHeadline(el, 'Massage');
+    expect(el.shadowRoot?.querySelector('.surface')?.classList.contains('linked')).toBe(false);
+  });
 });

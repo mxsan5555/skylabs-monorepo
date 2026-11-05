@@ -17,8 +17,10 @@ const OTHER_CUSTOMER_ID = 'b0b0b0b0-0000-4000-8000-000000000002';
 const ITEM_ID = 'd0d0d0d0-0000-4000-8000-000000000004';
 const VISIBLE_DEAL_ID = 'e0e0e0e0-0000-4000-8000-000000000005';
 const HIDDEN_DEAL_ID = 'f0f0f0f0-0000-4000-8000-000000000006';
+const PRODUCT_ID = 'a1a1a1a1-0000-4000-8000-000000000007';
 
 const visibleDealFixture = { id: VISIBLE_DEAL_ID, status: 'ACTIVE', approvalStatus: 'APPROVED' };
+const activeProductFixture = { id: PRODUCT_ID, isActive: true };
 
 const wishlistItemFixture = {
   id: ITEM_ID,
@@ -60,7 +62,22 @@ describe('GET /api/v1/wishlist', () => {
     expect(res.body.data[0].deal.title).toBe('Facial at Glow Beauty Studio');
     expect(prismaMock.wishlistItem.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ customerId: CUSTOMER_ID, deal: expect.objectContaining({ status: 'ACTIVE' }) }),
+        where: expect.objectContaining({
+          customerId: CUSTOMER_ID,
+          OR: expect.arrayContaining([
+            { deal: expect.objectContaining({ status: 'ACTIVE' }) },
+            { product: { isActive: true } },
+          ]),
+        }),
+        select: expect.objectContaining({
+          product: {
+            select: expect.objectContaining({
+              mediaImages: {
+                select: { storageKey: true, isPrimary: true, sortOrder: true },
+              },
+            }),
+          },
+        }),
       }),
     );
   });
@@ -135,6 +152,43 @@ describe('POST /api/v1/wishlist', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.data.dealId).toBe(VISIBLE_DEAL_ID);
+  });
+
+  it('adds an active Product using productId without routing it through Deal wishlist logic', async () => {
+    const productWishlistItem = {
+      ...wishlistItemFixture,
+      dealId: null,
+      productId: PRODUCT_ID,
+      deal: null,
+      product: { id: PRODUCT_ID, name: 'Massage Oil', isActive: true },
+    };
+    prismaMock.product.findFirst.mockResolvedValue(activeProductFixture);
+    prismaMock.wishlistItem.findUnique.mockResolvedValue(null);
+    prismaMock.wishlistItem.create.mockResolvedValue({
+      id: ITEM_ID,
+      customerId: CUSTOMER_ID,
+      dealId: null,
+      productId: PRODUCT_ID,
+    });
+    prismaMock.wishlistItem.findUniqueOrThrow.mockResolvedValue(productWishlistItem);
+
+    const res = await request(app)
+      .post('/api/v1/wishlist')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ productId: PRODUCT_ID });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data).toMatchObject({
+      dealId: null,
+      productId: PRODUCT_ID,
+    });
+    expect(prismaMock.product.findFirst).toHaveBeenCalledWith({
+      where: { id: PRODUCT_ID, isActive: true },
+    });
+    expect(prismaMock.wishlistItem.create).toHaveBeenCalledWith({
+      data: { customerId: CUSTOMER_ID, productId: PRODUCT_ID },
+    });
+    expect(prismaMock.deal.findFirst).not.toHaveBeenCalled();
   });
 });
 

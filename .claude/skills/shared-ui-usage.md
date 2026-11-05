@@ -16,21 +16,18 @@ import { applyTheme } from '@skylabs-monorepo/shared-ui';
 applyTheme('light');   // or 'dark', optional contrast: 'standard' | 'medium' | 'high'
 ```
 
-## React (msd) — Typed Wrappers
-Use typed wrappers from `@skylabs-monorepo/shared-ui/react`:
+## React (msd) — Typed Wrappers for md-*, raw tags for sky-*
+Use typed wrappers from `@skylabs-monorepo/shared-ui/react` for Material elements:
 ```tsx
-import {
-  FilledButton,
-  OutlinedButton,
-  SkyProductCardReact,
-  SkyImageCardReact,
-  SkyCategoryCardReact,
-  SkyInfoCardReact,
-  SkyAccordionReact,
-  SkyAccordionItemReact,
-} from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, OutlinedButton } from '@skylabs-monorepo/shared-ui/react';
 ```
-Raw `<md-*>` tags also work in JSX; types are declared in `apps/msd/src/types/swiper-elements.d.ts` and similar.
+`sky-*` elements have no wrappers: use raw tags (typed in `apps/msd/src/types/sky-elements.d.ts`).
+Write options whose attribute is kebab-case in that form, including keys in spread objects:
+```tsx
+<sky-product-card price-first image-alt={alt} heading={title} />   // right
+<sky-product-card priceFirst imageAlt={alt} />                      // lost on prerendered pages
+```
+`apps/msd/src/sky-element-props.test.ts` fails on the camelCase form and on unknown attributes.
 
 ## Angular (mera-driver) — Raw Tags
 Use raw `<md-*>` and `<sky-*>` tags in templates. Any component using them needs:

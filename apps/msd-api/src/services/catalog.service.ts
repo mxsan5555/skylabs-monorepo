@@ -1,11 +1,16 @@
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
 import type { Prisma } from '../generated/prisma-client';
-import { rankDeals, computeDealFacets, type DealSort } from './deal-ranking';
+import { rankDeals, computeDealFacets, type DealSort, type FacetRow } from './deal-ranking';
+import { daysFrom, hotIdsFrom, offerTag, tagsWhere, TAG_RULES, type OfferTagKey, type TagKind } from './offer-tag';
+import { rankTherapists, type TherapistSort } from './therapist-ranking';
+import { computeProductFacets } from './product-facets';
+import { VISIBLE_DEAL_WHERE, VISIBLE_PRODUCT_WHERE, VISIBLE_THERAPIST_WHERE } from './catalog-visibility';
 import { listActiveCategories, getActiveCategoryBySlugOrThrow } from './category.service';
 import { getActiveTagNamesFor } from './popular-tag.service';
 import { getPublicTreatmentDirectory } from './popular-treatment.service';
-import { getPublicPromotions as getPublicPromotionsList } from './promotion.service';
+import { paidUnits, stockLeft } from './deal-limits';
+import { discountOf } from './deal-pricing';
 // Home Hero's public read is NOT wrapped here — home-hero.service.ts imports
 // `VISIBLE_DEAL_WHERE`/`PUBLIC_DEAL_SELECT` FROM this file, so importing it back here would be a
 // circular module dependency. `catalog.routes.ts` calls `homeHeroService.getPublicHomeHero`
@@ -21,6 +26,51 @@ import * as careersService from './careers.service';
 import * as socialMediaService from './social-media.service';
 
 type TagRef = { id: string; name: string; slug: string };
+
+const HOT_CACHE_MS = 10 * 60 * 1000;
+const hotCache = new Map<TagKind, { at: number; ids: string[] }>();
+
+/** Clears the cached hot lists (tests). */
+export function clearHotCache() {
+  hotCache.clear();
+}
+
+/** Hot ids for a kind (`offer-tag.ts` rule) from paid order lines in the window, cached 10 min. */
+export async function getHotIds(kind: TagKind, now = new Date()): Promise<string[]> {
+  const cached = hotCache.get(kind);
+  if (cached && now.getTime() - cached.at < HOT_CACHE_MS) return cached.ids;
+  const key = kind === 'deal' ? 'dealId' : 'productId';
+  const groups = await prisma.orderItem.groupBy({
+    by: [key],
+    where: {
+      [key]: { not: null },
+      order: {
+        status: { in: ['CONFIRMED', 'COMPLETED'] },
+        createdAt: { gte: daysFrom(now, -TAG_RULES.hotWindowDays) },
+        payments: { some: { status: 'PAID' } },
+      },
+    },
+    _count: { _all: true },
+  });
+  const lines = ((groups ?? []) as unknown as Array<Record<string, unknown> & { _count: { _all: number } }>).map((g) => ({
+    id: g[key] as string,
+    count: g._count._all,
+  }));
+  const ids = [...hotIdsFrom(lines)];
+  hotCache.set(kind, { at: now.getTime(), ids });
+  return ids;
+}
+
+/** Adds each item's card `tag` (PLANNING §4 D30). */
+function withOfferTags<T extends { id: string; createdAt: Date; endDate?: Date | null }>(
+  rows: T[],
+  discountOf: (row: T) => number | null | undefined,
+  hot: string[],
+  now: Date,
+): (T & { tag: OfferTagKey | null })[] {
+  const hotSet = new Set(hot);
+  return rows.map((row) => ({ ...row, tag: offerTag({ id: row.id, createdAt: row.createdAt, endDate: row.endDate, discountPercent: discountOf(row) }, hotSet, now) }));
+}
 
 /** Great-circle distance in kilometers between two lat/lng points — the one, reused distance
  *  calculation for every "near me" catalog query (never a per-query reimplementation). */
@@ -152,6 +202,7 @@ const PUBLIC_THERAPIST_PACKAGE_ORDER_BY: Prisma.TherapistPackageOrderByWithRelat
  *  merged into one field — see Therapist's own schema doc comment. */
 const PUBLIC_THERAPIST_SELECT = {
   id: true,
+  slug: true,
   therapistType: true,
   personName: true,
   gender: true,
@@ -216,18 +267,20 @@ const PUBLIC_VENDOR_DETAIL_SELECT = {
 /** Product is a fully independent, directly-purchasable catalog entity (see Product's own schema
  *  doc comment) — unlike PUBLIC_DEAL_SELECT this carries its own price fields directly, since
  *  there is no wrapping Deal to price it. No branch/location fields — Product has no branchId. */
-const PUBLIC_PRODUCT_SELECT = {
+export const PUBLIC_PRODUCT_SELECT = {
   id: true,
   name: true,
   slug: true,
   brand: true,
   description: true,
   summary: true,
+  returnPolicy: true,
   image: true,
   imageAlt: true,
   price: true,
   originalPrice: true,
   discount: true,
+  createdAt: true,
   category: { select: PUBLIC_CATEGORY_SELECT },
   subcategory: { select: PUBLIC_CATEGORY_SELECT },
   vendor: { select: PUBLIC_VENDOR_SELECT },
@@ -266,13 +319,17 @@ export const PUBLIC_DEAL_SELECT = {
   shortDescription: true,
   description: true,
   termsAndConditions: true,
-  notes: true,
+  // `notes` deliberately omitted — internal-admin-only (a checklist for staff, not customer
+  // content); it must never reach a public response. `policy`/`termsAndConditions` stay public
+  // (cancellation policy / T&C are genuinely customer-facing).
   policy: true,
   originalPrice: true,
   salePrice: true,
   discountPercent: true,
   durationMinutes: true,
   images: true,
+  createdAt: true,
+  endDate: true,
   category: { select: PUBLIC_CATEGORY_SELECT },
   subcategory: { select: PUBLIC_CATEGORY_SELECT },
   vendor: { select: PUBLIC_VENDOR_SELECT },
@@ -286,32 +343,59 @@ export const PUBLIC_DEAL_SELECT = {
   mediaVideo: { select: PUBLIC_MEDIA_VIDEO_SELECT },
 } as const;
 
-/**
- * The one definition of "is this deal visible to a customer / still purchasable": active +
- * approved, its vendor active, its branch active (Deal has no master catalog row to check — see
- * Deal's own schema doc comment). Reused by both the list and single-deal lookup below (so a
- * customer can never reach an otherwise-hidden deal just by guessing its id) and by
- * `order.service.ts`'s checkout revalidation (a Deal must still pass this same bar to be
- * order-able, not just a looser "does it exist" check).
- */
-export const VISIBLE_DEAL_WHERE = {
-  status: 'ACTIVE' as const,
-  approvalStatus: 'APPROVED' as const,
-  vendor: { status: 'ACTIVE' as const },
-  branch: { isActive: true },
-};
+const PUBLIC_DEAL_FAQ_ORDER_BY: { sortOrder: 'asc' }[] = [{ sortOrder: 'asc' }];
 
-/**
- * The equivalent "is this product visible to a customer / still purchasable" bar for the fully
- * independent Product catalog entity — same discipline as VISIBLE_DEAL_WHERE, minus the
- * branch/approval concepts Product doesn't have (Product has no branchId and no vendor-approval
- * workflow of its own). Reused by the public list/single-product lookups below and by
- * `cart.service.ts`/`order.service.ts`'s add-to-cart/checkout revalidation.
- */
-export const VISIBLE_PRODUCT_WHERE = {
-  isActive: true as const,
-  vendor: { status: 'ACTIVE' as const },
-};
+/** Deal page (`GET /catalog/deals/:idOrSlug`, PLANNING §2.7): the card fields plus everything the
+ *  page shows, so the page needs no second call. Still an allow-list: no stock counts, owner,
+ *  KYC or bank fields. */
+const PUBLIC_DEAL_DETAIL_SELECT = {
+  ...PUBLIC_DEAL_SELECT,
+  highlights: true,
+  eligibility: true,
+  bookingRequired: true,
+  bookingInstructions: true,
+  validityDays: true,
+  limitPerCustomer: true,
+  maxBookings: true,
+  cancellationPolicy: true,
+  cancellationNote: true,
+  startDate: true,
+  updatedAt: true,
+  vendor: { select: { ...PUBLIC_VENDOR_SELECT, businessDescription: true, website: true } },
+  branch: {
+    select: {
+      ...PUBLIC_BRANCH_SELECT,
+      addressLine2: true,
+      state: true,
+      pincode: true,
+      phone: true,
+      mapLocationUrl: true,
+      openingHours: true,
+    },
+  },
+  packages: {
+    where: { isActive: true },
+    orderBy: PUBLIC_DEAL_PACKAGE_ORDER_BY,
+    select: { ...PUBLIC_DEAL_PACKAGE_SELECT, name: true, persons: true, inclusions: true },
+  },
+  mediaImages: { orderBy: PUBLIC_MEDIA_IMAGE_ORDER_BY, select: { ...PUBLIC_MEDIA_IMAGE_SELECT, altText: true } },
+  faqs: { orderBy: PUBLIC_DEAL_FAQ_ORDER_BY, select: { id: true, question: true, answer: true } },
+  therapistLinks: {
+    where: { therapist: VISIBLE_THERAPIST_WHERE },
+    select: { therapist: { select: PUBLIC_THERAPIST_LISTING_SELECT } },
+  },
+} as const;
+
+/** Most rows a ranked search loads (short queries match a lot; ranking happens in memory). */
+const SEARCH_RANK_LIMIT = 500;
+
+/** "{n} bought" only from this many paid units (PLANNING §2.7). */
+const BOUGHT_COUNT_MIN = 10;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+
+/** The visibility bars live in catalog-visibility.ts (no service imports, so no cycles). */
+export { VISIBLE_DEAL_WHERE, VISIBLE_PRODUCT_WHERE, VISIBLE_THERAPIST_WHERE } from './catalog-visibility';
 
 /** Shared by both public tree builders below — a category row's own list of active children,
  *  filtered against the ALREADY-FETCHED flat list `all` (no extra query per level: every row in
@@ -340,12 +424,6 @@ function buildPublicChildren<T extends { id: string; parentId: string | null; na
  *  slug) and filters to active groups/treatments server-side. */
 export async function getPublicPopularTreatments() {
   return getPublicTreatmentDirectory();
-}
-
-/** Public Home page "Promotions" read — thin pass-through to `promotion.service.ts`'s own public
- *  function, which already filters to active + within its visibility window server-side. */
-export async function getPublicPromotions() {
-  return getPublicPromotionsList();
 }
 
 export async function getPublicCategoryTree() {
@@ -447,10 +525,24 @@ export function buildDealWhere(opts: DealWhereOpts) {
           OR: [
             { title: { contains: opts.search, mode: 'insensitive' as const } },
             { vendor: { is: { businessName: { contains: opts.search, mode: 'insensitive' as const } } } },
+            { category: { is: { name: { contains: opts.search, mode: 'insensitive' as const } } } },
+            { subcategory: { is: { name: { contains: opts.search, mode: 'insensitive' as const } } } },
+            { branch: { is: { city: { contains: opts.search, mode: 'insensitive' as const } } } },
           ],
         }
       : {}),
   };
+}
+
+/** Search rank (PLANNING §2.7): title starts with the query, title contains it, member name,
+ *  then category, subcategory or city. Lower is better; stable for ties. */
+export function searchRank(row: { title: string; vendor?: { businessName: string | null } | null }, query: string): number {
+  const q = query.trim().toLowerCase();
+  const title = row.title.toLowerCase();
+  if (title.startsWith(q)) return 0;
+  if (title.includes(q)) return 1;
+  if ((row.vendor?.businessName ?? '').toLowerCase().includes(q)) return 2;
+  return 3;
 }
 
 export async function listPublicDeals(
@@ -473,9 +565,15 @@ export async function listPublicDeals(
      *  unchanged behavior (byte-identical to every pre-existing caller). */
     latitude?: number;
     longitude?: number;
+    /** Card tags (`tags=`): only deals whose shown tag is one of these. */
+    tags?: OfferTagKey[];
   },
 ) {
-  const where = buildDealWhere(opts);
+  const now = new Date();
+  const hot = await getHotIds('deal', now);
+  const where = opts.tags?.length ? { ...buildDealWhere(opts), AND: [tagsWhere(opts.tags, 'deal', hot, now)] } : buildDealWhere(opts);
+  const tagged = <T extends { id: string; createdAt: Date; endDate: Date | null; discountPercent: number | null }>(rows: T[]) =>
+    withOfferTags(rows, (d) => d.discountPercent, hot, now);
   const sort: DealSort = opts.sort ?? 'relevance';
   // 'discount' sorts deals with the biggest discountPercent first; deals with no discount (null)
   // are pushed to the end via `nulls: 'last'` rather than sorting ahead of real discounts
@@ -500,8 +598,22 @@ export async function listPublicDeals(
     const ranked = rankDeals(allRows, { sort, latitude: opts.latitude, longitude: opts.longitude, radiusKm: opts.radiusKm });
     const total = ranked.length;
     const page = ranked.slice((opts.page - 1) * opts.pageSize, (opts.page - 1) * opts.pageSize + opts.pageSize);
-    const items = await withDealPopularTags(page);
+    const items = await withDealPopularTags(tagged(page));
     return { items, total };
+  }
+
+  if (opts.search?.trim() && sort === 'relevance') {
+    const [allRows, matched] = await Promise.all([
+      prisma.deal.findMany({ where, orderBy, take: SEARCH_RANK_LIMIT, select: PUBLIC_DEAL_SELECT }),
+      prisma.deal.count({ where }),
+    ]);
+    const query = opts.search;
+    const ranked = allRows
+      .map((row, index) => ({ row, index, rank: searchRank(row, query) }))
+      .sort((a, b) => a.rank - b.rank || a.index - b.index)
+      .map((r) => r.row);
+    const page = ranked.slice((opts.page - 1) * opts.pageSize, opts.page * opts.pageSize);
+    return { items: await withDealPopularTags(tagged(page)), total: Math.min(matched, SEARCH_RANK_LIMIT) };
   }
 
   const [rows, total] = await Promise.all([
@@ -514,7 +626,7 @@ export async function listPublicDeals(
     }),
     prisma.deal.count({ where }),
   ]);
-  const items = await withDealPopularTags(rankDeals(rows, { sort }));
+  const items = await withDealPopularTags(tagged(rankDeals(rows, { sort })));
   return { items, total };
 }
 
@@ -525,6 +637,9 @@ const FACET_DEAL_SELECT = {
   vendorId: true,
   branchId: true,
   salePrice: true,
+  discountPercent: true,
+  createdAt: true,
+  endDate: true,
   vendor: { select: { businessName: true } },
   branch: { select: { name: true, city: true, latitude: true, longitude: true } },
 } as const;
@@ -546,11 +661,14 @@ export async function getPublicDealFacets(
     maxPrice?: number;
     latitude?: number;
     longitude?: number;
+    tags?: OfferTagKey[];
   },
 ) {
-  const { vendorIds = [], branchIds = [], radiusKm, minPrice, maxPrice, latitude, longitude, ...base } = opts;
-  const rows = await prisma.deal.findMany({ where: buildDealWhere(base), select: FACET_DEAL_SELECT });
-  return computeDealFacets(rows, { vendorIds, branchIds, radiusKm, minPrice, maxPrice, latitude, longitude });
+  const { vendorIds = [], branchIds = [], radiusKm, minPrice, maxPrice, latitude, longitude, tags, ...base } = opts;
+  const now = new Date();
+  const [rows, hot] = await Promise.all([prisma.deal.findMany({ where: buildDealWhere(base), select: FACET_DEAL_SELECT }), getHotIds('deal', now)]);
+  const facetRows = withOfferTags(rows, (d) => d.discountPercent, hot, now) as FacetRow[];
+  return computeDealFacets(facetRows, { vendorIds, branchIds, radiusKm, minPrice, maxPrice, latitude, longitude, tags });
 }
 
 /** Distinct active {state, city} pairs plus the average of that city's branch coordinates, so
@@ -559,53 +677,69 @@ export async function getPublicDealFacets(
 export async function listPublicLocations() {
   const rows = await prisma.branch.groupBy({
     by: ['state', 'city'],
-    where: { isActive: true, state: { not: null }, city: { not: null } },
+    // State and city are required columns (S22), so every active branch has both.
+    where: { isActive: true, vendor: { status: 'ACTIVE' } },
     _avg: { latitude: true, longitude: true },
     orderBy: [{ state: 'asc' }, { city: 'asc' }],
   });
   const toNumber = (v: unknown) => (v == null ? null : Number(v));
   return rows.map((r) => ({
-    state: r.state as string,
-    city: r.city as string,
+    state: r.state,
+    city: r.city,
     latitude: toNumber(r._avg.latitude),
     longitude: toNumber(r._avg.longitude),
   }));
 }
 
-export async function getPublicDealOrThrow(id: string) {
-  const deal = await prisma.deal.findFirst({ where: { id, ...VISIBLE_DEAL_WHERE }, select: PUBLIC_DEAL_SELECT });
+/**
+ * The deal page (`GET /catalog/deals/:idOrSlug`, API.md §4): a UUID, the current slug or an old
+ * slug; the response always carries the current `slug` so the page can replace its URL. Hidden
+ * deals are a 404.
+ */
+export async function getPublicDealOrThrow(idOrSlug: string) {
+  const match = UUID_RE.test(idOrSlug) ? { id: idOrSlug } : { OR: [{ slug: idOrSlug }, { previousSlugs: { has: idOrSlug } }] };
+  const deal = await prisma.deal.findFirst({ where: { ...match, ...VISIBLE_DEAL_WHERE }, select: PUBLIC_DEAL_DETAIL_SELECT });
   if (!deal) throw new ApiError('NOT_FOUND', 'Deal not found');
-  const [withTags] = await withDealPopularTags([deal]);
-  return withTags;
+
+  const now = new Date();
+  const [hot, sold] = await Promise.all([getHotIds('deal', now), paidUnits(deal.id)]);
+  const [withTags] = await withDealPopularTags(withOfferTags([deal], (d) => d.discountPercent, hot, now));
+  const { therapistLinks, maxBookings, shortDescription, packages, ...rest } = withTags;
+  const left = stockLeft(maxBookings, sold);
+  return {
+    ...rest,
+    shortDescription,
+    tagline: shortDescription,
+    currency: 'INR' as const,
+    boughtCount: sold >= BOUGHT_COUNT_MIN ? sold : null,
+    isSoldOut: left === 0,
+    stockLeft: left,
+    packages: packages.map((p) => ({ ...p, discountPercent: discountOf(p.sellingPrice, p.originalPrice) })),
+    therapists: therapistLinks.map((link) => link.therapist),
+  };
 }
 
-/**
- * Public, unauthenticated Product catalog — mirrors `listPublicDeals` exactly, minus the
- * branch/location/duration concepts Product doesn't have (no branchId, no packages). Product is
- * a fully independent catalog entity (see Product's own schema doc comment) — never nested under
- * or filtered through a Deal.
- */
-export async function listPublicProducts(opts: {
-  page: number;
-  pageSize: number;
+export interface ProductWhereOpts {
   categoryId?: string;
+  /** Top-level category ids (`categoryIds=`); win over `categoryId`. */
+  categoryIds?: string[];
   subcategoryId?: string;
   vendorId?: string;
+  /** Business ids (`vendorIds=`, item 4); win over `vendorId`. */
+  vendorIds?: string[];
   search?: string;
-  /** 'relevance' (default) and 'newest' both order by `createdAt desc` — every pre-existing
-   *  caller that omits this gets byte-identical results. 'price_asc'/'price_desc' order by
-   *  `price` asc/desc, ties by `createdAt desc`. 'discount' is the only non-fabricated "best
-   *  deals" proxy on Product (no Review/Rating model exists) — mirrors listPublicDeals's own
-   *  `sort` option. */
-  sort?: 'relevance' | 'price_asc' | 'price_desc' | 'newest' | 'discount';
   minPrice?: number;
   maxPrice?: number;
-}) {
-  const where = {
+}
+
+/** `Product.findMany`/`count`'s shared `where`, always visibility-gated; shared by the list and
+ *  `getPublicProductFacets` like `buildDealWhere`. */
+export function buildProductWhere(opts: ProductWhereOpts) {
+  return {
     ...VISIBLE_PRODUCT_WHERE,
-    ...(opts.categoryId ? { categoryId: opts.categoryId } : {}),
+    ...(opts.categoryIds?.length ? { categoryId: { in: opts.categoryIds } } : opts.categoryId ? { categoryId: opts.categoryId } : {}),
     ...(opts.subcategoryId ? { subcategoryId: opts.subcategoryId } : {}),
-    ...(opts.vendorId ? { vendorId: opts.vendorId } : {}),
+    ...(opts.vendorIds?.length ? { vendorId: { in: opts.vendorIds } } : opts.vendorId ? { vendorId: opts.vendorId } : {}),
     ...(opts.minPrice !== undefined || opts.maxPrice !== undefined
       ? {
           price: {
@@ -623,6 +757,28 @@ export async function listPublicProducts(opts: {
         }
       : {}),
   };
+}
+
+/**
+ * Public, unauthenticated Product catalog — mirrors `listPublicDeals`, minus the
+ * branch/location/duration concepts Product doesn't have (no branchId, no packages). Product is
+ * a fully independent catalog entity (see Product's own schema doc comment) — never nested under
+ * or filtered through a Deal.
+ */
+export async function listPublicProducts(
+  opts: ProductWhereOpts & {
+    page: number;
+    pageSize: number;
+    /** 'relevance' (default) and 'newest' both order by `createdAt desc`. 'price_asc'/'price_desc'
+     *  order by `price`, ties by `createdAt desc`. 'discount' is the only non-fabricated "best
+     *  deals" proxy on Product (no Review/Rating model exists). */
+    sort?: 'relevance' | 'price_asc' | 'price_desc' | 'newest' | 'discount';
+    tags?: OfferTagKey[];
+  },
+) {
+  const now = new Date();
+  const hot = await getHotIds('product', now);
+  const where = opts.tags?.length ? { ...buildProductWhere(opts), AND: [tagsWhere(opts.tags, 'product', hot, now)] } : buildProductWhere(opts);
   const orderBy =
     opts.sort === 'price_asc'
       ? [{ price: 'asc' as const }, { createdAt: 'desc' as const }, { id: 'asc' as const }]
@@ -641,12 +797,46 @@ export async function listPublicProducts(opts: {
     }),
     prisma.product.count({ where }),
   ]);
-  const items = await withProductPopularTags(rows);
+  const items = await withProductPopularTags(withOfferTags(rows, (p) => p.discount, hot, now));
   return { items, total };
 }
 
-export async function getPublicProductOrThrow(id: string) {
-  const product = await prisma.product.findFirst({ where: { id, ...VISIBLE_PRODUCT_WHERE }, select: PUBLIC_PRODUCT_SELECT });
+/** Filter-panel counts for the public product list (`GET /catalog/products/facets`): base
+ *  filters in SQL, category / business / tag / price in memory so each ignores its own selection. */
+export async function getPublicProductFacets(opts: ProductWhereOpts & { tags?: OfferTagKey[] }) {
+  const { categoryId, categoryIds, vendorIds, minPrice, maxPrice, tags = [], ...base } = opts;
+  const now = new Date();
+  const [rows, hot] = await Promise.all([
+    prisma.product.findMany({
+      where: buildProductWhere(base),
+      select: {
+        id: true,
+        price: true,
+        discount: true,
+        createdAt: true,
+        vendorId: true,
+        category: { select: PUBLIC_CATEGORY_SELECT },
+        vendor: { select: { businessName: true } },
+      },
+    }),
+    getHotIds('product', now),
+  ]);
+  return computeProductFacets(withOfferTags(rows, (p) => p.discount, hot, now), {
+    categoryIds: categoryIds ?? (categoryId ? [categoryId] : []),
+    vendorIds,
+    tags,
+    minPrice,
+    maxPrice,
+  });
+}
+
+/**
+ * Public product page (`GET /catalog/products/:idOrSlug`): accept either a UUID or the current
+ * product slug, with the response carrying the live `slug` so the page can replace stale URLs.
+ */
+export async function getPublicProductOrThrow(idOrSlug: string) {
+  const match = UUID_RE.test(idOrSlug) ? { id: idOrSlug } : { slug: idOrSlug };
+  const product = await prisma.product.findFirst({ where: { ...match, ...VISIBLE_PRODUCT_WHERE }, select: PUBLIC_PRODUCT_SELECT });
   if (!product) throw new ApiError('NOT_FOUND', 'Product not found');
   const [withTags] = await withProductPopularTags([product]);
   return withTags;
@@ -660,7 +850,7 @@ export async function getPublicProductOrThrow(id: string) {
  * per "reuse existing APIs first."
  */
 export async function getPublicVendorBySlugOrThrow(slug: string, opts: { state?: string; city?: string } = {}) {
-  const vendor = await prisma.vendor.findFirst({
+  const vendor = await prisma.member.findFirst({
     where: { slug, status: 'ACTIVE' },
     select: {
       ...PUBLIC_VENDOR_DETAIL_SELECT,
@@ -682,28 +872,22 @@ export async function getPublicVendorBySlugOrThrow(slug: string, opts: { state?:
  * Independently-browsable Therapist catalogue (`GET /catalog/therapists`) — mirrors
  * `listPublicDeals` exactly: a customer can browse/select a Therapist directly, never having
  * picked a Deal or even a vendor first (see Therapist's own schema doc comment). Only active
- * Therapists at an active Vendor/Branch, same "active gating" convention as VISIBLE_DEAL_WHERE.
- * Exported for `order.service.ts`'s checkout revalidation, same reuse convention as
- * VISIBLE_DEAL_WHERE.
+ * Therapists at an active Vendor/Branch (VISIBLE_THERAPIST_WHERE).
  */
-export const VISIBLE_THERAPIST_WHERE = {
-  isActive: true,
-  vendor: { status: 'ACTIVE' as const },
-  branch: { isActive: true },
-};
-
-export async function listPublicTherapists(opts: {
-  page: number;
-  pageSize: number;
+export interface TherapistWhereOpts {
   categoryId?: string;
   subcategoryId?: string;
   vendorId?: string;
   branchId?: string;
+  vendorIds?: string[];
+  branchIds?: string[];
   search?: string;
-  /** See `listPublicDeals`'s identical param doc comment. */
-  latitude?: number;
-  longitude?: number;
-}) {
+  state?: string;
+  city?: string;
+}
+
+/** `Therapist.findMany`/`count`'s shared `where`, always visibility-gated. */
+async function buildTherapistWhere(opts: TherapistWhereOpts) {
   // Therapist has one FK (`specializationCategoryId`), not Deal's separate categoryId/
   // subcategoryId pair — per its schema doc comment it may point at a top-level THERAPY
   // Category, one of its Subcategories, or (in practice, per seed.ts) one of the Type-tier leaf
@@ -722,11 +906,15 @@ export async function listPublicTherapists(opts: {
       specializationCategoryId: { in: [selectedNodeId, ...children.map((c) => c.id), ...grandchildren.map((c) => c.id)] },
     };
   }
-  const where = {
+  return {
     ...VISIBLE_THERAPIST_WHERE,
     ...(specializationCategoryWhere ?? {}),
-    ...(opts.vendorId ? { vendorId: opts.vendorId } : {}),
-    ...(opts.branchId ? { branchId: opts.branchId } : {}),
+    ...(opts.vendorIds?.length ? { vendorId: { in: opts.vendorIds } } : opts.vendorId ? { vendorId: opts.vendorId } : {}),
+    ...(opts.branchIds?.length ? { branchId: { in: opts.branchIds } } : opts.branchId ? { branchId: opts.branchId } : {}),
+    // Merged into the visibility clause's `branch: { isActive: true }`, never replacing it.
+    ...(opts.state || opts.city
+      ? { branch: { isActive: true, ...(opts.state ? { state: opts.state } : {}), ...(opts.city ? { city: opts.city } : {}) } }
+      : {}),
     ...(opts.search
       ? {
           OR: [
@@ -737,16 +925,38 @@ export async function listPublicTherapists(opts: {
         }
       : {}),
   };
-  // See `listPublicDeals`'s identical "keep it simple" doc comment on this same branch.
-  if (opts.latitude !== undefined && opts.longitude !== undefined) {
-    const [allRows, total] = await Promise.all([
-      prisma.therapist.findMany({ where, select: PUBLIC_THERAPIST_LISTING_SELECT }),
-      prisma.therapist.count({ where }),
-    ]);
-    const sorted = withDistance(allRows, opts.latitude, opts.longitude);
-    const page = sorted.slice((opts.page - 1) * opts.pageSize, (opts.page - 1) * opts.pageSize + opts.pageSize);
+}
+
+/**
+ * Independently-browsable Therapist catalogue (`GET /catalog/therapists`) — a customer can
+ * browse/select a Therapist directly, never having picked a Deal or even a vendor first (see
+ * Therapist's own schema doc comment). Only active Therapists at an active Vendor/Branch
+ * (VISIBLE_THERAPIST_WHERE). Coordinates, a price sort or a price/radius filter load the full
+ * matching set and rank it in memory (`rankTherapists`) before paging, so page 2 continues
+ * page 1's order; otherwise SQL pages newest first.
+ */
+export async function listPublicTherapists(
+  opts: TherapistWhereOpts & {
+    page: number;
+    pageSize: number;
+    sort?: TherapistSort;
+    minPrice?: number;
+    maxPrice?: number;
+    radiusKm?: number;
+    /** See `listPublicDeals`'s identical param doc comment. */
+    latitude?: number;
+    longitude?: number;
+  },
+) {
+  const where = await buildTherapistWhere(opts);
+  const sort = opts.sort ?? 'relevance';
+  const hasCoords = opts.latitude !== undefined && opts.longitude !== undefined;
+  if (hasCoords || sort === 'price_asc' || sort === 'price_desc' || opts.minPrice !== undefined || opts.maxPrice !== undefined) {
+    const allRows = await prisma.therapist.findMany({ where, orderBy: { createdAt: 'desc' }, select: PUBLIC_THERAPIST_LISTING_SELECT });
+    const ranked = rankTherapists(allRows, { sort, latitude: opts.latitude, longitude: opts.longitude, radiusKm: opts.radiusKm, minPrice: opts.minPrice, maxPrice: opts.maxPrice });
+    const page = ranked.slice((opts.page - 1) * opts.pageSize, (opts.page - 1) * opts.pageSize + opts.pageSize);
     const items = await withTherapistPopularTags(page);
-    return { items, total };
+    return { items, total: ranked.length };
   }
 
   const [rows, total] = await Promise.all([
@@ -763,9 +973,44 @@ export async function listPublicTherapists(opts: {
   return { items, total };
 }
 
-export async function getPublicTherapistOrThrow(id: string) {
+/** Filter-panel counts for the therapist list (`GET /catalog/therapists/facets`), in the deal
+ *  facet shape: price = each therapist's lowest active package. */
+export async function getPublicTherapistFacets(
+  opts: Omit<TherapistWhereOpts, 'vendorIds' | 'branchIds' | 'vendorId' | 'branchId'> & {
+    vendorIds?: string[];
+    branchIds?: string[];
+    radiusKm?: number;
+    minPrice?: number;
+    maxPrice?: number;
+    latitude?: number;
+    longitude?: number;
+  },
+) {
+  const { vendorIds = [], branchIds = [], radiusKm, minPrice, maxPrice, latitude, longitude, ...base } = opts;
+  const rows = await prisma.therapist.findMany({
+    where: await buildTherapistWhere(base),
+    select: {
+      id: true,
+      vendorId: true,
+      branchId: true,
+      packages: { where: { isActive: true }, select: { sellingPrice: true } },
+      vendor: { select: { businessName: true } },
+      branch: { select: { name: true, city: true, latitude: true, longitude: true } },
+    },
+  });
+  const facetRows: FacetRow[] = rankTherapists(rows, { sort: 'relevance' }).map((r) => ({
+    ...r,
+    salePrice: r.fromPrice ?? Number.NaN,
+    vendor: r.vendor ? { ...r.vendor, businessName: r.vendor.businessName ?? '' } : null,
+  }));
+  const { vendors, branches, distance, price } = computeDealFacets(facetRows, { vendorIds, branchIds, radiusKm, minPrice, maxPrice, latitude, longitude });
+  return { vendors, branches, distance, price };
+}
+
+export async function getPublicTherapistOrThrow(idOrSlug: string) {
+  const match = UUID_RE.test(idOrSlug) ? { id: idOrSlug } : { slug: idOrSlug };
   const therapist = await prisma.therapist.findFirst({
-    where: { id, ...VISIBLE_THERAPIST_WHERE },
+    where: { ...match, ...VISIBLE_THERAPIST_WHERE },
     select: PUBLIC_THERAPIST_LISTING_SELECT,
   });
   if (!therapist) throw new ApiError('NOT_FOUND', 'Therapist not found');

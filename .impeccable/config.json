@@ -1,0 +1,26 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "helvetica",
+        "files": [
+          "packages/shared-ui/src/components/sky-rich-text-editor/sky-rich-text-editor.ts"
+        ],
+        "createdAt": "2026-10-07T15:51:47.912Z",
+        "reason": "vendored verbatim from quill/dist/quill.core.css (Quill 2.0.3) as a fallback on .ql-container; actual editable text font-family is overridden by M3 tokens via .ql-editor rule later in the same file"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "packages/shared-ui/src/components/sky-rich-text-editor/sky-rich-text-editor.ts"
+        ],
+        "createdAt": "2026-10-07T15:51:53.617Z",
+        "reason": "flagged border is .ql-editor blockquote { border-inline-start } — a left rule on rendered WYSIWYG content (blockquote typography), not a card/panel accent border; standard blockquote convention, token-driven (outline-variant)"
+      }
+    ]
+  }
+}

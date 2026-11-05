@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { PopularTag, PopularTagMappings } from '../../../../api/rbac/popular-tags';
+import { PopularTagManagement } from './popular-tags';
 
 let grantedPermissions: Set<string>;
 
@@ -58,7 +59,6 @@ vi.mock('../../../../api/rbac/products', async () => {
   return { ...actual, listProducts: (...args: unknown[]) => listProductsMock(...args) };
 });
 
-import { PopularTagManagement } from './popular-tags';
 
 const TAG: PopularTag = {
   id: 'tag-1',

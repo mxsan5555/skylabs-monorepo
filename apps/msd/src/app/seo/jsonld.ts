@@ -84,6 +84,34 @@ export function faqPageJsonLd(faqs: { question: string; answer: string }[]): Jso
   };
 }
 
+/** A content page (About, Contact, legal, ...) as a schema.org WebPage subtype. */
+export function webPageJsonLd(input: {
+  type?: 'WebPage' | 'AboutPage' | 'ContactPage';
+  name: string;
+  description: string;
+  url: string;
+  dateModified?: string;
+}): JsonLdObject {
+  return {
+    '@context': CONTEXT,
+    '@type': input.type ?? 'WebPage',
+    name: input.name,
+    description: input.description,
+    url: input.url,
+    ...(input.dateModified ? { dateModified: input.dateModified } : {}),
+  };
+}
+
+/** Ordered steps (How it works) as a HowTo. */
+export function howToJsonLd(name: string, steps: { name: string; text: string }[]): JsonLdObject {
+  return {
+    '@context': CONTEXT,
+    '@type': 'HowTo',
+    name,
+    step: steps.map((s, i) => ({ '@type': 'HowToStep', position: i + 1, name: s.name, text: s.text })),
+  };
+}
+
 /** JSON for an inline <script>: escapes `<` (and U+2028/U+2029) so data can never close the
  *  script element. */
 export function serializeJsonLd(data: JsonLdObject | JsonLdObject[]): string {

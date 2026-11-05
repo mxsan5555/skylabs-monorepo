@@ -17,13 +17,15 @@ export interface SectionHeadProps {
   seeAllTo?: string;
   /** Trailing controls after the See all link (e.g. carousel prev/next). */
   actions?: ReactNode;
+  /** Decorative media in the row's right column (e.g. the brand logo); hidden under 600px. */
+  media?: ReactNode;
 }
 
 const seeAllLabel = (seeAll: string, heading: string) =>
   content.cardRail.seeAllLabel.replace('{seeAll}', seeAll).replace('{heading}', heading);
 
 /** Section header row: h2 (or h1 via `as`) + optional subheading, See all link and actions. */
-export function SectionHead({ id, as: Heading = 'h2', heading, titleClassName = 'headline-small', subheading, seeAll, seeAllTo, actions }: SectionHeadProps) {
+export function SectionHead({ id, as: Heading = 'h2', heading, titleClassName = 'headline-small', subheading, seeAll, seeAllTo, actions, media }: SectionHeadProps) {
   const link = seeAll && seeAllTo;
   return (
     <div className="section-head">
@@ -42,6 +44,7 @@ export function SectionHead({ id, as: Heading = 'h2', heading, titleClassName = 
           {actions}
         </div>
       )}
+      {media && <div className="section-head__media">{media}</div>}
     </div>
   );
 }

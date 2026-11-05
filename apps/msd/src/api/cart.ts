@@ -43,6 +43,7 @@ export interface CartTherapistSummary {
  *  no branchId, see msd-api's Product schema doc comment). */
 export interface CartProductSummary {
   id: string;
+  slug: string;
   name: string;
   image: string | null;
   imageAlt: string | null;

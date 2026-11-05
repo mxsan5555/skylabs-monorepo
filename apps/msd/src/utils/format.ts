@@ -1,11 +1,23 @@
+/** The storefront's one display locale. Fixed (not the browser's) so prerendered HTML and the
+ *  hydrated client format numbers and dates the same way. */
+export const LOCALE = 'en-IN';
+
 export const formatINR = (n: number): string =>
-  `₹${n.toLocaleString('en-IN')}`;
+  `₹${n.toLocaleString(LOCALE)}`;
+
+/** ISO date -> "14 October 2026". */
+export const formatLongDate = (iso: string): string =>
+  new Date(iso).toLocaleDateString(LOCALE, { dateStyle: 'long' });
 
 export const pluralize = (count: number, singular: string, plural = `${singular}s`): string =>
   count === 1 ? singular : plural;
 
 export const inputValue = (e: Event): string =>
   (e.target as unknown as { value: string }).value;
+
+export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** Indian 10-digit mobile number. */
+export const MOBILE_REGEX = /^[6-9]\d{9}$/;
 
 /** "20:00" -> "08:00 PM" (zero-padded hour, matching this app's own "10:00 AM - 08:00 PM"
  *  convention) — Branch.openingHours stores plain 24-hour "HH:MM" strings; this is the only place
@@ -34,3 +46,29 @@ export function formatRelativeTime(iso: string): string {
   const diffDays = Math.round(diffHours / 24);
   return `${diffDays} ${pluralize(diffDays, 'day')} ago`;
 }
+
+/** Fills `{key}` placeholders in content.json copy ("Add {title} to cart"). Unknown keys stay as
+ *  written, so a missing value is visible instead of silently blank. */
+export function fillTemplate(template: string, values: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (match, key: string) => values[key] ?? match);
+}
+
+/** An address line from its parts ("Karve Road, Pune, Maharashtra"), skipping empty parts and any
+ *  part the line already ends with: stored addresses often include the city already
+ *  ("Indiranagar, Bengaluru"), so the city is not printed twice. A part only counts as present when
+ *  it is the whole line so far or follows a comma, so "New Delhi" does not swallow the state "Delhi". */
+export function formatStreetAddress(parts: (string | null | undefined)[]): string {
+  let line = '';
+  for (const raw of parts) {
+    const part = raw?.trim();
+    if (!part) continue;
+    const lower = line.toLowerCase();
+    const key = part.toLowerCase();
+    if (lower === key || lower.endsWith(`, ${key}`)) continue;
+    line = line ? `${line}, ${part}` : part;
+  }
+  return line;
+}
+
+/** Short display number for an order, the same `ORD-XXXXXXXX` the API puts in emails. */
+export const orderNumber = (orderId: string): string => `ORD-${orderId.slice(-8).toUpperCase()}`;

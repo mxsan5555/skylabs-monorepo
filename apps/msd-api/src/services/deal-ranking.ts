@@ -1,4 +1,5 @@
 /** In-memory ranking and facet counting for the public deal list (small result sets). */
+import { OFFER_TAGS } from './offer-tag';
 
 export type DealSort = 'relevance' | 'price_asc' | 'price_desc' | 'distance' | 'newest' | 'discount';
 export const DISTANCE_BUCKETS_KM = [1, 5, 10, 20, 50, 100] as const;
@@ -15,7 +16,7 @@ export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: numb
   return 6371 * 2 * Math.asin(Math.sqrt(a));
 }
 
-function distanceOf(branch: BranchGeo, latitude?: number, longitude?: number): number | null {
+export function distanceOf(branch: BranchGeo, latitude?: number, longitude?: number): number | null {
   if (latitude === undefined || longitude === undefined || branch?.latitude == null || branch.longitude == null) return null;
   return haversineKm(latitude, longitude, Number(branch.latitude), Number(branch.longitude));
 }
@@ -54,6 +55,8 @@ export interface FacetRow {
   salePrice: Num;
   vendor: { businessName: string } | null;
   branch: { name: string; city: string | null; latitude: Num | null; longitude: Num | null } | null;
+  /** The card tag (`offer-tag.ts`); omitted for therapists. */
+  tag?: string | null;
 }
 
 export interface FacetSelection {
@@ -64,6 +67,7 @@ export interface FacetSelection {
   maxPrice?: number;
   latitude?: number;
   longitude?: number;
+  tags?: string[];
 }
 
 export interface DealFacets {
@@ -71,9 +75,11 @@ export interface DealFacets {
   branches: { id: string; name: string; city: string | null; vendorName: string; count: number }[];
   distance: { km: number; count: number }[];
   price: { min: number; max: number } | null;
+  /** Count per card tag, every tag listed (zeros included) in rule order. */
+  tags: { tag: (typeof OFFER_TAGS)[number]; count: number }[];
 }
 
-type Facet = 'vendor' | 'branch' | 'radius' | 'price';
+type Facet = 'vendor' | 'branch' | 'radius' | 'price' | 'tag';
 
 /** Counts per facet. `rows` must already match every non-facet filter (category, city, search);
  *  each facet's counts apply the other facets' selections but not its own. Options list every
@@ -88,7 +94,8 @@ export function computeDealFacets(rows: FacetRow[], sel: FacetSelection): DealFa
       (except === 'vendor' || sel.vendorIds.length === 0 || sel.vendorIds.includes(r.vendorId)) &&
       (except === 'branch' || sel.branchIds.length === 0 || sel.branchIds.includes(r.branchId)) &&
       (except === 'radius' || !hasCoords || sel.radiusKm === undefined || (km !== null && km <= sel.radiusKm)) &&
-      (except === 'price' || ((sel.minPrice === undefined || price >= sel.minPrice) && (sel.maxPrice === undefined || price <= sel.maxPrice)))
+      (except === 'price' || ((sel.minPrice === undefined || price >= sel.minPrice) && (sel.maxPrice === undefined || price <= sel.maxPrice))) &&
+      (except === 'tag' || !sel.tags?.length || (r.tag != null && sel.tags.includes(r.tag)))
     );
   };
   // Count desc only — ties keep the Map's insertion order (first-seen-in-`rows` order), a stable
@@ -112,11 +119,15 @@ export function computeDealFacets(rows: FacetRow[], sel: FacetSelection): DealFa
     ? DISTANCE_BUCKETS_KM.map((km) => ({ km, count: inRange.filter((d) => d !== null && d <= km).length }))
     : [];
 
-  const prices = rows.filter((r) => passes(r, 'price')).map((r) => Number(r.salePrice));
+  // A row with no price (a therapist without an active package) never sets the range.
+  const prices = rows.filter((r) => passes(r, 'price')).map((r) => Number(r.salePrice)).filter(Number.isFinite);
   // reduce, not Math.min(...prices): spreading a very large array can exceed the call-stack limit.
   const price = prices.length
     ? prices.reduce((acc, p) => ({ min: Math.min(acc.min, p), max: Math.max(acc.max, p) }), { min: prices[0], max: prices[0] })
     : null;
 
-  return { vendors: [...vendors.values()].sort(byCount), branches: [...branches.values()].sort(byCount), distance, price };
+  const tagged = rows.filter((r) => passes(r, 'tag'));
+  const tags = OFFER_TAGS.map((tag) => ({ tag, count: tagged.filter((r) => r.tag === tag).length }));
+
+  return { vendors: [...vendors.values()].sort(byCount), branches: [...branches.values()].sort(byCount), distance, price, tags };
 }

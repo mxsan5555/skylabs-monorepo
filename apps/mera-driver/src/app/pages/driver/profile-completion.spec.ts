@@ -2,6 +2,7 @@ import { calculateProfileCompletion } from './profile-completion';
 import type { DriverSelf } from '../../core/drivers/driver-self-api.service';
 
 const EMPTY: DriverSelf = {
+  city: null, accountPaymentMethod: null, completedSubSteps: [], currentStep: 1, currentSubStep: 0, completionPercentage: 0,
   id: 'driver-1',
   firstName: '',
   lastName: null,

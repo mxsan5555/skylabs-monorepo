@@ -4,7 +4,7 @@ import { authenticate } from '../middleware/authenticate';
 import { requirePermission } from '../middleware/requirePermission';
 import { validateBody, validateParams, validateQuery } from '../middleware/validate';
 import { UuidParamSchema } from '../schemas/common.schema';
-import { CustomerListQuerySchema, CustomerStatusUpdateSchema } from '../schemas/customer.schema';
+import { CustomerCreateSchema, CustomerListQuerySchema, CustomerStatusUpdateSchema } from '../schemas/customer.schema';
 import * as customerService from '../services/customer.service';
 import { writeAuditLog } from '../services/audit.service';
 import { sendData } from '../lib/http';
@@ -28,6 +28,23 @@ router.get('/', requirePermission('customers', 'view'), validateQuery(CustomerLi
     const { page, pageSize, search, status } = req.validatedQuery as ReturnType<typeof CustomerListQuerySchema.parse>;
     const { items, total } = await customerService.listCustomers({ page, pageSize, search, status });
     sendData(res, items, { meta: { total, page, pageSize } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/', requirePermission('customers', 'create'), validateBody(CustomerCreateSchema), async (req, res, next) => {
+  try {
+    const customer = await customerService.createCustomer(req.body);
+    await writeAuditLog({
+      actorUserId: req.user!.sub,
+      action: 'customer.create',
+      targetType: 'User',
+      targetId: customer.id,
+      after: customer,
+      ...requestMeta(req),
+    });
+    sendData(res, customer, { status: 201 });
   } catch (err) {
     next(err);
   }

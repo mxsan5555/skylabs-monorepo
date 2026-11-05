@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { RequireAuth, RequirePermission, useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { PublicLayout } from './layouts/public-layout';
@@ -9,7 +9,7 @@ import { AdminPage } from './admin/admin-page';
 import Home from './pages/home/home';
 import NotFound from './pages/not-found/not-found';
 import Showcase from './pages/showcase/showcase';
-import Blog from './pages/blog/blog';
+import Blog, { BlogCategory } from './pages/blog/blog';
 import BlogDetail from './pages/blog-detail/blog-detail';
 import SignIn from './pages/sign-in/sign-in';
 import Otp from './pages/otp/otp';
@@ -19,29 +19,37 @@ import { MyProfileSettings } from './pages/account/settings/settings';
 import Dashboard from './pages/account/dashboard';
 import { RoleManagement } from './pages/account/roles/roles';
 import { UserManagement } from './pages/account/users/users';
+import { UserDetailPage } from './pages/account/users/user-detail-page';
+import { RoleConflictsPage } from './pages/account/users/role-conflicts-page';
 import { AuditLogs } from './pages/account/audit-logs/audit-logs';
-import { VendorManagement } from './pages/account/vendors/vendors';
-import { VendorNewPage } from './pages/account/vendors/vendor-new-page';
-import { VendorDetailPage } from './pages/account/vendors/vendor-detail-page';
-import { BranchFormPage } from './pages/account/vendors/branch-form-page';
-import { DealFormPage } from './pages/account/vendors/deal-form-page';
-import { TherapistFormPage } from './pages/account/vendors/therapist-form-page';
-import { ProductFormPage } from './pages/account/vendors/product-form-page';
+import { MemberManagement } from './pages/account/members/members';
+import { MemberNewPage } from './pages/account/members/member-new-page';
+import { MemberDetailPage } from './pages/account/members/member-detail-page';
+import { BranchFormPage } from './pages/account/members/branch-form-page';
+import { DealFormPage } from './pages/account/members/deal-form-page';
+import { TherapistFormPage } from './pages/account/members/therapist-form-page';
+import { ProductFormPage } from './pages/account/members/product-form-page';
 import { CustomerManagement } from './pages/account/customers/customers';
-import { BranchList } from './pages/account/vendors/branch-list';
-import { DealList } from './pages/account/vendors/deal-list';
-import { TherapistList } from './pages/account/vendors/therapist-list';
-import { VendorBusinessProfile } from './pages/account/vendors/vendor-business-profile';
-import { VendorBranchesDeals } from './pages/account/vendors/vendor-branches-deals';
-import { VendorCustomers } from './pages/account/vendors/vendor-customers';
-import { VendorTherapists } from './pages/account/vendors/vendor-therapists';
-import { VendorDeals } from './pages/account/vendors/vendor-deals';
-import { VendorProducts } from './pages/account/vendors/vendor-products';
+import { CustomerDetailPage } from './pages/account/customers/customer-detail-page';
+import { CustomerOrderInvoicePage } from './pages/account/customers/customer-order-invoice-page';
+import { BranchList } from './pages/account/members/branch-list';
+import { DealList } from './pages/account/members/deal-list';
+import { TherapistList } from './pages/account/members/therapist-list';
+import { VendorBusinessProfile } from './pages/account/members/vendor-business-profile';
+import { VendorBranchesDeals } from './pages/account/members/vendor-branches-deals';
+import { VendorCustomers } from './pages/account/members/vendor-customers';
+import { VendorTherapists } from './pages/account/members/vendor-therapists';
+import { VendorDeals } from './pages/account/members/vendor-deals';
+import { VendorProducts } from './pages/account/members/vendor-products';
 import { CategoryManagement } from './pages/account/masters/categories';
 import { PopularTagManagement } from './pages/account/masters/popular-tags';
 import { PopularTreatmentManagement } from './pages/account/masters/popular-treatments';
 import { PromotionManagement } from './pages/account/masters/promotions';
 import { HomeHeroManagement } from './pages/account/masters/home-hero';
+import { HomeHeroBuilder } from './pages/account/masters/home-hero-builder';
+import { HomeTagSectionsManagement } from './pages/account/masters/home-tag-sections';
+import { HomeTagSectionsStatePage } from './pages/account/masters/home-tag-sections-state';
+import { HomeTagSectionsBuilder } from './pages/account/masters/home-tag-sections-builder';
 import { BlogList } from './pages/account/cms/blog-list';
 import { BlogDetailAdmin } from './pages/account/cms/blog-detail-admin';
 import { BlogCategoriesList } from './pages/account/cms/blog-categories-list';
@@ -54,12 +62,24 @@ import { LegalPagesList } from './pages/account/cms/legal-pages-list';
 import { SocialMediaList } from './pages/account/cms/social-media-list';
 import { ProductManagement } from './pages/account/products/products';
 import { OrderManagement } from './pages/account/orders/orders';
+import { OrderDetailPage } from './pages/account/orders/order-detail-page';
 import { Reports } from './pages/account/reports/reports';
+import { AccountsOverviewPage } from './pages/account/accounts/accounts-overview';
+import { CustomerPaymentsPage } from './pages/account/accounts/customer-payments';
+import { MemberSettlementsPage } from './pages/account/accounts/member-settlements';
+import { MemberSettlementDetailPage } from './pages/account/accounts/member-settlement-detail';
+import { RefundsDisputesPage } from './pages/account/accounts/refunds-disputes';
+import { MemberOrdersPage } from './pages/account/vendor-portal/member-orders-page';
+import { VoucherVerificationPage } from './pages/account/vendor-portal/voucher-verification-page';
+import { VendorCustomerDetailPage } from './pages/account/vendor-portal/vendor-customer-detail-page';
+import { EarningsPayouts } from './pages/account/vendor-portal/earnings-payouts';
+import { SystemSettingsPage } from './pages/account/system-settings/system-settings';
 import { NotificationsPage } from './pages/account/notifications/notifications';
 import Search from './pages/search/search';
 import Category from './pages/category/category';
 import { CategoriesIndex } from './pages/categories/categories';
 import About from './pages/about/about';
+import HelpCenter from './pages/help-center/help-center';
 import Contact from './pages/contact/contact';
 import Careers from './pages/careers/careers';
 import { BecomeVendor } from './pages/become-vendor/become-vendor';
@@ -68,23 +88,24 @@ import WebsitePage from './pages/website-page/website-page';
 import { Orders } from './pages/orders/orders';
 import { OrderDetail } from './pages/orders/order-detail';
 import { Invoice } from './pages/invoice/invoice';
+import { OrderResult } from './pages/order-result/order-result';
 import DealDetail from './pages/deal-detail/deal-detail';
 import { Cart } from './pages/cart/cart';
 import Wishlist from './pages/wishlist/wishlist';
 import Checkout from './pages/checkout/checkout';
-import ProductListing from './pages/products/products';
+import { ListingPage } from './pages/listing/listing-page';
 import ProductDetail from './pages/product-detail/product-detail';
 import VendorPage from './pages/vendor/vendor';
-import { Therapists } from './pages/therapists/therapists';
 import TherapistDetail from './pages/therapist-detail/therapist-detail';
 import { MyAccountLayout } from './pages/my-account/my-account-layout';
 import { MyAccountProfile } from './pages/my-account/profile';
 import { MyAccountPayments } from './pages/my-account/payments';
 import { ScrollToTop } from './components/ScrollToTop';
 import CustomerDashboard from './pages/customer-dashboard/customer-dashboard';
+import { Support } from './pages/support/support';
 /**
- * `/account/vendors` serves three audiences under different permission keys: admins hold
- * `vendors:view`, vendor-role users hold `vendors:custom` (never `view` — that would also
+ * `/account/members` serves three audiences under different permission keys: admins hold
+ * `members:view`, vendor-role users hold `members:custom` (never `view` — that would also
  * unlock the admin "list every vendor" endpoint, see vendors.tsx's doc comment) plus the
  * narrower `vendor-portal:view` that only surfaces the "My Business" sidebar item.
  * `RequirePermission` only checks a single action, so this route needs its own small
@@ -92,9 +113,33 @@ import CustomerDashboard from './pages/customer-dashboard/customer-dashboard';
  * `RequirePermission` component used by every other route in the app.
  */
 
+/** Old `/account/vendors/...` links (bookmarks, notification metadata) land on the members route. */
+function LegacyMemberRedirect() {
+  const { pathname, search } = useLocation();
+  return <Navigate to={`${pathname.replace('/account/vendors', '/account/members')}${search}`} replace />;
+}
+
 function VendorsRouteGuard({ children }: { children: ReactNode }) {
   const { can } = useAuth();
-  if (!can('vendors', 'view') && !can('vendors', 'custom') && !can('vendor-portal.profile', 'view')) {
+  if (!can('members', 'view') && !can('members', 'custom') && !can('vendor-portal.profile', 'view')) {
+    return <Navigate to="/account/profile" replace />;
+  }
+  return <>{children}</>;
+}
+
+/**
+ * `/account/orders/:orderId` — Bug 1 fix. The backend (`GET /orders/:id`) already correctly
+ * scopes a vendor caller to their own order items (`scopeOrderItemsToVendor`), but the route used
+ * to be gated on the bare `orders:view` permission alone, which a plain `vendor` role never holds
+ * (only `vendor-portal.orders:*` — deliberately, so a member never gets the admin-wide "Orders"
+ * sidebar node). That made the frontend guard STRICTER than the API it gates, silently bouncing a
+ * member's own "View Order" click to `/account/profile`. Same OR-of-two-permissions shape
+ * `orders.tsx`'s own "Change status" action already uses (`can('orders','status_change') ||
+ * can('vendors','custom')`), mirroring the backend's `requireOrdersOrVendorSelf`.
+ */
+export function OrderDetailRouteGuard({ children }: { children: ReactNode }) {
+  const { can } = useAuth();
+  if (!can('orders', 'view') && !can('vendors', 'custom')) {
     return <Navigate to="/account/profile" replace />;
   }
   return <>{children}</>;
@@ -108,6 +153,11 @@ function BranchFormPageRoute() {
 function DealFormPageRoute() {
   const { token } = useAuth();
   return <DealFormPage token={token} />;
+}
+
+function MemberDealFormPageRoute() {
+  const { token } = useAuth();
+  return <DealFormPage token={token} surface="member" />;
 }
 
 function TherapistFormPageRoute() {
@@ -137,14 +187,17 @@ export function AppRoutes() {
           <Route path="/categories" element={<CategoriesIndex />} />
           <Route path="/category/:slug" element={<Category />} />
           <Route path="/category/:slug/:city" element={<Category />} />
-          <Route path="/deal/:id" element={<DealDetail />} />
-          <Route path="/products" element={<ProductListing />} />
-          <Route path="/products/:id" element={<ProductDetail />} />
+          <Route path="/deal/:slug" element={<DealDetail />} />
+          <Route path="/deals" element={<ListingPage key="deals" kind="deals" />} />
+          <Route path="/deals/:city" element={<ListingPage key="deals" kind="deals" />} />
+          <Route path="/products" element={<ListingPage key="products" kind="products" />} />
+          <Route path="/products/:slug" element={<ProductDetail />} />
           <Route path="/vendor/:slug" element={<VendorPage />} />
           {/* Therapist as an independent, directly browsable/purchasable entity — never reachable
             only via a Deal's page (see msd-api's Therapist schema doc comment). */}
-          <Route path="/therapists" element={<Therapists />} />
-          <Route path="/therapist/:id" element={<TherapistDetail />} />
+          <Route path="/therapists" element={<ListingPage key="therapists" kind="therapists" />} />
+          <Route path="/therapists/:city" element={<ListingPage key="therapists" kind="therapists" />} />
+          <Route path="/therapist/:slug" element={<TherapistDetail />} />
           {/* Cart / Wishlist / Checkout — plain PublicLayout children (Header+Footer, no sidebar),
             exactly as they worked before the Customer Sidebar fix. These are NOT part of the
             Customer Sidebar — they stay reachable from the existing Header cart/wishlist icons,
@@ -198,7 +251,7 @@ export function AppRoutes() {
             <Route path="/my-account" element={<MyAccountProfile />} />
             <Route path="/my-account/profile" element={<MyAccountProfile />} />
             <Route path="/my-account/payments" element={<MyAccountPayments />} />
-
+            <Route path="/my-account/support" element={<Support />} />
             <Route
               path="/my-account/invoices"
               element={
@@ -223,15 +276,30 @@ export function AppRoutes() {
             <Route path="/my-account/wishlist" element={<Wishlist />} />
           </Route>
 
-          {/* =====================================================
-              ORDER DETAIL — standalone storefront page
-              NO MyAccountLayout / NO account sidebar
-             ===================================================== */}
+          {/* Customer Orders — storefront layout, without account sidebar */}
+          {/* <Route
+            path="/orders"
+            element={
+              <RequireAuth>
+                <Orders />
+              </RequireAuth>
+            }
+          /> */}
           <Route
             path="/orders/:id"
             element={
               <RequireAuth>
                 <OrderDetail />
+              </RequireAuth>
+            }
+          />
+
+          {/* Order result after checkout (item 3): thank you, payment failed, waiting, error. */}
+          <Route
+            path="/orders/:id/confirmation"
+            element={
+              <RequireAuth>
+                <OrderResult />
               </RequireAuth>
             }
           />
@@ -248,22 +316,23 @@ export function AppRoutes() {
 
           {/* ── Content pages ── */}
           <Route path="/blog" element={<Blog />} />
+          <Route path="/blog/category/:slug" element={<BlogCategory />} />
           <Route path="/blog/:slug" element={<BlogDetail />} />
           <Route path="/about" element={<About />} />
+          <Route path="/help-center" element={<HelpCenter />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/careers" element={<Careers />} />
           {/* Public, unauthenticated Vendor self-registration ("Become a Vendor") — the storefront
             counterpart of the admin "Add Vendor" wizard, see become-vendor.tsx's own doc
-            comment. Linked from the footer's "Partner With Us" entry (content.json). */}
+            comment. Linked from the header's "Become a Member" and the footer's "Partner With Us"
+            entries (content.json). */}
           <Route path="/become-member" element={<BecomeVendor />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
-          {/* WebsitePage is one reusable component parameterized by `slug` — wired to all 4 fixed
-            `WebsitePage` rows (see website-page.tsx's own doc comment), not 4 separate files. */}
-          <Route path="/privacy" element={<WebsitePage slug="privacy" />} />
-          <Route path="/terms" element={<WebsitePage slug="terms" />} />
-          <Route path="/accessibility" element={<WebsitePage slug="accessibility" />} />
-          <Route path="/cookies" element={<WebsitePage slug="cookies" />} />
-          <Route path="/products/:slug" element={<ProductDetail />} />
+          {/* One legal page component for the 4 fixed WebsitePage rows (see website-page.tsx). */}
+          <Route path="/privacy" element={<WebsitePage page="privacy" />} />
+          <Route path="/terms" element={<WebsitePage page="terms" />} />
+          <Route path="/return-refund-policy" element={<WebsitePage page="return-refund-policy" />} />
+          <Route path="/cookies" element={<WebsitePage page="cookies" />} />
           <Route path="/showcase" element={<Showcase />} />
           {/* ── Catch-all 404, inside the shell so it keeps header/footer. ── */}
           <Route path="*" element={<NotFound />} />
@@ -321,54 +390,92 @@ export function AppRoutes() {
               </RequirePermission>
             }
           />
+          {/* One customer's own page: real routes (not tabs), same shape as Member Detail's
+            `/account/members/:memberId`/`:section` below — see `customer-detail-page.tsx`'s own
+            doc comment. The static `/account/customers` list route above always wins over this
+            dynamic segment. */}
           <Route
-            path="/account/vendors"
+            path="/account/customers/:customerId"
             element={
-              <VendorsRouteGuard>
-                <VendorManagement />
-              </VendorsRouteGuard>
-            }
-          />
-          {/* Dedicated "Add New Vendor" page — see vendor-new-page.tsx's doc comment for why this
-            is a real route rather than the old inline-on-the-list-page wizard. Reuses the same
-            route guard as /account/vendors; VendorNewPage itself checks the finer-grained
-            `vendors:create` action and shows an empty state if the caller only holds
-            `vendors:view`/`vendors:custom` (the backend route is the real enforcement either
-            way). */}
-          <Route
-            path="/account/vendors/new"
-            element={
-              <VendorsRouteGuard>
-                <VendorNewPage />
-              </VendorsRouteGuard>
-            }
-          />
-          {/* One member's own page: an Overview of cards (Branches/Deals/Therapists/Products +
-            the profile summary), each card's Add/Edit button navigating to that section's own
-            URL below — no tab strip, real routes instead, so the breadcrumb and back button
-            always match what's on screen. Admin only: VendorDetailPage checks `vendors:view`
-            itself, and every API call it makes is permission-gated server-side. The static `new`
-            route above wins over this dynamic segment. */}
-          <Route
-            path="/account/vendors/:vendorId"
-            element={
-              <VendorsRouteGuard>
-                <VendorDetailPage />
-              </VendorsRouteGuard>
+              <RequirePermission menuKey="customers">
+                <CustomerDetailPage />
+              </RequirePermission>
             }
           />
           <Route
-            path="/account/vendors/:vendorId/:section"
+            path="/account/customers/:customerId/:section"
+            element={
+              <RequirePermission menuKey="customers">
+                <CustomerDetailPage />
+              </RequirePermission>
+            }
+          />
+          {/* Customer-scoped Order Detail/Invoice — reuses the same `OrderDetailPage`/
+            `CustomerOrderInvoicePage` the order-wide routes below use; `OrderDetailPage` itself
+            layers the `:customerId` ownership check on top of `GET /orders/:id` (see its own doc
+            comment). */}
+          <Route
+            path="/account/customers/:customerId/orders/:orderId"
+            element={
+              <RequirePermission menuKey="customers">
+                <OrderDetailPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/customers/:customerId/orders/:orderId/invoice"
+            element={
+              <RequirePermission menuKey="customers">
+                <CustomerOrderInvoicePage />
+              </RequirePermission>
+            }
+          />
+          <Route path="/account/vendors" element={<LegacyMemberRedirect />} />
+          <Route path="/account/vendors/*" element={<LegacyMemberRedirect />} />
+          <Route
+            path="/account/members"
             element={
               <VendorsRouteGuard>
-                <VendorDetailPage />
+                <MemberManagement />
+              </VendorsRouteGuard>
+            }
+          />
+          {/* Add member: the short form. Same route guard as /account/members; MemberNewPage itself
+            checks the finer-grained `members:create` action and shows an empty state otherwise
+            (the backend route is the real enforcement either way). */}
+          <Route
+            path="/account/members/new"
+            element={
+              <VendorsRouteGuard>
+                <MemberNewPage />
+              </VendorsRouteGuard>
+            }
+          />
+          {/* One member's own page: status actions in the header and seven tabs, each tab its
+            own URL (`:section`) so the back button and shared links land on the same tab.
+            Admin only: MemberDetailPage checks `members:view` itself, and every API call it
+            makes is permission-gated server-side. The static `new` route above wins over this
+            dynamic segment. */}
+          <Route
+            path="/account/members/:memberId"
+            element={
+              <VendorsRouteGuard>
+                <MemberDetailPage />
+              </VendorsRouteGuard>
+            }
+          />
+          <Route
+            path="/account/members/:memberId/:section"
+            element={
+              <VendorsRouteGuard>
+                <MemberDetailPage />
               </VendorsRouteGuard>
             }
           />
           {/* Branch add/edit — real pages, never a popup (see the branch-management design spec).
             The static `new` segment wins over the dynamic `:branchId` below it. */}
           <Route
-            path="/account/vendors/:vendorId/branches/new"
+            path="/account/members/:vendorId/branches/new"
             element={
               <VendorsRouteGuard>
                 <BranchFormPageRoute />
@@ -376,7 +483,7 @@ export function AppRoutes() {
             }
           />
           <Route
-            path="/account/vendors/:vendorId/branches/:branchId"
+            path="/account/members/:vendorId/branches/:branchId"
             element={
               <VendorsRouteGuard>
                 <BranchFormPageRoute />
@@ -386,7 +493,7 @@ export function AppRoutes() {
           {/* Deal add/edit — same real-page pattern as Branch above, never a popup. The static
             `new` segment wins over the dynamic `:dealId` below it. */}
           <Route
-            path="/account/vendors/:vendorId/deals/new"
+            path="/account/members/:vendorId/deals/new"
             element={
               <VendorsRouteGuard>
                 <DealFormPageRoute />
@@ -394,7 +501,7 @@ export function AppRoutes() {
             }
           />
           <Route
-            path="/account/vendors/:vendorId/deals/:dealId"
+            path="/account/members/:vendorId/deals/:dealId"
             element={
               <VendorsRouteGuard>
                 <DealFormPageRoute />
@@ -404,7 +511,7 @@ export function AppRoutes() {
           {/* Therapist add/edit — same real-page pattern as Branch/Deal above, never a popup.
             The static `new` segment wins over the dynamic `:therapistId` below it. */}
           <Route
-            path="/account/vendors/:vendorId/therapists/new"
+            path="/account/members/:vendorId/therapists/new"
             element={
               <VendorsRouteGuard>
                 <TherapistFormPageRoute />
@@ -412,7 +519,7 @@ export function AppRoutes() {
             }
           />
           <Route
-            path="/account/vendors/:vendorId/therapists/:therapistId"
+            path="/account/members/:vendorId/therapists/:therapistId"
             element={
               <VendorsRouteGuard>
                 <TherapistFormPageRoute />
@@ -422,7 +529,7 @@ export function AppRoutes() {
           {/* Product add/edit — same real-page pattern as Branch/Deal/Therapist above, never a
             popup. The static `new` segment wins over the dynamic `:productId` below it. */}
           <Route
-            path="/account/vendors/:vendorId/products/new"
+            path="/account/members/:vendorId/products/new"
             element={
               <VendorsRouteGuard>
                 <ProductFormPageRoute />
@@ -430,7 +537,7 @@ export function AppRoutes() {
             }
           />
           <Route
-            path="/account/vendors/:vendorId/products/:productId"
+            path="/account/members/:vendorId/products/:productId"
             element={
               <VendorsRouteGuard>
                 <ProductFormPageRoute />
@@ -468,9 +575,26 @@ export function AppRoutes() {
               </RequirePermission>
             }
           />
+          {/* The member's own deal form: the same page staff use (PLANNING §2.7). */}
+          <Route
+            path="/account/vendor-deals/new"
+            element={
+              <RequirePermission menuKey="vendor-portal.deals" action="create">
+                <MemberDealFormPageRoute />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/vendor-deals/:dealId"
+            element={
+              <RequirePermission menuKey="vendor-portal.deals" action="edit">
+                <MemberDealFormPageRoute />
+              </RequirePermission>
+            }
+          />
           {/* Vendor-facing Customers list — reuses `vendor-portal:view` too, so it's visible with
             zero seed.ts/permission changes (same one-permissionKey-many-nodes pattern as
-            orders above). Data itself is scoped `vendors:custom` server-side. */}
+            orders above). Data itself is scoped `members:custom` server-side. */}
           <Route
             path="/account/vendor-customers"
             element={
@@ -480,7 +604,7 @@ export function AppRoutes() {
             }
           />
           {/* Vendor-facing Therapists CRUD — reuses `vendor-portal:view` too (same one-permissionKey-
-            many-nodes pattern as Customers above). Data itself is scoped `vendors:custom` server-side. */}
+            many-nodes pattern as Customers above). Data itself is scoped `members:custom` server-side. */}
           <Route
             path="/account/vendor-therapists"
             element={
@@ -490,7 +614,7 @@ export function AppRoutes() {
             }
           />
           {/* Vendor-facing "Product" — same self-service /vendors/me/products* routes
-            (`vendors:custom`) the onboarding wizard's admin-on-behalf Products step already
+            (`members:custom`) the onboarding wizard's admin-on-behalf Products step already
             uses, just the ongoing-management surface. Never the read-only admin oversight
             `/account/products` page below. */}
           <Route
@@ -501,17 +625,106 @@ export function AppRoutes() {
               </RequirePermission>
             }
           />
-          {/* Vendor-facing "Order" — reuses the exact same <OrderManagement/> component as the
-            admin `/account/orders` route below (its GET/PATCH calls already force-scope a vendor
-            caller to its own vendorId server-side, see order.service.ts#listOrders) — just a
-            second route/nav entry gated `vendor-portal` instead of `orders`, so a vendor never
-            needs the admin-wide `orders:view` permission that would otherwise leak the top-level
-            "Orders" sidebar node (see msd-menu.json). */}
+          {/* Vendor-facing "Orders" — a real 2-tab page (`MemberOrdersPage`): Order History
+            (`<OrderManagement scope="member" />`, its GET/PATCH calls already force-scoped to the
+            caller's own vendorId server-side — order.service.ts#listOrders) and Verify & Complete
+            (voucher lookup + the backend-sourced Service Queue, `GET /vouchers/queue`). Replaces
+            the old single-page `OrdersAndVerify`. Same route, no new menu node — the whole voucher
+            router is gated `vendor-portal.orders:custom` server-side either way. */}
           <Route
             path="/account/vendor-orders"
             element={
               <RequirePermission menuKey="vendor-portal.orders">
-                <OrderManagement />
+                <MemberOrdersPage />
+              </RequirePermission>
+            }
+          />
+          {/* Resumable, step-based voucher verification detail page — reached from the Service
+            Queue, the "Open Voucher" lookup, and the per-entitlement "Continue Verification"/
+            "View Record" links on Order Details. `voucherCode` (not the entitlement's id) is the
+            only identifier the voucher API accepts, is DB-unique and permanent. Gated
+            `vendor-portal.orders:custom` — the same action key the whole `vouchers.routes.ts`
+            router requires. */}
+          <Route
+            path="/account/vendor-orders/verify/:code"
+            element={
+              <RequirePermission menuKey="vendor-portal.orders" action="custom">
+                <VoucherVerificationPage />
+              </RequirePermission>
+            }
+          />
+          {/* Member-scoped, read-only Customer Detail page — Bug 2 fix (no member-scoped customer
+            page existed anywhere before this). Data comes from `GET /vendors/me/customers/:id`
+            (gated `vendors:custom` server-side); no status-change actions (a member can't edit a
+            customer). Reached from the Vendor Customers list and from a future "View Customer"
+            link on Order Details. */}
+          <Route
+            path="/account/vendor-customers/:customerId"
+            element={
+              <RequirePermission menuKey="vendor-portal.customers">
+                <VendorCustomerDetailPage />
+              </RequirePermission>
+            }
+          />
+          {/* "Earnings & Payouts" — repurposes the old "Payments" stub (see settlements.routes.ts
+            / accounts routing for the Super-Admin equivalent); read-only for the member, no
+            payout controls (those are super-admin-only, see member-settlement-detail.tsx). */}
+          <Route
+            path="/account/vendor-payments"
+            element={
+              <RequirePermission menuKey="vendor-portal.payments">
+                <EarningsPayouts />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/vendor-reports"
+            element={
+              <RequirePermission menuKey="vendor-portal.reports">
+                <AdminPage title="Reports" subtitle="Module coming soon." />
+              </RequirePermission>
+            }
+          />
+          {/* Accounts, Member Settlements & Purchase Verification (Super-Admin console) — see
+            packages/shared-menu/src/msd-menu.json's "accounts" group for the exact routes/
+            permissionKeys these mirror. */}
+          <Route
+            path="/account/accounts/overview"
+            element={
+              <RequirePermission menuKey="accounts.overview">
+                <AccountsOverviewPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/accounts/customer-payments"
+            element={
+              <RequirePermission menuKey="accounts.customer-payments">
+                <CustomerPaymentsPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/accounts/member-settlements"
+            element={
+              <RequirePermission menuKey="accounts.member-settlements">
+                <MemberSettlementsPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/accounts/member-settlements/:vendorId"
+            element={
+              <RequirePermission menuKey="accounts.member-settlements">
+                <MemberSettlementDetailPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/accounts/refunds-disputes"
+            element={
+              <RequirePermission menuKey="accounts.refunds-disputes">
+                <RefundsDisputesPage />
               </RequirePermission>
             }
           />
@@ -547,6 +760,18 @@ export function AppRoutes() {
               </RequirePermission>
             }
           />
+          {/* Order-wide Order Details — the same `OrderDetailPage` the customer-scoped route
+            above uses, just without that route's extra ownership check (see that component's
+            own doc comment). Reachable from the Orders list's "View" action and from a
+            "New Order Received" notification click-through. */}
+          <Route
+            path="/account/orders/:orderId"
+            element={
+              <OrderDetailRouteGuard>
+                <OrderDetailPage />
+              </OrderDetailRouteGuard>
+            }
+          />
           <Route
             path="/account/products"
             element={
@@ -571,6 +796,10 @@ export function AppRoutes() {
               </RequirePermission>
             }
           />
+          {/* The old `/account/payments` stub (permissionKey "payments") was removed — the
+            "accounts" menu group above replaced it, per the approved plan's RBAC wiring section
+            ("removes rather than duplicates it — nothing else references permissionKey:
+            'payments'"). */}
           {/* No RequirePermission wrapper — every authenticated console user (Vendor or Superadmin
             alike) is entitled to their own notification inbox regardless of RBAC permissions;
             deliberately not in shared-menu's sidebar either, reachable only via the header
@@ -635,10 +864,58 @@ export function AppRoutes() {
             }
           />
           <Route
+            path="/account/masters/home-hero/:state"
+            element={
+              <RequirePermission menuKey="masters.home-hero">
+                <HomeHeroBuilder />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/masters/home-tag-sections"
+            element={
+              <RequirePermission menuKey="masters.home-tag-sections">
+                <HomeTagSectionsManagement />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/masters/home-tag-sections/:state"
+            element={
+              <RequirePermission menuKey="masters.home-tag-sections">
+                <HomeTagSectionsStatePage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/masters/home-tag-sections/:state/:tag"
+            element={
+              <RequirePermission menuKey="masters.home-tag-sections">
+                <HomeTagSectionsBuilder />
+              </RequirePermission>
+            }
+          />
+          <Route
             path="/account/cms/blog"
             element={
               <RequirePermission menuKey="cms.blog.pages">
                 <BlogList />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/cms/blog/articles"
+            element={
+              <RequirePermission menuKey="cms.blog.articles">
+                <BlogList scope="articles" />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/cms/blog/articles/:id"
+            element={
+              <RequirePermission menuKey="cms.blog.articles">
+                <BlogDetailAdmin scope="articles" />
               </RequirePermission>
             }
           />
@@ -731,6 +1008,30 @@ export function AppRoutes() {
             }
           />
           <Route
+            path="/account/administration/users/:userId"
+            element={
+              <RequirePermission menuKey="rbac.users">
+                <UserDetailPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/administration/users/:userId/:section"
+            element={
+              <RequirePermission menuKey="rbac.users">
+                <UserDetailPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/administration/role-conflicts"
+            element={
+              <RequirePermission menuKey="rbac.users" action="assign">
+                <RoleConflictsPage />
+              </RequirePermission>
+            }
+          />
+          <Route
             path="/account/administration/audit-logs"
             element={
               <RequirePermission menuKey="rbac.audit-logs">
@@ -743,6 +1044,14 @@ export function AppRoutes() {
             element={
               <RequirePermission menuKey="settings">
                 <MyProfileSettings />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/system-settings"
+            element={
+              <RequirePermission menuKey="system-settings">
+                <SystemSettingsPage />
               </RequirePermission>
             }
           />

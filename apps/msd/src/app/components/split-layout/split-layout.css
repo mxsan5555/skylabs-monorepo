@@ -1,0 +1,29 @@
+/* Main + right column. 840px = M3 expanded; below it the aside stacks under the main column. */
+.split-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+.split-layout__main {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  min-inline-size: 0;
+}
+.split-layout__aside {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-inline-size: 0;
+}
+@media (min-width: 840px) {
+  .split-layout {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    gap: 48px;
+  }
+  .split-layout__aside {
+    position: sticky;
+    inset-block-start: calc(var(--site-header-top-size) + 32px);
+  }
+}

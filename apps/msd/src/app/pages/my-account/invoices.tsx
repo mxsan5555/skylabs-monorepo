@@ -4,7 +4,10 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { listMyOrders, type Order } from '../../../api/orders';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { formatINR } from '../../../utils/format';
-import '../category/category.css';
+import { SectionHead } from '../../components/section-head/section-head';
+import content from '../../../content.json';
+
+const t = content.invoices;
 
 /** Invoices — every order the customer has placed, each linking to its real, printable invoice
  *  at `/orders/:id/invoice` (see `pages/invoice/invoice.tsx`). Same "zero new backend work,
@@ -20,7 +23,7 @@ export function MyAccountInvoices() {
     setError('');
     listMyOrders(token, { pageSize: 100 })
       .then(({ data }) => setOrders(data))
-      .catch((err) => setError(err instanceof ApiRequestError ? err.message : 'Could not load your invoices.'))
+      .catch((err) => setError(err instanceof ApiRequestError ? err.message : t.errors.load))
       .finally(() => setLoading(false));
   }, [token]);
 
@@ -29,51 +32,38 @@ export function MyAccountInvoices() {
   }, [load]);
 
   return (
-    <div className="category-page">
-      <title>Invoices | MSD</title>
+    <>
+      <title>{t.metaTitle}</title>
       <meta name="robots" content="noindex" />
-
-      <header className="category-page__hero">
-        <div className="category-page__hero-inner">
-          <div>
-            <h1 className="category-page__title">Invoices</h1>
-            <p className="category-page__subtitle">Every order you've placed, most recent first.</p>
-          </div>
+      <SectionHead as="h1" id="invoices-heading" heading={t.title} subheading={t.subtitle} />
+      {loading ? (
+        <p className="loading-state" role="status">{t.loading}</p>
+      ) : error ? (
+        <p className="error-state" role="alert">{error}</p>
+      ) : orders.length === 0 ? (
+        <div className="empty-state">
+          <sky-info-card icon="receipt_long" heading={t.empty.title} subheading={t.empty.description} />
         </div>
-      </header>
-
-      <section className="category-page__grid-wrap">
-        <div className="category-page__grid-inner">
-          {loading ? (
-            <p className="loading-state">Loading invoices…</p>
-          ) : error ? (
-            <p className="error-state" role="alert">{error}</p>
-          ) : orders.length === 0 ? (
-            <div className="category-page__empty">
-              <sky-info-card icon="receipt_long" heading="No invoices yet" subheading="Orders you place will show up here." />
-            </div>
-          ) : (
-            <ul className="entity-list">
-              {orders.map((order) => (
-                <li key={order.id}>
-                  <div className="entity-list__item">
-                    <span className="role-list__name">
-                      {order.vendorNameSnapshot}
-                      <span className="field-hint">
-                        {' '}
-                        · {formatINR(Number(order.total))} · {new Date(order.createdAt).toLocaleDateString()}
-                      </span>
-                    </span>
-                    <span className="status-pill status-pill--active">{order.status}</span>
-                  </div>
-                  <Link to={`/orders/${order.id}/invoice`} className="field-hint">View invoice →</Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </section>
-    </div>
+      ) : (
+        <ul className="entity-list">
+          {orders.map((order) => (
+            <li key={order.id}>
+              <div className="entity-list__item">
+                <span className="role-list__name">
+                  {order.vendorNameSnapshot}
+                  <span className="field-hint">
+                    {' '}
+                    · {formatINR(Number(order.total))} · {new Date(order.createdAt).toLocaleDateString()}
+                  </span>
+                </span>
+                <span className="status-pill status-pill--active">{order.status}</span>
+              </div>
+              <Link to={`/orders/${order.id}/invoice`} className="field-hint">{t.viewInvoice}</Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 }
 

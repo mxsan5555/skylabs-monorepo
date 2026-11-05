@@ -1,8 +1,9 @@
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ToastProvider } from '../../../../toast/toast-context';
+import { SnackbarHost } from '../../../../snackbar/snackbar';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import type { CareersJobListing, CareersPageContent } from '../../../../api/rbac/careers';
+import { CareersPage } from './careers';
 
 let grantedPermissions: Set<string>;
 
@@ -35,7 +36,6 @@ vi.mock('../../../../api/rbac/careers', async () => {
   };
 });
 
-import { CareersPage } from './careers';
 
 const CONTENT: CareersPageContent = {
   id: 'singleton',
@@ -65,9 +65,10 @@ const JOB: CareersJobListing = {
 
 function renderPage() {
   return render(
-    <ToastProvider>
+    <>
       <CareersPage />
-    </ToastProvider>,
+      <SnackbarHost />
+    </>,
   );
 }
 
@@ -156,7 +157,7 @@ describe('CareersPage', () => {
     expect(screen.getByText(/Last saved/)).toBeTruthy();
   });
 
-  it('Save intro calls updateCareersContent and shows a success toast', async () => {
+  it('Save intro calls updateCareersContent and shows a success snackbar', async () => {
     updateCareersContentMock.mockResolvedValue({ data: CONTENT });
     renderPage();
     await waitForTableLoaded(1);

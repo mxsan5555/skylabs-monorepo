@@ -12,7 +12,15 @@
     },
     {
       "files": ["*.ts", "*.tsx"],
-      "rules": {}
+      "rules": {
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "Identifier[name=/^(useToast|showToast|ToastProvider)$/]",
+            "message": "The React toast was removed. Show messages with showSnackbar() from snackbar/snackbar, which drives the app's <sky-snackbar>."
+          }
+        ]
+      }
     },
     {
       "files": ["*.js", "*.jsx"],

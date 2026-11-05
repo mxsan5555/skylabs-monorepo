@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
+import { parseOtpProvider, productionEnvProblems } from './env-checks';
 
 // Loaded once, first thing, before any other module reads process.env.
 // apps/msd-api/.env.local is never committed (see .gitignore); .env.example documents the shape.
@@ -8,16 +9,20 @@ import * as dotenv from 'dotenv';
 // This intentionally does NOT rely on `__dirname` alone: under the Nx/webpack production
 // build everything is bundled into a single dist/apps/msd-api/main.js, which changes
 // __dirname's depth relative to the source tree. Try a couple of likely locations instead,
-// and never override already-set process.env vars (real deploys inject secrets via the
-// platform/CI, not this file — see .env.example).
+// In local development the selected env file is authoritative, so an inherited DATABASE_URL
+// cannot silently point the API at another database. Production skips these files and uses
+// platform-injected secrets.
 if (process.env.NODE_ENV !== 'production') {
   const candidates = [
     path.join(__dirname, '../../.env.local'), // unbundled dev (src/config -> apps/msd-api)
+    path.join(__dirname, '../../.env'), // fallback for checked-in local dev env files
     path.join(process.cwd(), 'apps/msd-api/.env.local'), // run from workspace root
+    path.join(process.cwd(), 'apps/msd-api/.env'), // run from workspace root with fallback file
     path.join(process.cwd(), '.env.local'), // run from apps/msd-api itself
+    path.join(process.cwd(), '.env'), // run from apps/msd-api itself with fallback file
   ];
   const envFile = candidates.find((p) => fs.existsSync(p));
-  if (envFile) dotenv.config({ path: envFile });
+  if (envFile) dotenv.config({ path: envFile, override: true });
 }
 
 function required(name: string, fallback?: string): string {
@@ -35,6 +40,11 @@ function optionalInt(name: string, fallback: number): number {
   return Number.isNaN(parsed) ? fallback : parsed;
 }
 
+function envString(name: string, fallback = ''): string {
+  const value = process.env[name];
+  return value === undefined ? fallback : value;
+}
+
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: optionalInt('PORT', 3333),
@@ -43,14 +53,100 @@ export const env = {
 
   jwtSecret: required('JWT_SECRET'),
   jwtAccessTtlMinutes: optionalInt('JWT_ACCESS_TTL_MINUTES', 15),
-  jwtRefreshTtlDays: optionalInt('JWT_REFRESH_TTL_DAYS', 30),
+  /** Rolling session length: every successful refresh re-issues a new session for this long
+   *  from "now" (see token.service.ts#rotateRefreshToken calling issueRefreshSession again),
+   *  so a user active at least once every 60 days never has to re-enter an OTP. */
+  jwtRefreshTtlDays: optionalInt('JWT_REFRESH_TTL_DAYS', 60),
 
   otpExpiryMinutes: optionalInt('OTP_EXPIRY_MINUTES', 10),
   otpMaxAttempts: optionalInt('OTP_MAX_ATTEMPTS', 5),
+  get otpProvider() {
+    return parseOtpProvider(process.env.OTP_PROVIDER);
+  },
+  set otpProvider(value: string) {
+    process.env.OTP_PROVIDER = String(value).trim();
+  },
+  get adminLoginOtp() {
+    return envString('ADMIN_LOGIN_OTP');
+  },
+  set adminLoginOtp(value: string) {
+    if (value === undefined || value === null || value === '') delete process.env.ADMIN_LOGIN_OTP;
+    else process.env.ADMIN_LOGIN_OTP = String(value);
+  },
+  get memberLoginOtp() {
+    return envString('MEMBER_LOGIN_OTP');
+  },
+  set memberLoginOtp(value: string) {
+    if (value === undefined || value === null || value === '') delete process.env.MEMBER_LOGIN_OTP;
+    else process.env.MEMBER_LOGIN_OTP = String(value);
+  },
+  get salesLoginOtp() {
+    return envString('SALES_LOGIN_OTP');
+  },
+  set salesLoginOtp(value: string) {
+    if (value === undefined || value === null || value === '') delete process.env.SALES_LOGIN_OTP;
+    else process.env.SALES_LOGIN_OTP = String(value);
+  },
+  get marketingLoginOtp() {
+    return envString('MARKETING_LOGIN_OTP');
+  },
+  set marketingLoginOtp(value: string) {
+    if (value === undefined || value === null || value === '') delete process.env.MARKETING_LOGIN_OTP;
+    else process.env.MARKETING_LOGIN_OTP = String(value);
+  },
+  get supportLoginOtp() {
+    return envString('SUPPORT_LOGIN_OTP');
+  },
+  set supportLoginOtp(value: string) {
+    if (value === undefined || value === null || value === '') delete process.env.SUPPORT_LOGIN_OTP;
+    else process.env.SUPPORT_LOGIN_OTP = String(value);
+  },
+  get superAdminLoginMobile() {
+    return envString('SUPERADMIN_LOGIN_MOBILE');
+  },
+  set superAdminLoginMobile(value: string) {
+    if (value === undefined || value === null || value === '') delete process.env.SUPERADMIN_LOGIN_MOBILE;
+    else process.env.SUPERADMIN_LOGIN_MOBILE = String(value);
+  },
+  get superAdminLoginOtp() {
+    return envString('SUPERADMIN_LOGIN_OTP');
+  },
+  set superAdminLoginOtp(value: string) {
+    if (value === undefined || value === null || value === '') delete process.env.SUPERADMIN_LOGIN_OTP;
+    else process.env.SUPERADMIN_LOGIN_OTP = String(value);
+  },
   otpRequestRateLimitPer10Min: optionalInt('OTP_REQUEST_RATE_LIMIT_PER_10_MIN', 5),
+  /** OTP sends per identifier per hour, from any IP (stops IP rotation buying fresh codes). */
+  otpIdentifierRateLimitPerHour: optionalInt('OTP_IDENTIFIER_RATE_LIMIT_PER_HOUR', 10),
+  /** Local test contacts whose order notices are written to the console instead of delivered. */
+  devOtpIdentifiers: (process.env.DEV_OTP_IDENTIFIERS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+  /** Proxies in front of the API (Railway: 1). 0 locally, so a client cannot fake its IP. */
+  trustProxyHops: optionalInt('TRUST_PROXY_HOPS', 0),
+  /** Swagger UI at /docs: on outside production, off in production unless API_DOCS=true. */
+  apiDocsEnabled: process.env.API_DOCS === 'true' || process.env.NODE_ENV !== 'production',
+  /** One JSON log line per request (P2-10). On outside tests unless REQUEST_LOGGING=false. */
+  requestLogging: process.env.REQUEST_LOGGING ? process.env.REQUEST_LOGGING === 'true' : process.env.NODE_ENV !== 'test',
 
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? '',
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
+  /** Shown to a suspended member so they know how to get their account back. */
+  supportEmail: process.env.SUPPORT_EMAIL ?? '',
+  supportPhone: process.env.SUPPORT_PHONE ?? '',
+  /** 32 bytes, base64. Encrypts full Aadhaar and PAN numbers at rest. Optional in development. */
+  fieldEncryptionKey: process.env.FIELD_ENCRYPTION_KEY ?? '',
+  /** The storefront's public origin, for links in customer emails (order page). Defaults to the
+   *  first CORS origin, which is the storefront in every environment we run. */
+  publicSiteUrl: (process.env.PUBLIC_SITE_URL ?? '').trim().replace(/\/$/, ''),
+  /** D38: an order SMS goes out only when its DLT template id is set; email always goes. */
+  smsDltTemplateOrderConfirmed: process.env.SMS_DLT_TEMPLATE_ORDER_CONFIRMED ?? '',
+  smsDltTemplatePaymentFailed: process.env.SMS_DLT_TEMPLATE_PAYMENT_FAILED ?? '',
+  /** Shared with the Railway cron service; guards `/internal/jobs/*`. Unset disables the jobs (503). */
+  cronSecret: process.env.CRON_SECRET ?? '',
+  /** Secret mixed into the document number hash used for the duplicate check. */
+  docHashPepper: process.env.DOC_HASH_PEPPER ?? '',
   googleCallbackUrl:
     process.env.GOOGLE_CALLBACK_URL ?? 'http://localhost:3333/api/v1/auth/google/callback',
 
@@ -89,5 +185,14 @@ export const env = {
   r2AccessKeyId: process.env.R2_ACCESS_KEY_ID ?? '',
   r2SecretAccessKey: process.env.R2_SECRET_ACCESS_KEY ?? '',
   r2Bucket: process.env.R2_BUCKET ?? '',
+  /** Private bucket for member KYC documents (no public access). Uploads fail until it is set. */
+  r2PrivateBucket: process.env.R2_PRIVATE_BUCKET ?? '',
   r2PublicUrl: process.env.R2_PUBLIC_URL ?? '',
 };
+
+// P2-09: production fails fast on weak or missing security settings instead of starting with
+// them. The message names the variables only, never their values.
+if (env.nodeEnv === 'production') {
+  const problems = productionEnvProblems(process.env);
+  if (problems.length > 0) throw new Error(`Unsafe production environment: ${problems.join('; ')}`);
+}

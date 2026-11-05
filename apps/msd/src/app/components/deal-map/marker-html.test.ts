@@ -8,4 +8,9 @@ describe('markerHtml', () => {
       '<a class="deal-map__marker label-large" href="/deal/1" aria-label="Spa &lt;b&gt;&amp;&lt;/b&gt; &quot;Co&quot;, ₹999">₹999</a>',
     );
   });
+
+  it('renders plain escaped text, not a link, for a point without href (single-branch map)', () => {
+    const html = markerHtml({ id: 'b1', lat: 0, lng: 0, label: 'Spa & Co', title: 'Spa & Co' });
+    expect(html).toBe('<span class="deal-map__marker deal-map__marker--static label-large">Spa &amp; Co</span>');
+  });
 });

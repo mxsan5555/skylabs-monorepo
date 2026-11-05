@@ -13,13 +13,18 @@ const REQUIRED_ENV: Array<[name: string, value: string]> = [
   ['SMS_SENDER', env.smsSender],
 ];
 
+/** Configuration check for authentication to fail clearly before persisting an unusable challenge. */
+export function missingOtpConfiguration(): string[] {
+  return REQUIRED_ENV.filter(([, value]) => !value).map(([name]) => name);
+}
+
 /**
  * Sends an OTP SMS via ConnectExpress. Returns `true` only once the provider's response
  * indicates success; every attempt (success or failure) is logged with the provider's raw
  * response so delivery issues are diagnosable without reproducing the call.
  */
 export async function sendOtp(phone: string, otp: string): Promise<boolean> {
-  const missing = REQUIRED_ENV.filter(([, value]) => !value).map(([name]) => name);
+  const missing = missingOtpConfiguration();
   if (missing.length > 0) {
     console.error(`[sms:connectExpress] cannot send — missing env var(s): ${missing.join(', ')}`);
     return false;
@@ -97,5 +102,29 @@ function safeStringify(data: unknown): string {
     return JSON.stringify(data);
   } catch {
     return String(data);
+  }
+}
+
+/**
+ * Sends a free text SMS. Production senders must have this text registered as a DLT template
+ * with the provider, otherwise the carrier drops it. Returns true only on provider success.
+ */
+export async function sendTextSms(phone: string, message: string): Promise<boolean> {
+  const missing = REQUIRED_ENV.filter(([, value]) => !value).map(([name]) => name);
+  if (missing.length > 0) {
+    console.error(`[sms:connectExpress] cannot send, missing env var(s): ${missing.join(', ')}`);
+    return false;
+  }
+  try {
+    const response = await axios.get(env.smsApiUrl, {
+      params: { method: 'sms', api_key: env.smsApiKey, to: phone, sender: env.smsSender, unicode: 'auto', message, format: 'json' },
+      timeout: 10_000,
+    });
+    const ok = isProviderSuccess(response.data);
+    console.info(`[sms:connectExpress] ${ok ? 'sent' : 'send reported failure'} to=${maskPhone(phone)} response=${safeStringify(response.data)}`);
+    return ok;
+  } catch (err) {
+    console.error(`[sms:connectExpress] request FAILED to=${maskPhone(phone)} error=${(err as Error).message}`);
+    return false;
   }
 }

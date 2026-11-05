@@ -7,3 +7,16 @@
   transform: translateX(-50%);
   --md-filled-button-container-height: 44px;
 }
+
+/* Address autocomplete suggestions — a floating panel under the field it belongs to. */
+.rider-suggestions {
+  position: relative;
+  z-index: 10;
+  margin: 4px 0 8px;
+  max-height: 240px;
+  overflow-y: auto;
+  border-radius: 12px;
+  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  background: var(--md-sys-color-surface, #fff);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.12);
+}

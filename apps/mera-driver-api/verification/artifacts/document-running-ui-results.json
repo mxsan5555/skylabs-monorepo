@@ -1,0 +1,16 @@
+{
+  "realUi": true,
+  "mockedApi": false,
+  "mutations": false,
+  "authentication": "signed existing-user session fixture; actual login not tested",
+  "passed": [
+    "empty initial selection",
+    "current selection retained",
+    "unsaved selection excluded from second row",
+    "new row placeholder",
+    "unsaved deletion restores type",
+    "health, police and personal sections reserve unsaved types",
+    "real linked driver portal excludes saved active types"
+  ],
+  "pageErrors": []
+}

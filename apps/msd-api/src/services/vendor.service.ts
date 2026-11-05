@@ -3,31 +3,31 @@ import type { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
 import { ensureUniqueSlug } from '../lib/slug';
+import { sanitizeRichText } from '../lib/rich-text';
 import { resolveGoogleMapsLocation } from '../providers/maps/googleMapsUrlResolver.provider';
-import { assignRole, serializeUser } from './user.service';
-import {
-  listActiveCategories,
-  assertCategoryChildOf,
-  assertVendorHasCategoryAccess,
-  assertBranchHasCategoryAccess,
-  assertBranchHasSubcategoryAccess,
-  assertBranchHasAnyCategoryAccessOfType,
-} from './category.service';
+import { replaceUserRole, serializeUser } from './user.service';
+import { listActiveCategories, assertCategoryOfType } from './category.service';
 import { getProductScopedOrThrow } from './product.service';
 import * as mediaService from './media.service';
 import type { MediaFile } from './media.service';
-import * as notificationService from './notification.service';
-import { Prisma, type CategoryType, type VendorStatus, type KycStatus, type DealStatus, type DealApprovalStatus } from '../generated/prisma-client';
+import { documentsSummary } from './member-document.service';
+import { documentsDueAt } from './member-reminder-policy';
+import { sendMemberNotice } from './member-notice.service';
+import { ROLE_KEYS } from '../lib/role-keys';
+import {
+  Prisma,
+  type OrderStatus,
+  type MemberStatus,
+  type MemberDocumentStatus,
+  type KycStatus,
+} from '../generated/prisma-client';
 import type {
   VendorCreateSchema,
   VendorUpdateSchema,
-  VendorSelfCreateSchema,
+  MemberCreateSchema,
   VendorSelfUpdateSchema,
   BranchCreateSchema,
   BranchUpdateSchema,
-  BranchCategoryAccessInputSchema,
-  DealCreateSchema,
-  DealUpdateSchema,
   TherapistCreateSchema,
   TherapistUpdateSchema,
   TherapistPackageCreateSchema,
@@ -36,13 +36,10 @@ import type {
 
 type VendorCreateInput = z.infer<typeof VendorCreateSchema>;
 type VendorUpdateInput = z.infer<typeof VendorUpdateSchema>;
-type VendorSelfCreateInput = z.infer<typeof VendorSelfCreateSchema>;
+type MemberCreateInput = z.infer<typeof MemberCreateSchema>;
 type VendorSelfUpdateInput = z.infer<typeof VendorSelfUpdateSchema>;
 type BranchCreateInput = z.infer<typeof BranchCreateSchema>;
 type BranchUpdateInput = z.infer<typeof BranchUpdateSchema>;
-type BranchCategoryAccessInput = z.infer<typeof BranchCategoryAccessInputSchema>;
-type DealCreateInput = z.infer<typeof DealCreateSchema>;
-type DealUpdateInput = z.infer<typeof DealUpdateSchema>;
 type TherapistCreateInput = z.infer<typeof TherapistCreateSchema>;
 type TherapistUpdateInput = z.infer<typeof TherapistUpdateSchema>;
 type TherapistPackageCreateInput = z.infer<typeof TherapistPackageCreateSchema>;
@@ -103,12 +100,16 @@ const VENDOR_IMAGE_ORDER_BY: Prisma.VendorImageOrderByWithRelationInput[] = [
   { isPrimary: 'desc' },
   { sortOrder: 'asc' },
 ];
-/** Shared by every Vendor read/write include below — `getVendorByOwnerUserId`/`createSelfVendor`/
+/** Shared by every Vendor read/write include below — `getVendorByOwnerUserId`/
  *  `updateSelfVendor` used to each have their own bespoke include (or none at all), which is
  *  exactly the kind of per-endpoint drift that silently left a media include out of one read
  *  path in an earlier round of this same work (see `listDeals`'s equivalent gap) — one shared
  *  const here instead. */
-const VENDOR_MEDIA_INCLUDE = { mediaImages: { orderBy: VENDOR_IMAGE_ORDER_BY }, mediaVideo: true, documents: true } as const;
+/** Documents carry only what `documentsSummary` and `computeProfileCompletion` read. Hash,
+ *  ciphertext, masked number, storage key and filename never ride along on a member response;
+ *  the documents endpoints serve those to viewers allowed to see them. */
+const SAFE_DOCUMENT_SELECT = { select: { id: true, documentType: true, status: true } } as const;
+const VENDOR_MEDIA_INCLUDE = { mediaImages: { orderBy: VENDOR_IMAGE_ORDER_BY }, mediaVideo: true, documents: SAFE_DOCUMENT_SELECT } as const;
 
 /** Standard `include` for any Vendor read/write that should carry its linked-owner summary + branch count. */
 const OWNER_INCLUDE = { _count: { select: { branches: true, deals: true, products: true, therapists: true } }, owner: OWNER_SUMMARY_SELECT, ...VENDOR_MEDIA_INCLUDE } as const;
@@ -132,7 +133,7 @@ export async function attachLiveCounts<T extends { id: string }>(vendors: T[]): 
   const vendorId = { in: vendors.map((v) => v.id) };
   const [branches, deals, products, therapists] = await Promise.all([
     prisma.branch.groupBy({ by: ['vendorId'], where: { vendorId, isActive: true }, _count: { _all: true } }),
-    prisma.deal.groupBy({ by: ['vendorId'], where: { vendorId, status: 'ACTIVE', approvalStatus: 'APPROVED' }, _count: { _all: true } }),
+    prisma.deal.groupBy({ by: ['vendorId'], where: { vendorId, status: 'ACTIVE' }, _count: { _all: true } }),
     prisma.product.groupBy({ by: ['vendorId'], where: { vendorId, isActive: true }, _count: { _all: true } }),
     prisma.therapist.groupBy({ by: ['vendorId'], where: { vendorId, isActive: true }, _count: { _all: true } }),
   ]);
@@ -150,9 +151,22 @@ export async function attachLiveCounts<T extends { id: string }>(vendors: T[]): 
   }));
 }
 
-function heuristicInitialStatus(input: { gstNumber?: string; panNumber?: string }): VendorStatus {
-  return input.gstNumber && input.panNumber ? 'PENDING_VERIFICATION' : 'PROFILE_INCOMPLETE';
+/** Resolves `createdByUserId` to the creator's display name for the list/detail responses —
+ *  one batched `User` lookup for the whole page (same spirit as `attachLiveCounts`), not a
+ *  per-row join. Self-registered vendors (`createdByUserId: null`) and any historical row whose
+ *  creator User no longer resolves both come back as `createdByName: null`; the frontend shows
+ *  "Not recorded" rather than inventing a creator. */
+export async function attachCreatorNames<T extends { createdByUserId: string | null }>(
+  vendors: T[],
+): Promise<(T & { createdByName: string | null })[]> {
+  const ids = [...new Set(vendors.map((v) => v.createdByUserId).filter((id): id is string => Boolean(id)))];
+  const creators = ids.length
+    ? await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } })
+    : [];
+  const nameById = new Map(creators.map((c) => [c.id, c.name]));
+  return vendors.map((v) => ({ ...v, createdByName: v.createdByUserId ? nameById.get(v.createdByUserId) ?? null : null }));
 }
+
 
 interface RawOwner {
   id: string;
@@ -166,10 +180,20 @@ interface RawOwner {
 /** Flattens `owner.roles` from Prisma's join shape (`[{ role: {...} }]`) to `[{...}]` —
  *  matches the shape `userService.listUsers`/`serializeUser` already returns, so the
  *  frontend's "Vendor Account" display and "select existing user" search share one type. */
-function serializeVendor<T extends { owner: RawOwner | null }>(vendor: T) {
+type SafeDocument = { id: string; documentType: string; status: string };
+
+/** Rebuilds `documents` from picked fields, so a row that carries more than the select (a
+ *  future include change, a test double) still never leaks a secret column. */
+function withSafeDocuments<T extends { documents?: SafeDocument[] }>(vendor: T): T {
+  if (!vendor.documents) return vendor;
+  return { ...vendor, documents: vendor.documents.map((d) => ({ id: d.id, documentType: d.documentType, status: d.status })) };
+}
+
+function serializeVendor<T extends { owner: RawOwner | null; documents?: SafeDocument[]; documentsDueAt?: Date | null }>(vendor: T) {
   return {
-    ...vendor,
+    ...withSafeDocuments(vendor),
     owner: vendor.owner ? { ...vendor.owner, roles: vendor.owner.roles.map((r) => r.role) } : null,
+    documentsSummary: documentsSummary(vendor.documents ?? [], vendor.documentsDueAt ?? null),
   };
 }
 
@@ -179,63 +203,67 @@ export async function listVendors(opts: {
   page: number;
   pageSize: number;
   search?: string;
-  status?: VendorStatus;
+  status?: MemberStatus;
+  documents?: 'incomplete';
+  reviewFlag?: 'true';
+  sort?: 'businessName' | 'status' | 'documentsDueAt';
+  dir?: 'asc' | 'desc';
 }) {
-  const where = {
-    ...(opts.status ? { status: opts.status } : {}),
+  const providedStatuses: MemberDocumentStatus[] = ['SUBMITTED', 'APPROVED'];
+  const where: Prisma.MemberWhereInput = {
+    // Archived (deleted) members only show when asked for, so they can be found and restored.
+    status: opts.status ?? { not: 'ARCHIVED' },
+    ...(opts.reviewFlag ? { reviewFlaggedAt: { not: null } } : {}),
+    ...(opts.documents === 'incomplete'
+      ? {
+          OR: (['AADHAAR', 'PAN', 'GST'] as const).map((documentType) => ({
+            documents: { none: { documentType, status: { in: providedStatuses } } },
+          })),
+        }
+      : {}),
     ...(opts.search
       ? {
-          OR: [
-            { businessName: { contains: opts.search, mode: 'insensitive' as const } },
-            { businessEmail: { contains: opts.search, mode: 'insensitive' as const } },
+          AND: [
+            {
+              OR: [
+                { businessName: { contains: opts.search, mode: 'insensitive' as const } },
+                { businessEmail: { contains: opts.search, mode: 'insensitive' as const } },
+                { ownerMobile: { contains: opts.search } },
+              ],
+            },
           ],
         }
       : {}),
   };
+  // `id` breaks ties so paging stays stable when many rows share a status or due date.
+  const orderBy: Prisma.MemberOrderByWithRelationInput[] = opts.sort
+    ? [{ [opts.sort]: opts.dir ?? 'asc' }, { id: 'asc' }]
+    : [{ createdAt: 'desc' }];
   const [items, total] = await Promise.all([
-    prisma.vendor.findMany({
+    prisma.member.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy,
       skip: (opts.page - 1) * opts.pageSize,
       take: opts.pageSize,
       include: OWNER_INCLUDE,
     }),
-    prisma.vendor.count({ where }),
+    prisma.member.count({ where }),
   ]);
   return { items: items.map(serializeVendor), total };
 }
 
 export async function getVendorOrThrow(id: string) {
-  const vendor = await prisma.vendor.findUnique({ where: { id }, include: OWNER_INCLUDE });
+  const vendor = await prisma.member.findUnique({ where: { id }, include: OWNER_INCLUDE });
   if (!vendor) throw new ApiError('NOT_FOUND', 'Vendor not found');
   return serializeVendor(vendor);
 }
 
-/**
- * Validates a User is a legitimate link target for a Vendor: exists (and isn't soft-deleted),
- * is active, and doesn't already own a different vendor profile. `excludeVendorId` lets
- * `updateVendor` re-save a vendor's own existing `ownerUserId` without tripping the
- * already-owns-a-vendor check against itself.
- */
-async function assertOwnerUserAvailable(ownerUserId: string | undefined, excludeVendorId?: string) {
-  if (!ownerUserId) return;
-  const user = await prisma.user.findFirst({ where: { id: ownerUserId, deletedAt: null } });
-  if (!user) throw new ApiError('VALIDATION_ERROR', 'Selected user does not exist');
-  if (user.status !== 'active') {
-    throw new ApiError('VALIDATION_ERROR', 'Selected user is not eligible to become a vendor (inactive or blocked)');
-  }
-  const existing = await prisma.vendor.findUnique({ where: { ownerUserId } });
-  if (existing && existing.id !== excludeVendorId) {
-    throw new ApiError('CONFLICT', 'This user is already associated with a vendor');
-  }
-}
-
-/** Grants the existing `vendor` role to a newly-linked owner, preserving whatever roles they
- *  already had — idempotent (upsert), and the only way a User gains vendor-portal access. */
+/** Sets the `member` role on a newly-linked owner (single-role model, see `replaceUserRole`);
+ *  the only way a User gains vendor-portal access. */
 async function ensureVendorRoleAssigned(userId: string) {
-  const vendorRole = await prisma.role.findUnique({ where: { key: 'vendor' } });
+  const vendorRole = await prisma.role.findUnique({ where: { key: ROLE_KEYS.member } });
   if (!vendorRole) return; // defensive — seed.ts always creates the six system roles
-  await assignRole(userId, vendorRole.id);
+  await replaceUserRole(userId, vendorRole.id);
 }
 
 /**
@@ -296,7 +324,14 @@ export async function createVendorOwner(email: string | undefined, phone: string
     phone ? prisma.user.findFirst({ where: { phone, deletedAt: null }, select: { id: true } }) : Promise.resolve(null),
   ]);
   if (byEmail || byPhone) {
-    throw new ApiError('CONFLICT', 'A user with this email or phone already exists. Please use a different email/phone to create this Vendor.');
+    const conflicts: ('email' | 'phone')[] = [];
+    if (byEmail) conflicts.push('email');
+    if (byPhone) conflicts.push('phone');
+    throw new ApiError(
+      'CONFLICT',
+      'A user with this email or phone already exists. Please use a different email/phone to create this Vendor.',
+      { conflicts },
+    );
   }
   const created = await prisma.user.create({
     data: { name: name?.trim() || email || phone!, email: email || undefined, phone: phone || undefined },
@@ -337,28 +372,30 @@ export async function searchEligibleOwnerCandidates(query: string | undefined, p
     }),
     prisma.user.count({ where }),
   ]);
-  return { items: items.map(serializeUser), total };
+  return { items: items.map((user) => serializeUser(user)), total };
 }
 
 /**
- * The actual DB insert, factored out of `createVendor` so the new `registerPublicVendor` below
- * can reuse it verbatim rather than re-implementing slug/map-location resolution. Generates the
- * id up front (rather than relying on the schema's `@default(uuid())`) so it's available as
- * `ensureUniqueSlug`'s id-based fallback/placeholder in the same insert — see that function's
- * doc comment for why a plain businessName-derived slug isn't always enough.
+ * The actual DB insert, shared by `createVendor` and `createMember` so slug and map-location
+ * resolution live in one place. Generates the id up front (rather than relying on the schema's
+ * `@default(uuid())`) so it's available as `ensureUniqueSlug`'s id-based fallback/placeholder in
+ * the same insert. Starts the 14 day documents timer. `db` lets `createMember` run the insert
+ * inside its own transaction.
  */
 async function buildAndInsertVendor(
-  input: VendorCreateInput | VendorSelfCreateInput,
+  input: VendorCreateInput,
   ownerUserId: string | undefined,
   createdByUserId: string | null,
-  status: VendorStatus,
+  status: MemberStatus,
+  db: Prisma.TransactionClient = prisma,
 ) {
   const id = randomUUID();
   const slug = await ensureUniqueSlug(input.businessName || id, id, (candidate) =>
-    prisma.vendor.findUnique({ where: { slug: candidate } }).then(Boolean),
+    db.member.findUnique({ where: { slug: candidate } }).then(Boolean),
   );
   const mapLocation = await resolveMapLocationForCreate(input.mapLocationUrl);
-  const vendor = await prisma.vendor.create({
+  const now = Date.now();
+  const vendor = await db.member.create({
     data: {
       ...input,
       ...mapLocation,
@@ -367,7 +404,9 @@ async function buildAndInsertVendor(
       ownerUserId,
       status,
       createdByUserId,
-    } as Prisma.VendorUncheckedCreateInput,
+      statusChangedAt: new Date(now),
+      documentsDueAt: documentsDueAt(new Date(now)),
+    } as Prisma.MemberUncheckedCreateInput,
     include: OWNER_INCLUDE,
   });
   return serializeVendor(vendor);
@@ -376,10 +415,8 @@ async function buildAndInsertVendor(
 /**
  * Vendor creation ALWAYS creates a brand-new owner User — there is no "pick an existing user"
  * path here at all (see `createVendorOwner`'s own doc comment for why). A client-supplied
- * `input.ownerUserId` is deliberately never read/honored by this function — `VendorCreateSchema`
- * still declares the field only because `VendorUpdateSchema` (`VendorCreateSchema.partial()`)
- * needs it for `updateVendor`'s own, separate, pre-existing re-link-on-edit capability, which
- * this correction doesn't touch.
+ * `input.ownerUserId` is deliberately never read/honored by this function, and the admin update
+ * schema rejects it, so an owner is never re-linked.
  */
 export async function createVendor(input: VendorCreateInput, createdByUserId: string) {
   // Double-submit guard — only short-circuits a genuine resubmission of the SAME payload within
@@ -393,7 +430,7 @@ export async function createVendor(input: VendorCreateInput, createdByUserId: st
   // mobile) was silently discarded and the FIRST vendor was returned instead, before
   // `createVendorOwner`'s own conflict check ever ran. So a duplicate-owner submission never
   // surfaced its intended 409 — it just silently handed back an unrelated vendor.
-  const recentDuplicate = await prisma.vendor.findFirst({
+  const recentDuplicate = await prisma.member.findFirst({
     where: {
       createdByUserId,
       businessName: input.businessName ?? null,
@@ -419,49 +456,183 @@ export async function createVendor(input: VendorCreateInput, createdByUserId: st
     await ensureVendorRoleAssigned(ownerUserId);
   }
 
-  return buildAndInsertVendor(input, ownerUserId, createdByUserId, heuristicInitialStatus(input));
+  return buildAndInsertVendor(input, ownerUserId, createdByUserId, 'ACTIVE');
+}
+
+const EMAIL_TAKEN = 'This email already belongs to another account.';
+const MOBILE_TAKEN = 'This mobile number already belongs to another account.';
+const OWNER_CONFLICT = 'A user with this email or mobile number already exists.';
+
+/** Maps a User unique-constraint race (P2002 on email or phone) to the same field-specific 409. */
+function ownerConflictFromP2002(err: unknown): ApiError | null {
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') return null;
+  const target = err.meta?.target;
+  const targets = Array.isArray(target) ? target.map(String) : typeof target === 'string' ? [target] : [];
+  const fields: Record<string, string> = {};
+  if (targets.some((t) => t.includes('email'))) fields.ownerEmail = EMAIL_TAKEN;
+  if (targets.some((t) => t.includes('phone'))) fields.ownerMobile = MOBILE_TAKEN;
+  if (Object.keys(fields).length === 0) return null;
+  return new ApiError('CONFLICT', OWNER_CONFLICT, { fields });
 }
 
 /**
- * The public, unauthenticated "Become a Vendor" registration (`POST /vendors/public/register`,
- * its own router with no `authenticate` — see that route file's own doc comment). Input is the
- * existing `VendorSelfCreateSchema` shape, which structurally has no `ownerUserId`/status/role/
- * branch/category-access fields — there is nothing privileged for an anonymous caller to send,
- * not just something stripped at runtime. `createdByUserId` is always `null` here (this
- * codebase's existing "self-registration" encoding — see `Vendor.createdByUserId`'s own schema
- * doc comment), which doubles as this feature's Source signal for the admin Vendor List (ADMIN
- * when set, WEBSITE when null). Status is always `PENDING_VERIFICATION` — never the
- * `heuristicInitialStatus` draft-in-progress heuristic `createVendor` uses, since a public
- * submission is always a complete application, never a draft — and never auto-approved; only
- * the existing `approveVendor`/`rejectVendor` admin actions can move it further.
+ * The Add member form. Staff create every member (decision D9). A brand-new owner login is
+ * always created, status is ACTIVE from the first second, and the 14 day documents timer starts
+ * here. The owner User, the member role grant and the Member row commit in one transaction; the
+ * welcome notice goes out once, after commit, and `welcomeSentAt` records a delivered notice.
+ * A taken email or mobile returns 409 naming the field, never the account that holds it.
  */
-export async function registerPublicVendor(input: VendorSelfCreateInput) {
-  const ownerUserId = await createVendorOwner(
-    input.ownerEmail,
-    input.ownerMobile,
-    [input.ownerFirstName, input.ownerLastName].filter(Boolean).join(' ').trim() || input.contactPerson,
-  );
-  await ensureVendorRoleAssigned(ownerUserId);
-  return buildAndInsertVendor(input, ownerUserId, null, 'PENDING_VERIFICATION');
+export async function createMember(input: MemberCreateInput, createdByUserId: string) {
+  const availability = await checkVendorOwnerAvailability(input.ownerEmail, input.ownerMobile);
+  if (!availability.available) {
+    const fields: Record<string, string> = {};
+    if (availability.conflicts.includes('email')) fields.ownerEmail = EMAIL_TAKEN;
+    if (availability.conflicts.includes('phone')) fields.ownerMobile = MOBILE_TAKEN;
+    throw new ApiError('CONFLICT', OWNER_CONFLICT, { fields });
+  }
+
+  const ownerName = `${input.ownerFirstName} ${input.ownerLastName}`.trim();
+  let member: Awaited<ReturnType<typeof buildAndInsertVendor>>;
+  try {
+    member = await prisma.$transaction(async (tx) => {
+      const owner = await tx.user.create({
+        data: { name: ownerName, email: input.ownerEmail, phone: input.ownerMobile },
+      });
+      const memberRole = await tx.role.findUnique({ where: { key: ROLE_KEYS.member } });
+      if (!memberRole) throw new ApiError('SERVER_ERROR', 'The member role is missing. Run the seed.');
+      await tx.userRole.upsert({
+        where: { userId_roleId: { userId: owner.id, roleId: memberRole.id } },
+        update: {},
+        create: { userId: owner.id, roleId: memberRole.id },
+      });
+      return buildAndInsertVendor(
+        {
+          businessName: input.businessName,
+          ownerFirstName: input.ownerFirstName,
+          ownerLastName: input.ownerLastName,
+          ownerEmail: input.ownerEmail,
+          ownerMobile: input.ownerMobile,
+          businessEmail: input.ownerEmail,
+          businessPhone: input.ownerMobile,
+          contactPerson: ownerName,
+        },
+        owner.id,
+        createdByUserId,
+        'ACTIVE',
+        tx,
+      );
+    });
+  } catch (err) {
+    throw ownerConflictFromP2002(err) ?? err;
+  }
+
+  const notice = await sendMemberNotice('WELCOME', { name: ownerName, email: input.ownerEmail, phone: input.ownerMobile });
+  if (!notice.email && !notice.sms) return member;
+  const welcomeSentAt = new Date();
+  try {
+    await prisma.member.update({ where: { id: member.id }, data: { welcomeSentAt } });
+  } catch (err) {
+    console.error({ err, context: 'recording welcomeSentAt failed', memberId: member.id });
+    return member;
+  }
+  return { ...member, welcomeSentAt };
+}
+
+/**
+ * A Vendor's owner is a real `User` row — editing "Member User" must update that SAME linked
+ * account's actual name/email/phone (the identity it logs in with), never just the Vendor row's
+ * own `ownerFirstName`/`ownerLastName`/`ownerEmail`/`ownerMobile` display columns in isolation
+ * (those exist for display/snapshot purposes, kept in sync here, never the source of truth for
+ * login). Deliberately implemented here, not via `userService.updateUser` — that function (and
+ * its `PATCH /rbac/users/:id` route) is the general Users-screen surface, which explicitly
+ * excludes every vendor-owner account by design (see user.service.ts#listUsers's own doc
+ * comment: "a Vendor's owner User is managed exclusively through Vendor List/Management").
+ *
+ * `ownerMobile` arrives already normalized (`vendorPhoneSchema`'s own `normalizeIdentifier`
+ * transform in vendor.schema.ts) — no second normalization needed here. The duplicate check
+ * mirrors `createVendorOwner`'s exact pattern (email/phone uniqueness across `User`), excluding
+ * the owner's own current row so re-saving their own unchanged email/phone is never a false
+ * conflict.
+ */
+async function syncOwnerUserFromVendorFields(
+  ownerUserId: string,
+  input: VendorUpdateInput,
+  currentNames: { firstName: string | null; lastName: string | null },
+) {
+  const touchesOwnerIdentity =
+    'ownerFirstName' in input || 'ownerLastName' in input || 'ownerEmail' in input || 'ownerMobile' in input;
+  if (!touchesOwnerIdentity) return;
+
+  const email = input.ownerEmail || undefined;
+  const phone = input.ownerMobile || undefined;
+
+  if (email || phone) {
+    const [byEmail, byPhone] = await Promise.all([
+      email ? prisma.user.findFirst({ where: { email, deletedAt: null, id: { not: ownerUserId } }, select: { id: true } }) : Promise.resolve(null),
+      phone ? prisma.user.findFirst({ where: { phone, deletedAt: null, id: { not: ownerUserId } }, select: { id: true } }) : Promise.resolve(null),
+    ]);
+    if (byEmail || byPhone) {
+      const conflicts: ('email' | 'phone')[] = [];
+      if (byEmail) conflicts.push('email');
+      if (byPhone) conflicts.push('phone');
+      throw new ApiError('CONFLICT', 'A user with this email or phone already exists.', { conflicts });
+    }
+  }
+
+  const owner = await prisma.user.findUnique({ where: { id: ownerUserId }, select: { name: true, email: true, phone: true } });
+  if (!owner) return;
+
+  const firstName = 'ownerFirstName' in input ? input.ownerFirstName ?? '' : currentNames.firstName ?? '';
+  const lastName = 'ownerLastName' in input ? input.ownerLastName ?? '' : currentNames.lastName ?? '';
+  const nextName = firstName !== undefined || lastName !== undefined
+    ? [firstName, lastName].map((part) => part.trim()).filter(Boolean).join(' ')
+    : undefined;
+
+  const nextEmail = 'ownerEmail' in input ? (email ?? null) : owner.email;
+  const nextPhone = 'ownerMobile' in input ? (phone ?? null) : owner.phone;
+  if (!nextEmail && !nextPhone) {
+    throw new ApiError('VALIDATION_ERROR', 'The member user needs at least one of email or mobile — clearing both is not allowed.');
+  }
+
+  await prisma.user.update({
+    where: { id: ownerUserId },
+    data: {
+      ...(nextName ? { name: nextName } : {}),
+      ...('ownerEmail' in input ? { email: email ?? null } : {}),
+      ...('ownerMobile' in input ? { phone: phone ?? null } : {}),
+    },
+  });
 }
 
 export async function updateVendor(id: string, input: VendorUpdateInput) {
   const existing = await getVendorOrThrow(id);
-  if ('ownerUserId' in input) await assertOwnerUserAvailable(input.ownerUserId, id);
-  if (input.ownerUserId) await ensureVendorRoleAssigned(input.ownerUserId);
+  if (existing.ownerUserId) {
+    await syncOwnerUserFromVendorFields(existing.ownerUserId, input, {
+      firstName: existing.ownerFirstName,
+      lastName: existing.ownerLastName,
+    });
+  }
   // The admin-create pipeline's Step 1 persists a Vendor before any businessName is known (see
   // createVendor above), so its slug starts out id-derived rather than name-derived. The FIRST
   // time a real businessName arrives via update, upgrade the slug to reflect it — but never
   // again after that, so a vendor's public `/vendor/:slug` URL never unexpectedly changes once
   // it's been derived from a real name.
-  const data: Prisma.VendorUncheckedUpdateInput = { ...input } as Prisma.VendorUncheckedUpdateInput;
+  const data: Prisma.MemberUncheckedUpdateInput = { ...input } as Prisma.MemberUncheckedUpdateInput;
+  if (
+    !('contactPerson' in input) &&
+    ('ownerFirstName' in input || 'ownerLastName' in input)
+  ) {
+    const firstName = input.ownerFirstName ?? existing.ownerFirstName ?? '';
+    const lastName = input.ownerLastName ?? existing.ownerLastName ?? '';
+    data.contactPerson = [firstName, lastName].map((part) => part.trim()).filter(Boolean).join(' ');
+  }
   if (!existing.businessName && input.businessName) {
     data.slug = await ensureUniqueSlug(input.businessName, id, (candidate) =>
-      prisma.vendor.findUnique({ where: { slug: candidate } }).then((v) => Boolean(v) && v!.id !== id),
+      prisma.member.findUnique({ where: { slug: candidate } }).then((v) => Boolean(v) && v!.id !== id),
     );
   }
   Object.assign(data, await resolveMapLocationForUpdate(input, existing.mapLocationUrl));
-  const vendor = await prisma.vendor.update({
+  const vendor = await prisma.member.update({
     where: { id },
     data,
     include: OWNER_INCLUDE,
@@ -469,90 +640,31 @@ export async function updateVendor(id: string, input: VendorUpdateInput) {
   return serializeVendor(vendor);
 }
 
-/** Approve jumps straight to ACTIVE — no pointless extra "approved but not active" click. */
-export async function approveVendor(id: string) {
-  await getVendorOrThrow(id);
-  const vendor = await prisma.vendor.update({ where: { id }, data: { status: 'ACTIVE', statusReason: null }, include: OWNER_INCLUDE });
-  return serializeVendor(vendor);
-}
-
-export async function rejectVendor(id: string, reason: string) {
-  await getVendorOrThrow(id);
-  const vendor = await prisma.vendor.update({ where: { id }, data: { status: 'REJECTED', statusReason: reason }, include: OWNER_INCLUDE });
-  return serializeVendor(vendor);
-}
-
-/** Generic activate/deactivate/suspend for an already-approved vendor (not the initial approve/reject transition). */
-export async function setVendorStatus(id: string, status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED', reason?: string) {
-  await getVendorOrThrow(id);
-  const vendor = await prisma.vendor.update({ where: { id }, data: { status, statusReason: reason ?? null }, include: OWNER_INCLUDE });
-  return serializeVendor(vendor);
-}
-
-export async function reviewKyc(id: string, kycStatus: Extract<KycStatus, 'VERIFIED' | 'REJECTED'>, rejectionReason?: string) {
-  await getVendorOrThrow(id);
-  const vendor = await prisma.vendor.update({
-    where: { id },
-    data: { kycStatus, kycRejectionReason: kycStatus === 'REJECTED' ? rejectionReason : null },
-    include: OWNER_INCLUDE,
-  });
-  return serializeVendor(vendor);
-}
-
-/** Superadmin-only hard delete. `Branch`/`Deal`/`Therapist`/`Product`/`VendorDocument`/
- *  `VendorImage`/`VendorVideo`/`VendorCategoryAccess` all cascade away with the vendor
- *  (`onDelete: Cascade` on their `vendor` relation), but `Order`/`OrderItem`'s `vendor` relation
- *  has no `onDelete` (Postgres default = restrict) — a vendor with any real order history can
- *  never be hard-deleted, only deactivated/suspended via `setVendorStatus`. Mirrors this
- *  codebase's own established "catch a known Prisma error code, translate to a specific
- *  ApiError" convention (see the P2002-to-CONFLICT catches elsewhere in this file). */
-export async function deleteVendor(id: string) {
-  await getVendorOrThrow(id);
-  try {
-    await prisma.vendor.delete({ where: { id } });
-  } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
-      throw new ApiError('CONFLICT', 'Cannot delete this vendor because it has existing orders or other records referencing it. Deactivate it instead.');
-    }
-    throw err;
-  }
-}
-
 // ─── Vendor: self-service surface ────────────────────────────────────────────
 
 /** Never throws — callers decide whether "no vendor yet" means 404 or "show onboarding." */
 export async function getVendorByOwnerUserId(ownerUserId: string) {
-  return prisma.vendor.findUnique({
+  const vendor = await prisma.member.findUnique({
     where: { ownerUserId },
     include: { _count: { select: { branches: true } }, ...VENDOR_MEDIA_INCLUDE },
   });
+  return vendor ? withSafeDocuments(vendor) : null;
 }
 
+/** The one choke point every `/vendors/me/*` self-service route resolves ownership through —
+ *  a suspended member's token must stop authorizing portal access the moment suspension is
+ *  committed, not just at next login, and this is where that's enforced: every self-service
+ *  request re-reads the Vendor's live `status` here, so a token issued before suspension is
+ *  rejected on its very next use, with no separate revocation step needed. Admin-on-behalf
+ *  routes (`/vendors/:vendorId/*`) never call this — an admin's own access is never gated by a
+ *  member's suspension (see this function's own callers). */
 export async function getMyVendorOrThrow(ownerUserId: string) {
   const vendor = await getVendorByOwnerUserId(ownerUserId);
   if (!vendor) throw new ApiError('NOT_FOUND', 'Complete your business profile first');
+  if (vendor.status === 'SUSPENDED') {
+    throw new ApiError('FORBIDDEN', 'Your member account is suspended. Please contact support.');
+  }
   return vendor;
-}
-
-export async function createSelfVendor(ownerUserId: string, input: VendorSelfCreateInput) {
-  const existing = await prisma.vendor.findUnique({ where: { ownerUserId } });
-  if (existing) throw new ApiError('CONFLICT', 'You already have a vendor profile');
-  const id = randomUUID();
-  const slug = await ensureUniqueSlug(input.businessName, id, (candidate) =>
-    prisma.vendor.findUnique({ where: { slug: candidate } }).then(Boolean),
-  );
-  const mapLocation = await resolveMapLocationForCreate(input.mapLocationUrl);
-  return prisma.vendor.create({
-    data: {
-      ...input,
-      ...mapLocation,
-      id,
-      slug,
-      ownerUserId,
-      status: heuristicInitialStatus(input),
-    } as Prisma.VendorUncheckedCreateInput,
-    include: VENDOR_MEDIA_INCLUDE,
-  });
 }
 
 export async function updateSelfVendor(ownerUserId: string, input: VendorSelfUpdateInput) {
@@ -564,113 +676,12 @@ export async function updateSelfVendor(ownerUserId: string, input: VendorSelfUpd
     data.kycRejectionReason = null;
   }
   Object.assign(data, await resolveMapLocationForUpdate(input, vendor.mapLocationUrl));
-  return prisma.vendor.update({
+  const updated = await prisma.member.update({
     where: { id: vendor.id },
-    data: data as Prisma.VendorUncheckedUpdateInput,
+    data: data as Prisma.MemberUncheckedUpdateInput,
     include: VENDOR_MEDIA_INCLUDE,
   });
-}
-
-const REQUIRED_FOR_SUBMISSION: { key: keyof Awaited<ReturnType<typeof getMyVendorOrThrow>>; label: string }[] = [
-  { key: 'businessName', label: 'Business name' },
-  { key: 'businessEmail', label: 'Business email' },
-  { key: 'businessPhone', label: 'Business phone' },
-  { key: 'ownerFirstName', label: 'First name' },
-  { key: 'ownerLastName', label: 'Last name' },
-  { key: 'ownerMobile', label: 'Phone number' },
-  { key: 'ownerEmail', label: 'Email' },
-  { key: 'address', label: 'Address 1' },
-  { key: 'city', label: 'City' },
-  { key: 'state', label: 'State' },
-  { key: 'pincode', label: 'PIN code' },
-  { key: 'latitude', label: 'Latitude' },
-  { key: 'longitude', label: 'Longitude' },
-];
-
-/** At least one of GST/PAN/Aadhaar uploaded — real `VendorDocument` rows are the authoritative
- *  check (see that model's schema doc comment); the legacy `kycDocuments` JSON regex is kept
- *  ONLY as a fallback so a vendor onboarded before real file upload existed doesn't regress.
- *  The onboarding wizard's Step 1 gate moves this same check up client-side (disables
- *  "Continue"/"Create Vendor" until satisfied); this is the server-side confirmation. */
-async function hasMinimumKycDocument(vendorId: string, legacyKycDocuments: unknown): Promise<boolean> {
-  const realDocumentCount = await prisma.vendorDocument.count({ where: { vendorId } });
-  if (realDocumentCount > 0) return true;
-  if (!Array.isArray(legacyKycDocuments)) return false;
-  return legacyKycDocuments.some(
-    (doc) => doc && typeof doc === 'object' && typeof (doc as { type?: unknown }).type === 'string' &&
-      /gst|pan|aadhaar/i.test((doc as { type: string }).type) && Boolean((doc as { url?: unknown }).url),
-  );
-}
-
-/**
- * Onboarding wizard Step 6's completeness gate — extends the original scalar-field checklist
- * with the new direct-category-access requirements: at least one branch (with a state set, so
- * the vendor has at least one real operating location), at least one business module enabled,
- * and every enabled module backed by at least one granted category (a module checked with zero
- * categories is a valid mid-wizard state, but never a submittable one).
- */
-export async function submitForVerification(ownerUserId: string) {
-  const vendor = await getMyVendorOrThrow(ownerUserId);
-  if (vendor.status !== 'PROFILE_INCOMPLETE' && vendor.status !== 'REJECTED') {
-    throw new ApiError('CONFLICT', `Cannot submit a vendor with status ${vendor.status}`);
-  }
-  const missing = REQUIRED_FOR_SUBMISSION.filter((f) => !vendor[f.key]).map((f) => f.label);
-  if (!(await hasMinimumKycDocument(vendor.id, vendor.kycDocuments))) {
-    missing.push('At least one KYC document (GST, PAN, or Aadhaar)');
-  }
-
-  const branches = await prisma.branch.findMany({ where: { vendorId: vendor.id }, select: { state: true } });
-  if (branches.length === 0) {
-    missing.push('At least one branch');
-  } else if (!branches.some((b) => Boolean(b.state))) {
-    missing.push('At least one branch with a state set');
-  }
-
-  const enabledModules: CategoryType[] = [
-    ...(vendor.offersService ? (['SERVICE'] as const) : []),
-    ...(vendor.offersProduct ? (['PRODUCT'] as const) : []),
-    ...(vendor.offersTherapy ? (['THERAPY'] as const) : []),
-  ];
-  if (enabledModules.length === 0) {
-    missing.push('At least one business module (Service, Product, or Therapy)');
-  } else {
-    const grants = await prisma.vendorCategoryAccess.findMany({
-      where: { vendorId: vendor.id },
-      include: { category: { select: { type: true } } },
-    });
-    const grantedTypes = new Set(grants.map((g) => g.category.type));
-    for (const type of enabledModules) {
-      if (!grantedTypes.has(type)) {
-        missing.push(`At least one granted ${type.charAt(0)}${type.slice(1).toLowerCase()} category`);
-      }
-    }
-  }
-
-  if (missing.length > 0) {
-    throw new ApiError('VALIDATION_ERROR', 'Profile is incomplete', { missing });
-  }
-
-  // Runs in the same transaction as the status flip so a rolled-back submission can never leave a
-  // stray notification behind (mirrors createDeal's own notifySuperAdmins call-site pattern). The
-  // precondition above (status must currently be PROFILE_INCOMPLETE/REJECTED) means this function
-  // can only ever succeed once per submission cycle, which is also the notification's own
-  // duplicate-prevention — a vendor editing/saving again while PENDING_VERIFICATION never reaches
-  // this code path again.
-  return prisma.$transaction(async (tx) => {
-    const updated = await tx.vendor.update({
-      where: { id: vendor.id },
-      data: { status: 'PENDING_VERIFICATION', statusReason: null },
-    });
-    await notificationService.notifySuperAdmins(tx, {
-      type: 'VENDOR_PENDING_APPROVAL',
-      title: 'Vendor Profile Pending Approval',
-      message: `${vendor.businessName ?? 'A vendor'} completed their profile and is waiting for approval.`,
-      entityType: 'VENDOR',
-      entityId: vendor.id,
-      metadata: { vendorId: vendor.id },
-    });
-    return updated;
-  });
+  return withSafeDocuments(updated);
 }
 
 /**
@@ -722,8 +733,8 @@ export async function listAllBranches(opts: { page: number; pageSize: number; se
  *  (duplicated as a plain boolean check, not imported, to avoid a cross-service module
  *  dependency for four conditions) — used only to LABEL each row for the admin (e.g. the Home
  *  Hero slide picker's "X/5 eligible" indicator), never to filter what an admin can see. */
-function isDealPubliclyEligible(deal: { status: string; approvalStatus: string; vendor: { status: string }; branch: { isActive: boolean } }): boolean {
-  return deal.status === 'ACTIVE' && deal.approvalStatus === 'APPROVED' && deal.vendor.status === 'ACTIVE' && deal.branch.isActive;
+function isDealPubliclyEligible(deal: { status: string; vendor: { status: string }; branch: { isActive: boolean } }): boolean {
+  return deal.status === 'ACTIVE' && deal.vendor.status === 'ACTIVE' && deal.branch.isActive;
 }
 
 export async function listAllDeals(opts: { page: number; pageSize: number; search?: string; state?: string }) {
@@ -748,15 +759,16 @@ export async function listAllDeals(opts: { page: number; pageSize: number; searc
       include: {
         vendor: { select: { id: true, businessName: true, status: true } },
         branch: { select: { id: true, name: true, state: true, isActive: true } },
-        // Reuses the same OFFERING_INCLUDE shape (packages + media) every single-vendor deal
-        // read already uses — the cross-vendor Deals list needed these too for a "From ₹X"
-        // package summary and a thumbnail image, previously omitted here.
-        ...OFFERING_INCLUDE,
+        // Packages and media for the "From ₹X" summary and the thumbnail.
+        category: { select: { id: true, name: true } },
+        subcategory: { select: { id: true, name: true } },
+        packages: { orderBy: [{ sortOrder: 'asc' as const }, { durationMinutes: 'asc' as const }] },
+        mediaImages: { orderBy: [{ isPrimary: 'desc' as const }, { sortOrder: 'asc' as const }] },
       },
     }),
     prisma.deal.count({ where }),
   ]);
-  return { items: items.map((d) => ({ ...flattenDealTherapists(d), eligible: isDealPubliclyEligible(d) })), total };
+  return { items: items.map((d) => ({ ...d, eligible: isDealPubliclyEligible(d) })), total };
 }
 
 export async function listAllTherapists(opts: { page: number; pageSize: number; search?: string }) {
@@ -788,27 +800,14 @@ export async function listAllTherapists(opts: { page: number; pageSize: number; 
 
 // ─── Branch (shared by admin `:vendorId` path and self-derived vendorId) ─────
 
-/**
- * `categoryTypes` — the distinct `CategoryType`s this branch currently has ANY `BranchCategoryAccess`
- * grant for (e.g. `['THERAPY']`) — lets a caller (the Add Therapist/Deal forms' branch picker)
- * know which branches are currently eligible for a given module WITHOUT a separate
- * `getBranchCategoryAccess` round-trip per branch. Computed from the same single query as the
- * rest of this response (`include`, not a follow-up call), so listing N branches is still exactly
- * one query — never N+1 — regardless of how many categories each branch has mapped.
- */
+/** Every branch of a member, newest first, with its deal count. Any branch can hold deals and
+ *  therapists of any active category (D10: no category grants). */
 export async function listBranches(vendorId: string) {
-  const branches = await prisma.branch.findMany({
+  return prisma.branch.findMany({
     where: { vendorId },
     orderBy: { createdAt: 'desc' },
-    include: {
-      _count: { select: { deals: true } },
-      categoryAccess: { select: { category: { select: { type: true } } } },
-    },
+    include: { _count: { select: { deals: true } } },
   });
-  return branches.map(({ categoryAccess, ...branch }) => ({
-    ...branch,
-    categoryTypes: [...new Set(categoryAccess.map((a) => a.category.type).filter((t): t is CategoryType => t !== null))],
-  }));
 }
 
 /** 404 if the branch doesn't exist at all; 403 if it exists but belongs to a different vendor. */
@@ -839,93 +838,6 @@ export async function setBranchStatus(vendorId: string, branchId: string, isActi
   return prisma.branch.update({ where: { id: branchId }, data: { isActive } });
 }
 
-// ─── Branch category access (narrows the vendor's own VendorCategoryAccess grants — see
-// BranchCategoryAccess/BranchSubcategoryAccess's own schema doc comments) ────────────────────
-
-export async function getBranchCategoryAccess(vendorId: string, branchId: string) {
-  await getBranchScopedOrThrow(vendorId, branchId);
-  return prisma.branchCategoryAccess.findMany({
-    where: { branchId },
-    include: { category: true, subcategories: { include: { subcategory: true } } },
-  });
-}
-
-/**
- * Replace-the-full-set pattern (same shape as `setVendorModulesAndCategoryAccess` above) — each
- * `categoryId` must be a top-level SERVICE/THERAPY category, and each `subcategoryIds` entry must
- * be a real child of that `categoryId` (`assertCategoryChildOf`).
- *
- * Unlike the original design, this no longer requires the vendor to already hold a
- * `VendorCategoryAccess` grant for the category — Step 2's separate "Business Modules + Category
- * Access" screen for Service/Therapy was removed (category/subcategory access for those two
- * modules is now managed entirely from the branch), so this is the only place left that grants
- * them. A category with no existing vendor-level grant gets one created here automatically
- * (`offersService`/`offersTherapy` flipped to `true` as needed) in the same transaction, rather
- * than rejecting the save — see `category.type` below. Never auto-*revokes* on removal: unmapping
- * a category from one branch must never invalidate an existing Deal/Therapist at a different
- * branch still relying on that same vendor-level grant (`assertVendorHasCategoryAccess`) or flip a
- * module flag back off under a vendor's feet. Product is unaffected — it still only ever goes
- * through the explicit `setVendorModulesAndCategoryAccess` grant, since Product has no branch
- * scoping and never flows through this function.
- */
-export async function setBranchCategoryAccess(vendorId: string, branchId: string, input: BranchCategoryAccessInput) {
-  await getBranchScopedOrThrow(vendorId, branchId);
-
-  const categoriesById = new Map<string, { id: string; name: string; type: CategoryType | null }>();
-  for (const mapping of input.mappings) {
-    const category = await prisma.category.findUnique({ where: { id: mapping.categoryId } });
-    if (!category) throw new ApiError('VALIDATION_ERROR', 'categoryId does not exist');
-    if (category.parentId !== null) {
-      throw new ApiError('VALIDATION_ERROR', `Category "${category.name}" is a subcategory — map its top-level category instead`);
-    }
-    if (category.type !== 'SERVICE' && category.type !== 'THERAPY') {
-      throw new ApiError('VALIDATION_ERROR', `Category "${category.name}" is not a Service or Therapy category`);
-    }
-    categoriesById.set(category.id, category);
-    for (const subcategoryId of mapping.subcategoryIds) {
-      await assertCategoryChildOf(mapping.categoryId, subcategoryId);
-    }
-  }
-
-  const existingGrants = await prisma.vendorCategoryAccess.findMany({
-    where: { vendorId, categoryId: { in: [...categoriesById.keys()] } },
-    select: { categoryId: true },
-  });
-  const grantedIds = new Set(existingGrants.map((g) => g.categoryId));
-  const toGrant = [...categoriesById.values()].filter((c) => !grantedIds.has(c.id));
-
-  await prisma.$transaction(async (tx) => {
-    if (toGrant.length > 0) {
-      await tx.vendorCategoryAccess.createMany({
-        data: toGrant.map((c) => ({ vendorId, categoryId: c.id })),
-        skipDuplicates: true,
-      });
-      const flags: Prisma.VendorUpdateInput = {};
-      if (toGrant.some((c) => c.type === 'SERVICE')) flags.offersService = true;
-      if (toGrant.some((c) => c.type === 'THERAPY')) flags.offersTherapy = true;
-      if (Object.keys(flags).length > 0) {
-        await tx.vendor.update({ where: { id: vendorId }, data: flags });
-      }
-    }
-
-    // Cascades to BranchSubcategoryAccess automatically (onDelete: Cascade).
-    await tx.branchCategoryAccess.deleteMany({ where: { branchId } });
-    for (const mapping of input.mappings) {
-      await tx.branchCategoryAccess.create({
-        data: {
-          branchId,
-          categoryId: mapping.categoryId,
-          subcategories: {
-            create: mapping.subcategoryIds.map((subcategoryId) => ({ subcategoryId })),
-          },
-        },
-      });
-    }
-  });
-
-  return getBranchCategoryAccess(vendorId, branchId);
-}
-
 // ─── Therapist (shared by self-derived vendorId, mirrors Branch's scoping pattern) ───────────
 
 /** Same "declared outside the `as const` object" reasoning as DEAL_IMAGE_ORDER_BY — used only by
@@ -948,7 +860,7 @@ export async function listTherapists(vendorId: string, branchId: string) {
 /**
  * All therapists for a vendor (active AND inactive — unlike the self-service/public reads,
  * admin should see the full picture), across every branch, for the admin vendor detail page.
- * No ownership-resolution needed: the `vendors:view` permission check on the route is the gate.
+ * No ownership-resolution needed: the `members:view` permission check on the route is the gate.
  */
 export async function listVendorTherapistsForAdmin(vendorId: string) {
   return prisma.therapist.findMany({
@@ -972,7 +884,7 @@ export async function getTherapistScopedOrThrow(vendorId: string, therapistId: s
  *  (mirrors getBranchScopedOrThrow/getTherapistScopedOrThrow's vendor/branch discipline). This is
  *  the real security boundary for Deal<->Therapist linking; the frontend's branch-filtered
  *  therapist picker is UX only. No-op for an empty list. */
-async function assertTherapistsBelongToBranch(vendorId: string, branchId: string, therapistIds: string[]) {
+export async function assertTherapistsBelongToBranch(vendorId: string, branchId: string, therapistIds: string[]) {
   if (therapistIds.length === 0) return;
   const uniqueIds = [...new Set(therapistIds)];
   const therapists = await prisma.therapist.findMany({
@@ -999,31 +911,8 @@ async function assertTherapistsBelongToBranch(vendorId: string, branchId: string
  *  find-recent-then-reuse idempotency pattern rather than inventing a new mechanism. */
 const DUPLICATE_SUBMIT_WINDOW_MS = 10_000;
 
-/**
- * `Therapist.specializationCategoryId` may point at ANY tree depth (unlike Deal's two-column
- * categoryId/subcategoryId split — see Therapist's own schema doc comment), so the branch-access
- * check walks at most one `parentId` hop: a top-level pick only needs the branch's own
- * `BranchCategoryAccess` grant; a child pick needs the branch mapped to its parent (as the
- * category) AND that specific child explicitly enabled as a subcategory under it (see
- * BranchSubcategoryAccess's own schema doc comment on why subcategory access is always explicit).
- */
-async function assertBranchHasSpecializationCategoryAccess(branchId: string, specializationCategoryId: string) {
-  const category = await prisma.category.findUnique({ where: { id: specializationCategoryId } });
-  if (!category) throw new ApiError('VALIDATION_ERROR', 'specializationCategoryId does not exist');
-  if (category.parentId === null) {
-    await assertBranchHasCategoryAccess(branchId, specializationCategoryId);
-  } else {
-    await assertBranchHasCategoryAccess(branchId, category.parentId);
-    await assertBranchHasSubcategoryAccess(branchId, category.parentId, specializationCategoryId);
-  }
-}
-
 export async function createTherapist(vendorId: string, branchId: string, input: TherapistCreateInput) {
   await getBranchScopedOrThrow(vendorId, branchId);
-  // Unconditional — `specializationCategoryId` is optional on the input, so without this a
-  // branch with zero THERAPY access could still receive a therapist just by omitting that
-  // field. This is the real security boundary; the frontend's branch picker filtering is UX only.
-  await assertBranchHasAnyCategoryAccessOfType(branchId, 'THERAPY');
   const recentDuplicate = await prisma.therapist.findFirst({
     where: {
       vendorId,
@@ -1036,25 +925,35 @@ export async function createTherapist(vendorId: string, branchId: string, input:
     include: THERAPIST_MEDIA_INCLUDE,
   });
   if (recentDuplicate) return recentDuplicate;
-  if (input.specializationCategoryId) {
-    await assertVendorHasCategoryAccess(vendorId, input.specializationCategoryId, 'THERAPY');
-    await assertBranchHasSpecializationCategoryAccess(branchId, input.specializationCategoryId);
-  }
+  // D10: categories are open to every member; only the THERAPY type is checked.
+  if (input.specializationCategoryId) await assertCategoryOfType(input.specializationCategoryId, 'THERAPY');
+  const id = randomUUID();
+  const slug = await ensureUniqueSlug(input.personName || id, id, (candidate) =>
+    prisma.therapist.findUnique({ where: { slug: candidate } }).then(Boolean),
+  );
   return prisma.therapist.create({
-    data: { ...input, vendorId, branchId } as Prisma.TherapistUncheckedCreateInput,
+    data: {
+      ...input,
+      ...('bio' in input ? { bio: sanitizeRichText(input.bio) } : {}),
+      id,
+      slug,
+      vendorId,
+      branchId,
+    } as Prisma.TherapistUncheckedCreateInput,
     include: THERAPIST_MEDIA_INCLUDE,
   });
 }
 
 export async function updateTherapist(vendorId: string, therapistId: string, input: TherapistUpdateInput) {
-  const therapist = await getTherapistScopedOrThrow(vendorId, therapistId);
-  if (input.specializationCategoryId) {
-    await assertVendorHasCategoryAccess(vendorId, input.specializationCategoryId, 'THERAPY');
-    await assertBranchHasSpecializationCategoryAccess(therapist.branchId, input.specializationCategoryId);
-  }
+  await getTherapistScopedOrThrow(vendorId, therapistId);
+  if (input.specializationCategoryId) await assertCategoryOfType(input.specializationCategoryId, 'THERAPY');
   return prisma.therapist.update({
     where: { id: therapistId },
-    data: input as Prisma.TherapistUncheckedUpdateInput,
+    // `bio` is a `<sky-rich-text-editor>`-backed field — sanitized server-side before it ever
+    // reaches Prisma (`TherapistUpdateSchema` only validates its plain-text length, see
+    // `richTextField` in common.schema.ts). `null` (not `undefined`) when cleared, so an update
+    // can actually clear it, not merely leave it untouched.
+    data: { ...input, ...('bio' in input ? { bio: sanitizeRichText(input.bio) } : {}) } as Prisma.TherapistUncheckedUpdateInput,
     include: THERAPIST_MEDIA_INCLUDE,
   });
 }
@@ -1180,501 +1079,151 @@ export async function deleteTherapistVideo(vendorId: string, therapistId: string
 
 // ─── Customers (derived from Order — no dedicated table) ─────────────────────
 
+/** Distinct orders and distinct customers with at least one order line from this member, for the
+ *  member page header (P10-49). Same rows as `listMyCustomers`, so the numbers match that list.
+ *  Two COUNT queries: no rows are loaded, whatever the member's order history. */
+export async function getMemberSalesCounts(vendorId: string): Promise<{ orderCount: number; customerCount: number }> {
+  const hasMemberLine = { items: { some: { vendorId } } };
+  const [orderCount, customerCount] = await Promise.all([
+    prisma.order.count({ where: hasMemberLine }),
+    prisma.user.count({ where: { orders: { some: hasMemberLine } } }),
+  ]);
+  return { orderCount, customerCount };
+}
+
+/** Order statuses that make a member's customer "open" (D19): paid and not yet completed. */
+const OPEN_ORDER_STATUSES: ReadonlySet<string> = new Set(['CONFIRMED']);
+
 /**
- * Distinct customers who have at least one Order with this vendor, for the vendor-facing
- * "Customers" screen. Deliberately NOT a new Prisma model/migration — grouped off the existing
- * Order rows and merged in application code, then the *distinct-customer* list (not the raw Order
- * rows) is paginated and hydrated with each User's display fields. Same minimal, non-sensitive
- * customer summary as ORDER_INCLUDE in order.service.ts (id/name/phone/email only).
+ * Distinct customers with at least one order line from this member, for the Customers screens.
+ * Grouped off the existing OrderItem rows (OrderItem.vendorId, so a multi-member order still
+ * counts for every member on it), then the distinct-customer list is sorted by latest order,
+ * paged and joined to each User's display fields.
  *
- * Orders are grouped via OrderItem.vendorId, not Order.vendorId (the "primary vendor" only) —
- * a multi-vendor order where this vendor holds a non-primary line item must still surface that
- * customer here. `orderCount` counts distinct Orders touching this vendor, not raw item rows
- * (a multi-item order for this same vendor still counts once) — every purchase kind (Deal,
- * Product, Therapist) is an OrderItem, so this one count already covers all of them; there is no
- * separate booking count anymore.
+ * Per customer: `orderCount` (distinct orders, not lines), `lastActivityAt` (latest order date),
+ * `city` (shipping city of the latest order that has one), `hasOpenOrder` (a CONFIRMED order).
+ * `contact: 'open-orders'` (the member's own view, D19) returns phone and email only while
+ * `hasOpenOrder`; `contact: 'full'` (staff, D12) always returns them.
  */
-export async function listMyCustomers(vendorId: string, opts: { page: number; pageSize: number }) {
+export async function listMyCustomers(
+  vendorId: string,
+  opts: { page: number; pageSize: number; contact: 'open-orders' | 'full' },
+) {
   const vendorOrderItems = await prisma.orderItem.findMany({
     where: { vendorId },
-    select: { orderId: true, order: { select: { customerId: true, createdAt: true } } },
+    select: { orderId: true, order: { select: { customerId: true, createdAt: true, status: true, shippingCity: true } } },
   });
 
-  const distinctOrders = new Map<string, { customerId: string; createdAt: Date }>();
+  const distinctOrders = new Map<string, (typeof vendorOrderItems)[number]['order']>();
   for (const item of vendorOrderItems) {
-    if (!distinctOrders.has(item.orderId)) {
-      distinctOrders.set(item.orderId, { customerId: item.order.customerId, createdAt: item.order.createdAt });
-    }
-  }
-  const orderGroups = new Map<string, { count: number; maxCreatedAt: Date }>();
-  for (const { customerId, createdAt } of distinctOrders.values()) {
-    const g = orderGroups.get(customerId);
-    if (g) {
-      g.count += 1;
-      if (createdAt > g.maxCreatedAt) g.maxCreatedAt = createdAt;
-    } else {
-      orderGroups.set(customerId, { count: 1, maxCreatedAt: createdAt });
-    }
+    if (!distinctOrders.has(item.orderId)) distinctOrders.set(item.orderId, item.order);
   }
 
-  const total = orderGroups.size;
-  const ranked = Array.from(orderGroups.entries())
-    .map(([customerId, stats]) => ({ customerId, orderCount: stats.count, lastActivityAt: stats.maxCreatedAt }))
-    .sort((a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime());
-  const page = ranked.slice((opts.page - 1) * opts.pageSize, (opts.page - 1) * opts.pageSize + opts.pageSize);
+  type Group = { count: number; lastActivityAt: Date; city: string | null; cityAt: Date | null; hasOpenOrder: boolean };
+  const groups = new Map<string, Group>();
+  for (const order of distinctOrders.values()) {
+    const g = groups.get(order.customerId) ?? { count: 0, lastActivityAt: order.createdAt, city: null, cityAt: null, hasOpenOrder: false };
+    g.count += 1;
+    if (order.createdAt > g.lastActivityAt) g.lastActivityAt = order.createdAt;
+    if (order.shippingCity && (!g.cityAt || order.createdAt > g.cityAt)) {
+      g.city = order.shippingCity;
+      g.cityAt = order.createdAt;
+    }
+    if (OPEN_ORDER_STATUSES.has(order.status)) g.hasOpenOrder = true;
+    groups.set(order.customerId, g);
+  }
+
+  const total = groups.size;
+  const ranked = Array.from(groups.entries()).sort(([, a], [, b]) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime());
+  const page = ranked.slice((opts.page - 1) * opts.pageSize, opts.page * opts.pageSize);
 
   const users = await prisma.user.findMany({
-    where: { id: { in: page.map((p) => p.customerId) } },
+    where: { id: { in: page.map(([customerId]) => customerId) } },
     select: { id: true, name: true, phone: true, email: true },
   });
   const userById = new Map(users.map((u) => [u.id, u]));
 
-  const items = page.map((p) => {
-    const user = userById.get(p.customerId);
+  const items = page.map(([customerId, g]) => {
+    const user = userById.get(customerId);
+    const showContact = opts.contact === 'full' || g.hasOpenOrder;
     return {
-      id: p.customerId,
+      id: customerId,
       name: user?.name ?? null,
-      phone: user?.phone ?? null,
-      email: user?.email ?? null,
-      orderCount: p.orderCount,
-      lastActivityAt: p.lastActivityAt,
+      city: g.city,
+      orderCount: g.count,
+      lastActivityAt: g.lastActivityAt,
+      hasOpenOrder: g.hasOpenOrder,
+      phone: showContact ? (user?.phone ?? null) : null,
+      email: showContact ? (user?.email ?? null) : null,
     };
   });
 
   return { items, total };
 }
 
-// ─── Category access gate (replaces the old Service/Product master-row model) ────────────────
-// The actual `assertVendorHasCategoryAccess` gate lives in category.service.ts (imported below)
-// — it needs no vendor.service.ts state, and living there lets product.service.ts import it too
-// without a vendor.service.ts <-> product.service.ts circular dependency.
-
-/** Duration is a bookable time slot — required for every Deal (a Deal is always a service offering). */
-function assertDurationRequiredForService(durationMinutes: number | null | undefined) {
-  if (!durationMinutes) {
-    throw new ApiError('VALIDATION_ERROR', 'durationMinutes is required for a service deal');
-  }
-}
+/** An Order only ever reaches CONFIRMED/COMPLETED via a verified payment — same "money actually
+ *  received" definition as `customer.service.ts#loadOrderStats`/`settlement.service.ts#
+ *  customerPaymentsWhere` (never a separate/invented "confirmed" rule), just filtered additionally
+ *  to this vendor's own line items (`items: { some: { vendorId } }`, not `Order.vendorId` —
+ *  same multi-vendor-safe join every vendor-scoped query in this file uses). */
+const CONFIRMED_PAYMENT_ORDER_STATUSES: OrderStatus[] = ['CONFIRMED', 'COMPLETED'];
 
 /**
- * Replace-the-full-set pattern (same shape as role.service.ts#setRolePermissions) — a vendor's
- * enabled business modules + the top-level categories it's granted for them, saved together in
- * one call from the onboarding wizard's Step 2. Each `categoryId` must be a top-level category
- * (`parentId === null`) whose `type` matches one of the *enabled* modules — you can't grant a
- * Product category while `offersProduct` is false.
+ * Member-scoped single-customer lookup for the vendor-facing Customer Detail page. 404s (never
+ * confirms existence) unless at least one Order actually links this `customerId` to the caller's
+ * own vendor via `items: { some: { vendorId } }` — same "404 not 403, never confirm existence of
+ * someone else's data" discipline as `order.service.ts#getMyOrderOrThrow`. `totalOrders`/
+ * `confirmedPaymentsTotal` are each a single aggregate query over that same vendor-scoped
+ * `Order` set — `confirmedPaymentsTotal` sums the whole `Order.total` (not just this vendor's
+ * line items), matching how `loadOrderStats`/`customerPaymentsWhere` already treat a
+ * multi-vendor order's total.
  */
-export async function setVendorModulesAndCategoryAccess(
-  vendorId: string,
-  input: { offersService: boolean; offersProduct: boolean; offersTherapy: boolean; categoryIds: string[] },
-) {
-  await getVendorOrThrow(vendorId);
+export async function getMyCustomerOrThrow(callerUserId: string, customerId: string) {
+  const vendor = await getVendorByOwnerUserId(callerUserId);
+  if (!vendor) throw new ApiError('NOT_FOUND', 'Customer not found');
 
-  const enabledTypes = new Set<CategoryType>([
-    ...(input.offersService ? (['SERVICE'] as const) : []),
-    ...(input.offersProduct ? (['PRODUCT'] as const) : []),
-    ...(input.offersTherapy ? (['THERAPY'] as const) : []),
-  ]);
-
-  if (input.categoryIds.length > 0) {
-    const categories = await prisma.category.findMany({ where: { id: { in: input.categoryIds } } });
-    if (categories.length !== input.categoryIds.length) {
-      throw new ApiError('VALIDATION_ERROR', 'One or more categoryIds do not exist');
-    }
-    for (const category of categories) {
-      if (category.parentId !== null) {
-        throw new ApiError('VALIDATION_ERROR', `Category "${category.name}" is a subcategory — grant its top-level category instead`);
-      }
-      if (!category.type || !enabledTypes.has(category.type)) {
-        throw new ApiError('VALIDATION_ERROR', `Category "${category.name}" does not belong to an enabled business module`);
-      }
-    }
-  }
-
-  await prisma.$transaction([
-    prisma.vendor.update({
-      where: { id: vendorId },
-      data: { offersService: input.offersService, offersProduct: input.offersProduct, offersTherapy: input.offersTherapy },
+  const scopeWhere = { customerId, items: { some: { vendorId: vendor.id } } };
+  const [totalOrders, confirmed] = await Promise.all([
+    prisma.order.count({ where: scopeWhere }),
+    prisma.order.aggregate({
+      where: { ...scopeWhere, status: { in: CONFIRMED_PAYMENT_ORDER_STATUSES } },
+      _sum: { total: true },
     }),
-    prisma.vendorCategoryAccess.deleteMany({ where: { vendorId } }),
-    ...(input.categoryIds.length > 0
-      ? [
-          prisma.vendorCategoryAccess.createMany({
-            data: input.categoryIds.map((categoryId) => ({ vendorId, categoryId })),
-          }),
-        ]
-      : []),
   ]);
+  if (totalOrders === 0) throw new ApiError('NOT_FOUND', 'Customer not found');
 
-  return prisma.vendorCategoryAccess.findMany({ where: { vendorId }, include: { category: true } });
-}
-
-export async function getVendorCategoryAccess(vendorId: string) {
-  await getVendorOrThrow(vendorId);
-  return prisma.vendorCategoryAccess.findMany({ where: { vendorId }, include: { category: true } });
-}
-
-// ─── Deal (shared, scoped by vendorId + branchId) ────────────────────────────
-
-export async function listDeals(vendorId: string, branchId: string) {
-  await getBranchScopedOrThrow(vendorId, branchId);
-  const deals = await prisma.deal.findMany({
-    where: { branchId },
-    orderBy: { createdAt: 'desc' },
-    include: {
-      category: true,
-      subcategory: true,
-      // Root cause of "packages not showing in Deal Edit": this list response (the only source
-      // the Edit dialog is ever populated from — there is no single-deal GET) omitted `packages`
-      // entirely, unlike `OFFERING_INCLUDE` below (used by create/update). `DealDialog` seeds its
-      // package-editor state straight from `deal.packages`, so it was always `undefined` → `[]`.
-      packages: { orderBy: DEAL_PACKAGE_ORDER_BY },
-      mediaImages: { orderBy: DEAL_IMAGE_ORDER_BY },
-      mediaVideo: true,
-      therapistLinks: { include: { therapist: { select: THERAPIST_LINK_SELECT } } },
-    },
+  const customer = await prisma.user.findUnique({
+    where: { id: customerId },
+    select: { id: true, name: true, phone: true, email: true },
   });
-  return deals.map(flattenDealTherapists);
-}
+  if (!customer) throw new ApiError('NOT_FOUND', 'Customer not found');
 
-/**
- * All of a vendor's deals (every status, across every branch) for the admin's vendor detail
- * page — mirrors `listVendorTherapistsForAdmin`'s "vendor-wide, not branch-scoped" read exactly
- * (same reasoning: the admin overview's Deals card counts/links across the whole vendor, not one
- * branch at a time). Read-only — admin-on-behalf create/update/status-change stay branch-scoped
- * under `/:vendorId/branches/:branchId/deals[/:dealId]`, since a Deal can never be created or
- * edited outside the branch it belongs to.
- */
-export async function listVendorDealsForAdmin(vendorId: string) {
-  const deals = await prisma.deal.findMany({
-    where: { vendorId },
-    orderBy: { createdAt: 'desc' },
-    include: { branch: { select: { id: true, name: true } }, ...OFFERING_INCLUDE },
-  });
-  return deals.map(flattenDealTherapists);
-}
-
-/** 404 if the deal doesn't exist; 403 if it exists but its branch/vendor don't match the caller's scope. */
-export async function getDealScopedOrThrow(vendorId: string, branchId: string, dealId: string) {
-  await getBranchScopedOrThrow(vendorId, branchId);
-  const deal = await prisma.deal.findUnique({ where: { id: dealId } });
-  if (!deal) throw new ApiError('NOT_FOUND', 'Deal not found');
-  if (deal.branchId !== branchId || deal.vendorId !== vendorId) {
-    throw new ApiError('FORBIDDEN', 'This deal does not belong to your vendor');
-  }
-  return deal;
-}
-
-/** Declared outside OFFERING_INCLUDE's own `as const` (and explicitly typed, not inferred) so
- *  its `orderBy` stays the mutable array Prisma's generated types expect — nesting a plain
- *  array literal directly inside an `as const` object freezes it into a readonly tuple, which
- *  `DealPackageOrderByWithRelationInput[]` rejects (same pattern as catalog.service.ts's
- *  PUBLIC_THERAPIST_PACKAGE_ORDER_BY). */
-const DEAL_PACKAGE_ORDER_BY: Prisma.DealPackageOrderByWithRelationInput[] = [
-  { sortOrder: 'asc' },
-  { durationMinutes: 'asc' },
-];
-
-/** Same "declared outside the `as const` object" reasoning as DEAL_PACKAGE_ORDER_BY. */
-const DEAL_IMAGE_ORDER_BY: Prisma.DealImageOrderByWithRelationInput[] = [
-  { isPrimary: 'desc' },
-  { sortOrder: 'asc' },
-];
-
-/** Minimal shape for a therapist surfaced through a Deal's `therapists` field — never the full
- *  Therapist row (bio/photo/packages/etc. belong to the Therapist's own endpoints). */
-const THERAPIST_LINK_SELECT = { id: true, personName: true, therapistType: true, isActive: true } as const;
-
-const OFFERING_INCLUDE = {
-  category: { select: { id: true, name: true } },
-  subcategory: { select: { id: true, name: true } },
-  packages: { orderBy: DEAL_PACKAGE_ORDER_BY },
-  mediaImages: { orderBy: DEAL_IMAGE_ORDER_BY },
-  mediaVideo: true,
-  therapistLinks: { include: { therapist: { select: THERAPIST_LINK_SELECT } } },
-} as const;
-
-type DealPackageInput = NonNullable<DealCreateInput['packages']>[number];
-type DealTherapistLink = { therapist: { id: string; personName: string; therapistType: string; isActive: boolean } };
-
-/** Flattens the `DealTherapist` join-table include into a plain `therapists` array — API
- *  consumers should never see the join row shape, only the therapists it links to. Tolerates
- *  `therapistLinks` being absent (a caller that didn't include it) rather than requiring every
- *  caller to always fetch it. */
-function flattenDealTherapists<T extends { therapistLinks?: DealTherapistLink[] }>(deal: T) {
-  const { therapistLinks, ...rest } = deal;
-  return { ...rest, therapists: (therapistLinks ?? []).map((link) => link.therapist) };
-}
-
-/** Cheapest active package's price/duration becomes the Deal's own salePrice/originalPrice/
- *  durationMinutes — the "from price"/default-duration display cache every existing
- *  minPrice/maxPrice/sort/badge query already reads (see DealPackage's own schema doc comment).
- *  A no-op when `packages` is empty (a service deal update that didn't touch packages). */
-async function syncDealPriceFromPackages(tx: Prisma.TransactionClient, dealId: string) {
-  const cheapest = await tx.dealPackage.findFirst({
-    where: { dealId, isActive: true },
-    orderBy: { sellingPrice: 'asc' },
-  });
-  if (!cheapest) return;
-  await tx.deal.update({
-    where: { id: dealId },
-    data: {
-      salePrice: cheapest.sellingPrice,
-      originalPrice: cheapest.originalPrice ?? cheapest.sellingPrice,
-      durationMinutes: cheapest.durationMinutes,
-    },
-  });
-}
-
-export async function createDeal(
-  vendorId: string,
-  branchId: string,
-  input: DealCreateInput,
-  actorIsAdmin: boolean,
-) {
-  await getBranchScopedOrThrow(vendorId, branchId);
-  await assertCategoryChildOf(input.categoryId, input.subcategoryId);
-  await assertVendorHasCategoryAccess(vendorId, input.categoryId, 'SERVICE');
-  await assertBranchHasCategoryAccess(branchId, input.categoryId);
-  if (input.subcategoryId) {
-    await assertBranchHasSubcategoryAccess(branchId, input.categoryId, input.subcategoryId);
-  }
-  assertDurationRequiredForService(input.durationMinutes);
-  await assertTherapistsBelongToBranch(vendorId, branchId, input.therapistIds ?? []);
-  // App-layer pre-check for a clean 409 in the common case — Deal.slug's DB-level @unique is
-  // the hard guarantee this can't fully replace under a genuine race (two near-simultaneous
-  // double-submits of the same form both reading "slug free" before either commits — see the
-  // P2002 catch below, same discipline as order.service.ts#createOrderFromCart).
-  const existingSlug = await prisma.deal.findUnique({ where: { slug: input.slug } });
-  if (existingSlug) throw new ApiError('CONFLICT', `Deal slug "${input.slug}" already exists`);
-
-  const { packages, therapistIds, ...dealFields } = input;
-
-  try {
-    return await prisma.$transaction(async (tx) => {
-      const deal = await tx.deal.create({
-        data: {
-          ...dealFields,
-          vendorId, // always derived server-side — never trusted from the client
-          branchId,
-          status: actorIsAdmin ? 'ACTIVE' : 'DRAFT',
-          approvalStatus: actorIsAdmin ? 'APPROVED' : 'PENDING',
-        } as unknown as Prisma.DealUncheckedCreateInput,
-      });
-
-      if (packages && packages.length > 0) {
-        await tx.dealPackage.createMany({
-          data: packages.map((p: DealPackageInput) => ({
-            dealId: deal.id,
-            durationMinutes: p.durationMinutes,
-            sellingPrice: p.sellingPrice,
-            originalPrice: p.originalPrice,
-            isActive: p.isActive ?? true,
-            sortOrder: p.sortOrder ?? 0,
-          })),
-        });
-        await syncDealPriceFromPackages(tx, deal.id);
-      }
-
-      if (therapistIds && therapistIds.length > 0) {
-        await tx.dealTherapist.createMany({
-          data: [...new Set(therapistIds)].map((therapistId) => ({ dealId: deal.id, therapistId })),
-        });
-      }
-
-      // A vendor-created (never admin-created) deal needs Superadmin review before it goes live
-      // — see the `approvalStatus` gate above. Runs inside this same transaction so a rolled-back
-      // deal creation (e.g. the P2002 slug race below) can never leave a stray notification behind.
-      if (!actorIsAdmin) {
-        const vendor = await tx.vendor.findUnique({ where: { id: vendorId }, select: { businessName: true } });
-        await notificationService.notifySuperAdmins(tx, {
-          type: 'DEAL_PENDING_APPROVAL',
-          title: 'New Deal Pending Approval',
-          message: `${vendor?.businessName ?? 'A vendor'} submitted "${deal.title}" for approval.`,
-          entityType: 'DEAL',
-          entityId: deal.id,
-          metadata: { vendorId, branchId },
-        });
-      }
-
-      return flattenDealTherapists(await tx.deal.findUniqueOrThrow({ where: { id: deal.id }, include: OFFERING_INCLUDE }));
-    });
-  } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-      throw new ApiError('CONFLICT', `Deal slug "${input.slug}" already exists`);
-    }
-    throw err;
-  }
-}
-
-export async function updateDeal(vendorId: string, branchId: string, dealId: string, input: DealUpdateInput) {
-  const deal = await getDealScopedOrThrow(vendorId, branchId, dealId);
-  if (input.categoryId || input.subcategoryId) {
-    await assertCategoryChildOf(input.categoryId ?? deal.categoryId, input.subcategoryId ?? deal.subcategoryId ?? undefined);
-  }
-  // Any touch that could change the effective category must keep the category-access invariant
-  // intact.
-  const touchesOffering = 'durationMinutes' in input || 'categoryId' in input || 'subcategoryId' in input;
-  if (touchesOffering) {
-    const effectiveCategoryId = input.categoryId ?? deal.categoryId;
-    await assertVendorHasCategoryAccess(vendorId, effectiveCategoryId, 'SERVICE');
-    await assertBranchHasCategoryAccess(branchId, effectiveCategoryId);
-    const effectiveSubcategoryId = input.subcategoryId ?? deal.subcategoryId ?? undefined;
-    if (effectiveSubcategoryId) {
-      await assertBranchHasSubcategoryAccess(branchId, effectiveCategoryId, effectiveSubcategoryId);
-    }
-    const effectiveDuration = 'durationMinutes' in input ? input.durationMinutes : deal.durationMinutes ?? undefined;
-    assertDurationRequiredForService(effectiveDuration);
-  }
-  if (input.therapistIds) {
-    await assertTherapistsBelongToBranch(vendorId, branchId, input.therapistIds);
-  }
-
-  const { packages, therapistIds, ...dealFields } = input;
-
-  return prisma.$transaction(async (tx) => {
-    await tx.deal.update({ where: { id: dealId }, data: dealFields as unknown as Prisma.DealUncheckedUpdateInput });
-
-    if (packages) {
-      // Replace the full set, diffed by `id` — entries with an id update that row, entries
-      // without one are created, any existing row whose id is no longer present is deleted
-      // (safe: DealPackage's CartItem/OrderItem relations are `onDelete: SetNull`, see
-      // DealPackage's own schema doc comment).
-      const existing = await tx.dealPackage.findMany({ where: { dealId }, select: { id: true } });
-      const keptIds = new Set(packages.filter((p: DealPackageInput) => p.id).map((p: DealPackageInput) => p.id));
-      const toDelete = existing.filter((p) => !keptIds.has(p.id)).map((p) => p.id);
-      if (toDelete.length > 0) {
-        await tx.dealPackage.deleteMany({ where: { id: { in: toDelete } } });
-      }
-      for (const p of packages as DealPackageInput[]) {
-        if (p.id) {
-          await tx.dealPackage.update({
-            where: { id: p.id },
-            data: {
-              durationMinutes: p.durationMinutes,
-              sellingPrice: p.sellingPrice,
-              originalPrice: p.originalPrice,
-              ...(p.isActive !== undefined ? { isActive: p.isActive } : {}),
-              ...(p.sortOrder !== undefined ? { sortOrder: p.sortOrder } : {}),
-            },
-          });
-        } else {
-          await tx.dealPackage.create({
-            data: {
-              dealId,
-              durationMinutes: p.durationMinutes,
-              sellingPrice: p.sellingPrice,
-              originalPrice: p.originalPrice,
-              isActive: p.isActive ?? true,
-              sortOrder: p.sortOrder ?? 0,
-            },
-          });
-        }
-      }
-      await syncDealPriceFromPackages(tx, dealId);
-    }
-
-    if (therapistIds) {
-      // Replace the full set — same semantics as `packages` above (omit the field entirely to
-      // leave existing links untouched).
-      await tx.dealTherapist.deleteMany({ where: { dealId } });
-      if (therapistIds.length > 0) {
-        await tx.dealTherapist.createMany({
-          data: [...new Set(therapistIds)].map((id) => ({ dealId, therapistId: id })),
-        });
-      }
-    }
-
-    return flattenDealTherapists(await tx.deal.findUniqueOrThrow({ where: { id: dealId }, include: OFFERING_INCLUDE }));
-  });
-}
-
-export async function setDealStatus(
-  vendorId: string,
-  branchId: string,
-  dealId: string,
-  status: DealStatus,
-  actorIsAdmin: boolean,
-) {
-  const deal = await getDealScopedOrThrow(vendorId, branchId, dealId);
-  if (!actorIsAdmin && status === 'ACTIVE' && deal.approvalStatus !== 'APPROVED') {
-    throw new ApiError('FORBIDDEN', 'This deal must be approved before it can be activated');
-  }
-  return prisma.deal.update({ where: { id: dealId }, data: { status } });
-}
-
-/** Admin-only (routed only from the admin surface) — approve jumps straight to ACTIVE, same philosophy as vendor approval. */
-export async function approveDeal(vendorId: string, branchId: string, dealId: string) {
-  await getDealScopedOrThrow(vendorId, branchId, dealId);
-  return prisma.deal.update({
-    where: { id: dealId },
-    data: { approvalStatus: 'APPROVED', status: 'ACTIVE', approvalRejectionReason: null },
-  });
-}
-
-export async function rejectDeal(vendorId: string, branchId: string, dealId: string, reason: string) {
-  await getDealScopedOrThrow(vendorId, branchId, dealId);
-  return prisma.deal.update({
-    where: { id: dealId },
-    data: { approvalStatus: 'REJECTED' as DealApprovalStatus, status: 'INACTIVE', approvalRejectionReason: reason },
-  });
-}
-
-/** Superadmin-only hard delete. `CartItem`/`OrderItem`'s `deal` relation has no `onDelete`
- *  (Postgres default = restrict), so a Deal with any real order/cart history can never be
- *  hard-deleted — Postgres blocks it with a clean P2003, translated here to a specific CONFLICT
- *  (use `setDealStatus`'s INACTIVE instead for a deal that has already sold). */
-export async function deleteDeal(vendorId: string, branchId: string, dealId: string) {
-  await getDealScopedOrThrow(vendorId, branchId, dealId);
-  try {
-    await prisma.deal.delete({ where: { id: dealId } });
-  } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
-      throw new ApiError('CONFLICT', 'Cannot delete this deal because it has existing orders or carts referencing it. Deactivate it instead.');
-    }
-    throw err;
-  }
-}
-
-// ─── Deal media (shared upload system — see media.service.ts's doc comment for the full
-// architecture; ownership stays here, mechanics live there, same layering as every other
-// nested Deal resource in this file) ──────────────────────────────────────────
-
-export async function addDealImage(vendorId: string, branchId: string, dealId: string, file: MediaFile) {
-  await getDealScopedOrThrow(vendorId, branchId, dealId);
-  return mediaService.addImage('deal', dealId, file);
-}
-
-export async function deleteDealImage(vendorId: string, branchId: string, dealId: string, imageId: string) {
-  await getDealScopedOrThrow(vendorId, branchId, dealId);
-  return mediaService.deleteImage('deal', dealId, imageId);
-}
-
-export async function reorderDealImages(vendorId: string, branchId: string, dealId: string, orderedImageIds: string[]) {
-  await getDealScopedOrThrow(vendorId, branchId, dealId);
-  return mediaService.reorderImages('deal', dealId, orderedImageIds);
-}
-
-export async function setDealPrimaryImage(vendorId: string, branchId: string, dealId: string, imageId: string) {
-  await getDealScopedOrThrow(vendorId, branchId, dealId);
-  return mediaService.setPrimaryImage('deal', dealId, imageId);
-}
-
-export async function replaceDealVideo(vendorId: string, branchId: string, dealId: string, file: MediaFile) {
-  await getDealScopedOrThrow(vendorId, branchId, dealId);
-  return mediaService.replaceVideo('deal', dealId, file);
-}
-
-export async function deleteDealVideo(vendorId: string, branchId: string, dealId: string) {
-  await getDealScopedOrThrow(vendorId, branchId, dealId);
-  return mediaService.deleteVideo('deal', dealId);
+  return {
+    id: customer.id,
+    name: customer.name,
+    phone: customer.phone,
+    email: customer.email,
+    totalOrders,
+    confirmedPaymentsTotal: Number(confirmed._sum.total ?? 0),
+  };
 }
 
 // ─── Vendor media (shared upload system — see media.service.ts's doc comment; ownership here
 // is just "does this Vendor exist" — the self-service route already resolves its own vendorId
 // via getMyVendorOrThrow before calling these, and the admin route can manage any vendor) ────
 
+/** Member Business Media is a single profile image, not a gallery — a vendor-specific cap of 1,
+ *  tighter than the shared `MAX_IMAGES_PER_ENTITY` ceiling every other entity (Deal/Product/
+ *  Therapist) still uses. Enforced here, not in the shared `media.service.ts`, so this stays a
+ *  Vendor-only rule rather than narrowing every entity's gallery. The frontend's `MediaUploader
+ *  maxImages={1}` already hides the "Upload" control once an image exists (replace = remove,
+ *  then add) — this is the real backend backstop, not just a UX nicety. */
 export async function addVendorImage(vendorId: string, file: MediaFile) {
   await getVendorOrThrow(vendorId);
+  const existingCount = await prisma.vendorImage.count({ where: { vendorId } });
+  if (existingCount >= 1) {
+    throw new ApiError('VALIDATION_ERROR', 'A member can only have one profile image — remove the current one before adding a new one.');
+  }
   return mediaService.addImage('vendor', vendorId, file);
 }
 

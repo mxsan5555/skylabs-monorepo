@@ -6,7 +6,14 @@ vi.mock('../lib/prisma', async () => {
 });
 
 import { prisma } from '../lib/prisma';
-import { createVendorOwner, checkVendorOwnerAvailability, createTherapist, createDeal, updateDeal } from './vendor.service';
+import {
+  createVendor,
+  createVendorOwner,
+  checkVendorOwnerAvailability,
+  createTherapist,
+  listVendors,
+  listMyCustomers,
+} from './vendor.service';
 
 const prismaMock = vi.mocked(prisma, true);
 
@@ -123,11 +130,12 @@ describe('createVendorOwner', () => {
  * it only ever treats a call as "the same submission" when the owner identity matches too.
  */
 describe('createVendor — double-submit guard scoping (regression: two different owners created seconds apart used to collapse into one vendor)', () => {
-  const ROLE_FIXTURE = { id: VENDOR_ROLE_ID, key: 'vendor' };
+  const ROLE_FIXTURE = { id: VENDOR_ROLE_ID, key: 'member' };
 
   /** Arms every downstream call `createVendor` makes once its own double-submit guard clears —
-   *  `createVendorOwner`'s email/phone availability check, the new User insert, `assignRole`'s
-   *  own `getUserOrThrow` + role grant, and `buildAndInsertVendor`'s slug-uniqueness check +
+   *  `createVendorOwner`'s email/phone availability check, the new User insert,
+   *  `ensureVendorRoleAssigned`'s own `replaceUserRole` transaction (deleteMany + create + the
+   *  user update that clears `roleConflict`), and `buildAndInsertVendor`'s slug-uniqueness check +
    *  insert. Keyed off `where.id` (only `getUserOrThrow` queries by id) so the same
    *  `user.findFirst` mock correctly serves both callers regardless of call order. */
   function armDownstreamSuccess(newUserId: string, vendorRow: { id: string; ownerEmail?: string }) {
@@ -139,12 +147,12 @@ describe('createVendor — double-submit guard scoping (regression: two differen
     prismaMock.user.create.mockResolvedValue({ id: newUserId } as never);
     prismaMock.role.findUnique.mockResolvedValue(ROLE_FIXTURE as never);
     prismaMock.userRole.upsert.mockResolvedValue({} as never);
-    prismaMock.vendor.findUnique.mockResolvedValue(null as never); // slug uniqueness check
-    prismaMock.vendor.create.mockResolvedValue({ ...vendorRow, owner: null } as never);
+    prismaMock.member.findUnique.mockResolvedValue(null as never); // slug uniqueness check
+    prismaMock.member.create.mockResolvedValue({ ...vendorRow, owner: null } as never);
   }
 
   it("the guard query is scoped by the submitted owner's email/mobile, not businessName alone", async () => {
-    prismaMock.vendor.findFirst.mockResolvedValue(null); // no recent duplicate
+    prismaMock.member.findFirst.mockResolvedValue(null); // no recent duplicate
     armDownstreamSuccess(NEW_USER_ID, { id: 'vendor-a' });
 
     await createVendor(
@@ -152,7 +160,7 @@ describe('createVendor — double-submit guard scoping (regression: two differen
       ADMIN_ID,
     );
 
-    expect(prismaMock.vendor.findFirst).toHaveBeenCalledWith(
+    expect(prismaMock.member.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           createdByUserId: ADMIN_ID,
@@ -177,7 +185,7 @@ describe('createVendor — double-submit guard scoping (regression: two differen
     // A regardless of who owner B actually was); a field present in `where` must match vendor A's
     // own value to count as a hit. This is what makes the mock fail the same way the real Prisma
     // query did before the fix, and pass once the guard's `where` actually includes owner identity.
-    prismaMock.vendor.findFirst.mockImplementation(async (args: unknown) => {
+    prismaMock.member.findFirst.mockImplementation(async (args: unknown) => {
       const where = (args as { where?: Record<string, unknown> })?.where ?? {};
       if (where.createdByUserId !== ADMIN_ID) return null;
       if (where.businessName !== null) return null;
@@ -242,135 +250,134 @@ function branchFixture(overrides: Partial<{ id: string; vendorId: string }> = {}
 }
 
 /**
- * Feature: branch-level Therapy access is a real, backend-enforced gate — never just a
- * frontend branch-picker filter.
- * Scenario: a branch with zero `BranchCategoryAccess` rows of type THERAPY must be rejected by
- * `createTherapist` even when the caller simply omits `specializationCategoryId` (the one field
- * the pre-existing code already validated) — this is the exact bypass the Issue #2 fix closes.
+ * Feature: therapists need no category grant (D10, P4-15): a branch with no category mapping
+ * still gets therapists (the deal form creates them inline); a specialization must be THERAPY.
  */
-describe('createTherapist — branch-level Therapy access gate', () => {
-  it('rejects with VALIDATION_ERROR when the branch has zero THERAPY category access, even with no specializationCategoryId given', async () => {
+describe('createTherapist — no category grants (D10)', () => {
+  it('creates the therapist on a branch with no category mapping at all', async () => {
     prismaMock.branch.findUnique.mockResolvedValue(branchFixture());
-    prismaMock.branchCategoryAccess.findFirst.mockResolvedValue(null);
-
-    await expect(
-      createTherapist(VENDOR_ID, BRANCH_ID, { therapistType: 'Physio', personName: 'Alex' }),
-    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
-    expect(prismaMock.therapist.create).not.toHaveBeenCalled();
-  });
-
-  it('creates the therapist when the branch has at least one THERAPY category access row', async () => {
-    prismaMock.branch.findUnique.mockResolvedValue(branchFixture());
-    prismaMock.branchCategoryAccess.findFirst.mockResolvedValue({ id: 'bca-1' });
     prismaMock.therapist.findFirst.mockResolvedValue(null);
+    prismaMock.therapist.findUnique.mockResolvedValue(null as never); // slug uniqueness check
     prismaMock.therapist.create.mockResolvedValue({ id: 'th-1' });
 
     const result = await createTherapist(VENDOR_ID, BRANCH_ID, { therapistType: 'Physio', personName: 'Alex' });
 
     expect(result).toEqual({ id: 'th-1' });
-    expect(prismaMock.therapist.create).toHaveBeenCalled();
+    expect(prismaMock.branchCategoryAccess.findFirst).not.toHaveBeenCalled();
+    expect(prismaMock.therapist.create.mock.calls[0][0]!.data).toMatchObject({ vendorId: VENDOR_ID, branchId: BRANCH_ID });
+  });
+
+  it('rejects a specialization that is not a THERAPY category', async () => {
+    prismaMock.branch.findUnique.mockResolvedValue(branchFixture());
+    prismaMock.therapist.findFirst.mockResolvedValue(null);
+    prismaMock.category.findUnique.mockResolvedValue({ id: 'cat-1', parentId: null, type: 'SERVICE' } as never);
+
+    await expect(
+      createTherapist(VENDOR_ID, BRANCH_ID, { therapistType: 'Physio', personName: 'Alex', specializationCategoryId: 'b1b1b1b1-0000-4000-8000-000000000008' }),
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    expect(prismaMock.therapist.create).not.toHaveBeenCalled();
   });
 });
 
-const DEAL_ID = 'a1a1a1a1-0000-4000-8000-000000000007';
-const CATEGORY_ID = 'b1b1b1b1-0000-4000-8000-000000000008';
-const OTHER_BRANCH_ID = 'c2c2c2c2-0000-4000-8000-000000000009';
-const THERAPIST_ID = 'd3d3d3d3-0000-4000-8000-00000000000a';
+/**
+ * Feature: the staff member list filters by status, missing documents, review flag and search,
+ * and every row carries a documents summary.
+ */
+describe('listVendors — member list filters', () => {
+  beforeEach(() => {
+    prismaMock.member.findMany.mockResolvedValue([
+      { id: VENDOR_ID, owner: null, documents: [{ documentType: 'PAN', status: 'APPROVED' }], documentsDueAt: null },
+    ] as never);
+    prismaMock.member.count.mockResolvedValue(1);
+  });
 
-const serviceCategoryFixture = { id: CATEGORY_ID, name: 'Beauty', parentId: null, type: 'SERVICE' };
-const baseDealInput = {
-  categoryId: CATEGORY_ID,
-  title: 'Deep tissue',
-  slug: 'deep-tissue',
-  originalPrice: '399.00',
-  salePrice: '299.00',
-  durationMinutes: 30,
-  packages: [{ durationMinutes: 30, sellingPrice: 299 }],
-};
+  it('documents=incomplete matches members missing any provided AADHAAR, PAN or GST document', async () => {
+    await listVendors({ page: 1, pageSize: 20, documents: 'incomplete' });
+    const where = prismaMock.member.findMany.mock.calls[0][0].where;
+    expect(where.OR).toEqual(
+      ['AADHAAR', 'PAN', 'GST'].map((documentType) => ({
+        documents: { none: { documentType, status: { in: ['SUBMITTED', 'APPROVED'] } } },
+      })),
+    );
+    expect(prismaMock.member.count).toHaveBeenCalledWith({ where });
+  });
 
-/** Arranges every category/branch-access check `createDeal`/`updateDeal` makes before it ever
- *  touches therapist linking, so each test below only needs to vary the therapist-related mocks. */
-function arrangeDealOfferingChecksPass() {
-  prismaMock.category.findUnique.mockResolvedValue(serviceCategoryFixture as never);
-  prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue({ id: 'grant-1' } as never);
-  prismaMock.branchCategoryAccess.findUnique.mockResolvedValue({ id: 'branch-grant-1' } as never);
-  prismaMock.deal.findUnique.mockResolvedValue(null); // slug free
-  prismaMock.dealPackage.findFirst.mockResolvedValue(null); // syncDealPriceFromPackages no-op
-}
+  it('reviewFlag=true matches flagged members only', async () => {
+    await listVendors({ page: 1, pageSize: 20, reviewFlag: 'true', status: 'INACTIVE' });
+    const where = prismaMock.member.findMany.mock.calls[0][0].where;
+    expect(where).toMatchObject({ status: 'INACTIVE', reviewFlaggedAt: { not: null } });
+  });
+
+  it('search covers business name, business email and owner mobile, and combines with the documents filter', async () => {
+    await listVendors({ page: 1, pageSize: 20, search: '98765', documents: 'incomplete' });
+    const where = prismaMock.member.findMany.mock.calls[0][0].where;
+    expect(where.OR).toHaveLength(3);
+    expect(where.AND[0].OR).toEqual(
+      expect.arrayContaining([{ ownerMobile: { contains: '98765' } }, expect.objectContaining({ businessName: expect.anything() })]),
+    );
+  });
+
+  it('adds a documents summary to every row', async () => {
+    const { items, total } = await listVendors({ page: 1, pageSize: 20 });
+    expect(total).toBe(1);
+    expect(items[0].documentsSummary).toMatchObject({ complete: false, missing: ['AADHAAR', 'GST'] });
+  });
+});
 
 /**
- * Feature: a Deal may link the Therapist(s) who perform it, but only ones that actually work at
- * the same branch as the Deal (the real security boundary — see
- * vendor.service.ts#assertTherapistsBelongToBranch).
+ * Member customers (D19, P4-16): name, city, order count, last order date; phone and email only
+ * while the customer has a CONFIRMED order with this member. Staff (`contact: 'full'`) always
+ * get contact details (D12).
  */
-describe('createDeal / updateDeal — therapist linking', () => {
+describe('listMyCustomers', () => {
+  const day = (n: number) => new Date(Date.UTC(2026, 9, n));
+  const item = (orderId: string, customerId: string, status: string, createdAt: Date, shippingCity: string | null = null) => ({
+    orderId,
+    order: { customerId, createdAt, status, shippingCity },
+  });
+
   beforeEach(() => {
-    prismaMock.branch.findUnique.mockResolvedValue(branchFixture());
+    prismaMock.orderItem.findMany.mockResolvedValue([
+      // Asha: two lines of one completed order, then a newer confirmed (open) order.
+      item('o1', 'asha', 'COMPLETED', day(1), 'Pune'),
+      item('o1', 'asha', 'COMPLETED', day(1), 'Pune'),
+      item('o2', 'asha', 'CONFIRMED', day(5), null),
+      // Ravi: only a pending-payment order and a cancelled one: nothing open.
+      item('o3', 'ravi', 'PENDING_PAYMENT', day(3), 'Mumbai'),
+      item('o4', 'ravi', 'CANCELLED', day(4), 'Thane'),
+    ] as never);
+    prismaMock.user.findMany.mockResolvedValue([
+      { id: 'asha', name: 'Asha', phone: '+919800000001', email: 'asha@example.com' },
+      { id: 'ravi', name: 'Ravi', phone: '+919800000002', email: 'ravi@example.com' },
+    ] as never);
   });
 
-  it('rejects with VALIDATION_ERROR and creates nothing when a therapistId belongs to a different branch', async () => {
-    arrangeDealOfferingChecksPass();
-    prismaMock.therapist.findMany.mockResolvedValue([{ id: THERAPIST_ID, vendorId: VENDOR_ID, branchId: OTHER_BRANCH_ID }] as never);
-
-    await expect(
-      createDeal(VENDOR_ID, BRANCH_ID, { ...baseDealInput, therapistIds: [THERAPIST_ID] } as never, true),
-    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
-    expect(prismaMock.deal.create).not.toHaveBeenCalled();
+  it('reads only this member order lines', async () => {
+    await listMyCustomers('m1', { page: 1, pageSize: 20, contact: 'open-orders' });
+    expect(prismaMock.orderItem.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { vendorId: 'm1' } }));
   });
 
-  it('rejects with VALIDATION_ERROR when a therapistId does not exist at all', async () => {
-    arrangeDealOfferingChecksPass();
-    prismaMock.therapist.findMany.mockResolvedValue([]);
-
-    await expect(
-      createDeal(VENDOR_ID, BRANCH_ID, { ...baseDealInput, therapistIds: [THERAPIST_ID] } as never, true),
-    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
-    expect(prismaMock.deal.create).not.toHaveBeenCalled();
-  });
-
-  it('creates the deal and writes DealTherapist rows for each valid, branch-matching therapistId', async () => {
-    arrangeDealOfferingChecksPass();
-    prismaMock.therapist.findMany.mockResolvedValue([{ id: THERAPIST_ID, vendorId: VENDOR_ID, branchId: BRANCH_ID }] as never);
-    prismaMock.deal.create.mockResolvedValue({ id: DEAL_ID } as never);
-    prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ id: DEAL_ID, therapistLinks: [] } as never);
-
-    await createDeal(VENDOR_ID, BRANCH_ID, { ...baseDealInput, therapistIds: [THERAPIST_ID] } as never, true);
-
-    expect(prismaMock.dealTherapist.createMany).toHaveBeenCalledWith({
-      data: [{ dealId: DEAL_ID, therapistId: THERAPIST_ID }],
+  it('member view: contact only with a CONFIRMED order; city from the latest order that has one; distinct order count', async () => {
+    const { items, total } = await listMyCustomers('m1', { page: 1, pageSize: 20, contact: 'open-orders' });
+    expect(total).toBe(2);
+    expect(items[0]).toEqual({
+      id: 'asha', name: 'Asha', city: 'Pune', orderCount: 2, lastActivityAt: day(5), hasOpenOrder: true,
+      phone: '+919800000001', email: 'asha@example.com',
+    });
+    expect(items[1]).toEqual({
+      id: 'ravi', name: 'Ravi', city: 'Thane', orderCount: 2, lastActivityAt: day(4), hasOpenOrder: false,
+      phone: null, email: null,
     });
   });
 
-  it('createDeal never touches DealTherapist when therapistIds is omitted', async () => {
-    arrangeDealOfferingChecksPass();
-    prismaMock.deal.create.mockResolvedValue({ id: DEAL_ID } as never);
-    prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ id: DEAL_ID, therapistLinks: [] } as never);
-
-    await createDeal(VENDOR_ID, BRANCH_ID, baseDealInput as never, true);
-
-    expect(prismaMock.therapist.findMany).not.toHaveBeenCalled();
-    expect(prismaMock.dealTherapist.createMany).not.toHaveBeenCalled();
+  it('staff view always returns contact details', async () => {
+    const { items } = await listMyCustomers('m1', { page: 1, pageSize: 20, contact: 'full' });
+    expect(items.find((c) => c.id === 'ravi')).toMatchObject({ phone: '+919800000002', email: 'ravi@example.com', hasOpenOrder: false });
   });
 
-  it('updateDeal with therapistIds: [] clears every existing link without re-adding any', async () => {
-    prismaMock.deal.findUnique.mockResolvedValue({ id: DEAL_ID, vendorId: VENDOR_ID, branchId: BRANCH_ID, categoryId: CATEGORY_ID } as never);
-    prismaMock.therapist.findMany.mockResolvedValue([]);
-    prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ id: DEAL_ID, therapistLinks: [] } as never);
-
-    await updateDeal(VENDOR_ID, BRANCH_ID, DEAL_ID, { therapistIds: [] } as never);
-
-    expect(prismaMock.dealTherapist.deleteMany).toHaveBeenCalledWith({ where: { dealId: DEAL_ID } });
-    expect(prismaMock.dealTherapist.createMany).not.toHaveBeenCalled();
-  });
-
-  it('updateDeal omitting therapistIds leaves existing links completely untouched', async () => {
-    prismaMock.deal.findUnique.mockResolvedValue({ id: DEAL_ID, vendorId: VENDOR_ID, branchId: BRANCH_ID, categoryId: CATEGORY_ID } as never);
-    prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ id: DEAL_ID, therapistLinks: [] } as never);
-
-    await updateDeal(VENDOR_ID, BRANCH_ID, DEAL_ID, { title: 'Renamed' } as never);
-
-    expect(prismaMock.therapist.findMany).not.toHaveBeenCalled();
-    expect(prismaMock.dealTherapist.deleteMany).not.toHaveBeenCalled();
-    expect(prismaMock.dealTherapist.createMany).not.toHaveBeenCalled();
+  it('pages after sorting by the latest order, newest first', async () => {
+    const { items, total } = await listMyCustomers('m1', { page: 2, pageSize: 1, contact: 'open-orders' });
+    expect(total).toBe(2);
+    expect(items.map((c) => c.id)).toEqual(['ravi']);
   });
 });

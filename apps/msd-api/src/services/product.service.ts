@@ -1,11 +1,12 @@
 import type { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
-import { assertCategoryChildOf, assertVendorHasCategoryAccess } from './category.service';
+import { assertCategoryChildOf, assertCategoryOfType } from './category.service';
 import * as mediaService from './media.service';
 import type { MediaFile } from './media.service';
 import { Prisma } from '../generated/prisma-client';
 import type { ProductCreateSchema, ProductUpdateSchema } from '../schemas/product.schema';
+import { sanitizeRichText } from '../lib/rich-text';
 
 type ProductCreateInput = z.infer<typeof ProductCreateSchema>;
 type ProductUpdateInput = z.infer<typeof ProductUpdateSchema>;
@@ -96,15 +97,30 @@ async function assertSlugAvailable(slug: string, excludeId?: string) {
   }
 }
 
+/** Sanitizes every `<sky-rich-text-editor>`-backed field present on a Product create/update
+ *  input before it ever reaches Prisma (`description`/`returnPolicy`) — the schema
+ *  (`richTextField` in common.schema.ts) only validates plain-text length, it never trusts the
+ *  client's HTML as already-clean. Fields absent from `input` stay absent. */
+function sanitizeProductRichTextFields<T extends { description?: string; returnPolicy?: string }>(input: T): T {
+  const next = { ...input } as Record<string, unknown>;
+  for (const key of ['description', 'returnPolicy'] as const) {
+    if (key in input) next[key] = sanitizeRichText(input[key]);
+  }
+  return next as T;
+}
+
 export async function createProduct(vendorId: string, input: ProductCreateInput) {
   await assertSlugAvailable(input.slug);
   await assertCategoryChildOf(input.categoryId, input.subcategoryId);
-  await assertVendorHasCategoryAccess(vendorId, input.categoryId, 'PRODUCT');
+  await assertCategoryOfType(input.categoryId, 'PRODUCT');
   // App-layer pre-check above is a racy read, not an atomic guarantee (two near-simultaneous
   // double-submits of the same form could both pass it before either commits) — Product.slug's
   // DB-level @unique is the hard backstop, same discipline as vendor.service.ts#createDeal.
   try {
-    return await prisma.product.create({ data: { ...input, vendorId }, include: CATEGORY_INCLUDE });
+    return await prisma.product.create({
+      data: { ...sanitizeProductRichTextFields(input), vendorId },
+      include: CATEGORY_INCLUDE,
+    });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       throw new ApiError('CONFLICT', `Product slug "${input.slug}" already exists`);
@@ -123,9 +139,13 @@ export async function updateProduct(vendorId: string, productId: string, input: 
     );
   }
   if (input.categoryId) {
-    await assertVendorHasCategoryAccess(vendorId, input.categoryId, 'PRODUCT');
+    await assertCategoryOfType(input.categoryId, 'PRODUCT');
   }
-  return prisma.product.update({ where: { id: productId }, data: input, include: CATEGORY_INCLUDE });
+  return prisma.product.update({
+    where: { id: productId },
+    data: sanitizeProductRichTextFields(input),
+    include: CATEGORY_INCLUDE,
+  });
 }
 
 export async function setProductStatus(vendorId: string, productId: string, isActive: boolean) {

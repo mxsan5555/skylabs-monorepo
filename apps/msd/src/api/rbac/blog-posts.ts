@@ -61,35 +61,42 @@ function toQuery(params: Record<string, string | number | undefined>): string {
   return qs ? `?${qs}` : '';
 }
 
-export function listBlogPosts(
-  token: string | null,
-  opts: {
-    page?: number;
-    pageSize?: number;
-    search?: string;
-    status?: BlogPostStatus;
-    categoryId?: string;
-  } = {},
-) {
-  return apiGet<BlogPost[]>(`/blog-posts${toQuery(opts)}`, token);
+function blogPostApi(resource: '/blog-posts' | '/blog-articles') {
+  function listBlogPosts(
+    token: string | null,
+    opts: {
+      page?: number;
+      pageSize?: number;
+      search?: string;
+      status?: BlogPostStatus;
+      categoryId?: string;
+    } = {},
+  ) {
+    return apiGet<BlogPost[]>(`${resource}${toQuery(opts)}`, token);
+  }
+
+  function getBlogPost(token: string | null, id: string) {
+    return apiGet<BlogPost>(`${resource}/${id}`, token);
+  }
+
+  function createBlogPost(token: string | null, input: BlogPostInput) {
+    return apiPost<BlogPost>(resource, token, input);
+  }
+
+  function updateBlogPost(token: string | null, id: string, input: Partial<BlogPostInput>) {
+    return apiPatch<BlogPost>(`${resource}/${id}`, token, input);
+  }
+
+  function setBlogPostStatus(token: string | null, id: string, status: BlogPostStatus) {
+    return apiPatch<BlogPost>(`${resource}/${id}/status`, token, { status });
+  }
+
+  function deleteBlogPost(token: string | null, id: string) {
+    return apiDelete<null>(`${resource}/${id}`, token);
+  }
+
+  return { listBlogPosts, getBlogPost, createBlogPost, updateBlogPost, setBlogPostStatus, deleteBlogPost };
 }
 
-export function getBlogPost(token: string | null, id: string) {
-  return apiGet<BlogPost>(`/blog-posts/${id}`, token);
-}
-
-export function createBlogPost(token: string | null, input: BlogPostInput) {
-  return apiPost<BlogPost>('/blog-posts', token, input);
-}
-
-export function updateBlogPost(token: string | null, id: string, input: Partial<BlogPostInput>) {
-  return apiPatch<BlogPost>(`/blog-posts/${id}`, token, input);
-}
-
-export function setBlogPostStatus(token: string | null, id: string, status: BlogPostStatus) {
-  return apiPatch<BlogPost>(`/blog-posts/${id}/status`, token, { status });
-}
-
-export function deleteBlogPost(token: string | null, id: string) {
-  return apiDelete<null>(`/blog-posts/${id}`, token);
-}
+export const { listBlogPosts, getBlogPost, createBlogPost, updateBlogPost, setBlogPostStatus, deleteBlogPost } = blogPostApi('/blog-posts');
+export const blogArticlesApi = blogPostApi('/blog-articles');

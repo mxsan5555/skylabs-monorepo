@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { useRef } from 'react';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ToastProvider } from '../../../../toast/toast-context';
+import { SnackbarHost } from '../../../../snackbar/snackbar';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import type { BlogPost } from '../../../../api/rbac/blog-posts';
 import { BlogFormDialog } from './blog-form-dialog';
@@ -57,7 +57,7 @@ function renderDialog(props: {
   function Harness() {
     const dialogRef = useRef<MdDialog>(null);
     return (
-      <ToastProvider>
+      <>
         <BlogFormDialog
           dialogRef={dialogRef}
           token="tok"
@@ -66,7 +66,8 @@ function renderDialog(props: {
           categoriesLoading={props.categoriesLoading ?? false}
           onSave={props.onSave}
         />
-      </ToastProvider>
+        <SnackbarHost />
+      </>
     );
   }
   return render(<Harness />);
@@ -159,14 +160,14 @@ describe('BlogFormDialog — submit payload', () => {
     expect(await screen.findByText('Fix the highlighted fields and try again.')).toBeTruthy();
   });
 
-  it('a non-validation ApiRequestError shows its own message and a toast, without any field-level error', async () => {
+  it('a non-validation ApiRequestError shows its own message and a snackbar, without any field-level error', async () => {
     const onSave = vi.fn().mockRejectedValue(new ApiRequestError('CONFLICT', 'Blog post slug already exists', 409));
     renderDialog({ post: existingPost, onSave });
 
     fireEvent.click(saveButton());
 
-    // Renders twice by design — once as the inline `error-state` paragraph, once as the toast
-    // (see `submit()`'s catch block: both `setError(msg)` and `showToast(msg, 'error')` fire).
+    // Renders twice by design — once as the inline `error-state` paragraph, once as the snackbar
+    // (see `submit()`'s catch block: both `setError(msg)` and `showSnackbar(msg, ...)` fire).
     await waitFor(() => expect(screen.getAllByText('Blog post slug already exists').length).toBeGreaterThan(0));
     expect(screen.queryByText('Fix the highlighted fields and try again.')).toBeNull();
   });

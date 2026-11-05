@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import type { SkyDataTableParamsDetail } from '@skylabs-monorepo/shared-ui';
 import type { Customer, CustomerStatus } from '../../../../api/rbac/customers';
+import { formatINR } from '../../../../utils/format';
 
 interface CustomerTableParams {
   page: number;
@@ -28,8 +29,8 @@ interface CustomerListProps {
 }
 
 /** DB enum stays `active | inactive | blocked` (do not rename) — the UI displays `blocked` as
- *  "Suspended". Used both for the table's Status cell and reused by `customers.tsx` for the
- *  detail panel's Status stat-card so the two never drift out of sync. */
+ *  "Suspended". Used both for the table's Status cell and the detail page's own status display,
+ *  so the two never drift out of sync. */
 const CUSTOMER_STATUS_LABEL: Record<CustomerStatus, string> = {
   active: 'Active',
   inactive: 'Inactive',
@@ -40,6 +41,17 @@ export function customerStatusLabel(status: CustomerStatus): string {
   return CUSTOMER_STATUS_LABEL[status] ?? status;
 }
 
+/** A brand-new OTP signup has no name-collection step — `User.name` is seeded from the raw
+ *  phone/email identifier itself (see msd-api's `auth.service.ts`'s OTP signup, `name:
+ *  identifier`) — so a customer who never touched their profile has `name === phone` (or
+ *  `=== email`). Showing that verbatim in the "Customer" column would just repeat the adjacent
+ *  "Contact" line; "Name not added" is the honest fallback instead of inventing a display name. */
+export function customerDisplayName(customer: Pick<Customer, 'name' | 'phone' | 'email'>): string {
+  if (!customer.name) return 'Name not added';
+  if (customer.name === customer.phone || customer.name === customer.email) return 'Name not added';
+  return customer.name;
+}
+
 const CUSTOMER_STATUS_MAP: Record<string, 'success' | 'warning' | 'error'> = {
   Active: 'success',
   Inactive: 'warning',
@@ -47,15 +59,15 @@ const CUSTOMER_STATUS_MAP: Record<string, 'success' | 'warning' | 'error'> = {
 };
 
 const CUSTOMER_COLUMNS = JSON.stringify([
-  { key: 'Customer Name', label: 'Customer Name' },
-  { key: 'Mobile', label: 'Mobile' },
-  { key: 'Email', label: 'Email' },
-  { key: 'Status', label: 'Status', type: 'status', statusMap: CUSTOMER_STATUS_MAP },
-  { key: 'Orders', label: 'Orders' },
-  { key: 'Created At', label: 'Created At' },
+  { key: 'Customer', label: 'Customer / Contact', secondaryKey: 'Contact Detail' },
+  { key: 'Status', label: 'Account Status', type: 'status', statusMap: CUSTOMER_STATUS_MAP },
+  { key: 'Total Orders', label: 'Total Orders' },
+  { key: 'Net Paid', label: 'Net Paid' },
+  { key: 'Last Order', label: 'Last Order' },
+  { key: 'Joined', label: 'Joined' },
 ]);
 
-const CUSTOMER_VIEW_ACTION = { icon: 'chevron_right', label: 'View', event: 'select' };
+const CUSTOMER_VIEW_ACTION = { icon: 'chevron_right', label: 'View Customer', event: 'select' };
 
 /** sky-data-table's `actions` prop is one flat list rendered identically on every row (see
  *  `packages/shared-ui/src/components/sky-data-table/sky-data-table.ts` — no per-row action
@@ -77,18 +89,19 @@ const ACTION_TARGET_STATUS: Record<string, CustomerStatus> = {
 
 /** Flat row for <sky-data-table> — 'Customer ID' and 'Customer Status' are extra (non-column)
  *  keys used only by the row-action handler below (to look the customer back up, and to guard
- *  status-change no-ops against the row's real current status); they are not visible columns.
- *  'Status' itself is the display label ("Suspended", never "Blocked"/"blocked"). */
+ *  status-change no-ops against the row's real current status); they are not visible columns. */
 function toCustomerRow(customer: Customer): Record<string, string | number> {
+  const contactBits = [customer.phone, customer.email].filter(Boolean);
   return {
     'Customer ID': customer.id,
     'Customer Status': customer.status,
-    'Customer Name': customer.name,
-    Mobile: customer.phone ?? '—',
-    Email: customer.email ?? '—',
+    Customer: customerDisplayName(customer),
+    'Contact Detail': contactBits.join(' · ') || 'No contact on file',
     Status: customerStatusLabel(customer.status),
-    Orders: customer._count.orders,
-    'Created At': new Date(customer.createdAt).toLocaleDateString(),
+    'Total Orders': customer._count.orders,
+    'Net Paid': formatINR(customer.netPaid),
+    'Last Order': customer.lastOrderAt ? new Date(customer.lastOrderAt).toLocaleDateString() : '—',
+    Joined: new Date(customer.createdAt).toLocaleDateString(),
   };
 }
 

@@ -1,9 +1,10 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ToastProvider } from '../../../../toast/toast-context';
 import type { Customer } from '../../../../api/rbac/customers';
 import { ApiRequestError } from '../../../../api/rbac/client';
+import { SnackbarHost } from '../../../../snackbar/snackbar';
+import { CustomerManagement } from './customers';
 
 let grantedPermissions: Set<string>;
 
@@ -17,6 +18,7 @@ vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
 const listCustomersMock = vi.fn();
 const getCustomerMock = vi.fn();
 const setCustomerStatusMock = vi.fn();
+const createCustomerMock = vi.fn();
 
 vi.mock('../../../../api/rbac/customers', async () => {
   const actual = await vi.importActual<typeof import('../../../../api/rbac/customers')>('../../../../api/rbac/customers');
@@ -25,10 +27,10 @@ vi.mock('../../../../api/rbac/customers', async () => {
     listCustomers: (...args: unknown[]) => listCustomersMock(...args),
     getCustomer: (...args: unknown[]) => getCustomerMock(...args),
     setCustomerStatus: (...args: unknown[]) => setCustomerStatusMock(...args),
+    createCustomer: (...args: unknown[]) => createCustomerMock(...args),
   };
 });
 
-import { CustomerManagement } from './customers';
 
 const CUSTOMER: Customer = {
   id: 'customer-1',
@@ -38,15 +40,19 @@ const CUSTOMER: Customer = {
   status: 'active',
   createdAt: '2026-01-01T00:00:00Z',
   _count: { orders: 3 },
+  netPaid: 4500,
+  awaitingPayment: 0,
+  lastOrderAt: '2026-02-01T00:00:00Z',
 };
 
 function renderPage() {
   return render(
-    <ToastProvider>
+    <>
       <MemoryRouter>
         <CustomerManagement />
       </MemoryRouter>
-    </ToastProvider>,
+      <SnackbarHost />
+    </>
   );
 }
 
@@ -82,17 +88,17 @@ afterEach(() => {
 });
 
 /**
- * Feature: Customer Management — status-change confirm/API/toast flow
+ * Feature: Customer Management — status-change confirm/API/snackbar flow
  * Scenario: `doStatusChange` confirms via the themed `useConfirmDialog` (M3 Dialog, matching the
  * Showcase's `/showcase#dialog` component — see `confirm-dialog.tsx`), calls `setCustomerStatus`,
- * updates local state only on success (never optimistically), and shows a success/error toast —
+ * updates local state only on success (never optimistically), and shows a success/error snackbar —
  * same `blog-list.tsx#toggleStatus` pattern this codebase already uses elsewhere.
  *
  * Given: a SuperAdmin/staff viewing the Customer directory with `customers:status_change`
  * When: a status-change row action fires
  * Then: the confirm dialog gates the call; confirming it updates the table/detail and shows a
- *       success toast; cancelling it never calls the API; a failed API call shows an error
- *       toast and leaves the displayed status unchanged
+ *       success snackbar; cancelling it never calls the API; a failed API call shows an error
+ *       snackbar and leaves the displayed status unchanged
  *
  * Edge cases:
  * - a caller without `customers:status_change` sees no status-change actions (covered by
@@ -115,7 +121,7 @@ describe('CustomerManagement — status change', () => {
     expect(actions.map((a) => a.event)).toEqual(['select']);
   });
 
-  it('confirms via the themed dialog, then calls setCustomerStatus and shows a success toast', async () => {
+  it('confirms via the themed dialog, then calls setCustomerStatus and shows a success snackbar', async () => {
     setCustomerStatusMock.mockResolvedValue({ data: { ...CUSTOMER, status: 'blocked' } });
     renderPage();
     await waitForTableLoaded(1);
@@ -142,7 +148,7 @@ describe('CustomerManagement — status change', () => {
     expect(setCustomerStatusMock).not.toHaveBeenCalled();
   });
 
-  it('a failed status-change call shows an error toast and never changes the displayed status', async () => {
+  it('a failed status-change call shows an error snackbar and never changes the displayed status', async () => {
     setCustomerStatusMock.mockRejectedValue(new ApiRequestError('CONFLICT', 'Could not change status.', 409));
     renderPage();
     await waitForTableLoaded(1);
@@ -156,5 +162,36 @@ describe('CustomerManagement — status change', () => {
     // Still showing the original active-derived row — never optimistically flipped to Suspended.
     const rows = JSON.parse(table().getAttribute('rows') ?? '[]') as { Status: string }[];
     expect(rows[0].Status).toBe('Active');
+  });
+});
+
+/**
+ * Feature: Super Admin adding a customer directly (matrix: Customers = VC)
+ * Scenario: the "New customer" action is gated on `customers:create`; submitting the dialog calls
+ * `createCustomer` (no internal-role selector anywhere on this form) and prepends the new row.
+ */
+describe('CustomerManagement — Super Admin creates a customer directly', () => {
+  it('hides "New customer" without customers:create', async () => {
+    grantedPermissions = new Set(['customers:view']);
+    renderPage();
+    await waitForTableLoaded(1);
+    expect(screen.queryByText('New customer')).toBeNull();
+  });
+
+  // `@lit/react`-wrapped Material text fields can't have their live value simulated under jsdom
+  // (no native value setter — same documented gap as `settings.test.tsx`), so this verifies the
+  // dialog opens with exactly Name/Email/Phone (no internal-role selector anywhere on this form)
+  // rather than simulating typed input + submission. `createCustomer`'s own call shape (resolves
+  // and assigns the existing `customer` role server-side) is covered by the backend's
+  // `customers.routes.test.ts` suite.
+  it('shows "New customer" with customers:create, opening a dialog with Name/Email/Phone only (no role field)', async () => {
+    grantedPermissions = new Set(['customers:view', 'customers:create']);
+    renderPage();
+    await waitForTableLoaded(1);
+
+    fireEvent.click(await screen.findByText('New customer'));
+    const fields = Array.from(document.querySelectorAll('md-outlined-text-field'));
+    expect(fields).toHaveLength(3); // Name, Email, Phone — never a role/roleIds selector
+    expect(createCustomerMock).not.toHaveBeenCalled();
   });
 });

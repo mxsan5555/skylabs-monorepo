@@ -1,3 +1,4 @@
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 import { of, throwError } from 'rxjs';
@@ -11,7 +12,8 @@ describe('AccountService', () => {
       get: vi.fn().mockReturnValue(getResult),
       update: vi.fn(),
     };
-    const authMock = { refreshBootstrap: vi.fn().mockResolvedValue(undefined) };
+    const bootstrap=signal<any>({user:{id:'own-user'}});
+    const authMock = { bootstrap, refreshBootstrap: vi.fn().mockResolvedValue(undefined) };
     TestBed.configureTestingModule({
       providers: [
         { provide: AccountApiService, useValue: apiMock },
@@ -24,6 +26,7 @@ describe('AccountService', () => {
   it('loads the real profile from GET /rbac/users/me on construction — not a hardcoded seed', () => {
     setup();
     const service = TestBed.inject(AccountService);
+    TestBed.tick();
     expect(service.profile()).toEqual({ name: 'Ravi', email: 'ravi@example.com', phone: '9000000000' });
     expect(service.loading()).toBe(false);
   });
@@ -32,12 +35,14 @@ describe('AccountService', () => {
     const { apiMock } = setup(of({ name: '', email: '', phone: '' }));
     apiMock.get.mockReturnValue({ subscribe: () => undefined } as any); // never resolves
     const service = TestBed.inject(AccountService);
+    TestBed.tick();
     expect(service.loading()).toBe(true);
   });
 
   it('a failed fetch stops loading without throwing (profile page can show an error state)', () => {
     setup(throwError(() => new Error('network down')));
     const service = TestBed.inject(AccountService);
+    TestBed.tick();
     expect(service.loading()).toBe(false);
   });
 
@@ -45,6 +50,7 @@ describe('AccountService', () => {
     const { apiMock, authMock } = setup();
     apiMock.update.mockReturnValue(of({ name: 'Ravi K.', email: 'ravi@example.com', phone: '9000000000' }));
     const service = TestBed.inject(AccountService);
+    TestBed.tick();
 
     await new Promise<void>((resolve) => {
       service.updateProfile({ name: 'Ravi K.' }).subscribe(() => resolve());
@@ -55,10 +61,19 @@ describe('AccountService', () => {
     expect(authMock.refreshBootstrap).toHaveBeenCalled();
   });
 
+  it('clears the previous profile and uses user-scoped addresses on logout/account change',()=>{
+    const {authMock}=setup();const service=TestBed.inject(AccountService);TestBed.tick();
+    service.addAddress({label:'Home',line1:'Saved by own user',city:'Delhi',state:'Delhi',postalCode:'110001',country:'India'});
+    expect(service.addresses()).toHaveLength(1);
+    authMock.bootstrap.set(null);TestBed.tick();expect(service.profile().name).toBe('');expect(service.addresses()).toEqual([]);
+    authMock.bootstrap.set({user:{id:'another-user'}});TestBed.tick();expect(service.addresses()).toEqual([]);
+  });
+
   it('a failed updateProfile() propagates the error to the caller instead of silently updating', async () => {
     const { apiMock } = setup();
     apiMock.update.mockReturnValue(throwError(() => new Error('email already in use')));
     const service = TestBed.inject(AccountService);
+    TestBed.tick();
 
     let caught: unknown;
     await new Promise<void>((resolve) => {

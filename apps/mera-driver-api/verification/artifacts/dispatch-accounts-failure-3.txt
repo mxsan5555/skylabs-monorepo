@@ -1,0 +1,74 @@
+directions_car
+mera-driver
+Driver console
+dashboard
+Dashboard
+people
+Customers
+sports_motorsports
+Drivers
+directions_car
+Vehicles
+route
+TRIPS & BOOKINGS
+expand_more
+route
+Admin Dispatch
+sell
+Pricing
+event_available
+Attendance
+account_balance
+ACCOUNTS
+expand_more
+local_offer
+PROMOTIONS
+expand_more
+quiz
+FAQs
+rate_review
+Feedback
+insights
+Reports
+category
+DRIVER MASTERS
+expand_more
+admin_panel_settings
+ADMINISTRATION
+expand_more
+fact_check
+KYC Assignments
+settings
+Settings
+list
+Job Types
+list
+Job Choices
+list
+Work States
+list
+Driver Statuses
+S
+Super Admin
+9889259224
+person
+logout
+dock_to_right
+Account
+Admin Dispatch
+Admin Dispatch
+Trip status
+All trip statuses
+Finding a driver
+Confirmed
+On the way
+Arrived
+In progress
+Completed
+Cancelled
+Schedule from
+Schedule to
+Apply dispatch filters
+Clear dispatch filters
+
+View booking opens the full details. Assign eligible driver opens the paginated driver picker; blocked candidates cannot be assigned.

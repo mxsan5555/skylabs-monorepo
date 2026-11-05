@@ -1,0 +1,41 @@
+<md-admin-page title="My Trips" subtitle="Upcoming, active, completed and cancelled trips.">
+  @if (error()) {
+    <p class="otp-muted" role="alert">{{ error() }}</p>
+  }
+  <div class="flex flex-wrap gap-2" role="tablist">
+    @for (name of groupNames; track name) {
+      <md-filter-chip [label]="name" [selected]="view() === name" (click)="view.set(name)"></md-filter-chip>
+    }
+  </div>
+
+  @if (loading()) {
+    <p class="otp-muted">Loading…</p>
+  } @else if (visible().length === 0) {
+    <section class="account-card">
+      <p class="otp-muted">No {{ view().toLowerCase() }} trips.</p>
+    </section>
+  } @else {
+    @for (trip of visible(); track trip.id) {
+      <section class="account-card">
+        <div class="account-card__head">
+          <h2>{{ trip.bookingCode }}</h2>
+          <sky-badge variant="secondary">{{ statusLabel(trip.status) }}</sky-badge>
+        </div>
+        <p>Pickup: {{ trip.pickupAddress ?? 'Not provided' }}</p>
+        <p>Drop: {{ trip.dropAddress ?? 'Not provided' }}</p>
+        <p>Scheduled: {{ trip.startsAt ? (trip.startsAt | date: 'medium') : 'Not scheduled' }}</p>
+        <p>Fare: {{ money(trip.farePaise) }} · Your share: {{ money(trip.driverSharePaise) }}</p>
+        @if (nextStatus(trip)) {
+          <div style="display:flex;gap:10px;">
+            <md-filled-button [disabled]="!!updating()" (click)="advance(trip)">
+              {{ updating() === trip.id ? 'Updating…' : 'Mark ' + statusLabel(nextStatus(trip)!) }}
+            </md-filled-button>
+            @if (['confirmed', 'on_the_way'].includes(trip.status)) {
+              <md-outlined-button [disabled]="!!updating()" (click)="cancel(trip)">Cancel</md-outlined-button>
+            }
+          </div>
+        }
+      </section>
+    }
+  }
+</md-admin-page>

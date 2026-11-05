@@ -1,6 +1,7 @@
 <div class="admin-layout" [class.is-collapsed]="collapsed()">
-  <md-sidebar></md-sidebar>
-  <div class="admin-main">
+  @if (!collapsed()) { <button type="button" class="admin-sidebar-backdrop" aria-label="Close navigation" (click)="closeSidebar()"></button> }
+  <md-sidebar [open]="!collapsed()" (close)="closeSidebar()"></md-sidebar>
+  <div class="admin-main" [attr.inert]="mobileMenuOpen() ? '' : null">
     @if (auth.isPreviewing()) {
       <div
         class="flex items-center justify-between gap-3 bg-[var(--md-sys-color-tertiary-container,#ffd8e4)] px-5 py-2 text-sm text-[var(--md-sys-color-on-tertiary-container,#31111d)]"
@@ -30,6 +31,7 @@
       </nav>
     </div>
     <main class="admin-content">
+      @if (authorizationConflicts().length) { <sky-card><p role="alert">Additional assignments or direct overrides contribute to your effective access:</p>@for (conflict of authorizationConflicts(); track conflict) { <p>{{ conflict }}</p> }</sky-card> }
       <router-outlet></router-outlet>
     </main>
   </div>

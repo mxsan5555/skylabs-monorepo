@@ -67,3 +67,20 @@ function maskEmail(email: string): string {
   if (!domain) return email;
   return `${user.slice(0, 2)}***@${domain}`;
 }
+
+/** Sends a plain text transactional email. Returns true only once SMTP accepted it. */
+export async function sendEmail(to: string, subject: string, text: string): Promise<boolean> {
+  const missing = REQUIRED_ENV.filter(([, value]) => !value).map(([name]) => name);
+  if (missing.length > 0) {
+    console.error(`[email:smtp] cannot send, missing env var(s): ${missing.join(', ')}`);
+    return false;
+  }
+  try {
+    const info = await getTransporter().sendMail({ from: env.emailFrom, to, subject, text });
+    console.info(`[email:smtp] sent to=${maskEmail(to)} messageId=${info.messageId}`);
+    return true;
+  } catch (err) {
+    console.error(`[email:smtp] request FAILED to=${maskEmail(to)} error=${(err as Error).message}`);
+    return false;
+  }
+}

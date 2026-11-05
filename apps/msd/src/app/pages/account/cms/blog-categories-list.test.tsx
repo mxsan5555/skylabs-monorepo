@@ -1,7 +1,8 @@
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ToastProvider } from '../../../../toast/toast-context';
+import { SnackbarHost } from '../../../../snackbar/snackbar';
 import type { BlogCategory } from '../../../../api/rbac/blog-categories';
+import { BlogCategoriesList } from './blog-categories-list';
 
 let grantedPermissions: Set<string>;
 
@@ -28,7 +29,6 @@ vi.mock('../../../../api/rbac/blog-categories', async () => {
   };
 });
 
-import { BlogCategoriesList } from './blog-categories-list';
 
 const CATEGORY: BlogCategory = {
   id: 'cat-1',
@@ -43,9 +43,10 @@ const CATEGORY: BlogCategory = {
 
 function renderList() {
   return render(
-    <ToastProvider>
+    <>
       <BlogCategoriesList />
-    </ToastProvider>,
+      <SnackbarHost />
+    </>,
   );
 }
 
