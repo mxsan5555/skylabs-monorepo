@@ -77,7 +77,7 @@ test.describe('Member Suspension — real browser against the real running backe
       await expect(page.getByText(/not found/i)).toHaveCount(0);
     } finally {
       // Always leave the real seeded vendor ACTIVE, even if an assertion above failed.
-      await setStatus(request, 'ACTIVE').catch(() => {});
+      await setStatus(request, 'ACTIVE').catch(() => undefined);
     }
   });
 });

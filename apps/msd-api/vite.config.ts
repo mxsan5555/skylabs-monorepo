@@ -14,6 +14,10 @@ export default defineConfig(() => ({
     watch: false,
     globals: true,
     environment: 'node',
+    env: {
+      DATABASE_URL: 'postgresql://test:test@localhost:5432/msd_test',
+      JWT_SECRET: 'test-only-jwt-secret-not-used-outside-vitest',
+    },
     include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}', 'prisma/**/*.test.ts'],
     reporters: ['default'],
     coverage: {

@@ -235,6 +235,7 @@ describe('DealFormPage — create', () => {
     setText(fieldByLabel('Price'), '999');
     fireEvent.click(button('Save package') as HTMLElement);
     await screen.findByText('60 min');
+    await waitFor(() => expect(button('Add package')).toBeTruthy());
     fireEvent.click(button('Add package') as HTMLElement);
     setText(fieldByLabel('Price'), '1299');
     fireEvent.click(button('Save package') as HTMLElement);
