@@ -18,13 +18,11 @@ import { SummaryPanel } from '../../components/summary-panel/summary-panel';
 import { showSnackbar } from '../../../snackbar/snackbar';
 import content from '../../../content.json';
 import { Seo } from '../../seo/seo';
-
 const t = content.cart;
 const errorText = (err: unknown, fallback: string) => (err instanceof ApiRequestError ? err.message : fallback);
 const itemCount = (count: number) => (count === 1 ? t.itemCountOne : fillTemplate(t.itemCountMany, { count: String(count) }));
 const TITLE_ID = 'cart-title';
 const SUMMARY_ID = 'cart-summary-title';
-
 /**
  * Real, backend-driven cart. Deal/Product/Therapist are purchasable together in ONE cart, ONE
  * checkout, ONE order — there is no separate Deal Cart / Therapist Cart / Product Cart, and no
@@ -49,14 +47,12 @@ export function Cart() {
       .catch((err) => setError(errorText(err, t.error.load)))
       .finally(() => setLoading(false));
   }, [token]);
-  useEffect(() => {load(); }, [load]);
+  useEffect(() => { load(); }, [load]);
   const items = cart?.items ?? [];
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
   const subtotal = items.reduce((sum, i) => sum + Number(i.unitPrice) * i.quantity, 0);
-  // Only ids still in the cart count, so a line removed elsewhere drops out of the selection.
   const selectedIds = items.filter((item) => selected.has(item.id)).map((item) => item.id);
   const allSelected = items.length > 0 && selectedIds.length === items.length;
-
   const toggle = (itemId: string, checked: boolean) =>
     setSelected((prev) => {
       const next = new Set(prev);
@@ -65,32 +61,27 @@ export function Cart() {
       return next;
     });
   const toggleAll = (checked: boolean) => setSelected(new Set(checked ? items.map((item) => item.id) : []));
-
   const changeQty = async (itemId: string, quantity: number) => {
     if (quantity < 1) return;
     setError('');
     try {
       const { data } = await updateCartItemQuantity(token, itemId, quantity);
       setCart(data);
-    } catch (err) {
-      setError(errorText(err, t.error.updateQuantity));
-    }
+    } catch (err) { setError(errorText(err, t.error.updateQuantity)); }
   };
   const remove = async (itemId: string) => {
     setError('');
     try {
       const { data } = await removeCartItem(token, itemId);
       setCart(data);
-    } catch (err) {
-      setError(errorText(err, t.error.removeItem));
     }
+    catch (err) { setError(errorText(err, t.error.removeItem)); }
   };
   const removeSelected = async () => {
     if (selectedIds.length === 0) return;
     setError('');
     setBusy(true);
     try {
-      // One call when every line goes; otherwise line by line (there is no bulk delete).
       let latest: CartData | null = null;
       if (allSelected) latest = (await clearCart(token)).data;
       else for (const id of selectedIds) latest = (await removeCartItem(token, id)).data;
@@ -100,9 +91,7 @@ export function Cart() {
     } catch (err) {
       setError(errorText(err, t.error.removeSelected));
       load();
-    } finally {
-      setBusy(false);
-    }
+    } finally { setBusy(false); }
   };
   const moveToWishlist = async (item: CartItem) => {
     setError('');
@@ -117,19 +106,12 @@ export function Cart() {
       setError(errorText(err, t.error.moveToWishlist));
     }
   };
-  const doCheckout = () => {
-    // The real order-creation call happens on /checkout itself, so a page refresh mid-payment
-    // retries against the same Order instead of silently creating another one here.
-    navigate('/checkout');
-  };
+  const doCheckout = () => { navigate('/checkout'); };
   const seo = <Seo title={content.meta.cart.title} description={content.meta.cart.description} path={content.meta.cart.path} noindex="follow" />;
   if (loading) return <p className="loading-state">{t.loading}</p>;
   const errorAlert = error && (
-    <p className="error-state" role="alert">
-      {error}
-    </p>
+    <p className="error-state" role="alert">{error}</p>
   );
-
   if (items.length === 0) {
     return (
       <PageSection aria-labelledby={TITLE_ID}>
@@ -148,12 +130,9 @@ export function Cart() {
       </PageSection>
     );
   }
-
   return (
-    <PageSection aria-labelledby={TITLE_ID}>
-      {seo}
-      <SplitLayout
-        asideLabel={t.orderSummaryHeading}
+    <PageSection aria-labelledby={TITLE_ID}>{seo}
+      <SplitLayout asideLabel={t.orderSummaryHeading}
         aside={
           <SummaryPanel
             id={SUMMARY_ID}
@@ -163,11 +142,8 @@ export function Cart() {
             note={t.serverPriceNote}
             actions={
               <>
-                <FilledButton onClick={doCheckout}>
-                  {t.checkoutCta}
-                  <Icon slot="trailing-icon" aria-hidden="true">
-                    arrow_forward
-                  </Icon>
+                <FilledButton onClick={doCheckout}>{t.checkoutCta}
+                  <Icon slot="trailing-icon" aria-hidden="true">arrow_forward</Icon>
                 </FilledButton>
                 <OutlinedButton onClick={() => navigate('/')}>{t.continueBrowsing}</OutlinedButton>
               </>
@@ -228,17 +204,13 @@ export function Cart() {
                       createElement(
                         'md-text-button',
                         { 'aria-label': fillTemplate(t.moveToWishlistLabel, { title: line.title }), onClick: () => moveToWishlist(item) },
-                        <Icon slot="icon" aria-hidden="true">
-                          favorite
-                        </Icon>,
+                        <Icon slot="icon" aria-hidden="true">favorite</Icon>,
                         t.moveToWishlist,
                       )}
                     {createElement(
                       'md-text-button',
                       { 'aria-label': `${t.removeItem} ${line.title} ${t.fromCart}`, onClick: () => remove(item.id) },
-                      <Icon slot="icon" aria-hidden="true">
-                        delete_outline
-                      </Icon>,
+                      <Icon slot="icon" aria-hidden="true">delete_outline</Icon>,
                       t.removeItem,
                     )}
                   </>

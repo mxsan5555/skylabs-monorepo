@@ -13,7 +13,6 @@ export function BlogDetail() {
   const { slug } = useParams();
   const [post, setPost] = useState<BlogPost | null>(null);
   const [loading, setLoading] = useState(true);
-
   useEffect(() => {
     if (!slug) {
       setPost(null);
@@ -23,20 +22,11 @@ export function BlogDetail() {
     let cancelled = false;
     setLoading(true);
     getPost(slug)
-      .then((result) => {
-        if (!cancelled) setPost(result);
-      })
-      .catch(() => {
-        if (!cancelled) setPost(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .then((result) => { if (!cancelled) setPost(result); })
+      .catch(() => { if (!cancelled) setPost(null); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [slug]);
-
   if (loading) {
     return (
       <div className="post post--missing">
@@ -45,7 +35,6 @@ export function BlogDetail() {
       </div>
     );
   }
-
   if (!post) {
     return (
       <div className="post post--missing">
@@ -62,10 +51,7 @@ export function BlogDetail() {
       <title> {`${post.title}${content.blog.detail.metaTitleSuffix}`}</title>
       <meta name="description" content={post.excerpt} />
       <article>
-        <nav
-          className="post__crumb"
-          aria-label={content.blog.detail.breadcrumbLabel}
-        >
+        <nav className="post__crumb" aria-label={content.blog.detail.breadcrumbLabel}>
           <Link to="/blog">
             <Icon aria-hidden="true">arrow_back</Icon>
             {content.blog.detail.blogLabel}
@@ -97,11 +83,7 @@ export function BlogDetail() {
           {post.tags.length > 0 && (
             <ul className="post__tags" aria-label={content.blog.detail.tagsLabel}>
               {post.tags.map((t) => (
-                <li key={t}>
-                  <sky-badge variant="tertiary" size="small">
-                    #{t}
-                  </sky-badge>
-                </li>
+                <li key={t}><sky-badge variant="tertiary" size="small">#{t}</sky-badge></li>
               ))}
             </ul>
           )}

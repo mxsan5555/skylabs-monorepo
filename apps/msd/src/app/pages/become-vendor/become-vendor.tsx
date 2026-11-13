@@ -1,27 +1,13 @@
 import { createElement, useId, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  OutlinedTextField,
-  OutlinedSelect,
-  SelectOption,
-  Icon,
-} from '@skylabs-monorepo/shared-ui/react';
-import {
-  registerPublicVendor,
-  type VendorSelfInput,
-} from '../../../api/rbac/vendors';
+import { OutlinedTextField, OutlinedSelect, SelectOption, Icon, } from '@skylabs-monorepo/shared-ui/react';
+import { registerPublicVendor, type VendorSelfInput, } from '../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../api/rbac/client';
-import {
-  extractBecomeVendorFieldErrors,
-  type BecomeVendorFieldKey,
-} from '../account/cms/field-errors';
+import { extractBecomeVendorFieldErrors, type BecomeVendorFieldKey, } from '../account/cms/field-errors';
 import { STATES, citiesForState } from '@skylabs-monorepo/shared-utils';
 import { getCatalogContactUs } from '../../../api/catalog';
 import { useCmsContent } from '../../../hooks/use-cms-content';
-import {
-  ContactDetails,
-  contactInfo,
-} from '../../components/contact-details/contact-details';
+import { ContactDetails, contactInfo, } from '../../components/contact-details/contact-details';
 import { PageSection } from '../../components/page-section/page-section';
 import { SectionHead } from '../../components/section-head/section-head';
 import { SplitLayout } from '../../components/split-layout/split-layout';
@@ -29,15 +15,11 @@ import { StaticPage } from '../../components/static-page/static-page';
 import { EMAIL_REGEX, MOBILE_REGEX, inputValue } from '../../../utils/format';
 import content from '../../../content.json';
 import './become-vendor.css';
-
 const t = content.becomeMember;
-
 const PINCODE_REGEX = /^\d{6}$/;
-
 type Field = BecomeVendorFieldKey;
 type BecomeVendorForm = Record<Field, string>;
 type FormErrors = Partial<Record<Field, string>>;
-
 const EMPTY_FORM: BecomeVendorForm = {
   businessName: '',
   businessEmail: '',
@@ -51,11 +33,8 @@ const EMPTY_FORM: BecomeVendorForm = {
   state: '',
   pincode: '',
 };
-
-/** Text-field options: input type, autocomplete hint and, for numeric fields, the digit count. */
 type TextField = Exclude<Field, 'state' | 'city'>;
-const FIELD_OPTIONS: Record<
-  TextField,
+const FIELD_OPTIONS: Record<TextField,
   { type?: 'email' | 'tel'; autocomplete?: string; digits?: number }
 > = {
   businessName: { autocomplete: 'organization' },
@@ -68,8 +47,6 @@ const FIELD_OPTIONS: Record<
   address: { autocomplete: 'street-address' },
   pincode: { autocomplete: 'postal-code', digits: 6 },
 };
-
-/** Optional fields checked against a pattern when filled in. */
 const PATTERNS: Partial<Record<Field, [RegExp, string]>> = {
   businessEmail: [EMAIL_REGEX, t.errors.email],
   ownerEmail: [EMAIL_REGEX, t.errors.email],
@@ -77,23 +54,13 @@ const PATTERNS: Partial<Record<Field, [RegExp, string]>> = {
   ownerMobile: [MOBILE_REGEX, t.errors.mobile],
   pincode: [PINCODE_REGEX, t.errors.pincode],
 };
-
 const SECTIONS: { heading: string; fields: TextField[] }[] = [
-  {
-    heading: t.sections.business,
-    fields: ['businessName', 'businessEmail', 'businessPhone'],
-  },
-  {
-    heading: t.sections.owner,
-    fields: ['ownerFirstName', 'ownerLastName', 'ownerEmail', 'ownerMobile'],
-  },
+  { heading: t.sections.business, fields: ['businessName', 'businessEmail', 'businessPhone'], },
+  { heading: t.sections.owner, fields: ['ownerFirstName', 'ownerLastName', 'ownerEmail', 'ownerMobile'], },
 ];
-
-const trimAll = (form: BecomeVendorForm) =>
-  Object.fromEntries(
-    Object.entries(form).map(([k, v]) => [k, v.trim()]),
-  ) as BecomeVendorForm;
-
+const trimAll = (form: BecomeVendorForm) => Object.fromEntries(
+  Object.entries(form).map(([k, v]) => [k, v.trim()]),
+) as BecomeVendorForm;
 /**
  * Public, unauthenticated "Become a member" application (`POST /vendors/public/register`), the
  * storefront counterpart of the admin "Add member" wizard trimmed to a first pass: business name,
@@ -110,29 +77,20 @@ export function BecomeVendor() {
   const [submitError, setSubmitError] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const noticeId = useId();
-
   const set = (key: Field, value: string) => {
     setForm((f) => ({
-      ...f,
-      [key]: value,
-      ...(key === 'state' ? { city: '' } : {}),
+      ...f, [key]: value, ...(key === 'state' ? { city: '' } : {}),
     }));
     setErrors((e) => (e[key] ? { ...e, [key]: undefined } : e));
   };
-
   const validate = (v: BecomeVendorForm): boolean => {
     const next: FormErrors = {};
     if (!v.businessName) next.businessName = t.errors.businessName;
-    for (const [key, [pattern, message]] of Object.entries(PATTERNS) as [
-      Field,
-      [RegExp, string],
-    ][]) {
-      if (v[key] && !pattern.test(v[key])) next[key] = message;
-    }
+    for (const [key, [pattern, message]] of Object.entries(PATTERNS) as [Field, [RegExp, string],
+    ][]) { if (v[key] && !pattern.test(v[key])) next[key] = message; }
     setErrors(next);
     return Object.keys(next).length === 0;
   };
-
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (submitting) return;
@@ -141,7 +99,6 @@ export function BecomeVendor() {
     setSubmitting(true);
     setSubmitError('');
     try {
-      // Only the filled-in fields; businessName is always present after validation.
       const input = Object.fromEntries(
         Object.entries(v).filter(([, x]) => x),
       ) as VendorSelfInput;
@@ -151,21 +108,12 @@ export function BecomeVendor() {
       if (err instanceof ApiRequestError) {
         const fieldErrors = extractBecomeVendorFieldErrors(err);
         if (fieldErrors) setErrors((prev) => ({ ...prev, ...fieldErrors }));
-        // CONFLICT (email/phone already has an account) and RATE_LIMITED (429) both carry a
-        // message clear enough to show as-is.
         setSubmitError(err.message);
-      } else {
-        setSubmitError(t.errors.submit);
-      }
-    } finally {
-      setSubmitting(false);
-    }
+      } else { setSubmitError(t.errors.submit); }
+    } finally { setSubmitting(false); }
   };
-
   const hasFieldErrors = Object.values(errors).some(Boolean);
   const cityOptions = citiesForState(form.state);
-
-  /** One labelled text field and, below it, its error. */
   const textField = (key: TextField, required = false) => {
     const { type, autocomplete, digits } = FIELD_OPTIONS[key];
     return [
@@ -178,23 +126,15 @@ export function BecomeVendor() {
         value={form[key]}
         required={required}
         onInput={(e: Event) =>
-          set(
-            key,
-            digits
-              ? inputValue(e).replace(/\D/g, '').slice(0, digits)
-              : inputValue(e),
-          )
+          set(key, digits ? inputValue(e).replace(/\D/g, '').slice(0, digits) : inputValue(e),)
         }
         error={Boolean(errors[key])}
       />,
       errors[key] && (
-        <p key={`${key}-error`} className="error-state">
-          {errors[key]}
-        </p>
+        <p key={`${key}-error`} className="error-state">{errors[key]}</p>
       ),
     ];
   };
-
   const select = (
     key: 'state' | 'city',
     options: readonly string[],
@@ -207,9 +147,7 @@ export function BecomeVendor() {
       onChange={(e: Event) => set(key, inputValue(e))}
       disabled={disabled}
     >
-      <SelectOption value="">
-        <div slot="headline">{placeholder}</div>
-      </SelectOption>
+      <SelectOption value=""><div slot="headline">{placeholder}</div></SelectOption>
       {options.map((option) => (
         <SelectOption key={option} value={option}>
           <div slot="headline">{option}</div>
@@ -217,7 +155,6 @@ export function BecomeVendor() {
       ))}
     </OutlinedSelect>
   );
-
   if (submitted) {
     return (
       <PageSection aria-labelledby="become-member-success">
@@ -230,7 +167,6 @@ export function BecomeVendor() {
       </PageSection>
     );
   }
-
   return (
     <StaticPage
       path={t.path}
@@ -256,27 +192,18 @@ export function BecomeVendor() {
         >
           <p id={noticeId} className="become-vendor__notice body-large">
             {t.notice.before}
-            <Link className="text-link" to={content.contact.path}>
-              {t.notice.link}
-            </Link>
+            <Link className="text-link" to={content.contact.path}>{t.notice.link}</Link>
             {t.notice.after}
           </p>
 
           <form className="form-grid" onSubmit={submit} noValidate>
             {hasFieldErrors && (
-              <p className="error-state" role="alert">
-                {t.errors.summary}
-              </p>
+              <p className="error-state" role="alert">{t.errors.summary}</p>
             )}
             {SECTIONS.map((section) => [
-              <h2 key={section.heading} className="section-title">
-                {section.heading}
-              </h2>,
-              ...section.fields.map((key) =>
-                textField(key, key === 'businessName'),
-              ),
+              <h2 key={section.heading} className="section-title">{section.heading}</h2>,
+              ...section.fields.map((key) => textField(key, key === 'businessName'),),
             ])}
-
             <h2 className="section-title">{t.sections.address}</h2>
             {textField('address')}
             {select('state', STATES, t.selectState)}
@@ -287,22 +214,12 @@ export function BecomeVendor() {
               !form.state,
             )}
             {textField('pincode')}
-
             {submitError && (
-              <p className="error-state" role="alert">
-                {submitError}
-              </p>
+              <p className="error-state" role="alert">{submitError}</p>
             )}
-
             <div className="form-actions">
-              {/* Off for now: registration always ends in the contact-us answer shown above. */}
-              {createElement(
-                'md-filled-button',
-                {
-                  type: 'submit',
-                  disabled: submitting,
-                  'aria-describedby': noticeId,
-                },
+              {createElement('md-filled-button',
+                { type: 'submit', disabled: submitting, 'aria-describedby': noticeId, },
                 submitting ? 'Submitting...' : t.submit,
               )}
             </div>
@@ -312,5 +229,4 @@ export function BecomeVendor() {
     </StaticPage>
   );
 }
-
 export default BecomeVendor;

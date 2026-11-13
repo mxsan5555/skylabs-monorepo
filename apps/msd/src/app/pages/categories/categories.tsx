@@ -8,9 +8,7 @@ import { SectionHead } from '../../components/section-head/section-head';
 import { Seo } from '../../seo/seo';
 import { pluralize } from '../../../utils/format';
 import content from '../../../content.json';
-
 const t = content.categories;
-
 /** Public "browse all categories" index (`GET /catalog/categories`), composed from the same
  *  storefront blocks as `/category/:slug`. */
 export function CategoriesIndex() {
@@ -25,7 +23,6 @@ export function CategoriesIndex() {
       .catch((err) => setError(err instanceof ApiRequestError ? err.message : t.error.load))
       .finally(() => setLoading(false));
   }, []);
-
   const fallback = loading ? (
     <p className="loading-state" role="status">{t.loading}</p>
   ) : error ? (
@@ -33,7 +30,6 @@ export function CategoriesIndex() {
   ) : categories.length === 0 ? (
     <sky-info-card icon="category" heading={t.empty.title} subheading={t.empty.description} />
   ) : undefined;
-
   return (
     <>
       <Seo title={t.metaTitle} description={t.metaDescription} path={t.path} />
@@ -59,5 +55,4 @@ export function CategoriesIndex() {
     </>
   );
 }
-
 export default CategoriesIndex;

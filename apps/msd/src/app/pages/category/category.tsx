@@ -2,19 +2,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { FilledButton } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
-import {
-  getCatalogCategory,
-  listCatalogDeals,
-  listCatalogProducts,
-  listCatalogTherapists,
-  type CatalogCategoryWithChildren,
-  type CatalogDeal,
-  type CatalogDealSort,
-  type CatalogProduct,
-  type CatalogProductSort,
-  type CatalogTherapist,
-  type CatalogTherapistSort,
-} from '../../../api/catalog';
+import { getCatalogCategory, listCatalogDeals, listCatalogProducts, listCatalogTherapists, type CatalogCategoryWithChildren,type CatalogDeal, type CatalogDealSort, 
+ type CatalogProduct, type CatalogProductSort, type CatalogTherapist, type CatalogTherapistSort,} from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { PageSection } from '../../components/page-section/page-section';
@@ -34,16 +23,12 @@ import { CATEGORY_PAGE_SIZE, type CategoryData } from '../../../prerender-data/l
 import { Seo } from '../../seo/seo';
 import { breadcrumbJsonLd } from '../../seo/jsonld';
 import { SITE_URL } from '../../seo/site-url';
-import { dealPath, productPath, therapistPath } from '../../seo/public-urls';
 import content from '../../../content.json';
 import { BannerSlot } from '../../components/banner-slot/banner-slot';
 const t = content.category;
-
-/** SERVICE (or untyped, legacy) categories list deals; PRODUCT/THERAPY list their own entities. */
 function isDealCategory(category: CatalogCategoryWithChildren): boolean {
   return category.type !== 'PRODUCT' && category.type !== 'THERAPY';
 }
-
 /**
  * Category → Sub Category → (Deal | Product | Therapist) discovery page. `category.type`
  * (`SERVICE | PRODUCT | THERAPY`) picks what it lists — deals, products or therapists — and the
@@ -71,10 +56,7 @@ export function Category() {
   useEffect(() => {
     let cancelled = false;
     const notFound = (err: unknown) => err instanceof ApiRequestError && err.status === 404;
-    // `initial` is keyed by this slug (and city) and stable per key. Prerendered, the page shows it
-    // at once (a null category is a prerendered 404), then refreshes quietly and swaps only if the
-    // API changed it.
-    if (initial) {
+      if (initial) {
       const seed = initial.category;
       setCategory(seed);
       setCategoryLoading(false);
@@ -82,9 +64,7 @@ export function Category() {
         .then(({ data }) => {
           if (!cancelled && JSON.stringify(data) !== JSON.stringify(seed)) setCategory(data);
         })
-        .catch((err) => {
-          if (!cancelled && notFound(err)) setCategory(null);
-        });
+        .catch((err) => {if (!cancelled && notFound(err)) setCategory(null);});
       return () => { cancelled = true; };
     }
     setCategoryLoading(true);
@@ -99,7 +79,6 @@ export function Category() {
       .finally(() => { if (!cancelled) setCategoryLoading(false); });
     return () => { cancelled = true; };
   }, [slug, initial]);
-
   const kind = kindOfCategoryType(category?.type);
   const subSlug = searchParams.get('sub');
   const subcategoryIdx = (category?.children.findIndex((c) => c.slug === subSlug) ?? -1) + 1;
@@ -110,17 +89,10 @@ export function Category() {
   const lng = coords?.longitude ?? undefined;
   const ready = !!category && !cityPending && !cityMissing;
   const located = kind !== 'products';
-  // City pages exist for deal categories only; therapists here follow the visitor's location.
   const city = kind === 'deals' ? cityLocation : undefined;
-
-  // One filter set per kind, shared by the list and its facets (facets drop paging and sort).
-  const base = {
-    categoryId: category?.id,
-    subcategoryId: activeSubcategory?.id,
-    minPrice,
-    maxPrice,
-    ...(located
-      ? {
+ const base = {categoryId: category?.id, subcategoryId: activeSubcategory?.id,
+    minPrice, maxPrice,
+    ...(located? {
           city: city?.city,
           state: city?.state,
           latitude: lat,
@@ -136,13 +108,10 @@ export function Category() {
   const isDefaultView = !activeSubcategory && !sort && minPrice == null && maxPrice == null && lat == null && lng == null &&
     radius == null && vendorIds.length === 0 && branchIds.length === 0 && tags.length === 0;
   const loadError = listingLoadError(kind);
-
   const dealList = usePagedList<CatalogDeal>(
     (page) => listCatalogDeals({ ...base, page, pageSize: CATEGORY_PAGE_SIZE, sort: sort as CatalogDealSort | undefined }),
     listKey,
-    {
-      enabled: ready && kind === 'deals',
-      errorMessage: loadError,
+    {enabled: ready && kind === 'deals', errorMessage: loadError,
       initial: initialHasDeals && isDefaultView ? { items: initial.deals, total: initial.total ?? initial.deals.length } : undefined,
     },
   );
@@ -157,9 +126,7 @@ export function Category() {
     { enabled: ready && kind === 'therapists', errorMessage: loadError },
   );
   const list = kind === 'therapists' ? therapistList : kind === 'products' ? productList : dealList;
-
   const facets = useListingFacets<typeof base>(ready ? LISTING_FACETS[kind] : null, base, category?.id);
-
   const deals = dealList.items;
   if (categoryLoading || cityPending) { return <p className="loading-state"> {t.loading}</p>; }
   if (categoryError || !category || cityMissing) {

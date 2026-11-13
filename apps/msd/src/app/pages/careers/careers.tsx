@@ -7,15 +7,12 @@ import { SectionHead } from '../../components/section-head/section-head';
 import { StaticPage, StaticPageLoading } from '../../components/static-page/static-page';
 import { fillTemplate } from '../../../utils/format';
 import content from '../../../content.json';
-
 const t = content.careers;
-
 /** Careers: CMS hero and every published job (`GET /catalog/careers`). A job shows an Apply now
  *  link when it has `applyUrl`, otherwise its `applyInstructions` text. */
 export function Careers() {
   const { data, loading } = useCmsContent(getCatalogCareers);
   const jobs = data?.jobs ?? [];
-
   return (
     <StaticPage
       path={t.path}
@@ -43,16 +40,10 @@ export function Careers() {
                   </p>
                   <p>{job.description}</p>
                   {job.responsibilities && (
-                    <>
-                      <h4>{t.responsibilities}</h4>
-                      <p>{job.responsibilities}</p>
-                    </>
+                    <><h4>{t.responsibilities}</h4> <p>{job.responsibilities}</p></>
                   )}
                   {job.requirements && (
-                    <>
-                      <h4>{t.requirements}</h4>
-                      <p>{job.requirements}</p>
-                    </>
+                    <><h4>{t.requirements}</h4> <p>{job.requirements}</p></>
                   )}
                   {job.applyUrl ? (
                     createElement('md-filled-button', { href: job.applyUrl, 'aria-label': fillTemplate(t.applyLabel, { title: job.jobTitle }) }, t.apply)
@@ -68,5 +59,4 @@ export function Careers() {
     </StaticPage>
   );
 }
-
 export default Careers;
