@@ -27,7 +27,7 @@ export class GoogleMapsLoaderService {
     if (window.google?.maps) return Promise.resolve(window.google);
     if (this.loadPromise) return this.loadPromise;
 
-    const key = environment.googleMapsApiKey;
+    const key = (environment as { googleMapsApiKey?: string }).googleMapsApiKey;
     if (!key) {
       return Promise.reject(new Error('Google Maps API key is not configured for this environment.'));
     }

@@ -290,7 +290,7 @@ export class SkyRichTextEditor extends LitElement {
     if (!this._quill) return;
     const range = this._quill.getSelection(true);
     if (!range) return;
-    const existing = this._quill.getFormat(range).link as string | undefined;
+    const existing = this._quill.getFormat(range)['link'] as string | undefined;
     const url = window.prompt('Link URL', existing ?? 'https://');
     if (url === null) return;
     this._quill.format('link', url.trim() === '' ? false : url.trim(), 'user');

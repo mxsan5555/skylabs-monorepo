@@ -1,4 +1,15 @@
-<main class="showcase">
+<div class="showcase-shell">
+  <!-- Left Side Navigation -->
+  <nav class="showcase-nav" aria-label="Components">
+    @for (item of navItems(); track item.id) {
+      <md-text-button
+        [attr.aria-current]="activeNavId() === item.id ? 'location' : null"
+        (click)="scrollToSection($event, item.id)">
+        {{ item.label }}
+      </md-text-button>
+    }
+  </nav>
+  <main class="showcase">
   <header class="showcase__bar">
     <div class="showcase__title">
       <h1>mera-driver</h1>
@@ -13,7 +24,29 @@
     </label>
   </header>
 
-  <section class="showcase__card">
+  <!-- 1. Accordion -->
+  <section class="showcase__card" id="accordion">
+    <h2>Accordion</h2>
+    <sky-accordion>
+      <sky-accordion-item header="Accordion 1" open>{{ lorem }}</sky-accordion-item>
+      <sky-accordion-item header="Accordion 2" open>{{ lorem }}</sky-accordion-item>
+      <sky-accordion-item header="Accordion Actions">{{ lorem }}</sky-accordion-item>
+    </sky-accordion>
+  </section>
+ 
+  <!-- 2. Action field -->
+  <section class="showcase__card" id="action-field">
+    <h2>Action field</h2>
+    <p class="demo-label">Text input + action button: search, newsletter, coupon, pincode</p>
+    <div class="demo-stack">
+      <sky-action-field role="search" type="search" enterkeyhint="search" icon="search" label="Search drivers" placeholder="Search rides, destinations" action-label="Search"></sky-action-field>
+      <sky-action-field type="email" autocomplete="email" icon="mail" variant="outlined" label="Email address" placeholder="Your email address" action-label="Subscribe" required></sky-action-field>
+      <sky-action-field dense icon="sell" label="Coupon code" placeholder="Enter coupon code" action-label="Apply" shape="small"></sky-action-field>
+    </div>
+  </section>
+
+  <!-- 3. Buttons -->
+  <section class="showcase__card" id="buttons">
     <h2>Buttons</h2>
     <div class="showcase__row">
       <md-filled-button>Filled</md-filled-button>
@@ -27,443 +60,29 @@
     </div>
   </section>
 
-  <section class="showcase__card">
-    <h2>Chips</h2>
-    <md-chip-set>
-      <md-assist-chip label="Assist">
-        <md-icon slot="icon" aria-hidden="true">event</md-icon>
-      </md-assist-chip>
-      <md-filter-chip label="Filter" selected></md-filter-chip>
-      <md-filter-chip label="Another filter"></md-filter-chip>
-      <md-input-chip label="Input"></md-input-chip>
-      <md-suggestion-chip label="Suggestion"></md-suggestion-chip>
-    </md-chip-set>
-  </section>
-
-  <section class="showcase__card">
-    <h2>Data Table (Custom Element: &lt;sky-data-table&gt;)</h2>
-    <div style="display: flex; flex-direction: column; gap: 16px; width: 100%; overflow-x: auto;">
-      <sky-data-table
-        [columns]="tableColumns"
-        [rows]="tableRows"
-        [total]="5"
-        [pageSize]="10"
-        [page]="1"
-        selectable
-        exportable
-        searchable
-        caption="Drivers Roster Demo"
-      ></sky-data-table>
-    </div>
-  </section>
-
-  <section class="showcase__card">
-    <h2>Icon buttons</h2>
-    <div class="showcase__row">
-      <md-icon-button aria-label="Settings">
-        <md-icon>settings</md-icon>
-      </md-icon-button>
-      <md-filled-icon-button aria-label="Favorite">
-        <md-icon>favorite</md-icon>
-      </md-filled-icon-button>
-      <md-filled-tonal-icon-button aria-label="Bookmark">
-        <md-icon>bookmark</md-icon>
-      </md-filled-tonal-icon-button>
-      <md-outlined-icon-button aria-label="Share">
-        <md-icon>share</md-icon>
-      </md-outlined-icon-button>
-      <md-filled-icon-button aria-label="Toggle favorite" toggle>
-        <md-icon>favorite_border</md-icon>
-        <md-icon slot="selected">favorite</md-icon>
-      </md-filled-icon-button>
-    </div>
-  </section>
-
-  <section class="showcase__card">
-  <h2>Input box</h2>
-  <div class="showcase__row">
-    <md-outlined-text-field label="outlined" value="shruti">
-    </md-outlined-text-field>
-    <md-filled-text-field label="Filled" placeholder="type">
-    </md-filled-text-field>
-  </div>
-</section>
-
-  <section class="showcase__card">
-    <h2>Text Fields</h2>
-    <div class="showcase__row">
-      <md-outlined-text-field
-        label="Username"
-        placeholder="Enter your username">
-      </md-outlined-text-field>
-
-      <md-filled-text-field
-        label="Email"
-        placeholder="Enter your email">
-      </md-filled-text-field>
-
-      <md-outlined-text-field
-        label="Password"
-        type="password"
-        placeholder="Enter your password">
-      </md-outlined-text-field>
-    </div>
-  </section>
-
-  <section class="showcase__card">
-    <h2>Text Fields</h2>
-    <div class="showcase__row">
-      <md-outlined-text-field
-        label="name"
-        placeholder="Enter your name">
-      </md-outlined-text-field>
-      <md-outlined-text-field
-        label="fruit"
-        placeholder="favourite fruit">
-      </md-outlined-text-field>
-    <md-filled-text-field
-        label="Email"
-        placeholder="Enter your email">
-      </md-filled-text-field>
-      <md-filled-text-field
-         label="mail"
-         placeholder="write mail">
-      </md-filled-text-field>
-
-      <md-filled-text-field
-        label="work"
-        placeholder="write work">
-      </md-filled-text-field>
-
- <md-outlined-text-field
-        label="Password"
-        type="password"
-        placeholder="Enter your password">
-      </md-outlined-text-field>
-     </div>
-  </section>
-
-  <section class="showcase__card">
-    <h2>Tabs &amp; Progress</h2>
-    <md-tabs>
-      <md-primary-tab>Overview</md-primary-tab>
-      <md-primary-tab>Activity</md-primary-tab>
-      <md-primary-tab>Settings</md-primary-tab>
-    </md-tabs>
-    <div class="showcase__row">
-      <md-fab size="small" aria-label="Add">
-        <md-icon slot="icon">add</md-icon>
-      </md-fab>
-      <md-fab aria-label="Edit" variant="primary">
-        <md-icon slot="icon">edit</md-icon>
-      </md-fab>
-      <md-fab size="large" aria-label="Navigate">
-        <md-icon slot="icon">navigation</md-icon>
-      </md-fab>
-      <md-fab label="Compose" variant="primary">
-        <md-icon slot="icon">edit</md-icon>
-      </md-fab>
-      <md-branded-fab label="Create" aria-label="Create">
-        <md-icon slot="icon">add</md-icon>
-      </md-branded-fab>
-    </div>
-  </section>
-
-  <section class="showcase__card">
-    <h2>Selection</h2>
-    <div class="showcase__row">
-      <label class="showcase__inline">
-        <md-checkbox checked></md-checkbox> Checked
-      </label>
-      <label class="showcase__inline">
-        <md-checkbox indeterminate></md-checkbox> Indeterminate
-      </label>
-      <label class="showcase__inline">
-        <md-checkbox></md-checkbox> Unchecked
-      </label>
-    </div>
-    <div class="showcase__row" role="radiogroup" aria-label="Plan">
-      <label class="showcase__inline">
-        <md-radio name="plan" value="a" checked></md-radio> Basic
-      </label>
-      <label class="showcase__inline">
-        <md-radio name="plan" value="b"></md-radio> Pro
-      </label>
-      <label class="showcase__inline">
-        <md-radio name="plan" value="c"></md-radio> Max
-      </label>
-    </div>
-    <div class="showcase__row">
-      <label class="showcase__inline"><md-switch></md-switch> Off</label>
-      <label class="showcase__inline"><md-switch selected></md-switch> On</label>
-      <label class="showcase__inline">
-        <md-switch selected icons></md-switch> With icons
-      </label>
-    </div>
-  </section>
-
-  <section class="showcase__card">
-    <h2>Text fields</h2>
-    <div class="fields-grid">
-      <md-filled-text-field label="Filled" value="Hello"></md-filled-text-field>
-      <md-outlined-text-field
-        label="Outlined"
-        placeholder="Type here"
-      ></md-outlined-text-field>
-      <md-outlined-text-field label="With icons" placeholder="Search">
-        <md-icon slot="leading-icon" aria-hidden="true">search</md-icon>
-        <md-icon slot="trailing-icon" aria-hidden="true">close</md-icon>
-      </md-outlined-text-field>
-      <md-filled-text-field
-        label="Amount"
-        type="number"
-        prefix-text="$"
-        suffix-text=".00"
-      ></md-filled-text-field>
-      <md-outlined-text-field
-        label="Email"
-        type="email"
-        supporting-text="We'll never share it"
-      ></md-outlined-text-field>
-      <md-filled-text-field
-        label="Password"
-        type="password"
-        value="secret"
-      ></md-filled-text-field>
-      <md-outlined-text-field
-        label="Bio (textarea)"
-        type="textarea"
-        rows="3"
-      ></md-outlined-text-field>
-      <md-filled-text-field
-        label="With counter"
-        maxlength="20"
-        value="Count me"
-      ></md-filled-text-field>
-      <md-outlined-text-field
-        label="Required"
-        required
-        error
-        error-text="This field is required"
-      ></md-outlined-text-field>
-    </div>
-  </section>
-
-  <section class="showcase__card">
-    <h2>Select</h2>
-    <div class="showcase__row">
-      <md-filled-select label="Filled" value="apple">
-        <md-select-option value="apple">
-          <div slot="headline">Apple</div>
-        </md-select-option>
-        <md-select-option value="banana">
-          <div slot="headline">Banana</div>
-        </md-select-option>
-        <md-select-option value="cherry">
-          <div slot="headline">Cherry</div>
-        </md-select-option>
-      </md-filled-select>
-      <md-outlined-select label="Outlined" value="banana">
-        <md-select-option value="apple">
-          <div slot="headline">Apple</div>
-        </md-select-option>
-        <md-select-option value="banana">
-          <div slot="headline">Banana</div>
-        </md-select-option>
-        <md-select-option value="cherry">
-          <div slot="headline">Cherry</div>
-        </md-select-option>
-      </md-outlined-select>
-    </div>
-  </section>
-
-  <section class="showcase__card">
-    <h2>Slider</h2>
-    <p class="demo-label">Continuous</p>
-    <md-slider value="50" aria-label="Continuous value"></md-slider>
-    <p class="demo-label">Discrete (ticks + labeled)</p>
-    <md-slider
-      value="3"
-      min="0"
-      max="10"
-      step="1"
-      ticks
-      labeled
-      aria-label="Discrete value"
-    ></md-slider>
-    <p class="demo-label">Range</p>
-    <md-slider
-      range
-      [valueStart]="20"
-      [valueEnd]="70"
-      aria-label="Range value"
-    ></md-slider>
-  </section>
-
-  <section class="showcase__card">
-    <h2>Menu</h2>
-    <span class="menu-anchor-wrap">
-      <md-filled-button id="mera-menu-anchor" (click)="menuOpen.set(!menuOpen())">
-        Open menu
-      </md-filled-button>
-      <md-menu
-        anchor="mera-menu-anchor"
-        positioning="popover"
-        [open]="menuOpen()"
-        (closed)="menuOpen.set(false)"
-      >
-        <md-menu-item>
-          <div slot="headline">Profile</div>
-        </md-menu-item>
-        <md-menu-item>
-          <div slot="headline">Settings</div>
-        </md-menu-item>
-        <md-divider role="separator"></md-divider>
-        <md-sub-menu>
-          <md-menu-item slot="item">
-            <div slot="headline">More tools</div>
-            <md-icon slot="end" aria-hidden="true">chevron_right</md-icon>
-          </md-menu-item>
-          <md-menu slot="menu">
-            <md-menu-item>
-              <div slot="headline">Import</div>
-            </md-menu-item>
-            <md-menu-item>
-              <div slot="headline">Export</div>
-            </md-menu-item>
-          </md-menu>
-        </md-sub-menu>
-        <md-divider role="separator"></md-divider>
-        <md-menu-item>
-          <div slot="headline">Sign out</div>
-        </md-menu-item>
-      </md-menu>
-    </span>
-  </section>
-
-  <section class="showcase__card">
-    <h2>Tabs</h2>
-    <p class="demo-label">Primary</p>
-    <md-tabs>
-      <md-primary-tab>
-        <md-icon slot="icon" aria-hidden="true">dashboard</md-icon>
-        Overview
-      </md-primary-tab>
-      <md-primary-tab>
-        <md-icon slot="icon" aria-hidden="true">timeline</md-icon>
-        Activity
-      </md-primary-tab>
-      <md-primary-tab>
-        <md-icon slot="icon" aria-hidden="true">settings</md-icon>
-        Settings
-      </md-primary-tab>
-    </md-tabs>
-    <p class="demo-label">Secondary</p>
-    <md-tabs>
-      <md-secondary-tab>Flights</md-secondary-tab>
-      <md-secondary-tab>Hotels</md-secondary-tab>
-      <md-secondary-tab>Cars</md-secondary-tab>
-    </md-tabs>
-  </section>
-
-  <section class="showcase__card">
-    <h2>Progress</h2>
-    <p class="demo-label">Linear</p>
-    <div class="progress-stack">
-      <md-linear-progress value="0.6" aria-label="Determinate"></md-linear-progress>
-      <md-linear-progress
-        indeterminate
-        aria-label="Indeterminate"
-      ></md-linear-progress>
-    </div>
-    <p class="demo-label">Circular</p>
-    <div class="showcase__row">
-      <md-circular-progress value="0.6" aria-label="Determinate"></md-circular-progress>
-      <md-circular-progress
-        indeterminate
-        aria-label="Indeterminate"
-      ></md-circular-progress>
-      <md-circular-progress
-        indeterminate
-        four-color
-        aria-label="Four color"
-      ></md-circular-progress>
-    </div>
-  </section>
-
-  <section class="showcase__card">
-    <h2>Ripple</h2>
-    <button type="button" class="ripple-surface">
-      <md-ripple></md-ripple>
-      Press me
-    </button>
-  </section>
-
-  <section class="showcase__card">
-    <h2>Dialog</h2>
-    <md-filled-button (click)="dialog.show()">Open dialog</md-filled-button>
-    <md-dialog #dialog>
-      <div slot="headline">Themed dialog</div>
-      <form slot="content" id="demo-form" method="dialog">
-        This dialog and every control on this page share mera-driver's blue M3
-        theme.
-      </form>
-      <div slot="actions">
-        <md-text-button form="demo-form" value="ok">Got it</md-text-button>
-      </div>
-    </md-dialog>
-  </section>
-
-  <section class="showcase__card">
-    <h2>List</h2>
-    <md-list>
-      <md-list-item>
-        <md-icon slot="start" aria-hidden="true">label</md-icon>
-        <div slot="headline">Default with start icon</div>
-      </md-list-item>
-      <md-divider></md-divider>
-      <md-list-item>
-        <div slot="headline">Cucumber</div>
-        <div slot="supporting-text">
-          Cucumbers are long green fruits that are just as long as this
-          multi-line description
-        </div>
-        <md-icon slot="end" aria-hidden="true">check</md-icon>
-      </md-list-item>
-      <md-list-item
-        type="link"
-        href="https://google.com/search?q=buy+kiwis&tbm=shop"
-        target="_blank"
-      >
-        <div slot="headline">Shop for Kiwis</div>
-        <div slot="supporting-text">This will link you out in a new tab</div>
-        <md-icon slot="end" aria-hidden="true">open_in_new</md-icon>
-      </md-list-item>
-    </md-list>
-  </section>
-
-  <section class="showcase__card">
+  <!-- 4. Cards -->
+  <section class="showcase__card" id="cards">
     <h2>Cards</h2>
     <div class="cards-grid">
       <sky-product-card
-        image="https://picsum.photos/seed/spa/600/400"
-        image-alt="Massage therapy"
-        badge="Popular Gift"
+        image="/images/cities/hero_cities_driver.jpg"
+        image-alt="Executive sedan ride"
+        badge="Most Popular"
         favorite
-        eyebrow="Just Relax Spa"
-        heading="Enjoy a 90-minute VIP facial and body massage package"
-        location="Center City East, Philadelphia"
-        distance="11 mi"
+        eyebrow="Mera-Driver Prime"
+        heading="Full-day 8-hour city chauffeur and luxury sedan package"
+        location="Connaught Place, New Delhi"
+        distance="2.5 km"
         rating="4.7"
         reviews="783"
-        original-price="$220"
-        price="$159"
-        discount="-28%"
-        price-note="$119.25 with code SUMMER"
+        original-price="₹2,500"
+        price="₹1,999"
+        discount="-20%"
+        price-note="₹1,799 with code RIDEFIRST"
       ></sky-product-card>
       <sky-product-card
         variant="outlined"
-        image="https://picsum.photos/seed/grandhotel/600/400"
+        image="/images/cities/hero_cities_map.jpg"
         image-alt="The Grand Hotel at night"
         favorite
         tag="Hotel"
@@ -478,13 +97,13 @@
         price="$172"
       ></sky-product-card>
       <sky-image-card
-        image="https://picsum.photos/seed/cottages/600/800"
+        image="/images/gift/hero_gift.jpg"
         image-alt="Children playing in a cottage garden"
         label="Cottages"
         href="#cottages"
       ></sky-image-card>
       <sky-category-card
-        image="https://picsum.photos/seed/losangeles/600/600"
+        image="/images/careers/careers_hero.jpg"
         image-alt="Los Angeles hills"
         heading="Los Angeles"
         subheading="4,781 properties"
@@ -497,18 +116,92 @@
         subheading="We're always here to help"
       ></sky-info-card>
     </div>
+
+    <p class="demo-label">
+      Product card with an Add to cart action (sky-product-card's default slot —
+      same pattern as category.tsx's product grid): plain vs outlined, grid layout
+    </p>
+
+    <div class="cards-grid">
+      <sky-product-card
+        image="/images/about/hero_driver_portrait.jpg"
+        image-alt="Unlimited city ride pass"
+        badge="Best Seller"
+        eyebrow="Mera-Driver Pass"
+        heading="Unlimited City Commute Monthly Pass"
+        href="/showcase#cards"
+        original-price="₹2,499"
+        price="₹1,799"
+        discount="-28%"
+      >
+        <div (click)="$event.stopPropagation()">
+          <md-filled-button (click)="addToCart()">
+            <md-icon slot="icon" aria-hidden="true">shopping_bag</md-icon>
+            Add to cart
+          </md-filled-button>
+        </div>
+      </sky-product-card>
+
+      <sky-product-card
+        variant="outlined"
+        image="/images/about/hero_driver_app.jpg"
+        image-alt="Airport express transfer"
+        eyebrow="Airport Express"
+        heading="Guaranteed On-Time Airport Transfer Pass"
+        href="/showcase#cards"
+        price="₹899"
+      >
+        <div (click)="$event.stopPropagation()">
+          <md-filled-button (click)="addToCart()">
+            <md-icon slot="icon" aria-hidden="true">shopping_bag</md-icon>
+            Add to cart
+          </md-filled-button>
+        </div>
+      </sky-product-card>
+    </div>
+
+    <p class="demo-label">List layout</p>
+
+    <div class="demo-stack">
+      <sky-product-card
+        layout="horizontal"
+        image="/images/press/press_1.jpg"
+        image-alt="Weekend outstation driver package"
+        eyebrow="Outstation Trips"
+        heading="Weekend Getaway Round-Trip Driver Package"
+        href="/showcase#cards"
+        price="₹3,499"
+      >
+        <div (click)="$event.stopPropagation()">
+          <md-filled-button (click)="addToCart()">
+            <md-icon slot="icon" aria-hidden="true">shopping_bag</md-icon>
+            Add to cart
+          </md-filled-button>
+        </div>
+      </sky-product-card>
+
+      <sky-product-card
+        variant="outlined"
+        layout="horizontal"
+        image="/images/press/press_2.jpg"
+        image-alt="Hourly chauffeur rental"
+        eyebrow="Hourly Rental"
+        heading="Hourly Chauffeur Service — 4 Hours / 40 km"
+        href="/showcase#cards"
+        price="₹1,299"
+      >
+        <div (click)="$event.stopPropagation()">
+          <md-filled-button (click)="addToCart()">
+            <md-icon slot="icon" aria-hidden="true">shopping_bag</md-icon>
+            Add to cart
+          </md-filled-button>
+        </div>
+      </sky-product-card>
+    </div>
   </section>
 
-  <section class="showcase__card">
-    <h2>Accordion</h2>
-    <sky-accordion>
-      <sky-accordion-item header="Accordion 1" open>{{ lorem }}</sky-accordion-item>
-      <sky-accordion-item header="Accordion 2" open>{{ lorem }}</sky-accordion-item>
-      <sky-accordion-item header="Accordion Actions">{{ lorem }}</sky-accordion-item>
-    </sky-accordion>
-  </section>
-
-  <section class="showcase__card">
+  <!-- 5. Carousel (Swiper Element) -->
+  <section class="showcase__card" id="carousel-swiper-element">
     <h2>Carousel (Swiper Element)</h2>
 
     <h3 class="demo-carousel__label">1. Default</h3>
@@ -621,4 +314,810 @@
       }
     </swiper-container>
   </section>
+
+  <!-- 6. Chips -->
+  <section class="showcase__card" id="chips">
+    <h2>Chips</h2>
+    <md-chip-set>
+      <md-assist-chip label="Assist">
+        <md-icon slot="icon" aria-hidden="true">event</md-icon>
+      </md-assist-chip>
+      <md-filter-chip label="Filter" selected></md-filter-chip>
+      <md-filter-chip label="Another filter"></md-filter-chip>
+      <md-input-chip label="Input"></md-input-chip>
+      <md-suggestion-chip label="Suggestion"></md-suggestion-chip>
+    </md-chip-set>
+  </section>
+
+  <!-- 7. CTA banner -->
+  <section class="showcase__card" id="cta-banner">
+    <h2>CTA banner</h2>
+    <div class="demo-stack">
+      <sky-cta-banner
+        color="inverse"
+        icon="card_giftcard"
+        icon-style="tonal"
+        icon-shape="full"
+        headline="Give the gift of mobility"
+        text="Gift ride cards work across 200+ partner cities in India."
+        cta-label="Buy gift card"
+        cta-href="/showcase#cta-banner">
+      </sky-cta-banner>
+
+      <sky-cta-banner
+        color="primary"
+        icon="percent"
+        icon-style="surface"
+        headline="Flat 40% off your first ride"
+        text="New members only. Applied automatically at checkout."
+        cta-label="Browse rides"
+        cta-href="/showcase#cta-banner"
+        cta-icon="arrow_forward">
+      </sky-cta-banner>
+
+      <sky-cta-banner
+        color="none"
+        variant="outlined"
+        icon="directions_car"
+        icon-style="tonal"
+        headline="Drive with Mera-Driver?"
+        text="Attach your vehicle, choose your hours, and earn with verified bookings."
+        cta-label="Partner with us"
+        cta-href="/showcase#cta-banner">
+      </sky-cta-banner>
+
+      <sky-cta-banner
+        color="tertiary"
+        headline="No icon, tertiary container"
+        text="Every styling option from the feature card works seamlessly here."
+        cta-label="See options"
+        cta-href="/showcase#feature-card">
+      </sky-cta-banner>
+    </div>
+  </section>
+
+  <!-- 8. Data Table -->
+  <section class="showcase__card" id="data-table">
+    <h2>Data Table</h2>
+    <p class="demo-label">
+      Drivers Roster · search · sort · PDF export · selectable
+    </p>
+    <div style="display: flex; flex-direction: column; gap: 16px; width: 100%; overflow-x: auto;">
+      <sky-data-table
+        [columns]="tableColumns"
+        [rows]="tableRows"
+        [total]="5"
+        [pageSize]="10"
+        [page]="1"
+        selectable
+        exportable
+        searchable
+        caption="Drivers Roster Demo"
+      ></sky-data-table>
+    </div>
+  </section>
+
+  <!-- 9. Data Table - Filter by Status (no PDF export) -->
+  <section class="showcase__card" id="data-table-filter-by-status-no-pdf-export">
+    <h2>Data Table — Filter by Status (no PDF export)</h2>
+    <p class="demo-label">
+      Search · filter by status (Active / Completed / Cancelled) · sort · view details — no PDF export button
+    </p>
+    <div style="display: flex; flex-direction: column; gap: 16px; width: 100%; overflow-x: auto;">
+      <sky-data-table
+        caption="Trip Bookings"
+        [columns]="bkColumns"
+        [rows]="bkRows"
+        [total]="5"
+        [pageSize]="10"
+        searchable
+        search-placeholder="Search bookings…"
+        filter-label="Filter by Status"
+        [filterOptions]="bkFilters"
+        [actions]="bkActions"
+      ></sky-data-table>
+    </div>
+  </section>
+
+  <!-- 10. Data Table - Minimal (sort only) -->
+  <section class="showcase__card" id="data-table-minimal-sort-only">
+    <h2>Data Table — Minimal (sort only)</h2>
+    <p class="demo-label">
+      5 records · sort only — no search, no filter, no export, no row selection, no actions
+    </p>
+    <div style="display: flex; flex-direction: column; gap: 16px; width: 100%; overflow-x: auto;">
+      <sky-data-table
+        caption="Top Routes"
+        [columns]="tsColumns"
+        [rows]="tsRows"
+        [total]="5"
+        [pageSize]="10"
+      ></sky-data-table>
+    </div>
+  </section>
+
+  <!-- 11. Data Table - PDF Export (no filter dropdown) -->
+  <section class="showcase__card" id="data-table-pdf-export-no-filter-dropdown">
+    <h2>Data Table — PDF Export (no filter dropdown)</h2>
+    <p class="demo-label">
+      Search · sort · exportable PDF — filter dropdown omitted entirely
+    </p>
+    <div style="display: flex; flex-direction: column; gap: 16px; width: 100%; overflow-x: auto;">
+      <sky-data-table
+        caption="Monthly Revenue"
+        [columns]="rvColumns"
+        [rows]="rvRows"
+        [total]="4"
+        [pageSize]="10"
+        searchable
+        search-placeholder="Search revenue…"
+        exportable
+      ></sky-data-table>
+    </div>
+  </section>
+
+  <!-- 12. Dialog -->
+  <section class="showcase__card" id="dialog">
+    <h2>Dialog</h2>
+    <md-filled-button (click)="dialog.show()">Open dialog</md-filled-button>
+    <md-dialog #dialog>
+      <div slot="headline">Themed dialog</div>
+      <form slot="content" id="demo-form" method="dialog">
+        This dialog and every control on this page share mera-driver's blue M3
+        theme.
+      </form>
+      <div slot="actions">
+        <md-text-button form="demo-form" value="ok">Got it</md-text-button>
+      </div>
+    </md-dialog>
+  </section>
+
+  <!-- 13. FAB & extended FAB -->
+  <section class="showcase__card" id="fab-and-extended-fab">
+    <h2>FAB &amp; extended FAB</h2>
+
+    <div class="showcase__row">
+      <md-fab size="small" aria-label="Add">
+        <md-icon slot="icon">add</md-icon>
+      </md-fab>
+
+      <md-fab aria-label="Edit" variant="primary">
+        <md-icon slot="icon">edit</md-icon>
+      </md-fab>
+
+      <md-fab size="large" aria-label="Navigate">
+        <md-icon slot="icon">navigation</md-icon>
+      </md-fab>
+
+      <md-fab label="Compose" variant="primary">
+        <md-icon slot="icon">edit</md-icon>
+      </md-fab>
+
+      <md-branded-fab label="Create" aria-label="Create">
+        <md-icon slot="icon">add</md-icon>
+      </md-branded-fab>
+    </div>
+  </section>
+
+  <!-- 14. Feature card -->
+  <section class="showcase__card" id="feature-card">
+    <h2>Feature card</h2>
+
+    <p class="demo-label">Container colors with a CTA</p>
+
+    <div class="demo-grid demo-grid--wide">
+      <sky-feature-card
+        color="primary"
+        icon="card_giftcard"
+        icon-style="surface"
+        headline="Give the gift of mobility"
+        text="Gift ride vouchers. Redeemable with 5,000+ verified drivers across India."
+        cta-label="Buy gift card"
+        cta-href="/showcase#feature-card"
+      ></sky-feature-card>
+
+      <sky-feature-card
+        color="surface-high"
+        icon="payments"
+        icon-style="surface"
+        headline="Unlock member-only pricing"
+        text="Sign in to save rides, track bookings and see exclusive rates."
+        cta-label="Sign in"
+        cta-href="/showcase#feature-card"
+      ></sky-feature-card>
+
+      <sky-feature-card
+        color="secondary"
+        icon="event_available"
+        icon-style="surface"
+        headline="Book in 30 seconds"
+        text="Pick a pickup point, select your vehicle and get instant driver confirmation."
+        cta-label="Browse rides"
+        cta-href="/showcase#feature-card"
+        cta-icon="arrow_forward"
+      ></sky-feature-card>
+
+      <sky-feature-card
+        color="tertiary"
+        icon="verified"
+        icon-style="surface"
+        headline="Verified drivers"
+        text="Every driver is verified with background checks, licensing and customer ratings."
+      ></sky-feature-card>
+
+      <sky-feature-card
+        color="inverse"
+        icon="support_agent"
+        icon-style="tonal"
+        icon-shape="full"
+        headline="24/7 Driver Support"
+        text="Need assistance with a trip or booking? Our support team is always here to help."
+        cta-label="Chat with us"
+        cta-href="/showcase#feature-card"
+      ></sky-feature-card>
+    </div>
+
+    <p class="demo-label">
+      No background, outlined, elevated, no icon, custom actions slot
+    </p>
+
+    <div class="demo-grid demo-grid--wide">
+      <sky-feature-card
+        color="none"
+        variant="outlined"
+        icon="directions_car"
+        icon-style="tonal"
+        headline="Outlined, no fill"
+        text="variant outlined, color none"
+        cta-label="Learn more"
+        cta-href="/showcase#feature-card"
+      ></sky-feature-card>
+
+      <sky-feature-card
+        variant="elevated"
+        icon="local_taxi"
+        icon-style="plain"
+        headline="Elevated, plain icon"
+        text="variant elevated, icon-style plain"
+      ></sky-feature-card>
+
+      <sky-feature-card
+        shape="medium"
+        headline="No icon"
+        text="Headline and text only, medium shape."
+      >
+        <div slot="actions">
+          <md-filled-button>Primary</md-filled-button>
+          <md-text-button>Secondary</md-text-button>
+        </div>
+      </sky-feature-card>
+    </div>
+  </section>
+
+  <!-- 15. Icon buttons -->
+  <section class="showcase__card" id="icon-buttons">
+    <h2>Icon buttons</h2>
+    <div class="showcase__row">
+      <md-icon-button aria-label="Settings">
+        <md-icon>settings</md-icon>
+      </md-icon-button>
+      <md-filled-icon-button aria-label="Favorite">
+        <md-icon>favorite</md-icon>
+      </md-filled-icon-button>
+      <md-filled-tonal-icon-button aria-label="Bookmark">
+        <md-icon>bookmark</md-icon>
+      </md-filled-tonal-icon-button>
+      <md-outlined-icon-button aria-label="Share">
+        <md-icon>share</md-icon>
+      </md-outlined-icon-button>
+      <md-filled-icon-button aria-label="Toggle favorite" toggle>
+        <md-icon>favorite_border</md-icon>
+        <md-icon slot="selected">favorite</md-icon>
+      </md-filled-icon-button>
+    </div>
+  </section>
+
+  <!-- 16. Image -->
+  <section class="showcase__card" id="image">
+    <h2>Image</h2>
+
+    <p class="demo-label">
+      Logo (contain, outlined, linked), photo, round, placeholder, broken source
+    </p>
+
+    <div class="demo-grid demo-grid--images">
+      <sky-image
+        src="/app_mockup.png"
+        alt="Mera Driver App"
+        label="Mera Driver home"
+        href="/showcase#image"
+        fit="contain"
+        ratio="3 / 2"
+        variant="outlined"
+        color="surface-high"
+      ></sky-image>
+
+      <sky-image
+        src="/contact_support_banner.png"
+        alt="Driver Support Banner"
+        href="/showcase#image"
+        ratio="3 / 2"
+        shape="extra-large"
+      ></sky-image>
+
+      <sky-image
+        src="/images/about/hero_driver_portrait.jpg"
+        alt="Driver portrait"
+        shape="full"
+      ></sky-image>
+
+      <sky-image
+        alt="Photo coming soon"
+        ratio="3 / 2"
+      ></sky-image>
+
+      <sky-image
+        src="/broken-image.jpg"
+        alt="Broken source falls back"
+        ratio="3 / 2"
+        variant="outlined"
+        color="none"
+        placeholder-icon="broken_image"
+      ></sky-image>
+    </div>
+  </section>
+
+  <!-- 17. List -->
+  <section class="showcase__card" id="list">
+    <h2>List</h2>
+    <md-list>
+      <md-list-item>
+        <md-icon slot="start" aria-hidden="true">label</md-icon>
+        <div slot="headline">Default with start icon</div>
+      </md-list-item>
+      <md-divider></md-divider>
+      <md-list-item>
+        <div slot="headline">Cucumber</div>
+        <div slot="supporting-text">
+          Cucumbers are long green fruits that are just as long as this
+          multi-line description
+        </div>
+        <md-icon slot="end" aria-hidden="true">check</md-icon>
+      </md-list-item>
+      <md-list-item
+        type="link"
+        href="https://google.com/search?q=buy+kiwis&tbm=shop"
+        target="_blank"
+      >
+        <div slot="headline">Shop for Kiwis</div>
+        <div slot="supporting-text">This will link you out in a new tab</div>
+        <md-icon slot="end" aria-hidden="true">open_in_new</md-icon>
+      </md-list-item>
+    </md-list>
+  </section>
+
+  <!-- 18. Menu -->
+  <section class="showcase__card" id="menu">
+    <h2>Menu</h2>
+    <span class="menu-anchor-wrap">
+      <md-filled-button id="mera-menu-anchor" (click)="menuOpen.set(!menuOpen())">
+        Open menu
+      </md-filled-button>
+      <md-menu
+        anchor="mera-menu-anchor"
+        positioning="popover"
+        [open]="menuOpen()"
+        (closed)="menuOpen.set(false)"
+      >
+        <md-menu-item>
+          <div slot="headline">Profile</div>
+        </md-menu-item>
+        <md-menu-item>
+          <div slot="headline">Settings</div>
+        </md-menu-item>
+        <md-divider role="separator"></md-divider>
+        <md-sub-menu>
+          <md-menu-item slot="item">
+            <div slot="headline">More tools</div>
+            <md-icon slot="end" aria-hidden="true">chevron_right</md-icon>
+          </md-menu-item>
+          <md-menu slot="menu">
+            <md-menu-item>
+              <div slot="headline">Import</div>
+            </md-menu-item>
+            <md-menu-item>
+              <div slot="headline">Export</div>
+            </md-menu-item>
+          </md-menu>
+        </md-sub-menu>
+        <md-divider role="separator"></md-divider>
+        <md-menu-item>
+          <div slot="headline">Sign out</div>
+        </md-menu-item>
+      </md-menu>
+    </span>
+  </section>
+
+  <!-- 19. Progress -->
+  <section class="showcase__card" id="progress">
+    <h2>Progress</h2>
+    <p class="demo-label">Linear</p>
+    <div class="progress-stack">
+      <md-linear-progress value="0.6" aria-label="Determinate"></md-linear-progress>
+      <md-linear-progress
+        indeterminate
+        aria-label="Indeterminate"
+      ></md-linear-progress>
+    </div>
+    <p class="demo-label">Circular</p>
+    <div class="showcase__row">
+      <md-circular-progress value="0.6" aria-label="Determinate"></md-circular-progress>
+      <md-circular-progress
+        indeterminate
+        aria-label="Indeterminate"
+      ></md-circular-progress>
+      <md-circular-progress
+        indeterminate
+        four-color
+        aria-label="Four color"
+      ></md-circular-progress>
+    </div>
+  </section>
+
+  <!-- 20. Rich text editor -->
+  <section class="showcase__card" id="rich-text-editor">
+    <h2>Rich text editor</h2>
+    <p class="demo-label">
+      Quill-backed WYSIWYG for CMS body text — bold, italic, headings, lists, quote, link, image, clear formatting.
+    </p>
+    <div class="demo-stack">
+      <sky-rich-text-editor
+        label="Trip policy"
+        placeholder="Write policy details…"
+        value="<p>Enjoy a <strong>smooth ride</strong> with verified Mera-Driver partners.</p>">
+      </sky-rich-text-editor>
+
+      <p class="demo-label">Read-only</p>
+      <sky-rich-text-editor
+        label="Read-only preview"
+        readonly
+        value="<p>This content is <em>locked</em> for preview.</p>">
+      </sky-rich-text-editor>
+    </div>
+  </section>
+
+  <!-- 21. Ripple -->
+  <section class="showcase__card" id="ripple">
+    <h2>Ripple</h2>
+    <button type="button" class="ripple-surface">
+      <md-ripple></md-ripple>
+      Press me
+    </button>
+  </section>
+
+  <!-- 22. Select -->
+  <section class="showcase__card" id="select">
+    <h2>Select</h2>
+    <div class="showcase__row">
+      <md-filled-select label="Filled" value="apple">
+        <md-select-option value="apple">
+          <div slot="headline">Apple</div>
+        </md-select-option>
+        <md-select-option value="banana">
+          <div slot="headline">Banana</div>
+        </md-select-option>
+        <md-select-option value="cherry">
+          <div slot="headline">Cherry</div>
+        </md-select-option>
+      </md-filled-select>
+      <md-outlined-select label="Outlined" value="banana">
+        <md-select-option value="apple">
+          <div slot="headline">Apple</div>
+        </md-select-option>
+        <md-select-option value="banana">
+          <div slot="headline">Banana</div>
+        </md-select-option>
+        <md-select-option value="cherry">
+          <div slot="headline">Cherry</div>
+        </md-select-option>
+      </md-outlined-select>
+    </div>
+  </section>
+
+  <!-- 23. Selection -->
+  <section class="showcase__card" id="selection">
+    <h2>Selection</h2>
+    <div class="showcase__row">
+      <label class="showcase__inline">
+        <md-checkbox checked></md-checkbox> Checked
+      </label>
+      <label class="showcase__inline">
+        <md-checkbox indeterminate></md-checkbox> Indeterminate
+      </label>
+      <label class="showcase__inline">
+        <md-checkbox></md-checkbox> Unchecked
+      </label>
+    </div>
+    <div class="showcase__row" role="radiogroup" aria-label="Plan">
+      <label class="showcase__inline">
+        <md-radio name="plan" value="a" checked></md-radio> Basic
+      </label>
+      <label class="showcase__inline">
+        <md-radio name="plan" value="b"></md-radio> Pro
+      </label>
+      <label class="showcase__inline">
+        <md-radio name="plan" value="c"></md-radio> Max
+      </label>
+    </div>
+    <div class="showcase__row">
+      <label class="showcase__inline"><md-switch></md-switch> Off</label>
+      <label class="showcase__inline"><md-switch selected></md-switch> On</label>
+      <label class="showcase__inline">
+        <md-switch selected icons></md-switch> With icons
+      </label>
+    </div>
+  </section>
+
+  <!-- 24. Slider -->
+  <section class="showcase__card" id="slider">
+    <h2>Slider</h2>
+    <p class="demo-label">Continuous</p>
+    <md-slider value="50" aria-label="Continuous value"></md-slider>
+    <p class="demo-label">Discrete (ticks + labeled)</p>
+    <md-slider
+      value="3"
+      min="0"
+      max="10"
+      step="1"
+      ticks
+      labeled
+      aria-label="Discrete value"
+    ></md-slider>
+    <p class="demo-label">Range</p>
+    <md-slider
+      range
+      [valueStart]="20"
+      [valueEnd]="70"
+      aria-label="Range value"
+    ></md-slider>
+  </section>
+
+  <!-- 25. Snackbar -->
+  <section class="showcase__card" id="snackbar">
+    <h2>Snackbar</h2>
+    <p class="demo-label">
+      M3 snackbar — one instance driven imperatively via show()/hide() (only one should be
+      visible at a time per M3 guidance). Auto-dismiss pauses on hover/focus. Error uses
+      role="alert"/aria-live="assertive"; the rest use role="status"/aria-live="polite".
+    </p>
+
+    <div class="showcase__row">
+      <md-outlined-button (click)="showSnackbar('neutral', 'Link copied to clipboard.', undefined, true)">
+        Neutral
+      </md-outlined-button>
+
+      <md-outlined-button (click)="showSnackbar('success', 'Booking confirmed.', 'Undo', false)">
+        Success (+ action)
+      </md-outlined-button>
+
+      <md-outlined-button (click)="showSnackbar('warning', 'Your session expires in 2 minutes.', undefined, true)">
+        Warning
+      </md-outlined-button>
+
+      <md-outlined-button (click)="showSnackbar('error', 'Payment failed. Please try again.', 'Retry', true)">
+        Error (+ action)
+      </md-outlined-button>
+
+      <md-outlined-button (click)="showSnackbar('info', 'New ride requests nearby.', undefined, true, 0)">
+        Info (no auto-dismiss)
+      </md-outlined-button>
+    </div>
+
+    <p class="demo-label" role="status">
+      {{ snackbarLog() || 'Trigger a snackbar above — events log here.' }}
+    </p>
+
+    <sky-snackbar
+      #snackbar
+      duration="4000"
+      (sky-action)="onSnackbarAction()"
+      (sky-closed)="onSnackbarClosed($event)"
+    ></sky-snackbar>
+  </section>
+
+  <!-- 26. Tabs -->
+  <section class="showcase__card" id="tabs">
+    <h2>Tabs</h2>
+    <p class="demo-label">Primary</p>
+    <md-tabs>
+      <md-primary-tab>
+        <md-icon slot="icon" aria-hidden="true">dashboard</md-icon>
+        Overview
+      </md-primary-tab>
+      <md-primary-tab>
+        <md-icon slot="icon" aria-hidden="true">timeline</md-icon>
+        Activity
+      </md-primary-tab>
+      <md-primary-tab>
+        <md-icon slot="icon" aria-hidden="true">settings</md-icon>
+        Settings
+      </md-primary-tab>
+    </md-tabs>
+    <p class="demo-label">Secondary</p>
+    <md-tabs>
+      <md-secondary-tab>Flights</md-secondary-tab>
+      <md-secondary-tab>Hotels</md-secondary-tab>
+      <md-secondary-tab>Cars</md-secondary-tab>
+    </md-tabs>
+  </section>
+
+  <!-- 27. Text fields -->
+  <section class="showcase__card" id="text-fields">
+    <h2>Text fields</h2>
+    <div class="fields-grid">
+      <md-filled-text-field label="Filled" value="Hello"></md-filled-text-field>
+      <md-outlined-text-field
+        label="Outlined"
+        placeholder="Type here"
+      ></md-outlined-text-field>
+      <md-outlined-text-field label="With icons" placeholder="Search">
+        <md-icon slot="leading-icon" aria-hidden="true">search</md-icon>
+        <md-icon slot="trailing-icon" aria-hidden="true">close</md-icon>
+      </md-outlined-text-field>
+      <md-filled-text-field
+        label="Amount"
+        type="number"
+        prefix-text="$"
+        suffix-text=".00"
+      ></md-filled-text-field>
+      <md-outlined-text-field
+        label="Email"
+        type="email"
+        supporting-text="We'll never share it"
+      ></md-outlined-text-field>
+      <md-filled-text-field
+        label="Password"
+        type="password"
+        value="secret"
+      ></md-filled-text-field>
+      <md-outlined-text-field
+        label="Bio (textarea)"
+        type="textarea"
+        rows="3"
+      ></md-outlined-text-field>
+      <md-filled-text-field
+        label="With counter"
+        maxlength="20"
+        value="Count me"
+      ></md-filled-text-field>
+      <md-outlined-text-field
+        label="Required"
+        required
+        error
+        error-text="This field is required"
+      ></md-outlined-text-field>
+    </div>
+  </section>
+
+  <!-- 28. Tile card -->
+  <section class="showcase__card" id="tile-card">
+    <h2>Tile card</h2>
+
+    <p class="demo-label">
+      Variants and colors (linked tiles show the M3 state layer)
+    </p>
+
+    <div class="demo-grid">
+      <sky-tile-card
+        icon="directions_car"
+        headline="City Rides"
+        text="120 drivers online"
+        href="/showcase#tile-card"
+      ></sky-tile-card>
+
+      <sky-tile-card
+        icon="flight_takeoff"
+        headline="Airport Express"
+        text="45 available"
+        variant="filled"
+        color="surface-high"
+        href="/showcase#tile-card"
+      ></sky-tile-card>
+
+      <sky-tile-card
+        icon="route"
+        headline="Outstation"
+        text="28 routes"
+        variant="elevated"
+        href="/showcase#tile-card"
+      ></sky-tile-card>
+
+      <sky-tile-card
+        icon="schedule"
+        headline="Hourly Rental"
+        text="18 packages"
+        variant="filled"
+        color="primary"
+        icon-style="surface"
+        href="/showcase#tile-card"
+      ></sky-tile-card>
+
+      <sky-tile-card
+        icon="electric_car"
+        headline="EV Rides"
+        text="35 green cabs"
+        variant="filled"
+        color="secondary"
+        icon-style="surface"
+        icon-shape="full"
+      ></sky-tile-card>
+
+      <sky-tile-card
+        icon="shield"
+        headline="VIP Chauffeur"
+        text="15 premium cars"
+        variant="filled"
+        color="tertiary"
+        icon-style="surface"
+      ></sky-tile-card>
+    </div>
+
+    <p class="demo-label">
+      Icon styles, icon shapes, shapes, alignment, no icon
+    </p>
+
+    <div class="demo-grid">
+      <sky-tile-card
+        icon="favorite"
+        headline="Tonal icon"
+        text="icon-style tonal"
+        iconStyle="tonal"
+      ></sky-tile-card>
+
+      <sky-tile-card
+        icon="favorite"
+        headline="Plain icon"
+        text="icon-style plain"
+        iconStyle="plain"
+      ></sky-tile-card>
+
+      <sky-tile-card
+        icon="favorite"
+        headline="Round icon"
+        text="icon-shape full"
+        iconShape="full"
+      ></sky-tile-card>
+
+      <sky-tile-card
+        icon="favorite"
+        headline="Square corners"
+        text="shape small"
+        shape="small"
+        iconShape="small"
+      ></sky-tile-card>
+
+      <sky-tile-card
+        icon="favorite"
+        headline="Centered"
+        text="align center"
+        align="center"
+      ></sky-tile-card>
+
+      <sky-tile-card
+        headline="No icon"
+        text="Text only, no background"
+        color="none"
+      ></sky-tile-card>
+
+      <sky-tile-card
+        icon="nightlight"
+        headline="Inverse"
+        text="color inverse"
+        variant="filled"
+        color="inverse"
+        iconStyle="tonal"
+      ></sky-tile-card>
+    </div>
+  </section>
 </main>
+</div>

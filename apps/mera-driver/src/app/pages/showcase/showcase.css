@@ -4,13 +4,45 @@
   display: block;
 }
 
-.showcase {
-  max-width: 880px;
+.showcase-shell {
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 24px 16px 64px;
+  padding: 0 16px;
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 32px;
+}
+
+.showcase {
+  min-width: 0;
+  padding: 24px 0 64px;
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+/* Quick-jump nav */
+.showcase-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.showcase-nav md-text-button {
+  max-width: 100%;
+}
+
+/* Two columns on desktop (nav + content), one column on phone/tablet —
+   on phone/tablet the nav buttons wrap into a row instead of a tall stack. */
+@media (max-width: 839px) {
+  .showcase-shell {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .showcase-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
 }
 
 .showcase__bar {
@@ -50,6 +82,7 @@
 .showcase__card h2 {
   margin: 0 0 12px;
   font-size: 1rem;
+  font-weight: 700;
   color: var(--md-sys-color-on-surface-variant, #42474e);
 }
 
@@ -149,4 +182,25 @@
 /* Fixed width so `slides-per-view="auto"` and centered/free-mode demos work. */
 .demo-slide--auto {
   width: 200px;
+}
+/*actionfield*/
+.demo-stack {
+  display: grid;
+  gap: 16px;
+}
+
+/* --- sky-image / sky-tile-card / sky-feature-card / sky-cta-banner demos --- */
+.demo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 16px;
+}
+
+.demo-grid--wide {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.demo-grid--images {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  align-items: start;
 }
