@@ -12,7 +12,7 @@ import {
   type BlogCategoryInput,
 } from '../../../../api/rbac/blog-categories';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { useToast } from '../../../../toast/toast-context';
+import { showSnackbar } from '../../../../snackbar/snackbar';
 import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { BlogCategoryFormDialog } from './blog-category-form-dialog';
 
@@ -45,7 +45,6 @@ function excerpt(text: string, maxLength = 80): string {
 export function BlogCategoriesList() {
   const { token, can } = useAuth();
   const { confirm, ConfirmDialog } = useConfirmDialog();
-  const { showToast } = useToast();
   const canCreate = can('cms.blog-category', 'create');
   const canEdit = can('cms.blog-category', 'edit');
   const canDelete = can('cms.blog-category', 'delete');
@@ -87,13 +86,13 @@ export function BlogCategoriesList() {
     if (existing) {
       const { data } = await updateBlogCategory(token, existing.id, input);
       setCategories((prev) => prev.map((c) => (c.id === data.id ? data : c)));
-      showToast('Blog category updated.');
+      showSnackbar('Blog category updated.', { variant: 'success' });
       return data;
     }
     const { data } = await createBlogCategory(token, input);
     setCategories((prev) => [...prev, data]);
     setTotal((t) => t + 1);
-    showToast('Blog category created.');
+    showSnackbar('Blog category created.', { variant: 'success' });
     return data;
   };
 
@@ -102,11 +101,11 @@ export function BlogCategoriesList() {
     try {
       const { data } = await updateBlogCategory(token, category.id, { isActive: !category.isActive });
       setCategories((prev) => prev.map((c) => (c.id === data.id ? data : c)));
-      showToast(data.isActive ? 'Category activated.' : 'Category deactivated.');
+      showSnackbar(data.isActive ? 'Category activated.' : 'Category deactivated.', { variant: 'success' });
     } catch (err) {
       const msg = err instanceof ApiRequestError ? err.message : 'Could not change status.';
       setError(msg);
-      showToast(msg, 'error');
+      showSnackbar(msg, { variant: 'error' });
     }
   };
 
@@ -117,11 +116,11 @@ export function BlogCategoriesList() {
       await deleteBlogCategory(token, category.id);
       setCategories((prev) => prev.filter((c) => c.id !== category.id));
       setTotal((t) => t - 1);
-      showToast('Blog category deleted.');
+      showSnackbar('Blog category deleted.', { variant: 'success' });
     } catch (err) {
       const msg = err instanceof ApiRequestError ? err.message : 'Could not delete blog category.';
       setError(msg);
-      showToast(msg, 'error');
+      showSnackbar(msg, { variant: 'error' });
     }
   };
 

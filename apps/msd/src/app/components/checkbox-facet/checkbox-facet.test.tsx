@@ -76,6 +76,48 @@ describe('CheckboxFacet', () => {
     expect(visible).toEqual(['Zen Spa 2']);
   });
 
+  /** ST-25: a selected option never hides, so the visitor can always see and clear it. */
+  it('keeps a selected option past the limit visible while collapsed, without a jump in order', () => {
+    render(<CheckboxFacet options={options} selected={['v7']} onChange={vi.fn()} {...copy} limit={5} />);
+    expect(rows().map(rowText)).toEqual([
+      'Glow Beauty Studio 3',
+      'Zen Spa 2',
+      'Serenity 1',
+      'Aura Wellness 4',
+      'Bliss Point 0',
+      'Divine Touch 2',
+    ]);
+    expect((document.querySelector('md-text-button') as HTMLElement).textContent).toBe('Show more');
+  });
+
+  it('hides Show more when every option past the limit is already shown as selected', () => {
+    render(<CheckboxFacet options={options} selected={['v6', 'v7']} onChange={vi.fn()} {...copy} limit={5} />);
+    expect(rows()).toHaveLength(7);
+    expect(document.querySelector('md-text-button')).toBeNull();
+  });
+
+  it('keeps selected options visible when the search does not match them', () => {
+    render(<CheckboxFacet options={options} selected={['v4']} onChange={vi.fn()} {...copy} limit={5} />);
+    const search = document.querySelector('md-outlined-text-field') as HTMLElement & { value: string };
+    search.value = 'zen';
+    fireEvent.input(search);
+    expect(rows().map(rowText)).toEqual(['Zen Spa 2', 'Aura Wellness 4']);
+  });
+
+  it('keeps a selected option the facet stops listing, with its last label and a 0 count, so it can be cleared', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<CheckboxFacet options={options} selected={['v2']} onChange={onChange} {...copy} limit={5} />);
+    rerender(<CheckboxFacet options={options.filter((o) => o.value !== 'v2')} selected={['v2']} onChange={onChange} {...copy} limit={5} />);
+    const zen = rows().find((r) => rowText(r).startsWith('Zen Spa'));
+    expect(zen && rowText(zen)).toBe('Zen Spa 0');
+    const box = zen?.querySelector('md-checkbox') as HTMLElement & { checked: boolean; disabled: boolean };
+    expect(box.checked).toBe(true);
+    expect(box.disabled).toBe(false);
+    box.checked = false;
+    fireEvent.change(box);
+    expect(onChange).toHaveBeenCalledWith([]);
+  });
+
   it('gives screen readers the count as words and hides the bare number', () => {
     render(
       <CheckboxFacet

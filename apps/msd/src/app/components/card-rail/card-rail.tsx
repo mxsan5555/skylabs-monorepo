@@ -15,8 +15,8 @@ export interface CardRailProps {
   /** Id of the rendered h2; the parent <section aria-labelledby> points at it. */
   id: string;
   heading: string;
-  seeAll: string;
-  seeAllTo: string;
+  seeAll?: string;
+  seeAllTo?: string;
   /** Remounts the carousel when the slide set is swapped wholesale (e.g. a tab change). */
   railKey?: string;
   /** Content between the header row and the track (e.g. tabs). */

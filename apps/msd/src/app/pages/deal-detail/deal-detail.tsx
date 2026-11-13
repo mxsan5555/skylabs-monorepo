@@ -1,396 +1,443 @@
 import { useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { DealCard, type DealCardDeal } from '../../components/deal-card';
-import { Divider, FilledButton, Icon, OutlinedIconButton } from '@skylabs-monorepo/shared-ui/react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Icon, OutlinedButton, OutlinedIconButton } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { signInPathWithReturnTo } from '../../../auth/role-routing';
 import { addCartItem } from '../../../api/cart';
-import { getCatalogDeal, listCatalogDeals, type CatalogDeal, } from '../../../api/catalog';
+import { getCatalogDeal, listCatalogDeals, type CatalogDeal, type CatalogDealDetail } from '../../../api/catalog';
+import { resolveMediaUrl } from '../../../api/media';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { useWishlist } from '../../../wishlist/wishlist-context';
-import { Breadcrumb } from '../../components/breadcrumb';
+import { useRequireSignIn } from '../../../hooks/use-require-sign-in';
+import { useHydrated } from '../../../hooks/use-hydrated';
+import { showCartAdded } from '../../../hooks/use-add-product-to-cart';
 import { useDealPurchaseSelection } from '../../../hooks/use-deal-purchase-selection';
+import { OfferCard } from '../../components/offer-card/offer-card';
+import { TherapistCard } from '../../components/therapist-card/therapist-card';
+import { CardRail } from '../../components/card-rail/card-rail';
+import { Breadcrumb } from '../../components/breadcrumb';
+import { PageSection } from '../../components/page-section/page-section';
 import { DurationPackageSelector } from '../../components/duration-package-selector';
-import { formatINR } from '../../../utils/format';
+import { BranchPanels, DetailGallery, DetailNotFound, DetailPrice, DetailPurchase, discountPercent } from '../../components/detail-page/detail-page';
+import { BannerSlot } from '../../components/banner-slot/banner-slot';
+import { Seo } from '../../seo/seo';
+import { absoluteUrl } from '../../seo/site-url';
+import { usePrerenderedData, dealDataKey } from '../../../prerender-data/prerender-data';
+import { categoryHref, cityHref, citySlug } from '../../../catalog/catalog-shell';
+import { fillTemplate } from '../../../utils/format';
 import { resolveDealMedia } from '../../../utils/media';
 import content from '../../../content.json';
-import './deal-detail.css';
+const t = content.dealDetail;
+const d = content.detailPage;
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+const ENDS_IN_DAYS = 7;
+const LOW_STOCK = 10;
+const COUNTDOWN_TICK_MS = 60_000;
+const TITLE_MAX = 60;
+const META_MAX = 155;
+function endsInLabel(endDate: string | null, now: number): string | null {
+  if (!endDate) return null;
+  const left = new Date(endDate).getTime() - now;
+  if (!(left > 0) || left > ENDS_IN_DAYS * DAY_MS) return null;
+  const days = Math.floor(left / DAY_MS);
+  const hours = Math.max(1, Math.floor((left % DAY_MS) / HOUR_MS));
+  return days > 0
+    ? fillTemplate(t.availability.endsInDays, { days: String(days), hours: String(hours) })
+    : fillTemplate(t.availability.endsInHours, { hours: String(hours) });
+}
+function pageTitle(deal: CatalogDealDetail): string {
+  const member = deal.vendor?.businessName;
+  const city = deal.branch?.city;
+  if (!member) return deal.title;
+  const build = (title: string) => fillTemplate(city ? t.meta.titleTemplate : t.meta.titleTemplateNoCity, { title, member, city: city ?? '' });
+  const full = build(deal.title);
+  if (full.length <= TITLE_MAX) return full;
+  const room = Math.max(10, deal.title.length - (full.length - TITLE_MAX) - 1);
+  const cut = deal.title.slice(0, room);
+  const lastSpace = cut.lastIndexOf(' ');
+  return build(`${(lastSpace >= room / 2 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`);
+}
+function metaDescription(deal: CatalogDealDetail): string {
+  const text = (deal.tagline || deal.description || fillTemplate(t.meta.defaultDescription, { name: deal.title })).replace(/\s+/g, ' ').trim();
+  return text.length <= META_MAX ? text : `${text.slice(0, META_MAX - 1).trimEnd()}…`;
+}
+const SCHEMA_DAYS: Record<string, string> = {
+  mon: 'Monday',
+  tue: 'Tuesday',
+  wed: 'Wednesday',
+  thu: 'Thursday',
+  fri: 'Friday',
+  sat: 'Saturday',
+  sun: 'Sunday',
+};
+function dealJsonLd(deal: CatalogDealDetail, images: string[], crumbs: { label: string; to?: string }[]) {
+  const prices = deal.packages.map((p) => Number(p.sellingPrice));
+  const branch = deal.branch;
+  const hours = branch?.openingHours
+    ? Object.entries(branch.openingHours).flatMap(([day, h]) =>
+      h?.open && h.start && h.end ? [{ '@type': 'OpeningHoursSpecification', dayOfWeek: SCHEMA_DAYS[day], opens: h.start, closes: h.end }] : [],
+    ) : [];
+  const provider = deal.vendor?.businessName
+    ? {
+      '@type': 'LocalBusiness',
+      name: deal.vendor.businessName,
+      ...(deal.vendor.slug ? { url: absoluteUrl(`/vendor/${deal.vendor.slug}`) } : {}),
+      ...(branch
+        ? {
+          address: {
+            '@type': 'PostalAddress',
+            streetAddress: [branch.address, branch.addressLine2].filter(Boolean).join(', ') || undefined,
+            addressLocality: branch.city ?? undefined,
+            addressRegion: branch.state ?? undefined,
+            postalCode: branch.pincode ?? undefined,
+            addressCountry: 'IN',
+          },
+          ...(branch.phone ? { telephone: branch.phone } : {}),
+          ...(branch.latitude && branch.longitude
+            ? { geo: { '@type': 'GeoCoordinates', latitude: Number(branch.latitude), longitude: Number(branch.longitude) } }
+            : {}),
+          ...(hours.length ? { openingHoursSpecification: hours } : {}),
+        }
+        : {}),
+    }
+    : undefined;
+  const service = {
+    '@context': 'https://schema.org',
+    '@type': 'Service',
+    name: deal.title,
+    description: metaDescription(deal),
+    url: absoluteUrl(`/deal/${deal.slug}`),
+    ...(images.length ? { image: images } : {}),
+    ...(deal.category ? { serviceType: deal.category.name } : {}),
+    ...(branch?.city ? { areaServed: { '@type': 'City', name: branch.city } } : {}),
+    ...(provider ? { provider } : {}),
+    ...(prices.length
+      ? {
+        offers: {
+          '@type': 'AggregateOffer',
+          priceCurrency: deal.currency,
+          lowPrice: Math.min(...prices),
+          highPrice: Math.max(...prices),
+          offerCount: prices.length,
+          availability: deal.isSoldOut ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock',
+          ...(deal.endDate ? { validThrough: deal.endDate } : {}),
+        },
+      }
+      : {}),
+  };
+  const breadcrumbs = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: crumbs.map((c, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: c.label,
+      ...(c.to ? { item: absoluteUrl(c.to) } : {}),
+    })),
+  };
+  const faq = deal.faqs.length
+    ? [
+      {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: deal.faqs.map((f) => ({ '@type': 'Question', name: f.question, acceptedAnswer: { '@type': 'Answer', text: f.answer } })),
+      },
+    ]
+    : [];
+  return [service, breadcrumbs, ...faq];
+}
 /**
- * A single Deal — GET /catalog/deals/:id. Deal is always a service offering (Product is a fully
- * independent catalog entity — see msd-api's Product schema doc comment) — Add to Cart always
- * goes through `DealAddToCartDialog`'s package-selection flow.
- *
- * /category/:slug links service deals here. Products link to /products/:id.
+ * The deal page (`/deal/:slug`, docs/msd/PLANNING.md §2.7): gallery, buy box (tagline,
+ * highlights, packages, quantity within stock and the per-customer limit), What you get, How to
+ * redeem, Cancellation and Fine print, the deal's therapists, location and hours, About the
+ * business, questions, then more deals from the category. Opens by slug, an old slug or the
+ * UUID; the address bar and canonical always show the current slug. Prerendered pages carry the
+ * deal in the embedded payload.
  */
 export function DealDetail() {
-  const { id = '' } = useParams<{ id: string }>();
+  const { slug = '' } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
-  const { isAuthenticated, token } = useAuth();
-  const { has: isWishlisted, toggle: toggleWishlist, isPending: wishlistPending, } = useWishlist();
-  const { dealDetail } = content;
-  const [deal, setDeal] = useState<CatalogDeal | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { token } = useAuth();
+  const hydrated = useHydrated();
+  const requireSignIn = useRequireSignIn();
+  const { has: isWishlisted, toggle: toggleWishlist, isPending: wishlistPending } = useWishlist();
+  const seeded = usePrerenderedData<{ deal: CatalogDealDetail | null }>(dealDataKey(slug));
+  const [deal, setDeal] = useState<CatalogDealDetail | null>(seeded?.deal ?? null);
+  const [loading, setLoading] = useState(!seeded);
   const [error, setError] = useState('');
-  const [copied, setCopied] = useState(false);
   const [related, setRelated] = useState<CatalogDeal[]>([]);
-  const [activeImg, setActiveImg] = useState(0);
-  const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
   const [quantity, setQuantity] = useState(1);
+  const [now, setNow] = useState(0);
   useEffect(() => {
-    if (!id) {
+    if (seeded?.deal && seeded.deal.slug === slug) return;
+    if (!slug) {
       setDeal(null);
-      setError(dealDetail.errors.invalidDeal);
+      setError(t.errors.invalidDeal);
       setLoading(false);
       return;
     }
     setLoading(true);
     setError('');
-    setActiveImg(0);
-    getCatalogDeal(id)
-      .then(({ data }) => { setDeal(data); })
+    getCatalogDeal(slug)
+      .then(({ data }) => {
+        setDeal(data);
+        if (data.slug && data.slug !== slug) navigate(`/deal/${data.slug}`, { replace: true });
+      })
       .catch((err: unknown) => {
-        if (err instanceof ApiRequestError && err.status === 404) {
-          setDeal(null);
-          return;
-        }
-        setError(err instanceof ApiRequestError ? err.message : dealDetail.errors.loadDeal);
+        if (err instanceof ApiRequestError && err.status === 404) setDeal(null);
+        else setError(err instanceof ApiRequestError ? err.message : t.errors.loadDeal);
       })
       .finally(() => { setLoading(false); });
-  }, [id]);
+  }, [slug, navigate]);
   useEffect(() => {
-    if (!deal?.category?.id) {
+    if (!hydrated) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), COUNTDOWN_TICK_MS);
+    return () => window.clearInterval(timer);
+  }, [hydrated]);
+  const categoryId = deal?.category?.id;
+  const dealId = deal?.id;
+  const city = deal?.branch?.city ?? undefined;
+  useEffect(() => {
+    if (!categoryId) {
       setRelated([]);
       return;
     }
-    listCatalogDeals({
-      categoryId: deal.category.id,
-      pageSize: 7,
-    })
+    let cancelled = false;
+    listCatalogDeals({ categoryId, pageSize: 7, ...(city ? { city } : {}) })
       .then(({ data }) => {
-        setRelated(
-          data.filter((item) => item.id !== deal.id).slice(0, 6),
-        );
+        if (!cancelled) setRelated(data.filter((item) => item.id !== dealId).slice(0, 6));
       })
-      .catch(() => {
-        setRelated([]);
-      });
-  }, [deal]);
+      .catch(() => { if (!cancelled) setRelated([]); });
+    return () => { cancelled = true; };
+  }, [categoryId, dealId, city]);
   const purchaseSelection = useDealPurchaseSelection(deal);
-  if (loading) {
-    return (
-      <p className="loading-state">{dealDetail.loading}</p>
-    );
-  }
-  if (error || !deal) {
-    return (
-      <div className="deal-detail deal-detail--empty">
-        <title>{dealDetail.notFound.metaTitle}</title>
-        <sky-info-card
-          icon="search_off"
-          heading={dealDetail.notFound.heading}
-          subheading={dealDetail.notFound.subheading}
-        />
-        <FilledButton type="button" onClick={() => navigate('/categories')} > {dealDetail.notFound.cta} </FilledButton>
-      </div>
-    );
-  }
-  const requireAuthOrRedirect = () => {
-    if (isAuthenticated) {
-      return true;
-    }
-    navigate(signInPathWithReturnTo(location));
-    return false;
-  };
-  const name = deal.title;
-  const dealMedia = resolveDealMedia(deal);
-  const gallery = dealMedia.images;
-  const video = dealMedia.video;
-  const description = deal.description ?? deal.shortDescription ?? '';
+  if (loading) return <p className="loading-state" role="status">{t.loading}</p>;
+  if (error || !deal) return <DetailNotFound copy={t.notFound} to="/deals" />;
+  const media = resolveDealMedia(deal);
+  const alts = (deal.mediaImages ?? []).map((m) => m.altText);
+  const activePackage = deal.packages.find((p) => p.id === purchaseSelection.activePackage?.id) ?? deal.packages[0];
   const salePrice = purchaseSelection.unitPrice;
-  const originalPrice = purchaseSelection.activePackage?.originalPrice != null
-    ? Number(purchaseSelection.activePackage.originalPrice)
-    : deal.originalPrice != null ? Number(deal.originalPrice) : undefined;
-  const discountPct = deal.discountPercent ??
-    (originalPrice !== undefined && originalPrice > salePrice
-      ? Math.round(((originalPrice - salePrice) / originalPrice) * 100,) : 0);
-  const dealId = deal.id;
-  function toggleFavorite() {
-    if (!requireAuthOrRedirect()) {
-      return;
-    }
-    void toggleWishlist(dealId);
-  }
-  async function handleAddToCart() {
-    if (!deal) return;
-    if (!requireAuthOrRedirect()) return;
-    const activePackage = purchaseSelection.activePackage;
-    if (!activePackage) {
-      setActionError(
-        purchaseSelection.missingSelection ?? 'Please select a package.'
-      );
-      setActionMessage('');
+  const originalPrice = activePackage?.originalPrice != null ? Number(activePackage.originalPrice) : undefined;
+  const discountPct = activePackage?.discountPercent ?? discountPercent(salePrice, originalPrice);
+  const saved = isWishlisted(deal.id);
+  const caps = [deal.stockLeft, deal.limitPerCustomer].filter((n): n is number => n != null && n > 0);
+  const maxQuantity = caps.length ? Math.min(...caps) : undefined;
+  const endsIn = hydrated && now ? endsInLabel(deal.endDate, now) : null;
+  const chipCategory = deal.subcategory ?? deal.category;
+  const crumbs = [
+    { label: content.categories.breadcrumb.home, to: '/' },
+    ...(city ? [{ label: fillTemplate(t.breadcrumbCity, { city }), to: `/deals/${citySlug(city)}` }] : []),
+    ...(deal.category ? [{ label: deal.category.name, to: city ? cityHref(deal.category.slug, city) : categoryHref(deal.category.slug) }] : []),
+    { label: deal.title },
+  ];
+  const handleAddToCart = async () => {
+    if (!requireSignIn()) return;
+    if (!purchaseSelection.activePackage) {
+      setActionError(purchaseSelection.missingSelection ?? d.selectDuration);
       return;
     }
     setActionError('');
-    setActionMessage('');
     try {
-      await addCartItem(token, {
-        dealId: deal.id,
-        dealPackageId: activePackage.id,
-        quantity,
-      });
-      setActionMessage(`Added "${deal.title}" to your cart.`);
+      await addCartItem(token, { dealId: deal.id, dealPackageId: purchaseSelection.activePackage.id, quantity });
+      showCartAdded(deal.title, () => navigate('/cart'));
     } catch (err) {
-      const message = err instanceof ApiRequestError ? err.message : 'Unable to add item to cart.';
-      setActionError(message);
+      setActionError(err instanceof ApiRequestError ? err.message : t.errors.addToCart);
     }
-  }
-  async function copyLink() {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      setCopied(true);
-      setTimeout(() => { setCopied(false); }, 2000);
-    } catch {
-      setCopied(false);
-    }
-  }
+  };
+  const notes = [
+    deal.boughtCount != null && { icon: 'local_fire_department', text: fillTemplate(t.availability.bought, { count: String(deal.boughtCount) }) },
+    endsIn && { icon: 'schedule', text: endsIn },
+    !deal.isSoldOut && deal.stockLeft != null && deal.stockLeft <= LOW_STOCK && { icon: 'inventory_2', text: fillTemplate(t.availability.stockLeft, { count: String(deal.stockLeft) }) },
+    deal.limitPerCustomer != null && { icon: 'person', text: fillTemplate(t.availability.limit, { limit: String(deal.limitPerCustomer) }) },
+  ].filter((n): n is { icon: string; text: string } => Boolean(n));
+  const validity =
+    deal.validityDays != null
+      ? deal.validityDays === 1
+        ? t.redeem.validForOne
+        : fillTemplate(t.redeem.validFor, { days: String(deal.validityDays) })
+      : null;
+  const logo = deal.vendor?.mediaImages?.[0]?.storageKey ? resolveMediaUrl(deal.vendor.mediaImages[0].storageKey) : deal.vendor?.logoUrl;
   return (
-    <div className="deal-detail">
-      <title>{`${name} – ${deal.vendor?.businessName ?? 'MSD'} | MSD`}</title>
-      <meta
-        name="description"
-        content={`${description || `Book ${name} at MSD.`} ${formatINR(salePrice)}${deal.branch?.city ? ` in ${deal.branch.city}` : ''}.`}
+    <>
+      <Seo
+        title={pageTitle(deal)}
+        description={metaDescription(deal)}
+        path={`/deal/${deal.slug}`}
+        image={media.images[0]}
+        jsonLd={dealJsonLd(deal, media.images, crumbs)}
       />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            '@context': 'https://schema.org', '@type': 'Service',
-            name,
-            description,
-            provider: deal.vendor?.businessName ? { '@type': 'Organization', name: deal.vendor.businessName, } : undefined,
-            offers: {
-              '@type': 'Offer',
-              price: salePrice,
-              priceCurrency: 'INR',
-              availability: 'https://schema.org/InStock',
-            },
-          }),
-        }}
-      />
-      <Breadcrumb
-        className="deal-detail__breadcrumb"
-        items={[
-          { label: content.categories.breadcrumb.home, to: '/', },
-          ...(deal.category ? [
-            { label: deal.category.name, to: `/category/${deal.category.slug}`, },
-          ] : []),
-          { label: name, },]}
-      />
-      <div className="deal-detail__layout">
-        <div className="deal-detail__gallery">
-          <div className="deal-detail__main-img-wrap">
-            {gallery[activeImg] && (
-              <img
-                className="deal-detail__main-img"
-                src={gallery[activeImg]}
-                alt={name}
-                width={800}
-                height={450}
-              />
-            )}
-            {discountPct > 0 && (
-              <span className="deal-detail__badge" aria-label={`${discountPct}% ${dealDetail.labels.off}`}>
-                {discountPct}% {dealDetail.labels.off}
-              </span>
-            )}
-          </div>
-          {gallery.length > 1 && (
-            <div
-              className="deal-detail__thumbs"
-              aria-label="Gallery thumbnails"
-            >
-              {gallery.map((image, index) => (
-                <button
-                  key={`${image}-${index}`}
-                  type="button"
-                  className={`deal-detail__thumb${index === activeImg ? ' deal-detail__thumb--active' : ''}`}
-                  onClick={() => setActiveImg(index)}
-                  aria-label={`${dealDetail.gallery.viewImage} ${index + 1}`}
-                  aria-pressed={index === activeImg}
-                >
-                  <img
-                    src={image}
-                    alt=""
-                    width={80}
-                    height={60}
-                    loading="lazy"
-                  />
-                </button>
-              ))}
+      <PageSection stack aria-labelledby="detail-title">
+        <Breadcrumb items={crumbs} />
+        <div className="detail-page__grid">
+          <DetailGallery images={media.images} alts={alts} video={media.video} alt={deal.title} discountPct={discountPct ?? 0}
+          //  tag={deal.tag} 
+           />
+          <div className="detail-page__buy">
+            <div className="detail-page__chips">
+              {chipCategory && <sky-badge variant="secondary" size="small">{chipCategory.name}</sky-badge>}
+              {deal.vendor?.businessName &&
+                (deal.vendor.slug ? (
+                  <Link to={`/vendor/${deal.vendor.slug}`}>
+                    <sky-badge variant="primary" size="small">{deal.vendor.businessName}</sky-badge>
+                  </Link>
+                ) : (
+                  <sky-badge variant="primary" size="small">{deal.vendor.businessName}</sky-badge>
+                ))}
+              {city && <sky-badge variant="secondary" size="small">{city}</sky-badge>}
             </div>
-          )}
-          {video && (<video className="deal-detail__video" controls src={video} />)}
-        </div>
-        <div className="deal-detail__info">
-          <div className="deal-detail__meta-row">
-            {deal.vendor?.businessName &&
-              (deal.vendor.slug ? (
-                <Link to={`/vendor/${deal.vendor.slug}`} className="deal-detail__provider">{deal.vendor.businessName}</Link>
-              ) : (
-                <span className="deal-detail__provider">{deal.vendor.businessName}</span>
-              ))}
-            {deal.category && (
-              <sky-badge variant="secondary" size="small"> {deal.category.name} </sky-badge>
+            <h1 id="detail-title" className="detail-page__title headline-medium">{deal.title}</h1>
+            {deal.tagline && <p className="detail-page__tagline body-large">{deal.tagline}</p>}
+            {deal.highlights.length > 0 && (
+              <ul className="detail-page__highlights body-medium" aria-label={t.highlights}>
+                {deal.highlights.map((h) => (
+                  <li key={h}>
+                    <Icon aria-hidden="true">check_circle</Icon>
+                    <span>{h}</span>
+                  </li>
+                ))}
+              </ul>
             )}
-            <sky-badge variant="primary" size="small">{dealDetail.serviceType.service}</sky-badge>
-          </div>
-          <h1 className="deal-detail__title">{name}</h1>
-          {(deal.branch?.city || deal.branch?.address) && (
-            <p className="deal-detail__dist" aria-label={dealDetail.labels.location}>
-              <Icon aria-hidden="true"> near_me</Icon>
-              {[deal.branch?.name, deal.branch?.address ?? deal.branch?.city,]
-                .filter(Boolean)
-                .join(' · ')}
-            </p>
-          )}
-          <DurationPackageSelector selection={purchaseSelection} />
-          <div className="deal-detail__cta">
-            <div className="deal-detail__purchase">
-              <div className="deal-detail__quantity">
-                <span>Quantity</span>
-                <div
-                  className="deal-detail__quantity-control"
-                  role="group"
-                  aria-label="Quantity"
-                >
-                  <button
-                    type="button"
-                    aria-label="Decrease quantity"
-                    disabled={quantity <= 1}
-                    onClick={() => setQuantity((current) => Math.max(1, current - 1))}
-                  >−</button>
-                  <span aria-live="polite">{quantity}</span>
-                  <button
-                    type="button"
-                    aria-label="Increase quantity"
-                    onClick={() => setQuantity((current) => current + 1)
-                    }
-                  >+</button>
-                </div>
-              </div>
-              <div className="deal-detail__total">
-                <span>Total</span>
-                <strong>{formatINR(purchaseSelection.unitPrice * quantity)}</strong>
-              </div>
-              <div className="deal-detail__action-row">
-                <FilledButton
-                  type="button"
-                  className="deal-detail__add-btn"
-                  onClick={handleAddToCart}
-                  disabled={!!purchaseSelection.missingSelection}
-                >
-                  <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>Add to Cart</FilledButton>
+            <DetailPrice price={salePrice} originalPrice={originalPrice} discountPct={discountPct ?? 0} />
+            <DurationPackageSelector selection={purchaseSelection} />
+            <DetailPurchase
+              unitPrice={salePrice}
+              quantity={quantity}
+              onQuantityChange={(q) => setQuantity(maxQuantity ? Math.min(q, maxQuantity) : q)}
+              onAdd={() => void handleAddToCart()}
+              addDisabled={!!purchaseSelection.missingSelection}
+              maxQuantity={maxQuantity}
+              soldOut={deal.isSoldOut}
+              error={actionError}
+              actions={
                 <OutlinedIconButton
-                  className="deal-detail__action-icon"
-                  aria-label={isWishlisted(dealId) ? dealDetail.wishlist.remove : dealDetail.wishlist.save}
-                  aria-pressed={isWishlisted(dealId)}
-                  disabled={wishlistPending(dealId)}
-                  onClick={toggleFavorite}
+                  aria-label={saved ? t.wishlist.remove : t.wishlist.save}
+                  aria-pressed={saved}
+                  disabled={wishlistPending(deal.id)}
+                  onClick={() => { if (requireSignIn()) void toggleWishlist(deal.id); }}
                 >
-                  <Icon aria-hidden="true">{isWishlisted(dealId) ? 'favorite' : 'favorite_border'}</Icon>
+                  <Icon aria-hidden="true">{saved ? 'favorite' : 'favorite_border'}</Icon>
                 </OutlinedIconButton>
-                <OutlinedIconButton
-                  className="deal-detail__action-icon"
-                  aria-label={copied ? 'Link copied' : 'Share deal'}
-                  onClick={copyLink}
-                >
-                  <Icon aria-hidden="true">{copied ? 'check' : 'link'}</Icon>
-                </OutlinedIconButton>
-              </div>
-            </div>
+              }
+              notes={
+                notes.length > 0 ? (
+                  <ul className="detail-page__notes body-small">
+                    {notes.map((n) => (
+                      <li key={n.text}><Icon aria-hidden="true">{n.icon}</Icon>{n.text}</li>
+                    ))}
+                  </ul>
+                ) : undefined
+              }
+            />
           </div>
-          {actionMessage && (
-            <p className="field-hint" role="status"> {actionMessage} </p>
-          )}
-          {actionError && (
-            <p className="error-state" role="alert">{actionError} </p>
-          )}
-          <Divider />
-          <sky-accordion>
-            {description && (
-              <sky-accordion-item header={dealDetail.description} open>
-                <p className="deal-detail__desc">{description}</p>
-              </sky-accordion-item>
-            )}
-            {deal.notes && (
-              <sky-accordion-item header="Notes">
-                <p className="deal-detail__desc">{deal.notes}</p>
-              </sky-accordion-item>
-            )}
-            {deal.policy && (
-              <sky-accordion-item header="Policy">
-                <p className="deal-detail__policy">{deal.policy}</p>
-              </sky-accordion-item>
-            )}
-            <sky-accordion-item header={dealDetail.cancellationPolicy}>
-              <p className="deal-detail__policy">{dealDetail.cancellationText}</p>
-            </sky-accordion-item>
-            {deal.termsAndConditions && (
-              <sky-accordion-item header="Terms & Conditions">
-                <p className="deal-detail__policy">{deal.termsAndConditions}</p>
-              </sky-accordion-item>
-            )}
-          </sky-accordion>
         </div>
-      </div>
-      {related.length > 0 && (
-        <section className="deal-detail__related" aria-labelledby="related-heading">
-          <div className="deal-detail__related-inner">
-            <h2 id="related-heading" className="deal-detail__related-heading">{dealDetail.relatedDeals}</h2>
-            <div className="deal-detail__related-carousel">
-              <swiper-container
-                slides-per-view="auto"
-                space-between={16}
-                free-mode="true"
-                grab-cursor="true"
-              >
-                {related.map((item) => {
-                  const media = resolveDealMedia(item);
-                  const relatedDeal: DealCardDeal = {
-                    id: item.id,
-                    title: item.title,
-                    image: media.images[0] ?? '',
-                    imageAlt: item.title,
-                    gallery: media.images.length ? media.images : undefined,
-                    video: media.video,
-                    badge: dealDetail.serviceType.service,
-                    providerName: item.vendor?.businessName ?? undefined,
-                    price: Number(item.salePrice),
-                    originalPrice: item.originalPrice != null && Number(item.originalPrice) !== Number(item.salePrice) ? Number(item.originalPrice) : undefined, discount: item.discountPercent ?? undefined,
-                  };
-                  return (
-                    <swiper-slide key={item.id} style={{ width: '260px', height: 'auto' }}>
-                      <DealCard
-                        deal={relatedDeal}
-                        eyebrowHref={item.vendor?.slug ? `/vendor/${item.vendor.slug}` : undefined}
-                        favoriteActive={isWishlisted(item.id)}
-                        onFavorite={() => {
-                          if (!requireAuthOrRedirect()) return; void toggleWishlist(item.id);
-                        }}
-                      />
-                    </swiper-slide>
-                  );
-                })}
-              </swiper-container>
-            </div>
+      </PageSection>
+      <PageSection tone="tint" aria-labelledby="detail-details-heading">
+        <div className="detail-page__grid">
+          <div className="detail-page__content">
+            <h2 id="detail-details-heading" className="detail-page__heading title-large">{d.details}</h2>
+            <sky-accordion>
+              {deal.description && (
+                <sky-accordion-item header={t.sections.whatYouGet} level={3} open>
+                  <p className="detail-page__text body-large">{deal.description}</p>
+                </sky-accordion-item>
+              )}
+              <sky-accordion-item header={t.sections.howToRedeem} level={3}>
+                <p className="detail-page__text body-medium">{deal.bookingRequired ? t.redeem.bookingRequired : t.redeem.walkIn}</p>
+                {deal.bookingInstructions && <p className="detail-page__text body-medium">{deal.bookingInstructions}</p>}
+                {validity && <p className="detail-page__text body-medium">{validity}</p>}
+              </sky-accordion-item>
+              <sky-accordion-item header={t.sections.cancellation} level={3}>
+                <p className="detail-page__text body-medium">{t.cancellation[deal.cancellationPolicy] ?? t.cancellation.FREE_24H}</p>
+                {deal.cancellationNote && <p className="detail-page__text body-medium">{deal.cancellationNote}</p>}
+              </sky-accordion-item>
+              <sky-accordion-item header={t.sections.finePrint} level={3}>
+                {deal.eligibility.length > 0 && (
+                  <>
+                    <h4 className="title-small">{t.sections.eligibility}</h4>
+                    <ul className="detail-page__chip-list">
+                      {deal.eligibility.map((e) => (
+                        <li key={e}><sky-badge variant="secondary" size="small">{e}</sky-badge></li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+                {deal.termsAndConditions && <p className="detail-page__text body-medium">{deal.termsAndConditions}</p>}
+                <p className="body-medium"><Link to="/terms">{t.termsLink}</Link></p>
+              </sky-accordion-item>
+            </sky-accordion>
           </div>
-        </section>
+          {deal.branch && <BranchPanels branch={deal.branch} vendorSlug={deal.vendor?.slug} showMap />}
+        </div>
+      </PageSection>
+      {deal.therapists.length > 0 && (
+        <PageSection aria-labelledby="deal-therapists-heading">
+          <CardRail id="deal-therapists-heading" heading={t.sections.therapists}>
+            {deal.therapists.map((therapist) => (
+              <swiper-slide key={therapist.id} className="card-rail__slide">
+                <TherapistCard therapist={therapist} variant="outlined" />
+              </swiper-slide>
+            ))}
+          </CardRail>
+        </PageSection>
       )}
-    </div>
+      {deal.vendor?.businessName && (
+        <PageSection tone="tint" aria-labelledby="deal-about-heading">
+          <div className="detail-page__about">
+            {logo && <img className="detail-page__about-logo" src={logo} alt="" width={64} height={64} loading="lazy" />}
+            <div className="detail-page__about-body">
+              <h2 id="deal-about-heading" className="detail-page__heading title-large">
+                {fillTemplate(t.sections.about, { name: deal.vendor.businessName })}
+              </h2>
+              {deal.vendor.businessDescription && <p className="detail-page__text body-medium">{deal.vendor.businessDescription}</p>}
+              <div className="detail-page__panel-actions">
+                {deal.vendor.slug && (
+                  <OutlinedButton href={`/vendor/${deal.vendor.slug}`}>
+                    <Icon slot="icon" aria-hidden="true">storefront</Icon>
+                    {fillTemplate(t.about.allDeals, { name: deal.vendor.businessName })}
+                  </OutlinedButton>
+                )}
+                {deal.vendor.website && (
+                  <OutlinedButton href={deal.vendor.website} target="_blank" rel="noopener noreferrer">
+                    <Icon slot="icon" aria-hidden="true">language</Icon>
+                    {t.about.website}
+                  </OutlinedButton>
+                )}
+              </div>
+            </div>
+          </div>
+        </PageSection>
+      )}
+      {deal.faqs.length > 0 && (
+        <PageSection aria-labelledby="deal-faq-heading">
+          <h2 id="deal-faq-heading" className="detail-page__heading title-large">{t.sections.faqs}</h2>
+          <sky-accordion single>
+            {deal.faqs.map((faq) => (
+              <sky-accordion-item key={faq.id} header={faq.question} level={3}>
+                <p className="detail-page__text body-medium">{faq.answer}</p>
+              </sky-accordion-item>
+            ))}
+          </sky-accordion>
+        </PageSection>
+      )}
+      {related.length > 0 && (
+        <PageSection aria-labelledby="related-heading">
+          <CardRail
+            id="related-heading"
+            heading={deal.category ? fillTemplate(t.sections.related, { category: deal.category.name }) : d.related}
+          >
+            {related.map((item) => (
+              <swiper-slide key={item.id} className="card-rail__slide">
+                <OfferCard slider item={{ type: 'deal', deal: item }} variant="outlined" layout="vertical" />
+              </swiper-slide>
+            ))}
+          </CardRail>
+        </PageSection>
+      )}
+      <BannerSlot slot="DEAL_BOTTOM" />
+    </>
   );
 }
 export default DealDetail;

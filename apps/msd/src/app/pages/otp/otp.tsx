@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { FilledButton, OutlinedTextField, Icon, IconButton, TextButton, } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import content from '../../../content.json';
+import { Seo } from '../../seo/seo';
 import { requestOtp, verifyOtp } from '../../../api/rbac/auth';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { resolvePostLoginPath, sanitizeReturnUrl, signInPathWithNext } from '../../../auth/role-routing';
@@ -110,8 +111,7 @@ export function Otp() {
 
   return (
     <div className="auth-screen otp-screen">
-      <title>{otpContent.pageTitle}</title>
-      <meta name="robots" content="noindex, nofollow" />
+      <Seo title={otpContent.pageTitle} description={content.meta.otp.description} path={content.meta.otp.path} noindex />
       <IconButton
         className="otp-back"
         aria-label={otpContent.backAriaLabel}

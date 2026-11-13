@@ -10,6 +10,15 @@
       "executor": "nx:run-commands",
       "dependsOn": ["build"],
       "options": { "command": "npx tsx apps/msd/prerender/prerender.ts" }
+    },
+    "typecheck": {
+      "// typecheck": "ST-14: the browser app and the prerender scripts (Node, bundler module resolution) are checked separately, both always run",
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/msd",
+        "commands": ["tsc --noEmit -p tsconfig.prerender.json", "tsc --noEmit -p tsconfig.app.json"],
+        "parallel": true
+      }
     }
   }
 }

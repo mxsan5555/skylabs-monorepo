@@ -30,6 +30,7 @@ export interface OrderItem {
   therapistId: string | null;
   therapistPackageId: string | null;
   productId: string | null;
+  product?: { slug: string } | null;
   vendorId: string;
   branchId: string | null;
   vendorNameSnapshot: string;
@@ -41,6 +42,22 @@ export interface OrderItem {
   lineTotal: string;
   durationMinutes: number | null;
   image?: string | null;
+  /**
+   * KNOWN GAP: one row per redeemable voucher (`PurchaseEntitlement` — see
+   * `api/rbac/settlements.ts`), surfaced here so a customer can see their own voucher code/status
+   * and raise an issue against a specific one. Optional because the backend does not populate it
+   * yet — `order.service.ts`'s `CUSTOMER_ORDER_INCLUDE` doesn't join `PurchaseEntitlement`, and
+   * there is no `GET /orders/me/:id`-equivalent that returns it. The UI below degrades to
+   * rendering nothing extra until that backend include is added; do not remove this field when
+   * that happens — just drop this comment.
+   */
+  entitlements?: {
+    id: string;
+    voucherCode: string;
+    fulfilmentKind: 'SERVICE_SESSION' | 'PRODUCT_PICKUP' | 'PRODUCT_SHIPPED';
+    entitlementStatus: 'ACTIVE' | 'STARTED' | 'OTP_REQUESTED' | 'COMPLETED' | 'CANCELLED' | 'REFUNDED';
+    dispute?: { id: string; status: 'OPEN' | 'UNDER_REVIEW' | 'RESOLVED'; resolutionType?: 'NO_ACTION' | 'REFUNDED' | 'OTHER' | null } | null;
+  }[];
 }
 
 export type PaymentStatus = 'CREATED' | 'PAID' | 'FAILED' | 'CANCELLED';
@@ -79,6 +96,7 @@ export interface Order extends OrderContactDetails {
   total: string;
   cancellationReason: string | null;
   createdAt: string;
+  updatedAt: string;
   items: OrderItem[];
   payments: PaymentSummary[];
   branch: { id: string; name: string; address: string | null; city: string | null } | null;

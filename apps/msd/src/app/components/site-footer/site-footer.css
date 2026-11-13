@@ -37,9 +37,9 @@
 .site-footer__main,
 .site-footer__popular,
 .site-footer__legal {
-  max-inline-size: 1280px;
+  max-inline-size: var(--sky-content-max);
   margin-inline: auto;
-  padding-inline: 16px;
+  padding-inline: var(--sky-content-gutter);
 }
 .newsletter-band__inner {
   display: grid;
@@ -76,7 +76,7 @@
   border-radius: var(--md-sys-shape-corner-small);
 }
 .site-footer__logo img {
-  block-size: 48px;
+  block-size: 95px;
   inline-size: auto;
 }
 .site-footer__desc {

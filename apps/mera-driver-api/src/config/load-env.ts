@@ -13,8 +13,11 @@ import * as dotenv from 'dotenv';
 if (process.env.NODE_ENV !== 'production') {
   const candidates = [
     path.join(__dirname, '../../.env.local'), // unbundled dev (src/config -> apps/mera-driver-api)
+    path.join(__dirname, '../../.env'), // fallback for checked-in local dev env files
     path.join(process.cwd(), 'apps/mera-driver-api/.env.local'), // run from workspace root
+    path.join(process.cwd(), 'apps/mera-driver-api/.env'), // run from workspace root with fallback file
     path.join(process.cwd(), '.env.local'), // run from apps/mera-driver-api itself
+    path.join(process.cwd(), '.env'), // run from apps/mera-driver-api itself with fallback file
   ];
   const envFile = candidates.find((p) => fs.existsSync(p));
   if (envFile) dotenv.config({ path: envFile });

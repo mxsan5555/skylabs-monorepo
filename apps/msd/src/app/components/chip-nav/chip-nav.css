@@ -1,15 +1,73 @@
+/* Chip row + optional end content (result count). The count sits at the row end and wraps under
+   the chips when they need the width. */
+.chip-nav-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.chip-nav-row > .chip-nav {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+.chip-nav-row__end {
+  margin-inline-start: auto;
+  white-space: nowrap;
+}
+
 /* Pill row: wraps from 600px; a single scrolling row on phones. */
 .chip-nav {
   max-inline-size: 100%;
 }
+.chip-nav__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Link chip: the M3 filter chip's look (32dp, small corner, outline) for a real <a>. */
+.chip-nav__link {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 32px;
+  padding-inline: 16px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-small);
+  color: var(--md-sys-color-on-surface-variant);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.chip-nav__link:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--md-sys-color-on-surface-variant) calc(var(--md-sys-state-hover-state-layer-opacity) * 100%),
+    transparent
+  );
+}
+.chip-nav__link[aria-current='page'] {
+  border-color: transparent;
+  background-color: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+.chip-nav__link:focus-visible {
+  outline: 3px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
 @media (max-width: 599px) {
-  .chip-nav {
+  .chip-nav,
+  .chip-nav__list {
     flex-wrap: nowrap;
     overflow-x: auto;
     padding-block: 2px;
     scrollbar-width: none;
   }
-  .chip-nav > * {
+  .chip-nav > *,
+  .chip-nav__list > * {
     flex: none;
   }
 }

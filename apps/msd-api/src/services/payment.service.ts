@@ -6,6 +6,8 @@ import { ApiError } from '../lib/http';
 import { Prisma } from '../generated/prisma-client';
 import { getMyOrderOrThrow, finalizeCartForOrder } from './order.service';
 import { notifyOrderConfirmed } from './notification.service';
+import { createEntitlementsForOrder } from './settlement.service';
+import { sendOrderNotice } from './order-notice.service';
 
 /**
  * Razorpay integration for the existing Order (Phase 8) — see the Phase 9 architecture plan.
@@ -47,6 +49,22 @@ async function createRazorpayOrder(amountPaise: number, receipt: string) {
   } catch (err) {
     console.error({ err, context: 'razorpay.orders.create', amountPaise, receipt });
     throw new ApiError('SERVER_ERROR', 'Could not start the payment — please try again in a moment.');
+  }
+}
+
+/**
+ * Thin wrapper around `razorpay.payments.refund`, same uncaught-SDK-error -> clear `ApiError`
+ * discipline as `createRazorpayOrder` above — used by `refund.service.ts#createRefund`. Not
+ * idempotent on its own (a retry would create a second provider-side refund) — callers must only
+ * call this once per logical refund, which `createRefund`'s own Refund-row creation ensures.
+ */
+export async function createRazorpayRefund(providerPaymentId: string, amountPaise: number): Promise<{ id: string; status: string }> {
+  try {
+    const refund = await razorpay.payments.refund(providerPaymentId, { amount: amountPaise });
+    return { id: refund.id, status: refund.status };
+  } catch (err) {
+    console.error({ err, context: 'razorpay.payments.refund', providerPaymentId, amountPaise });
+    throw new ApiError('SERVER_ERROR', 'Could not process the refund with the payment gateway — please try again in a moment.');
   }
 }
 
@@ -117,11 +135,16 @@ export async function createCodPayment(customerId: string, orderId: string) {
     const updatedOrder = await tx.order.update({ where: { id: order.id }, data: { status: 'CONFIRMED' } });
     // Finalizes the linked Cart's items — see finalizeCartForOrder's own doc comment.
     await finalizeCartForOrder(tx, updatedOrder.id);
+    // Creates this order's vouchers (one PurchaseEntitlement per unit/line) — idempotent, see
+    // createEntitlementsForOrder's own doc comment.
+    await createEntitlementsForOrder(tx, updatedOrder.id);
     // Notifies each vendor involved + Superadmin — see notifyOrderConfirmed's own doc comment.
     await notifyOrderConfirmed(tx, updatedOrder.id);
     return { payment, updatedOrder };
   });
 
+  // Customer email (and SMS per D38), after the commit; never throws (item 3).
+  void sendOrderNotice('CONFIRMED', [updatedOrder.id]);
   return { order: updatedOrder, payment };
 }
 
@@ -215,6 +238,8 @@ export async function createCodBatchPayment(customerId: string, orderIds: string
       const updatedOrder = await tx.order.update({ where: { id: order.id }, data: { status: 'CONFIRMED' } });
       // Finalizes each linked Cart's items — see finalizeCartForOrder.
       await finalizeCartForOrder(tx, updatedOrder.id);
+      // Creates this order's vouchers — idempotent, see createEntitlementsForOrder's own doc comment.
+      await createEntitlementsForOrder(tx, updatedOrder.id);
       // Notifies each vendor involved + Superadmin — see notifyOrderConfirmed's own doc comment.
       await notifyOrderConfirmed(tx, updatedOrder.id);
       results.push(updatedOrder);
@@ -222,6 +247,7 @@ export async function createCodBatchPayment(customerId: string, orderIds: string
     return results;
   });
 
+  void sendOrderNotice('CONFIRMED', updatedOrders.map((order) => order.id));
   return { orders: updatedOrders };
 }
 
@@ -269,6 +295,7 @@ export async function verifyBatchPayment(customerId: string, orderIds: string[],
       where: { id: { in: payments.map((p) => p.id) } },
       data: { status: 'FAILED', failureReason: 'Signature verification failed' },
     });
+    void sendOrderNotice('PAYMENT_FAILED', orderIds);
     throw new ApiError('VALIDATION_ERROR', 'Payment signature verification failed');
   }
 
@@ -282,6 +309,8 @@ export async function verifyBatchPayment(customerId: string, orderIds: string[],
       const updatedOrder = await tx.order.update({ where: { id: order.id }, data: { status: 'CONFIRMED' } });
       // Finalizes each linked Cart's items — see finalizeCartForOrder.
       await finalizeCartForOrder(tx, updatedOrder.id);
+      // Creates this order's vouchers — idempotent, see createEntitlementsForOrder's own doc comment.
+      await createEntitlementsForOrder(tx, updatedOrder.id);
       // Notifies each vendor involved + Superadmin — see notifyOrderConfirmed's own doc comment.
       await notifyOrderConfirmed(tx, updatedOrder.id);
       results.push(updatedOrder);
@@ -289,6 +318,7 @@ export async function verifyBatchPayment(customerId: string, orderIds: string[],
     return results;
   });
 
+  void sendOrderNotice('CONFIRMED', updatedOrders.map((order) => order.id));
   return { orders: updatedOrders };
 }
 
@@ -342,6 +372,7 @@ export async function verifyPayment(customerId: string, orderId: string, input: 
 
   if (!timingSafeEqualHex(expectedSignature, input.razorpay_signature)) {
     await prisma.payment.update({ where: { id: payment.id }, data: { status: 'FAILED', failureReason: 'Signature verification failed' } });
+    void sendOrderNotice('PAYMENT_FAILED', [order.id]);
     throw new ApiError('VALIDATION_ERROR', 'Payment signature verification failed');
   }
 
@@ -353,11 +384,14 @@ export async function verifyPayment(customerId: string, orderId: string, input: 
     const updatedOrder = await tx.order.update({ where: { id: order.id }, data: { status: 'CONFIRMED' } });
     // Finalizes the linked Cart's items — see finalizeCartForOrder.
     await finalizeCartForOrder(tx, updatedOrder.id);
+    // Creates this order's vouchers — idempotent, see createEntitlementsForOrder's own doc comment.
+    await createEntitlementsForOrder(tx, updatedOrder.id);
     // Notifies each vendor involved + Superadmin — see notifyOrderConfirmed's own doc comment.
     await notifyOrderConfirmed(tx, updatedOrder.id);
     return { updatedPayment, updatedOrder };
   });
 
+  void sendOrderNotice('CONFIRMED', [updatedOrder.id]);
   return { order: updatedOrder, payment: updatedPayment };
 }
 
@@ -373,14 +407,39 @@ export function verifyWebhookSignature(rawBody: Buffer, signature: string): bool
 interface RazorpayWebhookBody {
   event: string;
   payload: {
-    payment: {
+    payment?: {
       entity: {
         id: string;
         order_id: string;
         error_description?: string;
       };
     };
+    refund?: {
+      entity: {
+        id: string;
+        status: string;
+      };
+    };
   };
+}
+
+/**
+ * `refund.processed`/`refund.failed` — the async confirmation path for a refund started via
+ * `refund.service.ts#createRefund` (that call already applied the `SettlementAdjustment`/
+ * `settlementStatus` ledger changes synchronously, from Razorpay's own immediate API response —
+ * this webhook only keeps `Refund.status` itself in sync, idempotently, exactly like
+ * `handleWebhookEvent`'s payment-side terminal-state guard below). Unknown `providerRefundId`
+ * (not ours) or an already-terminal Refund row is a no-op.
+ */
+async function handleRefundWebhookEvent(event: string, refundEntity: { id: string; status: string }): Promise<void> {
+  const refund = await prisma.refund.findUnique({ where: { providerRefundId: refundEntity.id } });
+  if (!refund || refund.status === 'PROCESSED' || refund.status === 'FAILED') return;
+
+  if (event === 'refund.processed') {
+    await prisma.refund.update({ where: { id: refund.id }, data: { status: 'PROCESSED', processedAt: new Date() } });
+  } else if (event === 'refund.failed') {
+    await prisma.refund.update({ where: { id: refund.id }, data: { status: 'FAILED' } });
+  }
 }
 
 /**
@@ -391,6 +450,12 @@ interface RazorpayWebhookBody {
  * this a no-op, so Razorpay's automatic webhook retries on non-2xx can never double-process.
  */
 export async function handleWebhookEvent(body: RazorpayWebhookBody): Promise<void> {
+  if (body.event === 'refund.processed' || body.event === 'refund.failed') {
+    const refundEntity = body.payload?.refund?.entity;
+    if (refundEntity) await handleRefundWebhookEvent(body.event, refundEntity);
+    return;
+  }
+
   const entity = body.payload?.payment?.entity;
   if (!entity?.order_id) return;
 
@@ -403,7 +468,7 @@ export async function handleWebhookEvent(body: RazorpayWebhookBody): Promise<voi
   if (pending.length === 0) return; // already terminal
 
   if (body.event === 'payment.captured') {
-    await prisma.$transaction(async (tx) => {
+    const confirmedIds = await prisma.$transaction(async (tx): Promise<string[]> => {
       // A pending Payment's Order may have already been settled by a different attempt (e.g.
       // COD, placed while this Razorpay payment was still in flight) — those must be marked
       // FAILED here, not PAID, or the order ends up with two "successful-looking" Payment rows
@@ -421,7 +486,7 @@ export async function handleWebhookEvent(body: RazorpayWebhookBody): Promise<voi
       }
 
       const live = pending.filter((p) => statusByOrderId.get(p.orderId) === 'PENDING_PAYMENT');
-      if (live.length === 0) return;
+      if (live.length === 0) return [];
 
       await tx.payment.updateMany({
         where: { id: { in: live.map((p) => p.id) } },
@@ -434,14 +499,19 @@ export async function handleWebhookEvent(body: RazorpayWebhookBody): Promise<voi
       const updatedOrders = await tx.order.findMany({ where: { id: { in: orderIds } } });
       for (const order of updatedOrders) {
         await finalizeCartForOrder(tx, order.id);
+        // Creates this order's vouchers — idempotent, see createEntitlementsForOrder's own doc comment.
+        await createEntitlementsForOrder(tx, order.id);
         // Notifies each vendor involved + Superadmin — see notifyOrderConfirmed's own doc comment.
         await notifyOrderConfirmed(tx, order.id);
       }
+      return orderIds;
     });
+    if (confirmedIds.length > 0) void sendOrderNotice('CONFIRMED', confirmedIds);
   } else if (body.event === 'payment.failed') {
     await prisma.payment.updateMany({
       where: { id: { in: pending.map((p) => p.id) } },
       data: { status: 'FAILED', failureReason: entity.error_description ?? 'Payment failed', providerPaymentId: entity.id },
     });
+    void sendOrderNotice('PAYMENT_FAILED', [...new Set(pending.map((p) => p.orderId))]);
   }
 }

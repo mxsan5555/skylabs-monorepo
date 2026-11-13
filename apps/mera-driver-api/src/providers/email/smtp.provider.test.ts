@@ -1,4 +1,5 @@
 import {beforeEach,afterEach,describe,it,expect,vi} from 'vitest';
+
 const {createTransport,sendMail}=vi.hoisted(()=>({createTransport:vi.fn(),sendMail:vi.fn()}));
 vi.mock('nodemailer',()=>({default:{createTransport}}));
 beforeEach(()=>{vi.stubEnv('SMTP_HOST','smtp.example.invalid');vi.stubEnv('SMTP_PORT','587');vi.stubEnv('SMTP_USER','user-fixture');vi.stubEnv('SMTP_PASS','secret-fixture');vi.stubEnv('EMAIL_FROM','sender@example.invalid');createTransport.mockReset().mockReturnValue({sendMail});sendMail.mockReset();vi.spyOn(console,'info').mockImplementation(()=>{});vi.spyOn(console,'error').mockImplementation(()=>{});});

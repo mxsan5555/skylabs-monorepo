@@ -1,0 +1,371 @@
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { FilledButton, Icon, OutlinedButton, OutlinedIconButton } from '@skylabs-monorepo/shared-ui/react';
+import { getCatalogVendor, type CatalogVendorBranch } from '../../../api/catalog';
+import { fillTemplate, formatINR, formatStreetAddress, formatTime12h } from '../../../utils/format';
+import content from '../../../content.json';
+import { useHydrated } from '../../../hooks/use-hydrated';
+import { DealMap, type DealMapPoint } from '../deal-map/deal-map';
+import { QuantityStepper } from '../quantity-stepper/quantity-stepper';
+import './detail-page.css';
+const t = content.detailPage;
+const g = t.gallery;
+const SWIPE_MIN_PX = 40;
+const days = content.vendor.days;
+const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
+export function discountPercent(price: number, original?: number | null): number {
+  return original != null && original > price ? Math.round(((original - price) / original) * 100) : 0;
+}
+export function DetailGallery({
+  images,
+  alts = [],
+  video,
+  alt,
+  discountPct = 0,
+  tag,
+}: {
+  images: string[];
+  alts?: (string | null | undefined)[];
+  video?: string | null;
+  alt: string;
+  discountPct?: number;
+  tag?: string | null;
+}) {
+  const imagesKey = images.join('|');
+  const [selection, setSelection] = useState({ key: imagesKey, index: 0 });
+  const active = selection.key === imagesKey ? selection.index : 0;
+  const setActive = (next: number | ((index: number) => number)) =>
+    setSelection((prev) => {
+      const current = prev.key === imagesKey ? prev.index : 0;
+      return { key: imagesKey, index: typeof next === 'function' ? next(current) : next };
+    });
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const openerRef = useRef<HTMLButtonElement>(null);
+  const swipeStart = useRef<number | null>(null);
+  const count = images.length;
+  const altOf = (index: number) => alts[index]?.trim() || alt;
+  const go = (delta: number) => setActive((i) => (i + delta + count) % count);
+  const counter = (n: number) => fillTemplate(g.counter, { n: String(n + 1), count: String(count) });
+  const onKey = (e: KeyboardEvent<HTMLElement>) => {
+    if (count < 2) return;
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      go(-1);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      go(1);
+    }
+  };
+  const onPointerDown = (e: PointerEvent<HTMLElement>) => {
+    swipeStart.current = e.clientX;
+  };
+  const onPointerUp = (e: PointerEvent<HTMLElement>) => {
+    if (swipeStart.current === null || count < 2) return;
+    const dx = e.clientX - swipeStart.current;
+    swipeStart.current = null;
+    if (Math.abs(dx) > SWIPE_MIN_PX) go(dx < 0 ? 1 : -1);
+  };
+  const openFullScreen = () => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (typeof dialog.showModal === 'function') dialog.showModal();
+    else dialog.setAttribute('open', '');
+  };
+  const closeFullScreen = () => {
+    const dialog = dialogRef.current;
+    if (dialog && typeof dialog.close === 'function') dialog.close();
+    else dialog?.removeAttribute('open');
+    openerRef.current?.focus();
+  };
+  return (
+    <div className="detail-page__gallery" role="group" aria-roledescription="carousel" aria-label={alt} onKeyDown={onKey}>
+      <div className="detail-page__main-img-wrap" onPointerDown={onPointerDown} onPointerUp={onPointerUp}>
+        {images[active] && (
+          <button
+            ref={openerRef}
+            type="button"
+            className="detail-page__main-btn"
+            aria-label={fillTemplate(g.open, { n: String(active + 1), count: String(count) })}
+            onClick={openFullScreen}
+          >
+            <img key={active} className="detail-page__main-img" src={images[active]} alt={altOf(active)} width={800} height={450} />
+          </button>
+        )}
+        {tag && (
+          <sky-badge className="detail-page__badge" size="large"
+            variant={tag === 'new' ? 'tertiary'
+              : tag === 'hot' ? 'error' : 'primary'}
+            status={tag === 'expire_soon' ? 'error' : undefined}
+          >
+            {tag}
+          </sky-badge>
+        )}
+        {count > 1 && (
+          <>
+            <OutlinedIconButton className="detail-page__nav detail-page__nav--prev" aria-label={g.previous} onClick={() => go(-1)}>
+              <Icon aria-hidden="true">chevron_left</Icon>
+            </OutlinedIconButton>
+            <OutlinedIconButton className="detail-page__nav detail-page__nav--next" aria-label={g.next} onClick={() => go(1)}>
+              <Icon aria-hidden="true">chevron_right</Icon>
+            </OutlinedIconButton>
+            <span className="detail-page__counter label-medium" aria-live="polite">{counter(active)}</span>
+          </>
+        )}
+      </div>
+      {count > 1 && (
+        <>
+          <div className="detail-page__thumbs" role="group" aria-label={t.thumbnails}>
+            {images.map((image, index) => (
+              <button
+                key={`${image}-${index}`}
+                type="button"
+                className="detail-page__thumb"
+                onClick={() => setActive(index)}
+                aria-label={fillTemplate(t.viewImage, { n: String(index + 1), count: String(count) })}
+                aria-pressed={index === active}
+              >
+                <img src={image} alt="" width={80} height={60} loading="lazy" />
+              </button>
+            ))}
+          </div>
+          <div className="detail-page__dots" role="group" aria-label={t.thumbnails}>
+            {images.map((image, index) => (
+              <button
+                key={`dot-${image}-${index}`}
+                type="button"
+                className="detail-page__dot"
+                onClick={() => setActive(index)}
+                aria-label={fillTemplate(t.viewImage, { n: String(index + 1), count: String(count) })}
+                aria-pressed={index === active}
+              />
+            ))}
+          </div>
+        </>
+      )}
+      {video && <video className="detail-page__video" controls src={video} />}
+      <dialog
+        ref={dialogRef}
+        className="detail-page__lightbox"
+        aria-label={fillTemplate(g.dialog, { title: alt })}
+        onCancel={(e) => { e.preventDefault(); closeFullScreen(); }}
+        onKeyDown={(e) => { e.stopPropagation(); onKey(e); }}
+      >
+        <div className="detail-page__lightbox-bar">
+          <span className="label-large" aria-live="polite">{counter(active)}</span>
+          <OutlinedIconButton aria-label={g.close} onClick={closeFullScreen}>
+            <Icon aria-hidden="true">close</Icon>
+          </OutlinedIconButton>
+        </div>
+        <div className="detail-page__lightbox-stage" onPointerDown={onPointerDown} onPointerUp={onPointerUp}>
+          {count > 1 && (
+            <OutlinedIconButton aria-label={g.previous} onClick={() => go(-1)}>
+              <Icon aria-hidden="true">chevron_left</Icon>
+            </OutlinedIconButton>
+          )}
+          {images[active] && <img className="detail-page__lightbox-img" src={images[active]} alt={altOf(active)} />}
+          {count > 1 && (
+            <OutlinedIconButton aria-label={g.next} onClick={() => go(1)}>
+              <Icon aria-hidden="true">chevron_right</Icon>
+            </OutlinedIconButton>
+          )}
+        </div>
+      </dialog>
+    </div>
+  );
+}
+export function DetailPrice({ price, originalPrice, discountPct }: { price: number; originalPrice?: number | null; discountPct: number }) {
+  return (
+    <div className="detail-page__price-row">
+      <span className="detail-page__price headline-medium">{formatINR(price)}</span>
+      {originalPrice != null && originalPrice > price && (
+        <s className="detail-page__original-price body-large" aria-label={fillTemplate(t.originalPrice, { price: formatINR(originalPrice) })}>
+          {formatINR(originalPrice)}
+        </s>
+      )}
+      {discountPct > 0 && (
+        <sky-badge variant="error" size="small">{fillTemplate(t.off, { percent: String(discountPct) })}</sky-badge>
+      )}
+    </div>
+  );
+}
+function ShareButton() {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { setCopied(false); }
+  };
+  return (
+    <OutlinedIconButton aria-label={copied ? t.copied : t.share} onClick={() => void copy()}>
+      <Icon aria-hidden="true">{copied ? 'check' : 'link'}</Icon>
+    </OutlinedIconButton>
+  );
+}
+export interface DetailPurchaseProps {
+  unitPrice: number;
+  quantity: number;
+  onQuantityChange: (quantity: number) => void;
+  onAdd: () => void;
+  addDisabled?: boolean;
+  maxQuantity?: number;
+  soldOut?: boolean;
+  actions?: ReactNode;
+  notes?: ReactNode;
+  error?: string;
+}
+export function DetailPurchase({ unitPrice, quantity, onQuantityChange, onAdd, addDisabled, maxQuantity, soldOut, actions, notes, error }: DetailPurchaseProps) {
+  const atMax = maxQuantity !== undefined && quantity >= maxQuantity;
+  return (
+    <>
+      <div className="detail-page__row body-large">
+        <span id="detail-quantity">{t.quantity}</span>
+        <QuantityStepper
+          value={quantity}
+          onChange={onQuantityChange}
+          max={soldOut || atMax ? quantity : maxQuantity}
+          labelledBy="detail-quantity"
+          decreaseLabel={t.decrease}
+          increaseLabel={t.increase}
+        />
+      </div>
+      <div className="detail-page__row body-large">
+        <span>{t.total}</span>
+        <strong className="detail-page__total title-large">{formatINR(unitPrice * quantity)}</strong>
+      </div>
+      <div className="detail-page__actions">
+        <FilledButton type="button" className="detail-page__add-btn" onClick={onAdd} disabled={addDisabled || soldOut}>
+          <Icon slot="icon" aria-hidden="true">{soldOut ? 'block' : 'shopping_bag'}</Icon>
+          {soldOut ? t.soldOut : t.addToCart}
+        </FilledButton>
+        {actions}
+        <ShareButton />
+      </div>
+      {notes}
+      {error && (<p className="error-state" role="alert">{error}</p>)}
+    </>
+  );
+}
+export interface DetailBranch {
+  id: string;
+  name: string;
+  address: string | null;
+  addressLine2?: string | null;
+  city: string | null;
+  latitude: string | null;
+  longitude: string | null;
+  phone?: string | null;
+  openingHours?: CatalogVendorBranch['openingHours'] | null;
+}
+function directionsUrl(branch: DetailBranch): string | undefined {
+  if (branch.latitude != null && branch.longitude != null) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${branch.latitude},${branch.longitude}`;
+  }
+  const query = formatStreetAddress([branch.name, branch.address, branch.city]);
+  return query ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(query)}` : undefined;
+}
+export function BranchPanels({
+  branch,
+  vendorSlug,
+  showMap = false,
+}: {
+  branch: DetailBranch;
+  vendorSlug?: string | null;
+  showMap?: boolean;
+}) {
+  const hydrated = useHydrated();
+  const mapPoint = useMemo<DealMapPoint | null>(() => {
+    const lat = Number(branch.latitude);
+    const lng = Number(branch.longitude);
+    if (branch.latitude == null || branch.longitude == null || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { id: branch.id, lat, lng, label: branch.name, title: branch.name };
+  }, [branch.id, branch.name, branch.latitude, branch.longitude]);
+  const given = branch.openingHours !== undefined;
+  const [hours, setHours] = useState<CatalogVendorBranch['openingHours'] | null>(branch.openingHours ?? null);
+  const [hoursLoaded, setHoursLoaded] = useState(given);
+  useEffect(() => {
+    if (given) {
+      setHours(branch.openingHours ?? null);
+      setHoursLoaded(true);
+      return;
+    }
+    if (!vendorSlug) {
+      setHours(null);
+      setHoursLoaded(true);
+      return;
+    }
+    let cancelled = false;
+    setHoursLoaded(false);
+    getCatalogVendor(vendorSlug)
+      .then(({ data }) => { if (!cancelled) setHours(data.branches.find((b) => b.id === branch.id)?.openingHours ?? null); })
+      .catch(() => { if (!cancelled) setHours(null); })
+      .finally(() => { if (!cancelled) setHoursLoaded(true); });
+    return () => { cancelled = true; };
+  }, [vendorSlug, branch.id, given]);
+  const street = formatStreetAddress([branch.address, branch.addressLine2, branch.city]);
+  const address = [branch.name, street].filter(Boolean).join(' — ');
+  const directions = directionsUrl(branch);
+  return (
+    <aside className="detail-page__aside" aria-label={t.locationAndHours}>
+      <section className="detail-page__panel" aria-labelledby="detail-location-heading">
+        <h3 id="detail-location-heading" className="detail-page__heading title-medium">{t.location}</h3>
+        <p className="detail-page__address body-medium">
+          <Icon aria-hidden="true">location_on</Icon>
+          <span>{address}</span>
+        </p>
+        {showMap && hydrated && mapPoint && (
+          <DealMap compact points={[mapPoint]} ariaLabel={fillTemplate(t.map.label, { name: branch.name })} loadingLabel={t.map.loading} />
+        )}
+        <div className="detail-page__panel-actions">
+          {directions && (
+            <OutlinedButton href={directions} target="_blank" rel="noopener noreferrer" className="detail-page__directions">
+              <Icon slot="icon" aria-hidden="true">directions</Icon>
+              {t.getDirections}
+            </OutlinedButton>
+          )}
+          {branch.phone && (
+            <OutlinedButton href={`tel:${branch.phone.replace(/\s+/g, '')}`} className="detail-page__directions">
+              <Icon slot="icon" aria-hidden="true">call</Icon>
+              {fillTemplate(t.call, { phone: branch.phone })}
+            </OutlinedButton>
+          )}
+        </div>
+      </section>
+      {hoursLoaded && (
+        <section className="detail-page__panel" aria-labelledby="detail-hours-heading">
+          <h3 id="detail-hours-heading" className="detail-page__heading title-medium">{t.hours}</h3>
+          {hours && Object.keys(hours).length > 0 ? (
+            <ul className="detail-page__hours body-small">
+              {DAY_ORDER.map((day) => {
+                const h = hours[day];
+                const time = h?.open && h.start && h.end ? `${formatTime12h(h.start)} – ${formatTime12h(h.end)}` : content.vendor.labels.closed;
+                return (
+                  <li key={day}>
+                    <strong>{days[day]}</strong>
+                    <span>{time}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="detail-page__text body-small">{content.vendor.labels.timingsNotAvailable}</p>
+          )}
+        </section>
+      )}
+    </aside>
+  );
+}
+export function DetailNotFound({ copy, to }: { copy: { metaTitle: string; heading: string; subheading: string; cta: string }; to: string }) {
+  const navigate = useNavigate();
+  return (
+    <div className="detail-page__empty">
+      <title>{copy.metaTitle}</title>
+      <meta name="robots" content="noindex" />
+      <sky-info-card icon="search_off" heading={copy.heading} subheading={copy.subheading} />
+      <FilledButton type="button" onClick={() => navigate(to)}>
+        {copy.cta}
+      </FilledButton>
+    </div>
+  );
+}

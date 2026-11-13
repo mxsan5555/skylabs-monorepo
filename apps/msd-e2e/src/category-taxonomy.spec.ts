@@ -53,7 +53,7 @@ async function mockBootstrap(page: Page, permissions: string[]) {
  * `<dialog>` toggles real visibility), so on a page that mounts more than one same-shaped dialog
  * at once (e.g. `CategoryManagement`'s always-present Add + empty-Edit pair), an unscoped
  * `getByRole('combobox', ...)` can resolve to more than one same-labeled control. `scope`
- * defaults to `page` (fine for the vendor wizard's dialogs, which are never mounted in such
+ * defaults to `page` (fine for real form pages such as the member deal form, which mount no such
  * pairs) but should be passed explicitly (e.g. `page.locator('md-dialog[open]')`) wherever more
  * than one matching dialog may be mounted at once. `option`s render into a top-level `md-menu`
  * outside any dialog, so that half of the lookup is always unscoped. */
@@ -245,61 +245,45 @@ interface DealBody {
   [key: string]: unknown;
 }
 
-/** Trimmed-down stand-in for the vendor-onboarding wizard's backend surface (see the fuller
- *  `VendorBackend` in `vendor-onboarding.spec.ts`) — only what's needed to reach Step 3 (Deals)
- *  and save one: create the vendor, add one branch, record the Deal actually submitted. The
- *  wizard's step nav buttons aren't gated on earlier steps being complete (`setActiveStep` is
- *  unconditional — see `vendor-pipeline.tsx`), so this test jumps straight to Step 2 (just to add
- *  a branch) and Step 3, skipping Step 1's own KYC fields entirely — nothing under test here
- *  depends on them. */
-class DealsOnlyVendorBackend {
-  vendor: Record<string, unknown> | null = null;
-  branches: Record<string, unknown>[] = [];
+const MEMBER_ID = 'member-1';
+const BRANCH = { id: 'branch-1', vendorId: MEMBER_ID, name: 'Serenity Spa - Andheri', isActive: true };
+
+const TOP_MASSAGE = { id: 'cat-massage', name: 'Massage', slug: 'massage', parentId: null, isActive: true, type: 'SERVICE' as const };
+const SUB_BODY_MASSAGE = { id: 'cat-body-massage', name: 'Body Massage', slug: 'body-massage', parentId: 'cat-massage', isActive: true };
+const TYPE_SWEDISH = { id: 'cat-swedish-massage', name: 'Swedish Massage', slug: 'swedish-massage', parentId: 'cat-body-massage', isActive: true };
+
+/** The branch's category mapping (`BranchCategoryAccessRow[]`): Massage, with both a
+ *  Subcategory-tier and a Type-tier row offered as subcategory options. */
+const BRANCH_CATEGORY_ACCESS = [
+  {
+    id: 'access-1',
+    branchId: BRANCH.id,
+    categoryId: TOP_MASSAGE.id,
+    createdAt: new Date().toISOString(),
+    category: TOP_MASSAGE,
+    subcategories: [
+      { id: 'access-sub-1', subcategoryId: SUB_BODY_MASSAGE.id, subcategory: SUB_BODY_MASSAGE },
+      { id: 'access-sub-2', subcategoryId: TYPE_SWEDISH.id, subcategory: TYPE_SWEDISH },
+    ],
+  },
+];
+
+/** A trimmed stand-in for the member sub-resources the deal form at
+ *  `/account/members/:vendorId/deals/new` calls: the member, its one branch, that branch's
+ *  category mapping, its therapists, and the Deal actually submitted. */
+class MemberDealsBackend {
   deals: DealBody[] = [];
-  nextId = 1;
-
-  id(prefix: string): string {
-    return `${prefix}-${this.nextId++}`;
-  }
-
-  createVendor() {
-    this.vendor = {
-      id: 'vendor-1',
-      businessName: null,
-      slug: null,
-      owner: { id: 'user-owner-1', name: 'Priya Owner', email: 'priya@example.com', phone: '+919876500000', status: 'active' },
-      kycStatus: 'PENDING',
-      status: 'PROFILE_INCOMPLETE',
-      offersService: false,
-      offersProduct: false,
-      offersTherapy: false,
-      kycDocuments: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    return this.vendor;
-  }
-
-  updateVendor(patch: Record<string, unknown>) {
-    this.vendor = { ...this.vendor, ...patch, updatedAt: new Date().toISOString() };
-    return this.vendor;
-  }
-
-  addBranch(input: Record<string, unknown>) {
-    const branch = { id: this.id('branch'), vendorId: 'vendor-1', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), ...input };
-    this.branches.push(branch);
-    return branch;
-  }
 
   addDeal(branchId: string, input: DealBody) {
     const deal = {
-      id: this.id('deal'),
-      vendorId: 'vendor-1',
+      id: `deal-${this.deals.length + 1}`,
+      vendorId: MEMBER_ID,
       branchId,
+      branch: { id: BRANCH.id, name: BRANCH.name },
       status: 'ACTIVE',
-      approvalStatus: 'PENDING',
       product: null,
-      packages: (input.packages as unknown[] | undefined)?.map((p, i) => ({ id: this.id('pkg'), isActive: true, sortOrder: i, ...(p as object) })) ?? [],
+      therapists: [],
+      packages: (input.packages as unknown[] | undefined)?.map((p, i) => ({ id: `pkg-${i + 1}`, isActive: true, sortOrder: i, ...(p as object) })) ?? [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       ...input,
@@ -309,115 +293,94 @@ class DealsOnlyVendorBackend {
   }
 }
 
-const TOP_MASSAGE = { id: 'cat-massage', name: 'Massage', slug: 'massage', parentId: null, isActive: true, type: 'SERVICE' as const };
-const SUB_BODY_MASSAGE = { id: 'cat-body-massage', name: 'Body Massage', slug: 'body-massage', parentId: 'cat-massage', isActive: true };
-const TYPE_SWEDISH = { id: 'cat-swedish-massage', name: 'Swedish Massage', slug: 'swedish-massage', parentId: 'cat-body-massage', isActive: true };
-// A flat list of top + subcategory + Type-tier rows — exactly the shape `listActiveCategories`
-// returns for a vendor's granted SERVICE categories per the 2-hop extension (see
-// `category.service.ts`'s own doc comment and `utils/category-tree.ts`'s `resolveCategoryTiers`).
-const GRANTED_SERVICE_CATEGORIES = [TOP_MASSAGE, SUB_BODY_MASSAGE, TYPE_SWEDISH];
+async function mockMemberDealsBackend(page: Page, backend: MemberDealsBackend) {
+  const member = {
+    id: MEMBER_ID,
+    businessName: 'Serenity Spa',
+    owner: { id: 'user-owner-1', name: 'Priya Shah', email: 'priya@example.com', phone: '+919876500000', status: 'active' },
+    status: 'ACTIVE',
+    statusReason: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
 
-async function mockDealsOnlyVendorBackend(page: Page, backend: DealsOnlyVendorBackend) {
-  await page.route(`${API_BASE}/vendors**`, (route: Route) => {
-    const pathname = new URL(route.request().url()).pathname;
+  // One handler for every `/vendors/...` and `/members/...` call, routed on path segments, so a
+  // request the fake does not know gets an empty list instead of hanging on the real API.
+  const handle = (route: Route) => {
     const method = route.request().method();
-    if (pathname === '/api/v1/vendors' && method === 'POST') {
-      route.fulfill({ json: envelope(backend.createVendor()) });
+    const segments = new URL(route.request().url()).pathname.replace('/api/v1/', '').split('/');
+    // segments: ['vendors' | 'members', ':id', 'branches', ':branchId', 'deals' | 'category-access']
+    if (segments.length === 2 && method === 'GET') {
+      route.fulfill({ json: envelope(member) });
       return;
     }
-    if (pathname === '/api/v1/vendors' && method === 'GET') {
-      route.fulfill({ json: envelope(backend.vendor ? [backend.vendor] : [], { total: backend.vendor ? 1 : 0 }) });
+    if (segments[2] === 'branches' && segments.length === 3) {
+      route.fulfill({ json: envelope([BRANCH]) });
       return;
     }
-    if (method === 'PATCH') {
-      const body = JSON.parse(route.request().postData() ?? '{}');
-      route.fulfill({ json: envelope(backend.updateVendor(body)) });
+    if (segments[2] === 'branches' && segments[4] === 'category-access') {
+      route.fulfill({ json: envelope(BRANCH_CATEGORY_ACCESS) });
       return;
     }
-    route.continue();
-  });
-
-  await page.route(`${API_BASE}/vendors/users/search**`, (route: Route) =>
-    route.fulfill({ json: envelope([{ id: 'user-owner-1', name: 'Priya Owner', email: 'priya@example.com', phone: '+919876500000', status: 'active', roles: [] }]) }),
-  );
-
-  await page.route(`${API_BASE}/vendors/categories**`, (route: Route) => {
-    const type = new URL(route.request().url()).searchParams.get('type');
-    route.fulfill({ json: envelope(type === 'SERVICE' ? GRANTED_SERVICE_CATEGORIES : []) });
-  });
-
-  await page.route(`${API_BASE}/vendors/*/category-access`, (route: Route) => route.fulfill({ json: envelope([]) }));
-
-  await page.route(`${API_BASE}/vendors/*/branches/*/deals`, (route: Route) => {
-    if (route.request().method() === 'POST') {
-      const branchId = new URL(route.request().url()).pathname.split('/')[4];
-      const body = JSON.parse(route.request().postData() ?? '{}');
-      route.fulfill({ json: envelope(backend.addDeal(branchId, body)) });
+    if (segments[2] === 'branches' && segments[4] === 'deals' && segments.length === 5 && method === 'POST') {
+      route.fulfill({ status: 201, json: envelope(backend.addDeal(segments[3], JSON.parse(route.request().postData() ?? '{}'))) });
       return;
     }
-    const branchId = new URL(route.request().url()).pathname.split('/')[4];
-    route.fulfill({ json: envelope(backend.deals.filter((d) => d.branchId === branchId)) });
-  });
-
-  await page.route(`${API_BASE}/vendors/*/branches`, (route: Route) => {
-    if (route.request().method() === 'POST') {
-      const body = JSON.parse(route.request().postData() ?? '{}');
-      route.fulfill({ json: envelope(backend.addBranch(body)) });
+    if (segments[2] === 'deals' && segments.length === 3) {
+      route.fulfill({ json: envelope(backend.deals) });
       return;
     }
-    route.fulfill({ json: envelope(backend.branches) });
-  });
-
-  await page.route(`${API_BASE}/vendors/*/products**`, (route: Route) => route.fulfill({ json: envelope([]) }));
-  await page.route(`${API_BASE}/vendors/*/therapists`, (route: Route) => route.fulfill({ json: envelope([]) }));
+    route.fulfill({ json: envelope([]) });
+  };
+  await page.route(`${API_BASE}/vendors/**`, handle);
+  await page.route(`${API_BASE}/members/**`, handle);
 }
 
-test.describe('Vendor — creating a Deal drilling into a Type-level category', () => {
-  test('picks Massage -> Body Massage -> Swedish Massage and the Deal is submitted with the Type-tier id as subcategoryId', async ({ page }) => {
+test.describe('Member deal form: a Type-tier pick is submitted as the subcategory', () => {
+  test('picks Massage -> Swedish Massage on the member deal form and the Deal carries the Type-tier id as subcategoryId', async ({ page }) => {
     test.slow();
-    const backend = new DealsOnlyVendorBackend();
+    const backend = new MemberDealsBackend();
     const token = fakeJwt({ sub: 'admin-1', roles: ['super_admin'], app: 'msd', exp: Math.floor(Date.now() / 1000) + 3600 });
     await signInWithToken(page, token);
-    await mockBootstrap(page, ['dashboard:view', 'vendors:view', 'vendors:create', 'vendors:edit']);
-    await mockDealsOnlyVendorBackend(page, backend);
+    await mockBootstrap(page, ['dashboard:view', 'members:view', 'members:edit', 'vendors.deals:view', 'vendors.deals:create']);
+    await mockMemberDealsBackend(page, backend);
 
-    await page.goto('/account/vendors/new');
-    await page.getByLabel(/Search existing user/i).fill('Priya');
-    await page.getByRole('button', { name: /Priya Owner/ }).click();
-    await page.getByRole('button', { name: 'Create Vendor' }).click();
-    await expect(page.getByRole('heading', { name: 'Step 1: Profile & KYC' })).toBeVisible();
+    await page.goto(`/account/members/${MEMBER_ID}/deals/new`);
+    await expect(page.getByRole('heading', { name: 'Add deal', level: 1 })).toBeVisible();
 
-    // Step nav buttons aren't gated on earlier steps — jump straight to Step 2 just to add a
-    // branch (Step 3 needs at least one to allow adding a deal), skipping Step 1's KYC fields.
-    // The nav's own label is the short "Branches & Access" (see `vendor-pipeline.tsx`'s `STEPS`
-    // array) — distinct from the longer `<h2>` section heading rendered once that step is active.
-    await page.getByRole('navigation', { name: 'Onboarding steps' }).getByRole('button', { name: 'Branches & Access' }).click();
-    await expect(page.getByRole('heading', { name: 'Step 2: Branches, Modules & Category Access' })).toBeVisible();
-    await page.getByRole('button', { name: 'Add branch' }).click();
-    await page.getByLabel('Branch Name').fill('Serenity Spa - Andheri');
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByText('Serenity Spa - Andheri')).toBeVisible();
+    // Branch first: the Category and Subcategory options come from that branch's mapping.
+    await selectMaterialOption(page, 'Branch', BRANCH.name);
+    await selectMaterialOption(page, 'Category', TOP_MASSAGE.name);
+    await selectMaterialOption(page, 'Subcategory (optional)', TYPE_SWEDISH.name);
 
-    // ── Step 3 — Deals: drill Category -> Subcategory -> Type ───────────────────────────
-    await page.getByRole('navigation', { name: 'Onboarding steps' }).getByRole('button', { name: 'Deals' }).click();
-    await expect(page.getByRole('heading', { name: 'Step 3: Deals' })).toBeVisible();
-    await page.getByRole('button', { name: 'Add deal' }).click();
-    await selectMaterialOption(page, 'Category', 'Massage');
-    await selectMaterialOption(page, 'Subcategory (optional)', 'Body Massage');
-    await selectMaterialOption(page, 'Type (optional)', 'Swedish Massage');
-    await page.getByLabel('Title').fill('Signature Swedish Massage');
-    await page.getByLabel('Slug').fill('signature-swedish-massage');
-    await page.getByText('Packages', { exact: true }).click();
+    await page.getByRole('button', { name: 'Details' }).click();
+    await page.getByLabel('Title', { exact: true }).fill('Signature Swedish Massage');
+    await page.getByLabel('Slug', { exact: true }).fill('signature-swedish-massage');
+
+    await page.getByRole('button', { name: 'Pricing' }).click();
     await page.getByRole('button', { name: 'Add package' }).click();
     await page.getByLabel('Duration (minutes)').fill('60');
     await page.getByLabel('Selling price').fill('1499');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByText('Signature Swedish Massage')).toBeVisible();
 
+    await expect(page).toHaveURL(new RegExp(`/account/members/${MEMBER_ID}/deals/deal-1$`));
     expect(backend.deals.length).toBe(1);
     expect(backend.deals[0].categoryId).toBe(TOP_MASSAGE.id);
-    // The Type pick overwrote subcategoryId with the deeper (Type-tier) id, not the Subcategory's.
+    // The Type-tier pick is sent as subcategoryId, not the Subcategory-tier id.
     expect(backend.deals[0].subcategoryId).toBe(TYPE_SWEDISH.id);
+  });
+
+  test('keeps Save disabled until a branch is chosen and sends no Deal', async ({ page }) => {
+    const backend = new MemberDealsBackend();
+    const token = fakeJwt({ sub: 'admin-1', roles: ['super_admin'], app: 'msd', exp: Math.floor(Date.now() / 1000) + 3600 });
+    await signInWithToken(page, token);
+    await mockBootstrap(page, ['dashboard:view', 'members:view', 'members:edit']);
+    await mockMemberDealsBackend(page, backend);
+
+    await page.goto(`/account/members/${MEMBER_ID}/deals/new`);
+    await expect(page.getByText('Pick a branch to choose a category.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+    expect(backend.deals).toHaveLength(0);
   });
 });
 

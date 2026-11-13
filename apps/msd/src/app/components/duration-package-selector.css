@@ -58,10 +58,27 @@
   background: var(--md-sys-color-primary-container);
 }
 
-.dps__package-label {
+.dps__package-text {
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-inline-size: 0;
+}
+
+.dps__package-label {
   font-weight: 500;
   font-size: 0.85rem;
+}
+
+/* Duration, people and inclusions under a named deal package (PLANNING §2.7). */
+.dps__package-meta {
+  font-size: 0.75rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.dps__package-row--selected .dps__package-meta {
+  color: var(--md-sys-color-on-primary-container);
 }
 
 .dps__package-discount {

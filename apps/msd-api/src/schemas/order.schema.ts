@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { PaginationQuerySchema } from './common.schema';
+import { PaginationQuerySchema, PincodeSchema } from './common.schema';
+import { isIndiaLocation } from '@skylabs-monorepo/shared-utils';
 
 extendZodWithOpenApi(z);
 
@@ -20,10 +21,17 @@ export const OrderContactDetailsSchema = z.object({
   shippingAddress: z.string().trim().min(1).max(500).optional(),
   shippingCity: z.string().trim().min(1).max(100).optional(),
   shippingState: z.string().trim().min(1).max(100).optional(),
-  shippingPincode: z.string().regex(/^\d{6}$/, 'Pincode must be 6 digits').optional(),
+  shippingPincode: PincodeSchema.optional(),
 });
 
-export const OrderCheckoutSchema = OrderContactDetailsSchema.openapi('OrderCheckout');
+/** Checkout body: the delivery state and city, when both are given, come from the India list
+ *  (item 2.2), the same list the checkout dropdowns use. */
+export const OrderDeliveryDetailsSchema = OrderContactDetailsSchema.refine(
+  (d) => !d.shippingState || !d.shippingCity || isIndiaLocation(d.shippingState, d.shippingCity),
+  { message: 'Pick the city from the list for the chosen state.', path: ['shippingCity'] },
+);
+
+export const OrderCheckoutSchema = OrderDeliveryDetailsSchema.openapi('OrderCheckout');
 
 /** Customer self-service may only ever cancel — confirm/complete is admin-only (existing
  *  `orders:status_change`). */
@@ -51,6 +59,9 @@ export const OrderListQuerySchema = PaginationQuerySchema.extend({
   /** Admin-only drill-in filter (Customer Detail's Orders tab) — a vendor caller stays
    *  force-scoped to its own vendorId regardless, same rule as `vendorId` above. */
   customerId: z.string().uuid().optional(),
+  /** "Customer's Other Orders" (Order Details' Customer card) — excludes the one order being
+   *  viewed from an otherwise-identical `customerId`-filtered list, so "other" is literal. */
+  excludeOrderId: z.string().uuid().optional(),
   /** Matches orders with at least one payment attempt in this state — Order has no single
    *  "payment status" column of its own (Order 1 -> Payment[], see the Phase 9 architecture
    *  plan), so this is necessarily "has a payment attempt with this status", not "the current
@@ -58,6 +69,18 @@ export const OrderListQuerySchema = PaginationQuerySchema.extend({
   paymentStatus: z.enum(['CREATED', 'PAID', 'FAILED', 'CANCELLED']).optional(),
   createdFrom: z.string().datetime().optional(),
   createdTo: z.string().datetime().optional(),
-  /** Free-text search across customer name, vendor/branch name snapshot, and item names. */
+  /** Free-text search across customer name/phone, the checkout-time `contactPhone` snapshot,
+   *  vendor/branch name snapshot, and item names. */
   search: z.string().max(200).optional(),
+});
+
+/** Same filters as `OrderListQuerySchema`, minus `page`/`pageSize`/`status`/`paymentStatus` —
+ *  `GET /orders/counts` always returns all three summary counts in one call (see
+ *  `order.service.ts#getOrderCounts`'s own doc comment for why status/paymentStatus are never
+ *  taken as filters here). */
+export const OrderCountsQuerySchema = OrderListQuerySchema.omit({
+  page: true,
+  pageSize: true,
+  status: true,
+  paymentStatus: true,
 });

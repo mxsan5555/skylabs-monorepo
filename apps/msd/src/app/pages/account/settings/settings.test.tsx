@@ -1,5 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { MyProfileSettings } from './settings';
 
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
   useAuth: () => ({ token: 'test-token' }),
@@ -13,7 +14,6 @@ vi.mock('../../../../api/rbac/me', () => ({
   updateMyProfile: (...args: unknown[]) => updateMyProfileMock(...args),
 }));
 
-import { MyProfileSettings } from './settings';
 
 const superAdminUser = {
   id: 'user-1',

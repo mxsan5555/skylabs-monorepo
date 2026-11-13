@@ -51,6 +51,9 @@ async function request<T>(
   const isFormData = init.body instanceof FormData;
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
+    // This wrapper expects a JSON envelope. A browser-generated 304 has no body and
+    // `Response.ok` is false, so revalidation can incorrectly turn a valid GET into an error.
+    ...(init.method?.toUpperCase() === 'GET' ? { cache: 'no-store' as const } : {}),
     headers: {
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -109,6 +112,9 @@ export function apiPut<T>(path: string, token: string | null, body?: unknown): P
   });
 }
 
-export function apiDelete<T>(path: string, token: string | null): Promise<ApiResult<T>> {
-  return request<T>(path, token, { method: 'DELETE' });
+export function apiDelete<T>(path: string, token: string | null, body?: unknown): Promise<ApiResult<T>> {
+  return request<T>(path, token, {
+    method: 'DELETE',
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
 }

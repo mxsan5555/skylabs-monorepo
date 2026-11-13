@@ -27,6 +27,27 @@ beforeEach(() => {
  * refresh session issuance, and login-history recording.
  */
 describe('loginWithGoogle', () => {
+  it('refuses Google sign-in for Super Admin so it cannot bypass the fixed mobile OTP flow', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: 'super-admin-user',
+      name: 'Super Admin',
+      email: 'superadmin@example.com',
+      phone: '+919999999999',
+      status: 'active',
+    });
+    prismaMock.userRole.findMany.mockResolvedValue([{ role: { key: 'super_admin' } }] as never);
+    prismaMock.loginHistory.create.mockResolvedValue({});
+
+    await expect(loginWithGoogle('google-sub-sa', 'superadmin@example.com', 'Super Admin')).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+    expect(prismaMock.refreshSession.create).not.toHaveBeenCalled();
+    expect(prismaMock.loginHistory.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ userId: 'super-admin-user', method: 'google', success: false }),
+    });
+  });
+
   it('creates a new user, assigns the default customer role, and issues tokens + login history', async () => {
     prismaMock.user.findUnique.mockResolvedValue(null);
     prismaMock.user.create.mockResolvedValue({
@@ -35,9 +56,7 @@ describe('loginWithGoogle', () => {
       email: 'ada@example.com',
       phone: null,
     });
-    prismaMock.userRole.findMany
-      .mockResolvedValueOnce([]) // no roles yet
-      .mockResolvedValueOnce([{ role: CUSTOMER_ROLE }]); // after assigning default
+    prismaMock.userRole.findMany.mockResolvedValueOnce([{ role: CUSTOMER_ROLE }]); // after assigning default
     prismaMock.role.findUnique.mockResolvedValue(CUSTOMER_ROLE);
     prismaMock.userRole.create.mockResolvedValue({});
     prismaMock.refreshSession.create.mockResolvedValue({});

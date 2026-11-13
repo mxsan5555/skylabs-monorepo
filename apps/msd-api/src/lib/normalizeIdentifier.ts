@@ -33,3 +33,13 @@ export function normalizeIdentifier(identifier: string): string {
   }
   return trimmed;
 }
+
+export function phoneLookupWhere(identifier: string) {
+  const normalized = normalizeIdentifier(identifier);
+  const bare = normalized.startsWith('+91') ? normalized.slice(3) : normalized.replace(/\D/g, '');
+  const variants = Array.from(new Set([identifier, normalized, bare, `+91${bare}`])).filter(Boolean);
+
+  return {
+    OR: variants.map((phone) => ({ phone })),
+  };
+}

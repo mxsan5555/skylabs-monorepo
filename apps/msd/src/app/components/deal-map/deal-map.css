@@ -48,8 +48,16 @@
   outline: 3px solid var(--md-sys-color-primary);
   outline-offset: 2px;
 }
+/* Plain-text marker (no link): no hover state. */
+.deal-map__marker--static:hover {
+  background-color: var(--md-sys-color-primary);
+}
 @media (min-width: 840px) {
   .deal-map {
     block-size: 600px;
   }
+}
+/* Single place (deal page Location panel). After the media query so it wins at every width. */
+.deal-map.deal-map--compact {
+  block-size: 240px;
 }

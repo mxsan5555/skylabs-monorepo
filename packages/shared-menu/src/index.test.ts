@@ -17,10 +17,15 @@ describe('getMenuForApp', () => {
     expect(msd.map((n) => n.id)).not.toEqual(meraDriver.map((n) => n.id));
   });
 
-  it('both app menus share the common "administration" RBAC subtree shape', () => {
-    const msdAdmin = getMenuForApp('msd').find((n) => n.id === 'administration');
+  it('both app menus hold the same RBAC administration screens, in the same order', () => {
+    // msd nests them one level deeper (Admin > Manage), mera-driver keeps them under Administration.
+    const msdAdmin = findMenuNodeByRoute(getMenuForApp('msd'), '/account/administration/roles');
+    const msdManage = getMenuForApp('msd')
+      .find((n) => n.id === 'admin')
+      ?.children?.find((c) => c.id === 'admin-manage');
     const meraAdmin = getMenuForApp('mera-driver').find((n) => n.id === 'administration');
-    expect(msdAdmin?.children?.map((c) => c.id)).toEqual(['admin-roles', 'admin-users', 'admin-audit-logs']);
+    expect(msdAdmin?.id).toBe('admin-roles');
+    expect(msdManage?.children?.map((c) => c.id)).toEqual(['admin-roles', 'admin-users', 'admin-audit-logs']);
     expect(meraAdmin?.children?.map((c) => c.id)).toEqual(['admin-roles', 'admin-users', 'admin-audit-logs']);
   });
 });
@@ -29,17 +34,17 @@ describe('findMenuNodeByRoute', () => {
   const menu = getMenuForApp('msd');
 
   it('finds a top-level node by its route', () => {
-    const node = findMenuNodeByRoute(menu, '/dashboard');
+    const node = findMenuNodeByRoute(menu, '/account/dashboard');
     expect(node?.id).toBe('dashboard');
   });
 
   it('finds a nested child node by its route', () => {
-    const node = findMenuNodeByRoute(menu, '/administration/roles');
+    const node = findMenuNodeByRoute(menu, '/account/administration/roles');
     expect(node?.id).toBe('admin-roles');
   });
 
   it('finds a deeply-nested child under a different parent group', () => {
-    const node = findMenuNodeByRoute(menu, '/masters/tags');
+    const node = findMenuNodeByRoute(menu, '/account/masters/tags');
     expect(node?.id).toBe('masters-tags');
   });
 
@@ -54,7 +59,7 @@ describe('findMenuNodeByRoute', () => {
 
   it('returns undefined for a route that belongs only to the other app', () => {
     const meraMenu = getMenuForApp('mera-driver');
-    expect(findMenuNodeByRoute(meraMenu, '/customers')).toBeUndefined();
+    expect(findMenuNodeByRoute(meraMenu, '/account/customers')).toBeUndefined();
   });
 });
 
@@ -63,14 +68,14 @@ describe('msd menu permissionKey independence (regression for the Role Permissio
   // `Permission.id` (Permission.key === `${menuKey}:${action}`), so checking one node's box in
   // the Role Permission Matrix silently checks every node sharing that key too. The admin
   // "Vendor" group and the vendor's own "Business" group both used to collapse their five/seven
-  // children onto one shared key ("vendors" / "vendor-portal") — this pins each child to its own
+  // children onto one shared key ("members" / "vendor-portal") — this pins each child to its own
   // distinct key so that regression can't silently come back.
   const msdMenu = getMenuForApp('msd');
 
   it('gives each child of the admin "Vendor" group its own distinct permissionKey', () => {
     const vendors = msdMenu.find((n) => n.id === 'vendors');
     const keys = vendors?.children?.map((c) => c.permissionKey) ?? [];
-    expect(keys).toEqual(['vendors', 'vendors.branches', 'vendors.deals', 'vendors.products', 'vendors.therapists']);
+    expect(keys).toEqual(['members', 'vendors.branches', 'vendors.deals', 'vendors.products', 'vendors.therapists']);
     expect(new Set(keys).size).toBe(keys.length);
   });
 

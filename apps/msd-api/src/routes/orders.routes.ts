@@ -3,6 +3,7 @@ import type { Request, Response, NextFunction } from 'express';
 import type { PermissionAction } from '@skylabs-monorepo/shared-types';
 import { can } from '@skylabs-monorepo/shared-permissions';
 import { authenticate } from '../middleware/authenticate';
+import { requirePermission } from '../middleware/requirePermission';
 import { resolveGrantedPermissionKeys } from '../services/permission-resolver.service';
 import { validateBody, validateParams, validateQuery } from '../middleware/validate';
 import { UuidParamSchema } from '../schemas/common.schema';
@@ -11,6 +12,7 @@ import {
   OrderCustomerCancelSchema,
   OrderStatusUpdateSchema,
   OrderListQuerySchema,
+  OrderCountsQuerySchema,
 } from '../schemas/order.schema';
 import { VerifyPaymentSchema, OrderBatchSchema, VerifyBatchPaymentSchema } from '../schemas/payment.schema';
 import * as orderService from '../services/order.service';
@@ -23,7 +25,7 @@ import { sendData, sendError } from '../lib/http';
  * one Order via `/orders/checkout`, never a separate Booking flow. Two access surfaces on one
  * router: `/orders/checkout`, `/orders/me*` are customer self-service (`authenticate` only, no
  * RBAC — mirrors `cart.routes.ts` exactly). `/orders` (list/get) and `/orders/:id/status` are
- * gated on the existing `orders` permission key (admin/sales) OR `vendors:custom` (the same
+ * gated on the existing `orders` permission key (admin/sales) OR `members:custom` (the same
  * vendor self-service gate every other `/vendors/me/*` route already uses) — never `orders:view`
  * alone, which would also grant the `vendor` role the admin-wide top-level "Orders" sidebar node
  * (see msd-menu.json) even though `orderService.listOrders`/`getOrderOrThrow`/`setOrderStatus`
@@ -32,7 +34,7 @@ import { sendData, sendError } from '../lib/http';
 const router = Router();
 router.use(authenticate);
 
-/** Passes if the caller holds `orders:{action}` (admin/sales) OR `vendors:custom` (vendor
+/** Passes if the caller holds `orders:{action}` (admin/sales) OR `members:custom` (vendor
  *  self-service — see this file's own doc comment for why `orders:view`/`status_change` are
  *  deliberately never granted to the `vendor` role directly). */
 function requireOrdersOrVendorSelf(action: PermissionAction) {
@@ -43,10 +45,12 @@ function requireOrdersOrVendorSelf(action: PermissionAction) {
     }
     try {
       const granted = await resolveGrantedPermissionKeys(req.user.roles);
-      if (!can(granted, 'orders', action) && !can(granted, 'vendors', 'custom')) {
+      if (!can(granted, 'orders', action) && !can(granted, 'members', 'custom')) {
         sendError(res, 'FORBIDDEN', `Missing permission orders:${action}`);
         return;
       }
+      // Without orders:{action} the caller may only ever reach their own business's orders.
+      res.locals.orderScope = can(granted, 'orders', action) ? 'ALL' : 'OWN';
       next();
     } catch (err) {
       next(err);
@@ -62,6 +66,8 @@ function requestMeta(req: import('express').Request) {
 
 router.post('/checkout', validateBody(OrderCheckoutSchema), async (req, res, next) => {
   try {
+    console.log('checkout request body:', req.body);
+    console.log('checkout request user:', req.user);
     const order = await orderService.createOrderFromCart(req.user!.sub, req.body);
     await writeAuditLog({
       actorUserId: req.user!.sub,
@@ -222,14 +228,15 @@ router.post('/pay-batch/verify', validateBody(VerifyBatchPaymentSchema), async (
 
 router.get('/', requireOrdersOrVendorSelf('view'), validateQuery(OrderListQuerySchema), async (req, res, next) => {
   try {
-    const { page, pageSize, status, vendorId, branchId, customerId, paymentStatus, createdFrom, createdTo, search } = req.validatedQuery as ReturnType<typeof OrderListQuerySchema.parse>;
-    const { items, total } = await orderService.listOrders(req.user!.sub, {
+    const { page, pageSize, status, vendorId, branchId, customerId, excludeOrderId, paymentStatus, createdFrom, createdTo, search } = req.validatedQuery as ReturnType<typeof OrderListQuerySchema.parse>;
+    const { items, total } = await orderService.listOrders(req.user!.sub, res.locals.orderScope, {
       page,
       pageSize,
       status,
       vendorId,
       branchId,
       customerId,
+      excludeOrderId,
       paymentStatus,
       createdFrom,
       createdTo,
@@ -241,9 +248,30 @@ router.get('/', requireOrdersOrVendorSelf('view'), validateQuery(OrderListQueryS
   }
 });
 
+router.get('/counts', requireOrdersOrVendorSelf('view'), validateQuery(OrderCountsQuerySchema), async (req, res, next) => {
+  try {
+    const { vendorId, branchId, customerId, excludeOrderId, createdFrom, createdTo, search } = req.validatedQuery as ReturnType<typeof OrderCountsQuerySchema.parse>;
+    const counts = await orderService.getOrderCounts(req.user!.sub, { vendorId, branchId, customerId, excludeOrderId, createdFrom, createdTo, search });
+    sendData(res, counts);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/:id', requireOrdersOrVendorSelf('view'), validateParams(UuidParamSchema), async (req, res, next) => {
   try {
-    sendData(res, await orderService.getOrderOrThrow(req.user!.sub, req.params.id));
+    sendData(res, await orderService.getOrderOrThrow(req.user!.sub, res.locals.orderScope, req.params.id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Same guard as GET /:id — the order-activity timeline is visible to whoever can already see the
+// order itself (never the narrower rbac.audit-logs:view, which is a different admin-only grant —
+// see getOrderActivityHistory's own doc comment).
+router.get('/:id/activity', requireOrdersOrVendorSelf('view'), validateParams(UuidParamSchema), async (req, res, next) => {
+  try {
+    sendData(res, await orderService.getOrderActivityHistory(req.user!.sub, res.locals.orderScope, req.params.id));
   } catch (err) {
     next(err);
   }
@@ -251,12 +279,13 @@ router.get('/:id', requireOrdersOrVendorSelf('view'), validateParams(UuidParamSc
 
 router.patch(
   '/:id/status',
-  requireOrdersOrVendorSelf('status_change'),
+  // D27: members view their own orders only; only orders:status_change (Super Admin, Admin) changes one.
+  requirePermission('orders', 'status_change'),
   validateParams(UuidParamSchema),
   validateBody(OrderStatusUpdateSchema),
   async (req, res, next) => {
     try {
-      const order = await orderService.setOrderStatus(req.user!.sub, req.params.id, req.body.status, req.body.cancellationReason);
+      const order = await orderService.setOrderStatus(req.params.id, req.body.status, req.body.cancellationReason);
       await writeAuditLog({
         actorUserId: req.user!.sub,
         action: 'order.status_change',

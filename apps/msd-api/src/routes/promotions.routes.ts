@@ -10,6 +10,8 @@ import {
   PromotionStatusUpdateSchema,
   PromotionListQuerySchema,
 } from '../schemas/promotion.schema';
+import { StateItemSearchQuerySchema } from '../schemas/home-hero.schema';
+import { searchStateItems } from '../services/state-catalog.service';
 import { MediaReorderSchema } from '../schemas/media.schema';
 import * as promotionService from '../services/promotion.service';
 import { writeAuditLog } from '../services/audit.service';
@@ -17,9 +19,9 @@ import { sendData, ApiError } from '../lib/http';
 import { imageUpload } from '../lib/media-upload.middleware';
 
 /**
- * Home page "Promotions" admin CRUD — gated on `masters.promotions`, mirroring
- * `popular-treatments.routes.ts`'s exact shape (list/create/get/patch/status/delete) plus
- * `categories.routes.ts`'s media sub-routes (image-only, no video — see media.service.ts).
+ * CTA banners admin CRUD (the `Promotion` model; docs/msd/PLANNING.md §6) — gated on
+ * `masters.promotions`: list/create/get/patch/status/delete, the shared state item search, and
+ * one image per banner (image-only, no video — see media.service.ts).
  */
 const router = Router();
 router.use(authenticate);
@@ -30,9 +32,20 @@ function requestMeta(req: Request) {
 
 router.get('/', requirePermission('masters.promotions', 'view'), validateQuery(PromotionListQuerySchema), async (req, res, next) => {
   try {
-    const { page, pageSize, search } = req.validatedQuery as ReturnType<typeof PromotionListQuerySchema.parse>;
-    const { items, total } = await promotionService.listPromotions({ page, pageSize, search });
+    const { page, pageSize, search, state } = req.validatedQuery as ReturnType<typeof PromotionListQuerySchema.parse>;
+    // A query string cannot carry null: `__global__` asks for the Global/Default banners only.
+    const stateFilter = state === undefined ? undefined : state === '__global__' ? null : state;
+    const { items, total } = await promotionService.listPromotions({ page, pageSize, search, state: stateFilter });
     sendData(res, items, { meta: { total, page, pageSize } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/search-items', requirePermission('masters.promotions', 'view'), validateQuery(StateItemSearchQuerySchema), async (req, res, next) => {
+  try {
+    const { state, q, type, pageSize, eligibleOnly } = req.validatedQuery as ReturnType<typeof StateItemSearchQuerySchema.parse>;
+    sendData(res, await searchStateItems({ state: state || null, q: q ?? '', type, pageSize, eligibleOnly }));
   } catch (err) {
     next(err);
   }

@@ -26,4 +26,4 @@ ALTER TABLE "SupportRequest" ADD CONSTRAINT "SupportRequest_customerId_fkey" FOR
 ALTER TABLE "OrderItem" ADD CONSTRAINT "OrderItem_dealId_fkey" FOREIGN KEY ("dealId") REFERENCES "Deal"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- RenameIndex
-ALTER INDEX "BranchSubcategoryAccess_branchCategoryAccessId_subcategoryId_uq" RENAME TO "BranchSubcategoryAccess_branchCategoryAccessId_subcategoryI_key";
+ALTER INDEX IF EXISTS "BranchSubcategoryAccess_branchCategoryAccessId_subcategoryId_uq" RENAME TO "BranchSubcategoryAccess_branchCategoryAccessId_subcategoryI_key";

@@ -4,7 +4,11 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { listMyOrders, type Order, type PaymentSummary, type PaymentStatus } from '../../../api/orders';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { formatINR } from '../../../utils/format';
-import '../category/category.css';
+import { SectionHead } from '../../components/section-head/section-head';
+import { fillTemplate } from '../../../utils/format';
+import content from '../../../content.json';
+
+const t = content.payments;
 
 /** One logical purchase (Order), carrying whichever Payment attempt actually represents its
  *  outcome — never one row per raw Payment record. See `groupPaymentsByOrder`'s own doc comment
@@ -74,7 +78,7 @@ export function MyAccountPayments() {
     setError('');
     listMyOrders(token, { pageSize: 100 })
       .then(({ data }) => setPayments(groupPaymentsByOrder(data)))
-      .catch((err) => setError(err instanceof ApiRequestError ? err.message : 'Could not load your payment history.'))
+      .catch((err) => setError(err instanceof ApiRequestError ? err.message : t.errors.load))
       .finally(() => setLoading(false));
   }, [token]);
 
@@ -83,61 +87,48 @@ export function MyAccountPayments() {
   }, [load]);
 
   return (
-    <div className="category-page">
-      <title>Payment History | MSD</title>
+    <>
+      <title>{t.metaTitle}</title>
       <meta name="robots" content="noindex" />
-
-      <header className="category-page__hero">
-        <div className="category-page__hero-inner">
-          <div>
-            <h1 className="category-page__title">Payment History</h1>
-            <p className="category-page__subtitle">Every payment across your orders, most recent first.</p>
-          </div>
+      <SectionHead as="h1" id="payments-heading" heading={t.title} subheading={t.subtitle} />
+      {loading ? (
+        <p className="loading-state" role="status">{t.loading}</p>
+      ) : error ? (
+        <p className="error-state" role="alert">{error}</p>
+      ) : payments.length === 0 ? (
+        <div className="empty-state">
+          <sky-info-card icon="payments" heading={t.empty.title} subheading={t.empty.description} />
         </div>
-      </header>
-
-      <section className="category-page__grid-wrap">
-        <div className="category-page__grid-inner">
-          {loading ? (
-            <p className="loading-state">Loading payment history…</p>
-          ) : error ? (
-            <p className="error-state" role="alert">{error}</p>
-          ) : payments.length === 0 ? (
-            <div className="category-page__empty">
-              <sky-info-card icon="payments" heading="No payments yet" subheading="Payments you make will show up here." />
-            </div>
-          ) : (
-            <ul className="entity-list">
-              {payments.map((row) => (
-                <li key={row.orderId}>
-                  <div className="entity-list__item">
-                    <span className="role-list__name">
-                      {row.itemNames.join(', ')}
-                      <span className="field-hint">
-                        {' '}
-                        · {formatINR(Number(row.primaryPayment.amount))} · {row.primaryPayment.provider} · {row.orderVendorName}
-                        {' '}
-                        · {new Date(row.createdAt).toLocaleDateString()}
-                      </span>
-                    </span>
-                    <span className={`status-pill ${STATUS_CLASS[row.primaryPayment.status]}`}>{row.primaryPayment.status}</span>
-                  </div>
-                  {row.primaryPayment.status === 'FAILED' && row.primaryPayment.failureReason && (
-                    <p className="error-state">{row.primaryPayment.failureReason}</p>
-                  )}
-                  {row.otherAttempts.length > 0 && (
-                    <p className="field-hint">
-                      Other payment attempts on this order: {row.otherAttempts.map((a) => `${a.provider} (${a.status})`).join(', ')}
-                    </p>
-                  )}
-                  <Link to={`/orders/${row.orderId}`} className="field-hint">View order →</Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </section>
-    </div>
+      ) : (
+        <ul className="entity-list">
+          {payments.map((row) => (
+            <li key={row.orderId}>
+              <div className="entity-list__item">
+                <span className="role-list__name">
+                  {row.itemNames.join(', ')}
+                  <span className="field-hint">
+                    {' '}
+                    · {formatINR(Number(row.primaryPayment.amount))} · {row.primaryPayment.provider} · {row.orderVendorName}
+                    {' '}
+                    · {new Date(row.createdAt).toLocaleDateString()}
+                  </span>
+                </span>
+                <span className={`status-pill ${STATUS_CLASS[row.primaryPayment.status]}`}>{row.primaryPayment.status}</span>
+              </div>
+              {row.primaryPayment.status === 'FAILED' && row.primaryPayment.failureReason && (
+                <p className="error-state">{row.primaryPayment.failureReason}</p>
+              )}
+              {row.otherAttempts.length > 0 && (
+                <p className="field-hint">
+                  {fillTemplate(t.otherAttempts, { attempts: row.otherAttempts.map((a) => `${a.provider} (${a.status})`).join(', ') })}
+                </p>
+              )}
+              <Link to={`/orders/${row.orderId}`} className="field-hint">{t.viewOrder}</Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 }
 

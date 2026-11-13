@@ -14,11 +14,15 @@ const { sendSmsOtpMock, sendOtpEmailMock } = vi.hoisted(() => ({
   sendSmsOtpMock: vi.fn().mockResolvedValue(true),
   sendOtpEmailMock: vi.fn().mockResolvedValue(true),
 }));
-vi.mock('../providers/sms/connectExpress.provider', () => ({ sendOtp: sendSmsOtpMock }));
+vi.mock('../providers/sms/connectExpress.provider', () => ({
+  sendOtp: sendSmsOtpMock,
+  missingOtpConfiguration: vi.fn().mockReturnValue([]),
+}));
 vi.mock('../providers/email/smtp.provider', () => ({ sendOtpEmail: sendOtpEmailMock }));
 
 import app from '../app';
 import { prisma } from '../lib/prisma';
+import { env } from '../config/env';
 
 const prismaMock = vi.mocked(prisma, true);
 
@@ -27,13 +31,15 @@ const OTP_CHALLENGE_ID = '3c8ac548-50c2-41ce-83eb-5e5c6249cfd2';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  env.otpProvider = 'sms';
   sendSmsOtpMock.mockReset().mockResolvedValue(true);
   sendOtpEmailMock.mockReset().mockResolvedValue(true);
+  prismaMock.user.findFirst.mockResolvedValue(null);
 });
 
 describe('POST /api/v1/auth/otp/request', () => {
   it('returns 200 with a generic message for a valid identifier (no user enumeration)', async () => {
-    prismaMock.otpChallenge.create.mockResolvedValue({});
+    prismaMock.otpChallenge.create.mockResolvedValue({} as any);
     const res = await request(app)
       .post('/api/v1/auth/otp/request')
       .send({ identifier: 'happy-path@example.com' });
@@ -55,9 +61,29 @@ describe('POST /api/v1/auth/otp/request', () => {
     expect(res.status).toBe(422);
   });
 
+  it('does not return or persist role OTP credentials in dummy mode', async () => {
+    env.otpProvider = 'dummy';
+    env.adminLoginOtp = '222222';
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: USER_ID,
+      status: 'active',
+      deletedAt: null,
+      roles: [{ role: { key: 'admin' } }],
+    } as never);
+    prismaMock.member.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).post('/api/v1/auth/otp/request').send({ identifier: '+919111111111' });
+
+    expect(res.status).toBe(200);
+    expect(JSON.stringify(res.body)).not.toContain('222222');
+    expect(JSON.stringify(res.body)).not.toContain('+919111111111');
+    expect(prismaMock.otpChallenge.create).not.toHaveBeenCalled();
+    expect(sendSmsOtpMock).not.toHaveBeenCalled();
+  });
+
   // Edge case: rate limiting — 5/10min per (ip + identifier) per apps/msd-api/.env.local.
   it('returns 429 after exceeding the per-identifier OTP request rate limit', async () => {
-    prismaMock.otpChallenge.create.mockResolvedValue({});
+    prismaMock.otpChallenge.create.mockResolvedValue({} as any);
     const identifier = 'rate-limited@example.com';
     let lastStatus = 0;
     for (let i = 0; i < 6; i++) {
@@ -75,28 +101,32 @@ describe('POST /api/v1/auth/otp/verify', () => {
     prismaMock.otpChallenge.findFirst.mockResolvedValue({
       id: OTP_CHALLENGE_ID,
       identifier,
-      attempts: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      purpose: 'login',
       expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      attempts: 0,
       hashedOtp: '$2b$10$invalidPlaceholderHashForMismatchTests..................',
+      verifiedAt: null,
       ...overrides,
-    });
+    } as any);
   }
 
   it('returns 200 with access/refresh tokens on a correct OTP (happy path)', async () => {
     const realOtp = '123456';
     const hashedOtp = await bcrypt.hash(realOtp, 10);
     mockPendingChallenge({ hashedOtp });
-    prismaMock.otpChallenge.update.mockResolvedValue({});
+    prismaMock.otpChallenge.update.mockResolvedValue({} as any);
     prismaMock.user.upsert.mockResolvedValue({
       id: USER_ID,
       name: identifier,
       email: identifier,
       phone: null,
       roles: [{ role: { key: 'customer' } }],
-    });
-    prismaMock.userRole.findMany.mockResolvedValue([{ role: { key: 'customer' } }]);
-    prismaMock.loginHistory.create.mockResolvedValue({});
-    prismaMock.refreshSession.create.mockResolvedValue({});
+    } as any);
+    prismaMock.userRole.findMany.mockResolvedValue([{ role: { key: 'customer' } }] as any);
+    prismaMock.loginHistory.create.mockResolvedValue({} as any);
+    prismaMock.refreshSession.create.mockResolvedValue({} as any);
 
     const res = await request(app)
       .post('/api/v1/auth/otp/verify')
@@ -114,9 +144,19 @@ describe('POST /api/v1/auth/otp/verify', () => {
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
   });
 
+  it('rejects a frontend-supplied role instead of trusting it during login', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/otp/verify')
+      .send({ identifier, otp: '123456', role: 'super_admin' });
+
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(prismaMock.user.upsert).not.toHaveBeenCalled();
+  });
+
   it('returns 401 for a wrong OTP code', async () => {
     mockPendingChallenge();
-    prismaMock.otpChallenge.update.mockResolvedValue({});
+    prismaMock.otpChallenge.update.mockResolvedValue({} as any);
     const res = await request(app)
       .post('/api/v1/auth/otp/verify')
       .send({ identifier, otp: '000000' });
@@ -156,6 +196,20 @@ describe('POST /api/v1/auth/otp/verify', () => {
     expect(res.status).toBe(401);
     expect(res.body.error.message).toMatch(/No pending OTP/);
   });
+
+  it('rate-limits repeated dummy OTP failures without storing the fixed value', async () => {
+    env.otpProvider = 'dummy';
+    const identifier = `+9192222${String(Date.now()).slice(-5)}`;
+    prismaMock.user.findFirst.mockResolvedValue(null);
+    let lastStatus = 0;
+    for (let i = 0; i < 6; i++) {
+      const res = await request(app).post('/api/v1/auth/otp/verify').send({ identifier, otp: '000000' });
+      lastStatus = res.status;
+    }
+    expect(lastStatus).toBe(429);
+    expect(prismaMock.otpChallenge.findFirst).not.toHaveBeenCalled();
+    expect(prismaMock.otpChallenge.create).not.toHaveBeenCalled();
+  });
 });
 
 describe('POST /api/v1/auth/refresh', () => {
@@ -165,6 +219,7 @@ describe('POST /api/v1/auth/refresh', () => {
   });
 
   it('returns 401 when the refresh token does not match any active session', async () => {
+    prismaMock.refreshSession.findFirst.mockResolvedValue(null);
     prismaMock.refreshSession.findMany.mockResolvedValue([]);
     const res = await request(app)
       .post('/api/v1/auth/refresh')

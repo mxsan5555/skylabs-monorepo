@@ -1,67 +1,50 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import {
-  FilledButton,
-  Icon,
-  OutlinedIconButton,
-  SecondaryTab,
-  Tabs,
-} from '@skylabs-monorepo/shared-ui/react';
+import { useMemo, type ReactNode } from 'react';
 import '@skylabs-monorepo/shared-ui/carousel';
-import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { signInPathWithReturnTo } from '../../../auth/role-routing';
-import { useWishlist } from '../../../wishlist/wishlist-context';
-import { useHydrated } from '../../../hooks/use-hydrated';
-import { formatINR } from '../../../utils/format';
-import { primaryImage, resolveDealMedia, resolveTherapistMedia } from '../../../utils/media';
+import { OfferCard, offerTagFor, type OfferTag } from '../../components/offer-card/offer-card';
+import { primaryImage, resolveDealMedia } from '../../../utils/media';
 import { CardRail } from '../../components/card-rail/card-rail';
-import { DealCard } from '../../components/deal-card';
-import { SkyProductCardWC } from '../../components/sky-product-card-wc';
+import { TherapistCard } from '../../components/therapist-card/therapist-card';
 import { PageSection } from '../../components/page-section/page-section';
 import { Seo } from '../../seo/seo';
 import { faqPageJsonLd, itemListJsonLd, type JsonLdObject } from '../../seo/jsonld';
 import { SITE_URL } from '../../seo/site-url';
+import { dealPath, } from '../../seo/public-urls';
 import { CategoryTiles } from './category-tiles';
 import { DealsNearYou } from './deals-near-you';
-import { HomeFaq } from './home-faq';
+import { HomeTagSections } from './home-tag-sections';
 import { HomeHero } from './home-hero';
-import { HomeOffers } from './home-offers';
+import { BannerSlot } from '../../components/banner-slot/banner-slot';
 import { HowItWorks } from './how-it-works';
+import { HomeFaq } from './home-faq';
 import { TreatmentDirectory } from './treatment-directory';
-import {
-  HOME_RAIL_SIZE,
-  toDealCardDeal,
-  toProductCardDeal,
-  useHomeCatalog,
-} from './home-data';
+import { HOME_RAIL_SIZE, useHomeCatalog, } from './home-data';
 import content from '../../../content.json';
 import './home.css';
 import { useCatalogShell } from '../../../catalog/catalog-shell';
 import { useVisitorLocation } from '../../../location/location-context';
-import type { CatalogDeal } from '../../../api/catalog';
+import type { CatalogDeal, CatalogHomeTagSection, } from '../../../api/catalog';
 const { home } = content;
-
+const getDealTag = (tag?: string | null, labelOverride?: string): OfferTag | undefined => {
+  const normalizedTag = typeof tag === 'string' && tag.trim() ? tag.trim() : undefined;
+  if (!normalizedTag) { return undefined; }
+  const normalizedKey = normalizedTag.toLowerCase();
+  const mappedTag =
+    normalizedKey === 'expire_soon' ? 'expire_soon' :
+      normalizedKey === 'hot' || normalizedKey === 'hot_deal' ? 'hot' :
+        normalizedKey === 'new' ? 'new' :
+          normalizedKey === 'deal' ? 'deal' :
+            undefined;
+  return mappedTag ? offerTagFor(mappedTag, labelOverride) : undefined;
+};
 export function Home() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { isAuthenticated } = useAuth();
-  // Rendering decisions wait for hydration so they match the prerendered (signed-out) HTML.
-  const signedIn = useHydrated() && isAuthenticated;
-  const { toggle, has } = useWishlist();
   const { categories } = useCatalogShell();
   const { status: locationStatus, coords } = useVisitorLocation();
   const catalog = useHomeCatalog(locationStatus === 'locating' ? undefined : coords);
   const ready = catalog.status === 'ready';
-
-  const spotlight = useMemo(
-    () => [...catalog.deals].sort((a, b) => (b.discountPercent ?? 0) - (a.discountPercent ?? 0))[0],
-    [catalog.deals],
-  );
-
+  const spotlight = useMemo(() => [...catalog.deals].sort((a, b) => (b.discountPercent ?? 0) - (a.discountPercent ?? 0))[0], [catalog.deals],);
   const jsonLd = useMemo(() => {
     const blocks: JsonLdObject[] = [];
     if (SITE_URL && catalog.deals.length > 0) {
-      // The list covers the first HOME_RAIL_SIZE deals (what the Deals near you rail leads with).
       blocks.push(
         itemListJsonLd(
           SITE_URL,
@@ -69,7 +52,7 @@ export function Home() {
             .slice(0, HOME_RAIL_SIZE)
             .map((d) => ({
               name: d.title,
-              path: `/deal/${d.id}`,
+              path: dealPath(d),
               price: Number(d.salePrice),
               image: primaryImage(resolveDealMedia(d)) || undefined,
             })),
@@ -79,26 +62,33 @@ export function Home() {
     if (catalog.faqs.length > 0) blocks.push(faqPageJsonLd(catalog.faqs));
     return blocks.length > 0 ? blocks : undefined;
   }, [catalog.deals, catalog.faqs]);
-
-  const handleFavorite = (id: string) => {
-    if (!isAuthenticated) {
-      navigate(signInPathWithReturnTo(location));
-      return;
-    }
-    toggle(id);
+  const renderDeal = (deal: CatalogDeal, tagInput?: string | number | CatalogHomeTagSection,): ReactNode => {
+    const tagKey = typeof tagInput === 'object' && tagInput ? tagInput.tag : deal.tag;
+    const tagLabel =
+      typeof tagInput === 'string' ? tagInput
+        : typeof tagInput === 'object' && tagInput ? tagInput.title : undefined;
+    const tag = getDealTag(tagKey, tagLabel);
+    return (
+      <swiper-slide key={deal.id} className="card-rail__slide">
+        <OfferCard
+          slider
+          item={{ type: 'deal', deal }}
+          {...(tag ? { tag } : {})}
+          variant="outlined"
+          layout="vertical"
+        />
+      </swiper-slide>
+    );
   };
-
-  const renderDeal = (deal: CatalogDeal) => (
-    <swiper-slide key={deal.id} className="card-rail__slide">
-      <DealCard
-        deal={toDealCardDeal(deal)}
-        eyebrowHref={deal.vendor?.slug ? `/vendor/${deal.vendor.slug}` : undefined}
-        favoriteActive={signedIn && has(deal.id)}
-        onFavorite={() => handleFavorite(deal.id)}
-      />
-    </swiper-slide>
+  const renderDealSection = (id: string, heading: string, seeAllTo: string, tag: OfferTag, tone: 'tint' | 'surface' = 'surface',) => (
+    <PageSection tone={tone} aria-labelledby={id}>
+      <CardRail id={id} heading={heading} seeAll="See All Deals" seeAllTo={seeAllTo} >
+        {catalog.deals
+          .slice(0, HOME_RAIL_SIZE)
+          .map((deal) => renderDeal(deal))}
+      </CardRail>
+    </PageSection>
   );
-
   return (
     <div className="home">
       <Seo title={content.meta.home.title} description={content.meta.home.description} path="/" jsonLd={jsonLd} />
@@ -111,6 +101,7 @@ export function Home() {
         categories={categories}
         renderDeal={renderDeal}
       />
+      <HomeTagSections renderDeal={(deal, section) => renderDeal(deal, section)} />
       <HowItWorks />
       {ready && catalog.therapists.length > 0 && (
         <PageSection tone="tint" aria-labelledby="therapists-heading">
@@ -120,34 +111,13 @@ export function Home() {
             seeAll={home.sections.therapists.seeAll}
             seeAllTo={home.sections.therapists.seeAllTo}
           >
-            {catalog.therapists.map((therapist) => {
-              const price = therapist.packages.length
-                ? Math.min(...therapist.packages.map((p) => Number(p.sellingPrice)))
-                : null;
-              return (
-                <swiper-slide key={therapist.id} className="card-rail__slide">
-                  <SkyProductCardWC
-                    image={primaryImage(resolveTherapistMedia(therapist))}
-                    imageAlt={therapist.personName}
-                    eyebrow={therapist.personName}
-                    eyebrowHref={therapist.vendor?.slug ? `/vendor/${therapist.vendor.slug}` : undefined}
-                    heading={therapist.therapistType}
-                    location={therapist.branch?.city ?? undefined}
-                    distance={
-                      therapist.distanceKm != null ? `${Math.round(therapist.distanceKm * 10) / 10} km` : undefined
-                    }
-                    tag={therapist.popularTags?.[0]?.name}
-                    pricePrefix={price != null ? home.ui.labels.from : undefined}
-                    price={price != null ? formatINR(price) : undefined}
-                    href={`/therapist/${therapist.id}`}
-                  />
-                </swiper-slide>
-              );
-            })}
+            {catalog.therapists.map((therapist) => (
+              <swiper-slide key={therapist.id} className="card-rail__slide"><TherapistCard therapist={therapist} /> </swiper-slide>
+            ))}
           </CardRail>
         </PageSection>
       )}
-      <HomeOffers isAuthenticated={signedIn} />
+      <BannerSlot slot="HOME_AFTER_DEALS" />
       {ready && catalog.products.length > 0 && (
         <PageSection tone="tint" aria-labelledby="products-heading">
           <CardRail
@@ -158,21 +128,20 @@ export function Home() {
           >
             {catalog.products.map((product) => (
               <swiper-slide key={product.id} className="card-rail__slide">
-                <DealCard
-                  deal={toProductCardDeal(product)}
-                  href={`/products/${product.id}`}
-                  favoriteActive={signedIn && has(product.id)}
-                  onFavorite={() => handleFavorite(product.id)}
+                <OfferCard slider
+                  item={{ type: 'product', product }}
+                  variant="outlined"
+                  layout="vertical"
                 />
               </swiper-slide>
             ))}
           </CardRail>
         </PageSection>
       )}
+      <BannerSlot slot="HOME_AFTER_PRODUCTS" />
       <TreatmentDirectory groups={catalog.popularTreatments} />
-      {ready && <HomeFaq faqs={catalog.faqs} />}
+      <HomeFaq faqs={catalog.faqs} />
       <PageSection flush aria-labelledby="partner-heading">
-        {/* Heading and body are slotted light DOM so the section has a real h2. */}
         <sky-cta-banner
           color="inverse"
           icon={home.partnerBanner.icon}
@@ -189,5 +158,4 @@ export function Home() {
     </div>
   );
 }
-
 export default Home;

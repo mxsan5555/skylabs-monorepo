@@ -9,8 +9,12 @@ import type { BootstrapResponse } from '@skylabs-monorepo/shared-types';
 export interface AuthStorageKeys {
   /** The live bearer token the app sends on every request. */
   token: string;
-  /** During a SuperAdmin "Login As" preview, the real SuperAdmin token is stashed here. */
+  /** Legacy: older builds stashed the real SuperAdmin token here during a preview. Only read to
+   *  migrate such a session, then cleared. */
   realToken: string;
+  /** A "Login As" preview token, in sessionStorage only: it never outlives its tab and never
+   *  replaces the real token in localStorage (P10-38). */
+  previewToken: string;
   /** The rotated opaque refresh token paired with `token` — absent for preview tokens (a
    *  "Login As" preview is never refreshed; see CLAUDE.md's Login As section). */
   refreshToken: string;
@@ -21,22 +25,51 @@ export function authStorageKeys(appPrefix: string): AuthStorageKeys {
     token: `${appPrefix}_auth_token`,
     realToken: `${appPrefix}_auth_real_token`,
     refreshToken: `${appPrefix}_auth_refresh_token`,
+    previewToken: `${appPrefix}_auth_preview_token`,
   };
 }
 
-function safeLocalStorage(): Storage | null {
-  return typeof localStorage === 'undefined' ? null : localStorage;
+type StorageKind = 'localStorage' | 'sessionStorage';
+
+/** The browser storage, or null outside a browser (server rendering, tests without jsdom). */
+function safeStorage(kind: StorageKind): Storage | null {
+  return typeof globalThis[kind] === 'undefined' ? null : globalThis[kind];
 }
 
-export function readStorageValue(key: string): string | null {
-  return safeLocalStorage()?.getItem(key) ?? null;
+function readValue(kind: StorageKind, key: string): string | null {
+  return safeStorage(kind)?.getItem(key) ?? null;
 }
 
-export function writeStorageValue(key: string, value: string | null): void {
-  const storage = safeLocalStorage();
+/** Writes `value`, or removes the key when `value` is null or empty. */
+function writeValue(kind: StorageKind, key: string, value: string | null): void {
+  const storage = safeStorage(kind);
   if (!storage) return;
   if (value) storage.setItem(key, value);
   else storage.removeItem(key);
+}
+
+export const readStorageValue = (key: string) => readValue('localStorage', key);
+export const writeStorageValue = (key: string, value: string | null) => writeValue('localStorage', key, value);
+
+/** Tab-scoped value (sessionStorage): gone when the tab closes, never seen by other tabs. */
+export const readSessionValue = (key: string) => readValue('sessionStorage', key);
+export const writeSessionValue = (key: string, value: string | null) => writeValue('sessionStorage', key, value);
+
+/** The token this tab starts with: a live "Login As" preview from sessionStorage, else the real
+ *  token from localStorage. Drops an expired preview, and moves a preview that an older build
+ *  left in localStorage back out of the way (P10-38). */
+export function resolveInitialToken(keys: AuthStorageKeys): string | null {
+  const preview = readSessionValue(keys.previewToken);
+  if (preview && !isJwtExpired(preview)) return preview;
+  if (preview) writeSessionValue(keys.previewToken, null);
+  const stored = readStorageValue(keys.token);
+  if (stored && isPreviewToken(stored)) {
+    const real = readStorageValue(keys.realToken);
+    writeStorageValue(keys.token, real);
+    writeStorageValue(keys.realToken, null);
+    return real;
+  }
+  return stored;
 }
 
 /** Decodes the JWT payload for read-only UI hints (e.g. `preview`). Never trust this for access control — the server re-verifies on every request. */
@@ -122,6 +155,21 @@ export async function refreshAccessToken(
   }
   const body = (await res.json()) as { data: { accessToken: string; refreshToken: string } };
   return body.data;
+}
+
+/** Best-effort server sign-out: revokes `refreshToken` via `POST /auth/logout`. Never throws;
+ *  the caller clears local state either way. */
+export async function revokeSession(apiBaseUrl: string, accessToken: string, refreshToken: string): Promise<void> {
+  try {
+    await fetch(`${apiBaseUrl}/auth/logout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ refreshToken }),
+      keepalive: true,
+    });
+  } catch {
+    // Offline or server down: the refresh token simply expires on its own.
+  }
 }
 
 export type { BootstrapResponse };

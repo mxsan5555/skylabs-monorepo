@@ -1,6 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
-  output   = "../src/generated/prisma-client"
+  provider      = "prisma-client-js"
+  output        = "../src/generated/prisma-client"
   // "native" covers the local dev OS; "debian-openssl-3.0.x" is the Railway/Nixpacks runtime, so a
   // Linux query-engine is always generated for the deployed host (harmless locally).
   binaryTargets = ["native", "debian-openssl-3.0.x"]
@@ -9,6 +9,11 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+enum PermissionScope {
+  ALL
+  OWN
 }
 
 model User {
@@ -22,6 +27,13 @@ model User {
   createdAt              DateTime               @default(now())
   updatedAt              DateTime               @updatedAt
   deletedAt              DateTime?
+  roleConflict           Boolean                @default(false)
+  /// The customer's saved delivery address (D37, item 2.2): pre-fills checkout, editable there,
+  /// and replaced by the details of each placed order. State and city from the India list.
+  address                String?
+  city                   String?
+  state                  String?
+  pincode                String?
   auditLogsAsActor       AuditLog[]             @relation("AuditLogActor")
   cart                   Cart?
   impersonationsAsAdmin  ImpersonationSession[] @relation("ImpersonationSuperAdmin")
@@ -31,11 +43,44 @@ model User {
   orders                 Order[]
   refreshSessions        RefreshSession[]
   roles                  UserRole[]
-  vendorProfile          Vendor?                @relation("VendorOwner")
+  vendorProfile          Member?                @relation("VendorOwner")
   wishlistItems          WishlistItem[]
   supportRequests        SupportRequest[]
+  purchaseEntitlements   PurchaseEntitlement[]  @relation("EntitlementCustomer")
+  purchaseDisputes       PurchaseDispute[]      @relation("DisputeCustomer")
 
   @@index([status])
+}
+
+enum VendorApplicationStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+model VendorApplication {
+  id             String                  @id @default(uuid())
+  businessName   String
+  businessEmail  String
+  businessPhone  String
+  ownerFirstName String
+  ownerLastName  String
+  ownerEmail     String
+  ownerMobile    String
+  address        String
+  city           String
+  state          String
+  pincode        String
+  status         VendorApplicationStatus @default(PENDING)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([ownerEmail])
+  @@index([ownerMobile])
+  @@index([businessEmail])
 }
 
 model SupportRequest {
@@ -51,7 +96,6 @@ model SupportRequest {
   @@index([customerId])
   @@index([createdAt])
 }
-
 
 model Role {
   id               String                @id @default(uuid())
@@ -90,13 +134,16 @@ model Permission {
 model RolePermission {
   roleId       String
   permissionId String
-  createdAt    DateTime   @default(now())
-  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  scope        PermissionScope @default(ALL)
+  createdAt    DateTime        @default(now())
+
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@id([roleId, permissionId])
   @@index([roleId])
   @@index([permissionId])
+  @@index([scope])
 }
 
 model UserRole {
@@ -156,6 +203,17 @@ model RefreshSession {
   id          String    @id @default(uuid())
   userId      String
   hashedToken String    @unique
+  /// SHA-256 hex digest of the raw token — a fast, indexed O(1) lookup key. `hashedToken`
+  /// (bcrypt, salted, non-deterministic) can only ever be checked by loading EVERY active
+  /// session and calling bcrypt.compare on each one; that's fine at a handful of sessions but
+  /// becomes a multi-second linear scan once the table has hundreds of active rows (persistent
+  /// login's whole point is frequent automatic refreshes, so this gets hit constantly). SHA-256
+  /// is safe here specifically because the input is already a 48-byte crypto.randomBytes token,
+  /// not a low-entropy secret like a password — the slow/salted properties bcrypt exists for
+  /// don't apply. Nullable + lookup-with-fallback (see token.service.ts#rotateRefreshToken) so
+  /// sessions issued before this column existed keep working via the old path until they next
+  /// rotate, instead of being invalidated.
+  lookupHash  String?   @unique
   deviceInfo  String?
   ip          String?
   userAgent   String?
@@ -228,25 +286,25 @@ model LoginHistory {
 }
 
 model ImpersonationSession {
-  id               String    @id @default(uuid())
+  id               String   @id @default(uuid())
   superAdminUserId String
   targetUserId     String
-  startedAt        DateTime  @default(now())
-  previewTokenJti  String    @unique
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  superAdmin       User      @relation("ImpersonationSuperAdmin", fields: [superAdminUserId], references: [id], onDelete: Cascade)
-  target           User      @relation("ImpersonationTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  startedAt        DateTime @default(now())
+  previewTokenJti  String   @unique
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  superAdmin       User     @relation("ImpersonationSuperAdmin", fields: [superAdminUserId], references: [id], onDelete: Cascade)
+  target           User     @relation("ImpersonationTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
 
   @@index([superAdminUserId])
   @@index([targetUserId])
 }
 
-model Vendor {
-  id                         String                 @id @default(uuid())
+model Member {
+  id                         String                   @id @default(uuid())
   /// The User who logs in and manages this business. Null until an admin-created
   /// vendor is claimed, or set immediately on self-registration (== req.user.sub).
-  ownerUserId                String?                @unique
+  ownerUserId                String?                  @unique
   /// Nullable: the admin-create pipeline persists a Vendor after Step 1 (Vendor User)
   /// with only ownerUserId set, before Business Details (Step 2) is filled in.
   businessName               String?
@@ -267,8 +325,8 @@ model Vendor {
   state                      String?
   country                    String?
   pincode                    String?
-  latitude                   Decimal?               @db.Decimal(10, 6)
-  longitude                  Decimal?               @db.Decimal(10, 6)
+  latitude                   Decimal?                 @db.Decimal(10, 6)
+  longitude                  Decimal?                 @db.Decimal(10, 6)
   /// User-pasted Google Maps share URL (e.g. `https://maps.app.goo.gl/...`) — the source the
   /// admin/vendor actually edits. `latitude`/`longitude` above remain the persisted, queried
   /// coordinates, resolved server-side from this URL on create/update (see
@@ -283,48 +341,67 @@ model Vendor {
   /// KYC documents are now actual uploaded files (see `VendorDocument`); this column is kept
   /// read-only for backward compatibility with any vendor onboarded before that existed.
   kycDocuments               Json?
-  kycStatus                  KycStatus              @default(PENDING)
+  kycStatus                  KycStatus                @default(PENDING)
   kycRejectionReason         String?
   bankAccountHolder          String?
   bankName                   String?
   bankAccountNumber          String?
   bankIfsc                   String?
   upiId                      String?
-  status                     VendorStatus           @default(PROFILE_INCOMPLETE)
-  /// Reason recorded on reject/suspend — never on approve/activate.
+  status                     MemberStatus             @default(ACTIVE)
+  /// Reason recorded on inactive, suspend and archive. Cleared when the member becomes ACTIVE.
   statusReason               String?
+  statusChangedAt            DateTime?
+  statusChangedByUserId      String?
+  archivedAt                 DateTime?
+  /// Documents are a follow-up, never a gate: due 14 days after the member is created.
+  documentsDueAt             DateTime?
+  /// Set by the reminder job after the final warning. Never suspends on its own.
+  reviewFlaggedAt            DateTime?
+  welcomeSentAt              DateTime?
+  statusHistory              MemberStatusHistory[]
+  documentReminders          MemberDocumentReminder[]
   /// Admin who created this vendor profile, if admin-created (self-registration leaves this null).
   createdByUserId            String?
-  createdAt                  DateTime               @default(now())
-  updatedAt                  DateTime               @updatedAt
+  createdAt                  DateTime                 @default(now())
+  updatedAt                  DateTime                 @updatedAt
   /// Public storefront URL slug (`/vendors/:slug`). Nullable — existing rows predate this
   /// column; backfilled once in seed.ts, never required at the DB level to avoid a
   /// backfill-before-migrate step. Unique so two vendors can never collide on one slug.
-  slug                       String?                @unique
-  offersProduct              Boolean                @default(false)
+  slug                       String?                  @unique
+  offersProduct              Boolean                  @default(false)
   /// Business module flags — kept explicit rather than derived from `categoryAccess` existing so
   /// "module checked, no category chosen yet" remains representable (a distinct validation state
   /// from "module not offered at all"). Set together with `categoryAccess` via
   /// `setVendorModulesAndCategoryAccess` (vendor.service.ts).
-  offersService              Boolean                @default(false)
-  offersTherapy              Boolean                @default(false)
+  offersService              Boolean                  @default(false)
+  offersTherapy              Boolean                  @default(false)
   addressLine2               String?
   ownerFirstName             String?
   ownerLastName              String?
+  /// Per-vendor commission override — null means "use `FinanceSettings.defaultCommissionRatePercent`"
+  /// (see `settlement.service.ts#resolveCommissionRateForVendor`). Snapshotted onto every
+  /// `PurchaseEntitlement` at entitlement-creation time, so editing this later never touches
+  /// already-created entitlements' own `commissionRatePercent` — only future orders see the change.
+  commissionRatePercent      Decimal?               @db.Decimal(5, 2)
   branches                   Branch[]
   deals                      Deal[]
   orders                     Order[]
   orderItems                 OrderItem[]
   products                   Product[]
   therapists                 Therapist[]
-  owner                      User?                  @relation("VendorOwner", fields: [ownerUserId], references: [id])
+  owner                      User?                    @relation("VendorOwner", fields: [ownerUserId], references: [id])
   categoryAccess             VendorCategoryAccess[]
-  documents                  VendorDocument[]
+  documents                  MemberDocument[]
   mediaImages                VendorImage[]
   mediaVideo                 VendorVideo?
+  purchaseEntitlements       PurchaseEntitlement[]
+  memberPayouts              MemberPayout[]
 
   @@index([status])
   @@index([ownerUserId])
+  @@index([businessName(ops: raw("gin_trgm_ops"))], type: Gin, map: "Vendor_businessName_trgm_idx")
+  @@map("Vendor")
 }
 
 /// A real uploaded KYC document (GST/PAN/Aadhaar) — one row per `documentType`, replacing the
@@ -333,20 +410,75 @@ model Vendor {
 /// schema's established convention (see `DealImage`'s doc comment) — and one row per type (not
 /// many-with-ordering like `VendorImage`) since exactly one active file per document type is the
 /// whole model: re-uploading the same type replaces it via the `@@unique` below.
-model VendorDocument {
-  id               String             @id @default(uuid())
+model MemberDocument {
+  id               String               @id @default(uuid())
   vendorId         String
   documentType     VendorDocumentType
   storageKey       String
   originalFilename String?
   mimeType         String
   sizeBytes        Int
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  vendor           Vendor             @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  status           MemberDocumentStatus @default(SUBMITTED)
+  /// `XXXX XXXX 1234` for Aadhaar, `ABXXXXX34F` for PAN, the number itself for GST.
+  numberMasked     String?
+  /// HMAC of type + number. Enforces one number per member, never returned by the API.
+  numberHash       String?
+  /// AES-256-GCM of the full number. Never returned by the API.
+  numberEncrypted  String?
+  rejectionReason  String?
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+  expiresAt        DateTime?
+  uploadedByUserId String?
+  uploadedOnBehalf Boolean              @default(false)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  vendor           Member               @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
   @@unique([vendorId, documentType])
+  @@unique([documentType, numberHash])
   @@index([vendorId])
+  @@index([status, expiresAt])
+  @@map("VendorDocument")
+}
+
+model MemberStatusHistory {
+  id          String       @id @default(uuid())
+  memberId    String
+  fromStatus  MemberStatus
+  toStatus    MemberStatus
+  reason      String?
+  actorUserId String?
+  createdAt   DateTime     @default(now())
+  member      Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId, createdAt])
+}
+
+/// One documents reminder to a member: a scheduled warning (`sequence` 1 to 3, sent by the daily
+/// job) or a manual "Remind now" from an admin (`sequence` null, `sentByUserId` set). One row
+/// covers both channels; a null channel status means the member has no email or phone on record.
+/// Timeline rules live in `services/member-reminder-policy.ts`.
+model MemberDocumentReminder {
+  id           String               @id @default(uuid())
+  memberId     String
+  sequence     Int?
+  /// Documents still missing, rejected or expired when the reminder was sent.
+  missingTypes VendorDocumentType[]
+  emailStatus  ReminderDelivery?
+  smsStatus    ReminderDelivery?
+  /// Send attempts so far. Claimed with a conditional update, so two runs never send one row twice.
+  attempts     Int                  @default(0)
+  /// First time at least one channel was delivered. Null while nothing has gone out.
+  sentAt       DateTime?
+  sentByUserId String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  member       Member               @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  /// One row per scheduled warning. Postgres treats null as distinct, so manual rows never collide.
+  @@unique([memberId, sequence])
+  @@index([memberId, createdAt])
 }
 
 /// One uploaded image for a Vendor's public profile — part of the shared Deal/Product/
@@ -365,7 +497,7 @@ model VendorImage {
   isPrimary        Boolean  @default(false)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
-  vendor           Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor           Member   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
   @@index([vendorId])
 }
@@ -380,20 +512,22 @@ model VendorVideo {
   sizeBytes        Int
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
-  vendor           Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor           Member   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 }
 
 model Branch {
-  id             String      @id @default(uuid())
+  id             String                 @id @default(uuid())
   vendorId       String
   name           String
   address        String?
-  city           String?
-  state          String?
+  addressLine2   String?
+  /// From the India location list (`@skylabs-monorepo/shared-utils`); required since S22 (DL-02).
+  city           String
+  state          String
   country        String?
   pincode        String?
-  latitude       Decimal?    @db.Decimal(10, 6)
-  longitude      Decimal?    @db.Decimal(10, 6)
+  latitude       Decimal?               @db.Decimal(10, 6)
+  longitude      Decimal?               @db.Decimal(10, 6)
   /// User-pasted Google Maps share URL — see Vendor.mapLocationUrl's doc comment for the full
   /// rationale (identical here).
   mapLocationUrl String?
@@ -402,16 +536,16 @@ model Branch {
   isActive       Boolean     @default(true)
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
-  /// Loosely-structured weekly hours, e.g. {"mon":"09:00-20:00",...,"sun":"closed"} — same
-  /// no-upload-pipeline-style Json field as Vendor.kycDocuments/Deal.images. Nullable: existing
-  /// seeded branches predate this column.
+  /// Weekly hours per day key `mon`..`sun`: `{ open, start?, end? }` (`OpeningHoursSchema`).
+  /// Nullable: branches may leave hours unset.
   openingHours   Json?
-  vendor         Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor         Member                 @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   deals          Deal[]
   orders         Order[]
   orderItems     OrderItem[]
   therapists     Therapist[]
   categoryAccess BranchCategoryAccess[]
+  purchaseEntitlements PurchaseEntitlement[]
 
   @@index([vendorId])
 }
@@ -434,7 +568,7 @@ model Therapist {
   /// Free-text, historical display only — kept untouched (never backfilled/repointed) for
   /// existing rows. Going forward, `specializationCategoryId` below is the restricted-choice
   /// field new Therapist create/update flows validate against (must be a top-level Category
-  /// with `type: THERAPY` the vendor has been granted, or one of its subcategories).
+  /// with `type: THERAPY`, or one of its subcategories; open to every member, D10).
   specialization           String?
   bio                      String?
   experienceYears          Int?
@@ -445,8 +579,12 @@ model Therapist {
   therapistType            String                @default("Therapist")
   /// Nullable — no non-fabricated default exists for rows that predate this field.
   gender                   String?
+  /// Public storefront URL slug (`/therapist/:slug`). Nullable, same pattern as `Vendor.slug` —
+  /// existing rows predate this field and are backfilled separately (prisma/seed.ts), never
+  /// overwritten in place by the migration itself. Unique so two therapists never collide.
+  slug                     String?               @unique
   /// Restricted choice, added alongside the free-text `specialization` above — validated in
-  /// vendor.service.ts's createTherapist/updateTherapist via assertVendorHasCategoryAccess.
+  /// vendor.service.ts's createTherapist/updateTherapist via assertCategoryOfType.
   /// Nullable: not required, and every pre-existing Therapist row predates this column.
   specializationCategoryId String?
   cartItems                CartItem[]
@@ -454,7 +592,7 @@ model Therapist {
   popularTagLinks          PopularTagTherapist[]
   branch                   Branch                @relation(fields: [branchId], references: [id], onDelete: Cascade)
   specializationCategory   Category?             @relation("TherapistSpecialization", fields: [specializationCategoryId], references: [id])
-  vendor                   Vendor                @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor                   Member                @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   mediaImages              TherapistImage[]
   packages                 TherapistPackage[]
   mediaVideo               TherapistVideo?
@@ -534,32 +672,32 @@ model TherapistVideo {
 /// `masters.sub-categories` (parentId: set rows) admin pages, and the source of
 /// Deal.categoryId/subcategoryId.
 model Category {
-  id                       String                 @id @default(uuid())
+  id                       String                    @id @default(uuid())
   name                     String
-  slug                     String                 @unique
+  slug                     String                    @unique
   parentId                 String?
-  isActive                 Boolean                @default(true)
-  createdAt                DateTime               @default(now())
-  updatedAt                DateTime               @updatedAt
+  isActive                 Boolean                   @default(true)
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
   description              String?
-  sortOrder                Int                    @default(0)
+  sortOrder                Int                       @default(0)
   /// Nullable during migration only — backfilled by the direct_category_access data-fix, then
   /// tightened to required in a follow-up migration once every row has a value (see that
   /// migration's own comment). Only ever meaningful/set on a top-level row (`parentId: null`);
   /// a subcategory inherits its parent's type by join — never duplicated here.
   type                     CategoryType?
-  parent                   Category?              @relation("CategoryParent", fields: [parentId], references: [id])
-  children                 Category[]             @relation("CategoryParent")
+  parent                   Category?                 @relation("CategoryParent", fields: [parentId], references: [id])
+  children                 Category[]                @relation("CategoryParent")
   mediaImages              CategoryImage[]
-  deals                    Deal[]                 @relation("DealCategory")
-  subcategoryDeals         Deal[]                 @relation("DealSubcategory")
+  deals                    Deal[]                    @relation("DealCategory")
+  subcategoryDeals         Deal[]                    @relation("DealSubcategory")
   popularTagLinks          PopularTagCategory[]
-  popularTreatments        PopularTreatment[]     @relation("PopularTreatmentCategory")
-  popularTreatmentSubcats  PopularTreatment[]     @relation("PopularTreatmentSubcategory")
+  popularTreatments        PopularTreatment[]        @relation("PopularTreatmentCategory")
+  popularTreatmentSubcats  PopularTreatment[]        @relation("PopularTreatmentSubcategory")
   promotionLinks           Promotion[]
-  products                 Product[]              @relation("ProductCategory")
-  subcategoryProducts      Product[]              @relation("ProductSubcategory")
-  therapistSpecializations Therapist[]            @relation("TherapistSpecialization")
+  products                 Product[]                 @relation("ProductCategory")
+  subcategoryProducts      Product[]                 @relation("ProductSubcategory")
+  therapistSpecializations Therapist[]               @relation("TherapistSpecialization")
   vendorAccess             VendorCategoryAccess[]
   branchAccess             BranchCategoryAccess[]
   branchSubcategoryAccess  BranchSubcategoryAccess[]
@@ -844,7 +982,7 @@ model VendorCategoryAccess {
   categoryId String
   createdAt  DateTime @default(now())
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  vendor     Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor     Member   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
   @@unique([vendorId, categoryId])
   @@index([vendorId])
@@ -944,33 +1082,75 @@ model PopularTreatment {
 /// gates (both null = always visible while `isActive`) — same "hard-coded server-side visibility
 /// filter, never trust a caller-supplied override" discipline as `VISIBLE_DEAL_WHERE`.
 model Promotion {
-  id               String                @id @default(uuid())
+  id               String               @id @default(uuid())
   title            String
   description      String?
   buttonLabel      String?
-  destinationType  PromotionDestination  @default(ROUTE)
+  destinationType  PromotionDestination @default(ROUTE)
   destinationRoute String?
   categoryId       String?
   dealId           String?
-  sortOrder        Int                   @default(0)
-  isActive         Boolean               @default(true)
+  productId        String?
+  /// null = Global/Default banner, shown where the visitor's state has none for the slot.
+  state            String?
+  backgroundRole   BannerColorRole      @default(PRIMARY)
+  buttonRole       BannerColorRole      @default(PRIMARY)
+  sortOrder        Int                  @default(0)
+  isActive         Boolean              @default(true)
   startDate        DateTime?
   endDate          DateTime?
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
-  category         Category?             @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  deal             Deal?                 @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  category         Category?            @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  deal             Deal?                @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  product          Product?             @relation(fields: [productId], references: [id], onDelete: SetNull)
   mediaImages      PromotionImage[]
+  placements       PromotionPlacement[]
 
   @@index([sortOrder])
   @@index([categoryId])
   @@index([dealId])
+  @@index([productId])
+  @@index([state])
+}
+
+/// Where a CTA banner shows (docs/msd/PLANNING.md §6, D25). One banner, many slots.
+model PromotionPlacement {
+  promotionId String
+  slot        BannerSlot
+  createdAt   DateTime   @default(now())
+  promotion   Promotion  @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+
+  @@id([promotionId, slot])
+  @@index([slot])
+}
+
+/// Named places on storefront pages that render `<BannerSlot slot="...">`.
+enum BannerSlot {
+  HOME_AFTER_DEALS
+  HOME_AFTER_PRODUCTS
+  CATEGORY_TOP
+  EXPLORE_TOP
+  DEAL_BOTTOM
+  PRODUCT_BOTTOM
+}
+
+/// M3 colour roles (D24); maps 1:1 to the `sky-cta-banner` `color` attribute, so every banner keeps
+/// the theme's paired text colour and contrast.
+enum BannerColorRole {
+  PRIMARY
+  SECONDARY
+  TERTIARY
+  SURFACE
+  SURFACE_HIGH
+  INVERSE
 }
 
 enum PromotionDestination {
   ROUTE
   CATEGORY
   DEAL
+  PRODUCT
 }
 
 /// One uploaded image for a Promotion row — same shared Deal/Product/Therapist/Category/Vendor
@@ -1003,15 +1183,71 @@ model PromotionImage {
 /// `isActive`/fewer than 5 is a valid *draft* state, just never returned by the public read).
 model HomeHeroSlide {
   id        String   @id @default(uuid())
-  dealId    String
+  /// Exactly one of dealId / productId is set (CHECK home_hero_slide_one_item in the migration).
+  dealId    String?
+  productId String?
   state     String?
   sortOrder Int      @default(0)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  deal      Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([state])
+  @@index([dealId])
+  @@index([productId])
+  @@index([sortOrder])
+}
+
+enum HomeTagSectionTag {
+  NEW
+  DEAL
+  HOT_DEAL
+  EXPIRE_SOON
+}
+
+/// One row per state x tag (docs/msd/PLANNING.md §7.1); `state: null` is the Global/Default
+/// section, same convention as `HomeHeroSlide`. Unlike the hero (one flat row per slide), a
+/// section's deals live in `HomeTagSectionItem` (join-table shape, like `RoleDashboardWidget`/
+/// `PromotionPlacement`) because a section holds several independently-ordered deals behind one
+/// `isEnabled` switch.
+///
+/// `@@unique([state, tag])` below exists for Prisma Client's own typed `upsert`/`findUnique`
+/// ergonomics (`setSectionEnabled` upserts by this key) — but it is NOT the real NULL-safety
+/// constraint: Postgres treats every NULL as distinct, so this plain index alone would silently
+/// allow several Global (`state: null`) rows for the same tag. The migration additionally hand-
+/// writes two partial unique indexes (`home_tag_section_global_tag_unique` WHERE state IS NULL,
+/// `home_tag_section_state_tag_unique` WHERE state IS NOT NULL) that are what Postgres actually
+/// enforces for the `state: null` case — same "Prisma's declarative DSL can't express this"
+/// pattern as `HomeHeroSlide`'s own `home_hero_slide_one_item` CHECK.
+model HomeTagSection {
+  id        String            @id @default(uuid())
+  state     String?
+  tag       HomeTagSectionTag
+  isEnabled Boolean           @default(false)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  items     HomeTagSectionItem[]
+
+  @@unique([state, tag])
+  @@index([state])
+  @@index([tag])
+}
+
+/// A deal assigned into one `HomeTagSection`, manually picked and ordered by the admin (never
+/// computed) — see `home-tag-section.service.ts`'s own doc comment for the eligibility rules.
+model HomeTagSectionItem {
+  id               String         @id @default(uuid())
+  homeTagSectionId String
+  dealId           String
+  sortOrder        Int            @default(0)
+  createdAt        DateTime       @default(now())
+  section          HomeTagSection @relation(fields: [homeTagSectionId], references: [id], onDelete: Cascade)
+  deal             Deal           @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@unique([homeTagSectionId, dealId])
+  @@index([homeTagSectionId])
   @@index([dealId])
   @@index([sortOrder])
 }
@@ -1122,13 +1358,33 @@ model Deal {
   updatedAt               DateTime           @updatedAt
   /// A bookable time slot — required for every Deal (Deal is always a service offering now).
   durationMinutes         Int?
-  notes                   String?
+  /// Deal page "How to redeem" text (rich text). Was `notes` before the deal page rework
+  /// (docs/msd/PLANNING.md §2.7); renamed in place, data kept.
+  bookingInstructions     String?
+  /// Legacy free text, superseded by `cancellationPolicy` + `cancellationNote` (copied there by
+  /// the deal page migration). Never written; dropped in the contract step.
   policy                  String?
+  /// Plain-text selling points shown under the title (PLANNING §2.7: up to 6 × 80).
+  highlights              String[]                @default([])
+  /// Short plain-text eligibility items, e.g. "Women only", "18+" (up to 6 × 40).
+  eligibility             String[]                @default([])
+  bookingRequired         Boolean                 @default(true)
+  /// Days after purchase the voucher can be used; null = no limit stated.
+  validityDays            Int?
+  /// Units one customer may buy; null = no limit.
+  limitPerCustomer        Int?
+  cancellationPolicy      DealCancellationPolicy  @default(FREE_24H)
+  cancellationNote        String?
+  /// Slugs this deal had before; they still open the deal (PLANNING §2.7 URLs).
+  previousSlugs           String[]                @default([])
+  /// First time the deal went ACTIVE; from then on only staff change the slug.
+  publishedAt             DateTime?
+  faqs                    DealFaq[]
   cartItems               CartItem[]
   branch                  Branch             @relation(fields: [branchId], references: [id], onDelete: Cascade)
   category                Category           @relation("DealCategory", fields: [categoryId], references: [id])
   subcategory             Category?          @relation("DealSubcategory", fields: [subcategoryId], references: [id])
-  vendor                  Vendor             @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor                  Member             @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   mediaImages             DealImage[]
   packages                DealPackage[]
   mediaVideo              DealVideo?
@@ -1136,12 +1392,29 @@ model Deal {
   popularTagLinks         PopularTagDeal[]
   promotionLinks          Promotion[]
   heroSlides              HomeHeroSlide[]
+  homeTagSectionItems     HomeTagSectionItem[]
   wishlistItems           WishlistItem[]
   therapistLinks          DealTherapist[]
 
   @@index([vendorId])
   @@index([branchId])
   @@index([status])
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "Deal_title_trgm_idx")
+}
+
+/// One question and answer on a deal page (PLANNING §2.7, up to 10 per deal), ordered by
+/// `sortOrder`. Plain text; replaced as a set on deal update.
+model DealFaq {
+  id        String   @id @default(uuid())
+  dealId    String
+  question  String
+  answer    String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId, sortOrder])
 }
 
 /// A service Deal's own duration/price menu — the authoritative child entity a customer actually
@@ -1156,6 +1429,12 @@ model Deal {
 model DealPackage {
   id              String      @id @default(uuid())
   dealId          String
+  /// Optional label, e.g. "Couple Swedish + steam"; the page shows "{duration} min" when empty.
+  name            String?
+  /// People one package covers ("For 2 people").
+  persons         Int         @default(1)
+  /// Plain-text "what's included" items (up to 8 × 80).
+  inclusions      String[]    @default([])
   durationMinutes Int
   sellingPrice    Decimal     @db.Decimal(10, 2)
   originalPrice   Decimal?    @db.Decimal(10, 2)
@@ -1167,7 +1446,7 @@ model DealPackage {
   deal            Deal        @relation(fields: [dealId], references: [id], onDelete: Cascade)
   orderItems      OrderItem[]
 
-  @@unique([dealId, durationMinutes])
+  @@unique([dealId, durationMinutes, persons])
   @@index([dealId])
 }
 
@@ -1189,6 +1468,8 @@ model DealImage {
   sizeBytes        Int
   sortOrder        Int      @default(0)
   isPrimary        Boolean  @default(false)
+  /// Up to 125 characters; the page falls back to the deal title.
+  altText          String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   deal             Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
@@ -1270,9 +1551,12 @@ model Product {
   popularTagLinks PopularTagProduct[]
   category        Category            @relation("ProductCategory", fields: [categoryId], references: [id])
   subcategory     Category?           @relation("ProductSubcategory", fields: [subcategoryId], references: [id])
-  vendor          Vendor              @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor          Member              @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   mediaImages     ProductImage[]
+  wishlistItems   WishlistItem[]
   mediaVideo      ProductVideo?
+  promotionLinks  Promotion[]
+  heroSlides      HomeHeroSlide[]
 
   @@index([categoryId])
   @@index([vendorId])
@@ -1399,14 +1683,19 @@ model CartItem {
 model WishlistItem {
   id         String   @id @default(uuid())
   customerId String
-  dealId     String
+  dealId     String?
+  productId  String?
   createdAt  DateTime @default(now())
-  customer   User     @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  deal       Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  customer User     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  deal     Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  product  Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([customerId, dealId])
+  @@unique([customerId, productId])
   @@index([customerId])
   @@index([dealId])
+  @@index([productId])
 }
 
 /// The single convergence point for every purchase flow (Deal, Product, and Therapist all go
@@ -1463,7 +1752,7 @@ model Order {
   pendingForCart     Cart?
   branch             Branch?     @relation(fields: [branchId], references: [id])
   customer           User        @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  vendor             Vendor      @relation(fields: [vendorId], references: [id])
+  vendor             Member      @relation(fields: [vendorId], references: [id])
   items              OrderItem[]
   payments           Payment[]
 
@@ -1525,8 +1814,11 @@ model OrderItem {
   order              Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
   therapist          Therapist?        @relation(fields: [therapistId], references: [id])
   therapistPackage   TherapistPackage? @relation(fields: [therapistPackageId], references: [id])
-  vendor             Vendor            @relation(fields: [vendorId], references: [id])
+  vendor             Member            @relation(fields: [vendorId], references: [id])
   product            Product?          @relation(fields: [productId], references: [id])
+  purchaseEntitlements PurchaseEntitlement[]
+  disputes             PurchaseDispute[]
+  refunds              Refund[]
 
   @@index([orderId])
   @@index([dealId])
@@ -1566,11 +1858,260 @@ model Payment {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   order             Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  refunds           Refund[]
 
   @@index([orderId])
   @@index([status])
   @@index([providerOrderId])
   @@index([providerPaymentId])
+}
+
+/// One voucher or product-fulfilment record per purchased unit. Finance and fulfilment state
+/// lives here so order snapshots remain immutable.
+model PurchaseEntitlement {
+  id                       String                 @id @default(uuid())
+  orderItemId              String
+  sequenceNo               Int
+  voucherCode              String                 @unique
+  customerId               String
+  vendorId                 String
+  branchId                 String?
+  fulfilmentKind           FulfilmentKind
+  entitlementStatus        EntitlementStatus      @default(ACTIVE)
+  serviceStartedAt         DateTime?
+  completedAt              DateTime?
+  carrier                  String?
+  trackingNumber           String?
+  shippedAt                DateTime?
+  deliveryEvidenceStorageKey String?
+  deliveryEvidenceNote     String?
+  recordedByUserId         String?
+  grossAmount              Decimal                @db.Decimal(10, 2)
+  commissionRatePercent    Decimal                @db.Decimal(5, 2)
+  commissionAmount         Decimal                @db.Decimal(10, 2)
+  memberShareAmount        Decimal                @db.Decimal(10, 2)
+  settlementStatus         SettlementStatus       @default(PENDING_FULFILMENT)
+  preDisputeStatus         SettlementStatus?
+  holdUntil                DateTime?
+  payoutItemId             String?
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  orderItem                OrderItem              @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  customer                 User                   @relation("EntitlementCustomer", fields: [customerId], references: [id], onDelete: Cascade)
+  vendor                   Member                 @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  branch                   Branch?                @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  adjustments              SettlementAdjustment[]
+  completionOtpChallenges  CompletionOtpChallenge[]
+  disputes                 PurchaseDispute[]
+  payoutItem               MemberPayoutItem?
+
+  @@unique([orderItemId, sequenceNo])
+  @@index([vendorId, settlementStatus])
+  @@index([voucherCode])
+  @@index([customerId])
+  @@index([orderItemId])
+}
+
+model SettlementAdjustment {
+  id            String                   @id @default(uuid())
+  entitlementId String
+  type          SettlementAdjustmentType
+  amount        Decimal                  @db.Decimal(10, 2)
+  reason        String?
+  refundId      String?
+  createdByUserId String
+  createdAt     DateTime                 @default(now())
+  entitlement   PurchaseEntitlement      @relation(fields: [entitlementId], references: [id], onDelete: Cascade)
+
+  @@index([entitlementId])
+}
+
+model CompletionOtpChallenge {
+  id                String                @id @default(uuid())
+  entitlementId     String
+  purpose           CompletionOtpPurpose
+  hashedOtp         String
+  attempts          Int                   @default(0)
+  expiresAt         DateTime
+  verifiedAt        DateTime?
+  resendCount       Int                   @default(0)
+  lastSentAt        DateTime              @default(now())
+  requestedByUserId String
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  entitlement       PurchaseEntitlement   @relation(fields: [entitlementId], references: [id], onDelete: Cascade)
+
+  @@index([entitlementId])
+}
+
+model PurchaseDispute {
+  id                 String                  @id @default(uuid())
+  orderItemId        String
+  entitlementId      String?
+  customerId         String
+  status             DisputeStatus           @default(OPEN)
+  reason             String
+  description        String?
+  evidenceStorageKey String?
+  resolvedAt         DateTime?
+  resolvedByUserId   String?
+  resolutionNotes    String?
+  resolutionType    DisputeResolutionType?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  orderItem          OrderItem               @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  entitlement        PurchaseEntitlement?    @relation(fields: [entitlementId], references: [id], onDelete: SetNull)
+  customer           User                    @relation("DisputeCustomer", fields: [customerId], references: [id], onDelete: Cascade)
+  refunds            Refund[]
+
+  @@index([orderItemId])
+  @@index([entitlementId])
+  @@index([customerId])
+  @@index([status])
+}
+
+model Refund {
+  id               String       @id @default(uuid())
+  orderItemId      String
+  paymentId        String
+  amount           Decimal      @db.Decimal(10, 2)
+  type             RefundType
+  reason           String?
+  disputeId        String?
+  status           RefundStatus @default(REQUESTED)
+  providerRefundId String?      @unique
+  processedByUserId String?
+  processedAt      DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  orderItem        OrderItem    @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  payment          Payment      @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  dispute          PurchaseDispute? @relation(fields: [disputeId], references: [id], onDelete: SetNull)
+
+  @@index([orderItemId])
+  @@index([paymentId])
+  @@index([disputeId])
+  @@index([status])
+}
+
+model MemberPayout {
+  id                         String       @id @default(uuid())
+  vendorId                   String
+  amount                     Decimal      @db.Decimal(10, 2)
+  method                     PayoutMethod @default(MANUAL_BANK_TRANSFER)
+  status                     PayoutStatus @default(PENDING)
+  bankAccountHolderSnapshot  String
+  bankNameSnapshot           String?
+  bankAccountNumberSnapshot  String
+  bankIfscSnapshot           String
+  upiIdSnapshot              String?
+  reference                  String?
+  transferDate               DateTime?
+  proofStorageKey             String?
+  idempotencyKey             String       @unique
+  recordedByUserId            String
+  createdAt                  DateTime     @default(now())
+  updatedAt                  DateTime     @updatedAt
+  vendor                     Member       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  items                      MemberPayoutItem[]
+
+  @@index([vendorId])
+  @@index([status])
+}
+
+model MemberPayoutItem {
+  id            String              @id @default(uuid())
+  payoutId      String
+  entitlementId String              @unique
+  amount        Decimal             @db.Decimal(10, 2)
+  createdAt     DateTime            @default(now())
+  payout        MemberPayout        @relation(fields: [payoutId], references: [id], onDelete: Cascade)
+  entitlement   PurchaseEntitlement @relation(fields: [entitlementId], references: [id], onDelete: Restrict)
+
+  @@index([payoutId])
+}
+
+model FinanceSettings {
+  id                               String   @id @default("singleton")
+  defaultCommissionRatePercent     Decimal  @default(10) @db.Decimal(5, 2)
+  serviceHoldHours                 Int      @default(24)
+  productReturnHoldHours           Int      @default(168)
+  completionOtpExpiryMinutes       Int      @default(10)
+  completionOtpMaxAttempts         Int      @default(5)
+  completionOtpResendCooldownSeconds Int     @default(60)
+  updatedByUserId                  String?
+  updatedAt                        DateTime @updatedAt
+}
+
+enum FulfilmentKind {
+  SERVICE_SESSION
+  PRODUCT_PICKUP
+  PRODUCT_SHIPPED
+}
+
+enum EntitlementStatus {
+  ACTIVE
+  STARTED
+  OTP_REQUESTED
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum SettlementStatus {
+  PENDING_FULFILMENT
+  ON_HOLD
+  DISPUTED_BLOCKED
+  PROCESSING
+  PAID
+  FAILED
+  VOID
+}
+
+enum SettlementAdjustmentType {
+  REFUND
+  MANUAL_ADJUSTMENT
+  RECOVERY
+}
+
+enum CompletionOtpPurpose {
+  SERVICE_COMPLETION
+  PRODUCT_PICKUP
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+}
+
+enum DisputeResolutionType {
+  NO_ACTION
+  REFUNDED
+  OTHER
+}
+
+enum RefundType {
+  FULL
+  PARTIAL
+}
+
+enum RefundStatus {
+  REQUESTED
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+enum PayoutMethod {
+  MANUAL_BANK_TRANSFER
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
 }
 
 enum UserStatus {
@@ -1612,14 +2153,18 @@ enum LoginMethod {
   google
 }
 
-enum VendorStatus {
-  PROFILE_INCOMPLETE
-  PENDING_VERIFICATION
-  APPROVED
-  REJECTED
+enum MemberStatus {
   ACTIVE
   INACTIVE
   SUSPENDED
+  ARCHIVED
+}
+
+enum MemberDocumentStatus {
+  SUBMITTED
+  APPROVED
+  REJECTED
+  EXPIRED
 }
 
 enum KycStatus {
@@ -1633,6 +2178,13 @@ enum DealStatus {
   ACTIVE
   INACTIVE
   EXPIRED
+}
+
+/// Deal page cancellation rule (PLANNING §2.7).
+enum DealCancellationPolicy {
+  FREE_24H
+  FREE_48H
+  NON_REFUNDABLE
 }
 
 enum DealApprovalStatus {
@@ -1702,10 +2254,37 @@ enum NotificationType {
   DEAL_PENDING_APPROVAL
   ORDER_RECEIVED
   VENDOR_PENDING_APPROVAL
+  MEMBER_SUSPENDED
+  DOCUMENT_APPROVED
+  DOCUMENT_REJECTED
+  MEMBER_REVIEW_FLAGGED
+  DISPUTE_RAISED
+  PAYOUT_RECORDED
+}
+
+enum ReminderDelivery {
+  PENDING
+  SENT
+  FAILED
 }
 
 enum VendorDocumentType {
   GST
   PAN
   AADHAAR
+}
+
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  subject   String
+  message   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([email])
 }

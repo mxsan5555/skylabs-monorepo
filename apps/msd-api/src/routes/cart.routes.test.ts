@@ -28,9 +28,25 @@ const BRANCH_B_ID = 'a4a4a4a4-0000-4000-8000-00000000000a';
 
 const emptyCart = { id: CART_ID, customerId: CUSTOMER_ID, items: [] };
 const productFixture = { id: PRODUCT_ID, isActive: true, vendorId: VENDOR_A_ID, vendor: { status: 'ACTIVE' }, price: '299.00' };
-const serviceDealFixture = { id: SERVICE_DEAL_ID, vendorId: VENDOR_A_ID, branchId: BRANCH_A_ID, salePrice: '499.00' };
+const serviceDealFixture = {
+  id: SERVICE_DEAL_ID,
+  vendorId: VENDOR_A_ID,
+  branchId: BRANCH_A_ID,
+  salePrice: '499.00',
+  status: 'ACTIVE',
+  approvalStatus: 'APPROVED',
+  vendor: { status: 'ACTIVE' },
+  branch: { isActive: true },
+};
 const dealPackageFixture = { id: DEAL_PACKAGE_ID, dealId: SERVICE_DEAL_ID, isActive: true, sellingPrice: '599.00' };
-const therapistFixture = { id: THERAPIST_ID, isActive: true, vendorId: VENDOR_A_ID, branchId: BRANCH_A_ID };
+const therapistFixture = {
+  id: THERAPIST_ID,
+  isActive: true,
+  vendorId: VENDOR_A_ID,
+  branchId: BRANCH_A_ID,
+  vendor: { status: 'ACTIVE' },
+  branch: { isActive: true },
+};
 const therapistPackageFixture = { id: THERAPIST_PACKAGE_ID, therapistId: THERAPIST_ID, isActive: true, sellingPrice: '899.00' };
 
 beforeEach(() => {
@@ -50,11 +66,62 @@ describe('GET /api/v1/cart', () => {
     expect(res.body.data.items).toEqual([]);
     expect(prismaMock.cart.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { customerId: CUSTOMER_ID } }));
   });
+
+  /**
+   * Feature: a stale cart item reads back as unavailable once its Member is suspended
+   * Scenario: the line was added while everything was fine; the cart is never auto-pruned, so
+   * the next GET must flag it rather than silently keep presenting it exactly as it looked at
+   * add-time — a stale client (or a customer who never refreshes) must not be misled into
+   * thinking it's still purchasable. Checkout re-validates independently regardless.
+   */
+  it('flags a cart line as unavailable once its deal\'s vendor has been suspended since it was added', async () => {
+    prismaMock.cart.upsert.mockResolvedValue({
+      id: CART_ID,
+      customerId: CUSTOMER_ID,
+      items: [
+        {
+          id: ITEM_ID,
+          quantity: 1,
+          unitPrice: '599.00',
+          deal: { ...serviceDealFixture, vendor: { status: 'SUSPENDED' } },
+          dealPackage: dealPackageFixture,
+          therapist: null,
+          therapistPackage: null,
+          product: null,
+        },
+      ],
+    });
+    const res = await request(app).get('/api/v1/cart').set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data.items[0].available).toBe(false);
+  });
+
+  it('a still-eligible cart line reads back as available (regression)', async () => {
+    prismaMock.cart.upsert.mockResolvedValue({
+      id: CART_ID,
+      customerId: CUSTOMER_ID,
+      items: [
+        {
+          id: ITEM_ID,
+          quantity: 1,
+          unitPrice: '299.00',
+          deal: null,
+          dealPackage: null,
+          therapist: null,
+          therapistPackage: null,
+          product: { ...productFixture, isActive: true },
+        },
+      ],
+    });
+    const res = await request(app).get('/api/v1/cart').set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data.items[0].available).toBe(true);
+  });
 });
 
 describe('POST /api/v1/cart/items — Product line (productId only)', () => {
   it('rejects a bare dealId with no dealPackageId (every Deal is a service deal now)', async () => {
-    prismaMock.deal.findUnique.mockResolvedValue(serviceDealFixture);
+    prismaMock.deal.findFirst.mockResolvedValue(serviceDealFixture);
     const res = await request(app)
       .post('/api/v1/cart/items')
       .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
@@ -136,8 +203,55 @@ describe('POST /api/v1/cart/items — Service-Deal line (dealId + dealPackageId)
     expect(prismaMock.cartItem.create).not.toHaveBeenCalled();
   });
 
+  /** Regression: only the Product line checked `vendor.status` — a Deal (or Therapist, below)
+   *  whose Member had been suspended could still be added to cart directly via the API, even
+   *  though the same deal was already hidden from every public listing/detail read. The real
+   *  fix lives in `VISIBLE_DEAL_WHERE` (passed into `deal.findFirst`'s own `where`), so a
+   *  suspended-vendor deal reads back as not-found here — never as a distinct 422 — same as an
+   *  inactive therapist below and the "hides items of a member that is not ACTIVE" tests further
+   *  down this file. */
+  it('rejects a deal whose vendor has been suspended (the visibility filter hides it, 404 not 422)', async () => {
+    prismaMock.deal.findFirst.mockResolvedValue(null);
+    const res = await request(app)
+      .post('/api/v1/cart/items')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ dealId: SERVICE_DEAL_ID, dealPackageId: DEAL_PACKAGE_ID, quantity: 1 });
+    expect(res.status).toBe(404);
+    expect(prismaMock.cartItem.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a deal whose branch has been deactivated (the visibility filter hides it, 404 not 422)', async () => {
+    prismaMock.deal.findFirst.mockResolvedValue(null);
+    const res = await request(app)
+      .post('/api/v1/cart/items')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ dealId: SERVICE_DEAL_ID, dealPackageId: DEAL_PACKAGE_ID, quantity: 1 });
+    expect(res.status).toBe(404);
+    expect(prismaMock.cartItem.create).not.toHaveBeenCalled();
+  });
+
+  /** Regression: `deal.findFirst`'s `where` (VISIBLE_DEAL_WHERE) filters on `vendor.status`/
+   *  `branch.isActive` but — unlike an `include` — never adds those relations to the returned
+   *  row, so a real Prisma call never returns a `vendor`/`branch` key on `deal` at all (the
+   *  earlier `vendor`/`branch` fixture keys above are exactly what was masking this). Code that
+   *  re-reads `deal.vendor.status`/`deal.branch.isActive` after this call crashed with "Cannot
+   *  read properties of undefined (reading 'status')" on every visible deal. */
+  it('does not crash reading a visible deal back from findFirst (no vendor/branch keys on the row, matching a real un-included Prisma result)', async () => {
+    const { vendor: _vendor, branch: _branch, ...dealRowWithoutRelations } = serviceDealFixture;
+    prismaMock.deal.findFirst.mockResolvedValue(dealRowWithoutRelations as never);
+    prismaMock.dealPackage.findUnique.mockResolvedValue(dealPackageFixture);
+    prismaMock.cart.upsert.mockResolvedValue(emptyCart);
+    prismaMock.cartItem.findFirst.mockResolvedValue(null);
+    const res = await request(app)
+      .post('/api/v1/cart/items')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ dealId: SERVICE_DEAL_ID, dealPackageId: DEAL_PACKAGE_ID, quantity: 1 });
+    expect(res.status).toBe(201);
+    expect(prismaMock.cartItem.create).toHaveBeenCalled();
+  });
+
   it('404s when the package does not belong to the deal', async () => {
-    prismaMock.deal.findUnique.mockResolvedValue(serviceDealFixture);
+    prismaMock.deal.findFirst.mockResolvedValue(serviceDealFixture);
     prismaMock.dealPackage.findUnique.mockResolvedValue({ ...dealPackageFixture, dealId: 'some-other-deal' });
     const res = await request(app)
       .post('/api/v1/cart/items')
@@ -148,7 +262,7 @@ describe('POST /api/v1/cart/items — Service-Deal line (dealId + dealPackageId)
   });
 
   it('adds a service deal with its selected package, priced from the package (never Deal.salePrice)', async () => {
-    prismaMock.deal.findUnique.mockResolvedValue(serviceDealFixture);
+    prismaMock.deal.findFirst.mockResolvedValue(serviceDealFixture);
     prismaMock.dealPackage.findUnique.mockResolvedValue(dealPackageFixture);
     prismaMock.cart.upsert.mockResolvedValue(emptyCart);
     prismaMock.cartItem.findFirst.mockResolvedValue(null);
@@ -163,21 +277,82 @@ describe('POST /api/v1/cart/items — Service-Deal line (dealId + dealPackageId)
       }),
     );
   });
+
+  /** PLANNING §2.7: stock and the per-customer limit count the whole cart for the deal, plus
+   *  paid orders; both answer 409 with their own code. */
+  const addDeal = (quantity: number) =>
+    request(app)
+      .post('/api/v1/cart/items')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ dealId: SERVICE_DEAL_ID, dealPackageId: DEAL_PACKAGE_ID, quantity });
+
+  it('409 DEAL_LIMIT_REACHED when cart + paid units would pass the per-customer limit', async () => {
+    prismaMock.deal.findFirst.mockResolvedValue({ ...serviceDealFixture, maxBookings: null, limitPerCustomer: 2 });
+    prismaMock.dealPackage.findUnique.mockResolvedValue(dealPackageFixture);
+    prismaMock.cart.upsert.mockResolvedValue(emptyCart);
+    prismaMock.cartItem.aggregate.mockResolvedValue({ _sum: { quantity: 1 } } as never); // 1 already in the cart
+    prismaMock.orderItem.aggregate.mockResolvedValue({ _sum: { quantity: 0 } } as never);
+    const res = await addDeal(2);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('DEAL_LIMIT_REACHED');
+    expect(prismaMock.cartItem.create).not.toHaveBeenCalled();
+  });
+
+  it('409 DEAL_SOLD_OUT when the deal has no stock left', async () => {
+    prismaMock.deal.findFirst.mockResolvedValue({ ...serviceDealFixture, maxBookings: 5, limitPerCustomer: null });
+    prismaMock.dealPackage.findUnique.mockResolvedValue(dealPackageFixture);
+    prismaMock.cart.upsert.mockResolvedValue(emptyCart);
+    prismaMock.cartItem.aggregate.mockResolvedValue({ _sum: { quantity: 0 } } as never);
+    prismaMock.orderItem.aggregate.mockResolvedValue({ _sum: { quantity: 5 } } as never);
+    const res = await addDeal(1);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('DEAL_SOLD_OUT');
+  });
+
+  it('within the limit and stock the line is added', async () => {
+    prismaMock.deal.findFirst.mockResolvedValue({ ...serviceDealFixture, maxBookings: 5, limitPerCustomer: 3 });
+    prismaMock.dealPackage.findUnique.mockResolvedValue(dealPackageFixture);
+    prismaMock.cart.upsert.mockResolvedValue(emptyCart);
+    prismaMock.cartItem.findFirst.mockResolvedValue(null);
+    prismaMock.cartItem.aggregate.mockResolvedValue({ _sum: { quantity: 1 } } as never); // 1 in the cart + 2 = 3 = the limit
+    prismaMock.orderItem.aggregate.mockResolvedValue({ _sum: { quantity: 0 } } as never);
+    expect((await addDeal(2)).status).toBe(201);
+  });
 });
 
 describe('POST /api/v1/cart/items — Therapist line (therapistId + therapistPackageId)', () => {
-  it('rejects an inactive therapist', async () => {
-    prismaMock.therapist.findUnique.mockResolvedValue({ ...therapistFixture, isActive: false });
+  it('404s an inactive therapist like a missing one (the visibility filter hides it)', async () => {
+    prismaMock.therapist.findFirst.mockResolvedValue(null);
     const res = await request(app)
       .post('/api/v1/cart/items')
       .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
       .send({ therapistId: THERAPIST_ID, therapistPackageId: THERAPIST_PACKAGE_ID, quantity: 1 });
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(404);
+    expect(prismaMock.cartItem.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a therapist whose vendor has been suspended (the visibility filter hides it, 404 not 422)', async () => {
+    prismaMock.therapist.findFirst.mockResolvedValue(null);
+    const res = await request(app)
+      .post('/api/v1/cart/items')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ therapistId: THERAPIST_ID, therapistPackageId: THERAPIST_PACKAGE_ID, quantity: 1 });
+    expect(res.status).toBe(404);
+    expect(prismaMock.cartItem.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a therapist whose branch has been deactivated (the visibility filter hides it, 404 not 422)', async () => {
+    prismaMock.therapist.findFirst.mockResolvedValue(null);
+    const res = await request(app)
+      .post('/api/v1/cart/items')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ therapistId: THERAPIST_ID, therapistPackageId: THERAPIST_PACKAGE_ID, quantity: 1 });
+    expect(res.status).toBe(404);
     expect(prismaMock.cartItem.create).not.toHaveBeenCalled();
   });
 
   it('404s when the package does not belong to the therapist', async () => {
-    prismaMock.therapist.findUnique.mockResolvedValue(therapistFixture);
+    prismaMock.therapist.findFirst.mockResolvedValue(therapistFixture);
     prismaMock.therapistPackage.findUnique.mockResolvedValue({ ...therapistPackageFixture, therapistId: 'some-other-therapist' });
     const res = await request(app)
       .post('/api/v1/cart/items')
@@ -188,7 +363,7 @@ describe('POST /api/v1/cart/items — Therapist line (therapistId + therapistPac
   });
 
   it('adds a therapist with its selected package — entirely independent of any Deal', async () => {
-    prismaMock.therapist.findUnique.mockResolvedValue(therapistFixture);
+    prismaMock.therapist.findFirst.mockResolvedValue(therapistFixture);
     prismaMock.therapistPackage.findUnique.mockResolvedValue(therapistPackageFixture);
     prismaMock.cart.upsert.mockResolvedValue(emptyCart);
     prismaMock.cartItem.findFirst.mockResolvedValue(null);
@@ -253,5 +428,38 @@ describe('DELETE /api/v1/cart', () => {
     const res = await request(app).delete('/api/v1/cart').set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
     expect(res.status).toBe(200);
     expect(prismaMock.cartItem.deleteMany).toHaveBeenCalledWith({ where: { cartId: CART_ID } });
+  });
+});
+
+/** A filtering double: returns the row only when the query demands what the row satisfies. */
+function visibleOnly<T>(row: T, memberStatus: string) {
+  return async ({ where }: { where: { vendor?: { status?: string } } }) =>
+    where.vendor?.status === 'ACTIVE' && memberStatus !== 'ACTIVE' ? null : row;
+}
+
+describe('POST /api/v1/cart/items hides items of a member that is not ACTIVE', () => {
+  it.each(['SUSPENDED', 'INACTIVE'])('404s a deal of a %s member', async (memberStatus) => {
+    prismaMock.deal.findFirst.mockImplementation(visibleOnly(serviceDealFixture, memberStatus) as never);
+    // An unfiltered lookup would find the row: only the visibility filter may hide it.
+    prismaMock.deal.findUnique.mockResolvedValue(serviceDealFixture);
+    prismaMock.dealPackage.findUnique.mockResolvedValue(dealPackageFixture);
+    const res = await request(app)
+      .post('/api/v1/cart/items')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ dealId: SERVICE_DEAL_ID, dealPackageId: DEAL_PACKAGE_ID, quantity: 1 });
+    expect(res.status).toBe(404);
+    expect(prismaMock.cartItem.create).not.toHaveBeenCalled();
+  });
+
+  it.each(['SUSPENDED', 'INACTIVE'])('404s a therapist of a %s member', async (memberStatus) => {
+    prismaMock.therapist.findFirst.mockImplementation(visibleOnly(therapistFixture, memberStatus) as never);
+    prismaMock.therapist.findUnique.mockResolvedValue(therapistFixture);
+    prismaMock.therapistPackage.findUnique.mockResolvedValue(therapistPackageFixture);
+    const res = await request(app)
+      .post('/api/v1/cart/items')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ therapistId: THERAPIST_ID, therapistPackageId: THERAPIST_PACKAGE_ID, quantity: 1 });
+    expect(res.status).toBe(404);
+    expect(prismaMock.cartItem.create).not.toHaveBeenCalled();
   });
 });

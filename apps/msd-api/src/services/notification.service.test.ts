@@ -8,6 +8,7 @@ vi.mock('../lib/prisma', async () => {
 import { prisma } from '../lib/prisma';
 import {
   notifySuperAdmins,
+  notifyPermissionHolders,
   notifyVendorOwner,
   notifyOrderConfirmed,
   shortOrderNumber,
@@ -53,7 +54,7 @@ describe('notifySuperAdmins', () => {
 
 describe('notifyVendorOwner', () => {
   it('creates a VENDOR notification for the vendor\'s ownerUserId', async () => {
-    prismaMock.vendor.findUnique.mockResolvedValue({ ownerUserId: 'owner-1' });
+    prismaMock.member.findUnique.mockResolvedValue({ ownerUserId: 'owner-1' });
     await notifyVendorOwner(tx, 'vendor-1', { type: 'ORDER_RECEIVED', title: 'T', message: 'M', entityType: 'ORDER', entityId: 'order-1' });
     expect(prismaMock.notification.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ recipientUserId: 'owner-1', recipientType: 'VENDOR' }) }),
@@ -61,13 +62,13 @@ describe('notifyVendorOwner', () => {
   });
 
   it('no-ops (does not throw) when the vendor has no ownerUserId yet (unclaimed admin-created vendor)', async () => {
-    prismaMock.vendor.findUnique.mockResolvedValue({ ownerUserId: null });
+    prismaMock.member.findUnique.mockResolvedValue({ ownerUserId: null });
     await expect(notifyVendorOwner(tx, 'vendor-1', { type: 'ORDER_RECEIVED', title: 'T', message: 'M' })).resolves.toBeUndefined();
     expect(prismaMock.notification.create).not.toHaveBeenCalled();
   });
 
   it('no-ops when the vendor itself is not found', async () => {
-    prismaMock.vendor.findUnique.mockResolvedValue(null);
+    prismaMock.member.findUnique.mockResolvedValue(null);
     await expect(notifyVendorOwner(tx, 'missing-vendor', { type: 'ORDER_RECEIVED', title: 'T', message: 'M' })).resolves.toBeUndefined();
     expect(prismaMock.notification.create).not.toHaveBeenCalled();
   });
@@ -82,7 +83,7 @@ describe('shortOrderNumber', () => {
 describe('notifyOrderConfirmed', () => {
   it('notifies each DISTINCT vendor among the order\'s OrderItems exactly once, plus one Superadmin notification', async () => {
     prismaMock.orderItem.findMany.mockResolvedValue([{ vendorId: 'vendor-A' }, { vendorId: 'vendor-A' }, { vendorId: 'vendor-B' }]);
-    prismaMock.vendor.findUnique.mockImplementation(({ where }: { where: { id: string } }) =>
+    prismaMock.member.findUnique.mockImplementation(({ where }: { where: { id: string } }) =>
       Promise.resolve(where.id === 'vendor-A' ? { ownerUserId: 'owner-A' } : { ownerUserId: 'owner-B' }),
     );
     prismaMock.user.findMany.mockResolvedValue([{ id: 'superadmin-1' }]);
@@ -147,5 +148,24 @@ describe('listNotificationsForUser', () => {
     expect(prismaMock.notification.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { recipientUserId: 'user-1' } }),
     );
+  });
+});
+
+describe('notifyPermissionHolders', () => {
+  const input = { type: 'MEMBER_REVIEW_FLAGGED' as const, title: 'T', message: 'M', entityType: 'MEMBER', entityId: 'm1' };
+
+  it('finds active users by permission or super admin flag, never by role name', async () => {
+    tx.user.findMany.mockResolvedValue([{ id: 'u1' }, { id: 'u2' }] as never);
+    tx.notification.create.mockResolvedValue({} as never);
+    const count = await notifyPermissionHolders(tx as never, { menuKey: 'members', action: 'status_change' }, input);
+    const { where } = tx.user.findMany.mock.calls[0][0] as { where: Record<string, unknown> };
+    expect(where).toEqual({
+      status: 'active',
+      deletedAt: null,
+      roles: { some: { role: { isActive: true, OR: [{ isSuperAdmin: true }, { permissions: { some: { permission: { key: 'members:status_change' } } } }] } } },
+    });
+    expect(JSON.stringify(where)).not.toMatch(/"key":"(super_admin|admin)"/);
+    expect(tx.notification.create).toHaveBeenCalledTimes(2);
+    expect(count).toBe(2);
   });
 });
