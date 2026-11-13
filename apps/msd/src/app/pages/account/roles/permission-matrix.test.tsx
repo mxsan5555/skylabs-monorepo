@@ -98,7 +98,7 @@ describe('PermissionMatrix', () => {
     expect(screen.getByRole('rowheader', { name: 'Members' })).toBeTruthy();
     expect(screen.getByRole('rowheader', { name: 'Logs' })).toBeTruthy();
     const headers = screen.getAllByRole('columnheader').map((h) => h.textContent);
-    expect(headers).toEqual(['Resource', 'View', 'Create', 'Edit', 'Delete', 'Scope']);
+    expect(headers).toEqual(['Resource', 'V', 'C', 'E', 'D', 'Scope']);
     expect(document.querySelector('.perm-matrix-wrap table.perm-matrix')).toBeTruthy();
   });
 

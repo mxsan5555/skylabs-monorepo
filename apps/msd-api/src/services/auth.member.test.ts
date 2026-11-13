@@ -40,6 +40,7 @@ beforeEach(() => {
 });
 
 function arrangeSuccessfulLogin() {
+  prismaMock.user.update.mockResolvedValue({ id: 'u1', name: 'A', email: null, phone: PHONE, roles: [{}] } as never);
   prismaMock.user.upsert.mockResolvedValue({ id: 'u1', name: 'A', email: null, phone: PHONE, roles: [{}] } as never);
   prismaMock.userRole.findMany.mockResolvedValue([{ role: { key: 'member' } }] as never);
   prismaMock.loginHistory.create.mockResolvedValue({} as never);
@@ -47,15 +48,15 @@ function arrangeSuccessfulLogin() {
 
 describe('suspended member cannot log in or receive an OTP', () => {
   it('refuses login with MEMBER_SUSPENDED and records a failed attempt', async () => {
-    prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'u1', status: 'active' } as never);
+    prismaMock.user.findFirst.mockResolvedValueOnce({ id: 'u1', status: 'active' } as never);
     prismaMock.member.findUnique.mockResolvedValue({ status: 'SUSPENDED', statusReason: 'Rule break reported' } as never);
-    await expect(loginWithIdentifier(PHONE)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(loginWithIdentifier(PHONE)).rejects.toMatchObject({ code: 'MEMBER_SUSPENDED' });
     await expect(
       (async () => {
-        prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'u1', status: 'active' } as never);
+        prismaMock.user.findFirst.mockResolvedValueOnce({ id: 'u1', status: 'active' } as never);
         return loginWithIdentifier(PHONE);
       })(),
-    ).rejects.toThrow('Your member account is suspended. Please contact support.');
+    ).rejects.toThrow('Rule break reported');
     expect(prismaMock.loginHistory.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ userId: 'u1', success: false }) }),
     );
@@ -63,7 +64,7 @@ describe('suspended member cannot log in or receive an OTP', () => {
   });
 
   it('refuses login for an archived member', async () => {
-    prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'u1', status: 'active' } as never);
+    prismaMock.user.findFirst.mockResolvedValueOnce({ id: 'u1', status: 'active' } as never);
     prismaMock.member.findUnique.mockResolvedValue({ status: 'ARCHIVED', statusReason: null } as never);
     await expect(loginWithIdentifier(PHONE)).rejects.toMatchObject({ code: 'MEMBER_SUSPENDED' });
     expect(prismaMock.user.upsert).not.toHaveBeenCalled();
@@ -72,7 +73,7 @@ describe('suspended member cannot log in or receive an OTP', () => {
   it('refuses Google login for a suspended member', async () => {
     prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'u1', status: 'active', name: 'A' } as never);
     prismaMock.member.findUnique.mockResolvedValue({ status: 'SUSPENDED', statusReason: null } as never);
-    await expect(loginWithGoogle('g1', 'a@example.com', 'A')).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(loginWithGoogle('g1', 'a@example.com', 'A')).rejects.toMatchObject({ code: 'MEMBER_SUSPENDED' });
     expect(prismaMock.user.update).not.toHaveBeenCalled();
   });
 
@@ -96,7 +97,7 @@ describe('suspended member cannot log in or receive an OTP', () => {
   });
 
   it('lets an inactive member log in', async () => {
-    prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'u1', status: 'active' } as never);
+    prismaMock.user.findFirst.mockResolvedValueOnce({ id: 'u1', status: 'active' } as never);
     prismaMock.member.findUnique.mockResolvedValue({ status: 'INACTIVE', statusReason: null } as never);
     arrangeSuccessfulLogin();
     await expect(loginWithIdentifier(PHONE)).resolves.toHaveProperty('accessToken');
@@ -112,7 +113,7 @@ describe('suspended member cannot log in or receive an OTP', () => {
   });
 
   it('leaves a non-member user unaffected at login and OTP request', async () => {
-    prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'u1', status: 'active' } as never);
+    prismaMock.user.findFirst.mockResolvedValueOnce({ id: 'u1', status: 'active' } as never);
     arrangeSuccessfulLogin();
     await expect(loginWithIdentifier(PHONE)).resolves.toHaveProperty('accessToken');
 

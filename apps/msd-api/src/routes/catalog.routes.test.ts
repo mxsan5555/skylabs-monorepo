@@ -545,7 +545,7 @@ describe('GET /api/v1/catalog/products/:id', () => {
     expect(res.body.data.name).toBe('Face Cream');
     expect(prismaMock.product.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ OR: [{ id: PRODUCT_ID }, { slug: PRODUCT_ID }], isActive: true, vendor: { status: 'ACTIVE' } }),
+        where: expect.objectContaining({ id: PRODUCT_ID, isActive: true, vendor: { status: 'ACTIVE' } }),
       }),
     );
   });
@@ -556,7 +556,7 @@ describe('GET /api/v1/catalog/products/:id', () => {
     expect(res.status).toBe(200);
     expect(prismaMock.product.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ OR: [{ id: 'face-cream' }, { slug: 'face-cream' }] }),
+        where: expect.objectContaining({ slug: 'face-cream' }),
       }),
     );
   });
@@ -825,7 +825,7 @@ describe('GET /api/v1/catalog/therapists/:id', () => {
     expect(prismaMock.therapist.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          OR: [{ id: THERAPIST_ID }, { slug: THERAPIST_ID }],
+          id: THERAPIST_ID,
           isActive: true,
           vendor: { status: 'ACTIVE' },
           branch: { isActive: true },
@@ -847,7 +847,7 @@ describe('GET /api/v1/catalog/therapists/:id', () => {
     expect(res.status).toBe(200);
     expect(prismaMock.therapist.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ OR: [{ id: 'amit-verma' }, { slug: 'amit-verma' }] }),
+        where: expect.objectContaining({ slug: 'amit-verma' }),
       }),
     );
   });
@@ -1242,14 +1242,17 @@ describe('ST-40 card tags on deals and products', () => {
     expect(res.body.data.map((d: { tag: string }) => d.tag)).toEqual(['expire_soon', 'deal']);
   });
 
-  it('marks a deal hot from paid order lines (top 10%, at least 5)', async () => {
+  it('marks a deal hot from paid order lines only (top 10%, at least 5)', async () => {
     prismaMock.orderItem.groupBy.mockResolvedValue([{ dealId: DEAL_ID, _count: { _all: 6 } }] as never);
     prismaMock.deal.findMany.mockResolvedValue([serviceDealFixture] as never);
     prismaMock.deal.count.mockResolvedValue(1);
     const res = await request(app).get('/api/v1/catalog/deals');
     expect(res.body.data[0].tag).toBe('hot');
-    const groupBy = prismaMock.orderItem.groupBy.mock.calls[0][0] as unknown as { where: { order: { status: { in: string[] } } } };
+    const groupBy = prismaMock.orderItem.groupBy.mock.calls[0][0] as unknown as {
+      where: { order: { status: { in: string[] }; payments: { some: { status: string } } } };
+    };
     expect(groupBy.where.order.status.in).toEqual(['CONFIRMED', 'COMPLETED']);
+    expect(groupBy.where.order.payments.some.status).toBe('PAID');
   });
 
   it('tags=hot,new narrows the SQL where with one clause per tag', async () => {

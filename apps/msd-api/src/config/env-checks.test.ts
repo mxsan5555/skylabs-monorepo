@@ -84,6 +84,8 @@ describe('env boot in production', () => {
   const stubProduction = (overrides: Record<string, string>) => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('DATABASE_URL', 'postgresql://localhost/msd_test');
+    vi.stubEnv('DEV_OTP_IDENTIFIERS', '');
+    vi.stubEnv('OTP_PROVIDER', '');
     for (const [name, v] of Object.entries({ ...GOOD, ...overrides })) vi.stubEnv(name, v);
   };
 

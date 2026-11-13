@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { FilledButton, Icon, OutlinedTextField, TextButton } from '@skylabs-monorepo/shared-ui/react';
+import { createElement, useEffect, useState, type ChangeEvent } from 'react';
+import { FilledButton, Icon, TextButton } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import {
   verifyVoucher,
@@ -74,6 +74,14 @@ function pushHistory(entry: HistoryEntry) {
   } catch {
     // Storage unavailable (private mode, quota) — history is best-effort only.
   }
+}
+
+function VoucherField({ label, value, onInput }: { label: string; value: string; onInput: (value: string) => void }) {
+  return createElement('md-outlined-text-field', {
+    label,
+    value,
+    onInput: (e: ChangeEvent<HTMLElement & { value: string }>) => onInput(e.currentTarget.value),
+  });
 }
 
 /**
@@ -169,7 +177,12 @@ export function OrdersAndVerify() {
       recordHistory({ code: voucher.code, itemName: voucher.itemName, event: 'Completion OTP requested' });
     });
 
-  const doComplete = () =>
+  const doComplete = () => {
+    if (otp.trim().length !== 6) return;
+    return completeWithOtp();
+  };
+
+  const completeWithOtp = () =>
     voucher &&
     runAction('Marked complete.', async () => {
       const { data } = await completeVoucher(token, voucher.code, otp.trim());
@@ -214,11 +227,7 @@ export function OrdersAndVerify() {
       <section aria-labelledby="verify-purchase-title" className="panel">
         <h2 id="verify-purchase-title">Verify Purchase</h2>
         <div className="form-grid">
-          <OutlinedTextField
-            label="Voucher code"
-            value={code}
-            onInput={(e: Event) => setCode((e.target as HTMLInputElement).value)}
-          />
+          <VoucherField label="Voucher code" value={code} onInput={setCode} />
           <FilledButton onClick={doVerify} disabled={verifying || !code.trim()}>
             {verifying ? 'Verifying…' : 'Verify'}
           </FilledButton>
@@ -255,8 +264,8 @@ export function OrdersAndVerify() {
           <div className="panel" aria-label="Ship this item instead">
             <h3 className="section-title">Ship this item instead</h3>
             <div className="form-grid">
-              <OutlinedTextField label="Carrier" value={carrier} onInput={(e: Event) => setCarrier((e.target as HTMLInputElement).value)} />
-              <OutlinedTextField label="Tracking number" value={trackingNumber} onInput={(e: Event) => setTrackingNumber((e.target as HTMLInputElement).value)} />
+              <VoucherField label="Carrier" value={carrier} onInput={setCarrier} />
+              <VoucherField label="Tracking number" value={trackingNumber} onInput={setTrackingNumber} />
               <FilledButton onClick={doShip} disabled={actionBusy || !carrier.trim() || !trackingNumber.trim()}>Ship</FilledButton>
             </div>
           </div>
@@ -266,7 +275,7 @@ export function OrdersAndVerify() {
           <div className="panel" aria-label="Enter completion OTP">
             <h3 className="section-title">Enter the OTP the customer shares with you</h3>
             <div className="form-grid">
-              <OutlinedTextField label="6-digit OTP" value={otp} onInput={(e: Event) => setOtp((e.target as HTMLInputElement).value)} />
+              <VoucherField label="6-digit OTP" value={otp} onInput={setOtp} />
               <FilledButton onClick={doComplete} disabled={actionBusy || otp.trim().length !== 6}>Complete</FilledButton>
               <TextButton onClick={doRequestOtp} disabled={actionBusy}>Resend OTP</TextButton>
             </div>
@@ -285,7 +294,7 @@ export function OrdersAndVerify() {
                 accept="image/jpeg,image/png,application/pdf"
                 onChange={(e) => setEvidenceFile(e.target.files?.[0] ?? null)}
               />
-              <OutlinedTextField label="Note (optional)" value={evidenceNote} onInput={(e: Event) => setEvidenceNote((e.target as HTMLInputElement).value)} />
+              <VoucherField label="Note (optional)" value={evidenceNote} onInput={setEvidenceNote} />
               <FilledButton onClick={doRecordEvidence} disabled={actionBusy || !evidenceFile}>Record Evidence</FilledButton>
             </div>
           </div>

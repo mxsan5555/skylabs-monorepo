@@ -159,7 +159,7 @@ export function AccountsOverviewPage() {
             <sky-tile-card
               color="primary"
               icon="payments"
-              iconStyle="surface"
+              icon-style="surface"
               headline={formatINR(Number(data.collections))}
               text="Customer Collections — payments received from customers."
               href="/account/accounts/customer-payments"
@@ -167,14 +167,14 @@ export function AccountsOverviewPage() {
             <sky-tile-card
               color="secondary"
               icon="percent"
-              iconStyle="surface"
+              icon-style="surface"
               headline={formatINR(Number(data.commission))}
               text="MSD Commission — platform share before expenses."
             />
             <sky-tile-card
               color="tertiary"
               icon="account_balance_wallet"
-              iconStyle="surface"
+              icon-style="surface"
               headline={formatINR(Number(data.memberLiability))}
               text="Member Dues — unpaid member share."
               href="/account/accounts/member-settlements"
@@ -185,11 +185,11 @@ export function AccountsOverviewPage() {
             <sky-cta-banner
               color="primary"
               icon="task_alt"
-              iconStyle="surface"
+              icon-style="surface"
               headline={`${formatINR(Number(data.readyForPayout))} ready for payout`}
               text={`${data.readyForPayoutMemberCount} member${data.readyForPayoutMemberCount === 1 ? '' : 's'} eligible right now — hold period has passed, no open dispute.`}
-              ctaLabel="Review Payouts"
-              ctaHref="/account/accounts/member-settlements?status=ready"
+              cta-label="Review Payouts"
+              cta-href="/account/accounts/member-settlements?status=ready"
             />
           )}
 
@@ -199,7 +199,7 @@ export function AccountsOverviewPage() {
               <sky-tile-card
                 color="surface-high"
                 icon="hourglass_top"
-                iconStyle="surface"
+                icon-style="surface"
                 headline={formatINR(Number(data.pendingFulfilment))}
                 text="Pending Fulfilment — not yet started, completed, or shipped."
                 href="/account/accounts/member-settlements"
@@ -207,7 +207,7 @@ export function AccountsOverviewPage() {
               <sky-tile-card
                 color="surface-high"
                 icon="lock_clock"
-                iconStyle="surface"
+                icon-style="surface"
                 headline={formatINR(Number(data.onHold))}
                 text="On Hold — includes amounts currently blocked by an open dispute; not double-counted elsewhere."
                 href="/account/accounts/member-settlements"
@@ -215,7 +215,7 @@ export function AccountsOverviewPage() {
               <sky-tile-card
                 color="secondary"
                 icon="task_alt"
-                iconStyle="surface"
+                icon-style="surface"
                 headline={formatINR(Number(data.readyForPayout))}
                 text="Ready for Payout — hold period has passed, no open dispute."
                 href="/account/accounts/member-settlements?status=ready"
@@ -226,7 +226,7 @@ export function AccountsOverviewPage() {
           <sky-tile-card
             color="surface-high"
             icon="account_balance"
-            iconStyle="surface"
+            icon-style="surface"
             headline={formatINR(Number(data.paid))}
             text="Already Paid to Members — settled via a recorded bank transfer."
             href="/account/accounts/member-settlements"
@@ -241,11 +241,11 @@ export function AccountsOverviewPage() {
             <sky-cta-banner
               color="tertiary"
               icon="warning"
-              iconStyle="surface"
+              icon-style="surface"
               headline={`${data.disputeAttention.openCount} open dispute${data.disputeAttention.openCount === 1 ? '' : 's'}`}
               text={`${formatINR(Number(data.disputeAttention.blockedAmount))} currently blocked — already counted inside On Hold above, not double-counted.`}
-              ctaLabel="Review Issues"
-              ctaHref="/account/accounts/refunds-disputes"
+              cta-label="Review Issues"
+              cta-href="/account/accounts/refunds-disputes"
             />
           )}
         </>

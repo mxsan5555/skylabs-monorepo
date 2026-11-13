@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Icon } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { getBlogPost, type BlogPost } from '../../../../api/rbac/blog-posts';
+import { blogArticlesApi, getBlogPost, type BlogPost } from '../../../../api/rbac/blog-posts';
 import { renderBlock } from '../../../components/blog-blocks/blog-blocks';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { resolveMediaUrl } from '../../../../api/media';

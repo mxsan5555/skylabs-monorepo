@@ -177,8 +177,7 @@ export async function recordDeliveryEvidence(callerUserId: string, code: string,
     throw new ApiError('VALIDATION_ERROR', 'Delivery evidence can only be recorded for a shipped product voucher');
   }
   const validated = validateMediaFile(file.buffer, 'document');
-  void note;
-  await writeMediaFile('entitlement-evidence', entitlement.id, file.buffer, validated.extension);
+  const { storageKey } = await writeMediaFile(`entitlement-evidence/${entitlement.id}`, file.buffer, validated.extension, 'private');
   const settings = await getFinanceSettings();
   const holdUntil = new Date(Date.now() + holdHoursFor(entitlement.fulfilmentKind, settings) * 60 * 60 * 1000);
 
@@ -189,6 +188,8 @@ export async function recordDeliveryEvidence(callerUserId: string, code: string,
       completedAt: new Date(),
       settlementStatus: 'ON_HOLD',
       holdUntil,
+      deliveryEvidenceStorageKey: storageKey,
+      deliveryEvidenceNote: note,
     },
   });
   if (result.count === 0) throw new ApiError('CONFLICT', 'This voucher is not awaiting delivery evidence');

@@ -4,6 +4,7 @@ import {
   extractReturnUrl,
   isCustomerAccountUser,
   isDualRoleUser,
+  isStaffUser,
   isVendorUser,
   resolvePostLoginPath,
   sanitizeReturnUrl,

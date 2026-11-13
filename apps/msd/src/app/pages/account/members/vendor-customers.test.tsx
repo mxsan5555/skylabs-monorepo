@@ -1,5 +1,6 @@
 import { render, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import type { CustomerRow } from '../../../../api/rbac/vendors';
 import { VendorCustomers } from './vendor-customers';
 
@@ -42,7 +43,7 @@ beforeEach(() => {
 
 describe('VendorCustomers', () => {
   it('shows City and the contact details of a customer with an open order', async () => {
-    render(<VendorCustomers />);
+    render(<MemoryRouter><VendorCustomers /></MemoryRouter>);
     await waitFor(() => expect(tableRows()).toHaveLength(2));
     const columns = JSON.parse(document.querySelector('sky-data-table')?.getAttribute('columns') ?? '[]') as { label: string }[];
     expect(columns.map((c) => c.label)).toContain('City');
@@ -50,7 +51,7 @@ describe('VendorCustomers', () => {
   });
 
   it('says contact details are hidden until an order is open, and shows a dash for a missing city', async () => {
-    render(<VendorCustomers />);
+    render(<MemoryRouter><VendorCustomers /></MemoryRouter>);
     await waitFor(() => expect(tableRows()).toHaveLength(2));
     expect(tableRows()[1]).toMatchObject({
       Name: 'Ravi',
@@ -69,7 +70,7 @@ describe('VendorCustomers for staff (vendorId given)', () => {
       data: [{ ...CLOSED, phone: '+919800000002', email: 'ravi@example.com' }],
       meta: { total: 1 },
     });
-    render(<VendorCustomers vendorId="m1" />);
+    render(<MemoryRouter><VendorCustomers vendorId="m1" /></MemoryRouter>);
     await waitFor(() => expect(tableRows()).toHaveLength(1));
     expect(listVendorCustomersForAdminMock).toHaveBeenCalledWith('tok', 'm1', { page: 1, pageSize: 20 });
     expect(listMyCustomersMock).not.toHaveBeenCalled();

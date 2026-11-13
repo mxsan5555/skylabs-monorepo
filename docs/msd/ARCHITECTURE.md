@@ -258,9 +258,11 @@ on the create screen they travel with `DealCreate`.
 - **Card tags (API):** `services/offer-tag.ts` (pure) holds the D30 thresholds, `offerTag(item,
   hotIds, now)`, `hotIdsFrom(lines)` and `tagWhere` / `tagsWhere` (a Prisma `where` per tag with
   the higher-priority tags excluded, so filter, count and card always agree; `offer-tag.test.ts`
-  checks the two against each other). `getHotIds(kind)` in `catalog.service.ts` groups paid
-  `OrderItem` lines of the last 30 days by `dealId` / `productId`, cached in memory for 10 minutes
-  (`clearHotCache()` for tests). Product facets: `services/product-facets.ts`.
+  checks the two against each other). `getHotIds(kind)` in `catalog.service.ts` groups
+  `OrderItem` lines from orders with a `PAID` payment in the last 30 days by `dealId` /
+  `productId`; order status alone is not sufficient because COD orders become `CONFIRMED` before
+  cash is collected. Results are cached in memory for 10 minutes (`clearHotCache()` for tests).
+  Product facets: `services/product-facets.ts`.
 - **Therapist listing (API):** Prisma narrows by category, city/state, member and branch;
   `services/therapist-ranking.ts` (pure, like `deal-ranking.ts`) adds the lowest package price
   and distance, then filters by price and radius, sorts and pages in memory. Before ST-40 the

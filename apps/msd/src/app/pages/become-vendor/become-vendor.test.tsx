@@ -57,9 +57,8 @@ describe('BecomeVendor', () => {
     expect(registerPublicVendorMock).not.toHaveBeenCalled();
   });
 
-  it('does not show the old staff-only 403 notice and keeps the submit button enabled by default', () => {
+  it('keeps the submit button enabled by default', () => {
     render(<BecomeVendor />);
-    expect(screen.queryByText(/created by our team/i)).toBeNull();
     const button = Array.from(
       document.querySelectorAll('md-filled-button'),
     ).find((el) => el.textContent?.includes('Submit application'));

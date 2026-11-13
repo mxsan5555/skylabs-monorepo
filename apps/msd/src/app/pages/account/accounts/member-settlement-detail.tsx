@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { type ChangeEvent, createElement, useCallback, useEffect, useRef, useState } from 'react';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
 import { Link, useParams } from 'react-router-dom';
 import {
-  Checkbox,
   Dialog,
   Divider,
   FilledButton,
@@ -319,11 +318,11 @@ export function MemberSettlementDetailPage() {
                 <thead>
                   <tr>
                     <th scope="col">
-                      <Checkbox
-                        checked={selected.size === detail.eligibleItems.length}
-                        onChange={(e: Event) => toggleSelectAll((e.target as HTMLInputElement).checked)}
-                        aria-label="Select all eligible items"
-                      />
+                      {createElement('md-checkbox', {
+                        checked: selected.size === detail.eligibleItems.length,
+                        onChange: (e: ChangeEvent<HTMLElement & { checked: boolean }>) => toggleSelectAll(e.currentTarget.checked),
+                        'aria-label': 'Select all eligible items',
+                      })}
                     </th>
                     <th scope="col">Voucher</th>
                     <th scope="col">Item</th>
@@ -335,11 +334,11 @@ export function MemberSettlementDetailPage() {
                   {detail.eligibleItems.map((row) => (
                     <tr key={row.id}>
                       <td>
-                        <Checkbox
-                          checked={selected.has(row.id)}
-                          onChange={(e: Event) => toggleSelected(row.id, (e.target as HTMLInputElement).checked)}
-                          aria-label={`Select voucher ${row.voucherCode}`}
-                        />
+                        {createElement('md-checkbox', {
+                          checked: selected.has(row.id),
+                          onChange: (e: ChangeEvent<HTMLElement & { checked: boolean }>) => toggleSelected(row.id, e.currentTarget.checked),
+                          'aria-label': `Select voucher ${row.voucherCode}`,
+                        })}
                       </td>
                       <td>{row.voucherCode}</td>
                       <td>{row.orderItem?.itemName ?? '—'}</td>
@@ -435,6 +434,7 @@ export function MemberSettlementDetailPage() {
         </div>
       </Dialog>
 
+      {canRecordPayout && (
       <Dialog ref={payoutDialogRef}>
         <div slot="headline">Record Bank Payment</div>
         <div slot="content" className="form-grid">
@@ -468,6 +468,7 @@ export function MemberSettlementDetailPage() {
           </FilledButton>
         </div>
       </Dialog>
+      )}
     </div>
   );
 }

@@ -79,6 +79,7 @@ export function createPrismaMock() {
       updateMany: vi.fn(),
     },
     refreshSession: {
+      findFirst: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),

@@ -1,7 +1,6 @@
 import { createElement, useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import '@skylabs-monorepo/shared-ui';
-import '@skylabs-monorepo/shared-ui/editor';
 import { FilledButton } from '@skylabs-monorepo/shared-ui/react';
 import {
   createVendorProduct,
@@ -130,6 +129,11 @@ const EMPTY_FORM = {
  *  known dedup opportunity already flagged for `BranchFormPage`/`DealFormPage`/`TherapistFormPage`.
  *  Renders raw M3 elements for the same testability reason those three pages do. */
 export function ProductFormPage({ token }: ProductFormPageProps) {
+  // Quill reads `document` on import, so load it in the browser only (see register-editor.ts).
+  useEffect(() => {
+    void import('../../showcase/register-editor');
+  }, []);
+
   const { vendorId, productId } = useParams<{ vendorId: string; productId?: string }>();
   const navigate = useNavigate();
   const isEdit = Boolean(productId);

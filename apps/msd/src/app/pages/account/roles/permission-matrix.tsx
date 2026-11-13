@@ -21,10 +21,10 @@ interface PermissionMatrixProps {
 }
 
 const ACTIONS = [
-  { key: 'view', label: 'View' },
-  { key: 'create', label: 'Create' },
-  { key: 'edit', label: 'Edit' },
-  { key: 'delete', label: 'Delete' },
+  { key: 'view', label: 'V', description: 'View' },
+  { key: 'create', label: 'C', description: 'Create' },
+  { key: 'edit', label: 'E', description: 'Edit' },
+  { key: 'delete', label: 'D', description: 'Delete' },
 ] as const;
 
 function normalize(value: string): string {
@@ -115,7 +115,7 @@ export function PermissionMatrix({
             <tr>
               <th scope="col">Resource</th>
               {ACTIONS.map((action) => (
-                <th scope="col" key={action.key}>
+                <th scope="col" key={action.key} title={action.description} aria-label={action.description}>
                   {action.label}
                 </th>
               ))}
@@ -159,13 +159,13 @@ export function PermissionMatrix({
                       >
                         <input
                           type="checkbox"
-                          aria-label={`${roleName}: ${resource.title}: ${action.label}`}
+                          aria-label={`${roleName}: ${resource.title}: ${action.description}`}
                           checked={checked}
                           disabled={disabled || ids.length === 0}
                           title={
                             ids.length === 0
                               ? 'Permission record is missing. Refresh the permission catalog after backend seeding.'
-                              : `${action.label} — ${scope}${dirty ? ' (unsaved)' : ''}`
+                              : `${action.description} — ${scope}${dirty ? ' (unsaved)' : ''}`
                           }
                           onChange={(event) => {
                             if (ids.length === 0) return;

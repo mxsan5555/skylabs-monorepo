@@ -711,12 +711,12 @@ a.dashboard-stat:focus-visible {
 }
 
 .perm-matrix__cell--dirty {
-  background-color: var(--md-sys-color-tertiary-container, #ffd8c2);
+  background-color: var(--md-sys-color-tertiary-container);
   border-radius: 8px;
 }
 
 .perm-matrix__cell--na {
-  color: var(--md-sys-color-outline, #767a7c);
+  color: var(--md-sys-color-outline);
 }
 
 .widget-assign-row {
@@ -951,7 +951,7 @@ a.dashboard-stat:focus-visible {
 }
 
 .wizard-steps__item--done .wizard-steps__num {
-  background-color: var(--md-sys-color-primary-container, #cee5ff);
+  background-color: var(--md-sys-color-primary-container);
 }
 
 /* Voucher Code lookup row (Member Orders page, Verify & Complete tab) — a text field that grows
