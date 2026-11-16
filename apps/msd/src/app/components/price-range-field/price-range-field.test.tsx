@@ -60,6 +60,24 @@ describe('PriceRangeField', () => {
     expect(onChange).toHaveBeenCalledWith({ min: 1000, max: 1000 });
   });
 
+  /** ST-25: a URL price outside narrowed facet bounds is shown clamped into the slider range. */
+  it('clamps URL values outside the bounds into the fields and the slider', () => {
+    render(<PriceRangeField bounds={{ min: 500, max: 3000, step: 100 }} value={{ min: 100, max: 9000 }} onChange={vi.fn()} copy={copy} />);
+    const [minField, maxField] = Array.from(document.querySelectorAll('md-outlined-text-field')) as (HTMLElement & { value: string })[];
+    expect(minField.value).toBe('500');
+    expect(maxField.value).toBe('3000');
+    const slider = document.querySelector('md-slider') as HTMLElement;
+    expect(slider.getAttribute('value-start')).toBe('500');
+    expect(slider.getAttribute('value-end')).toBe('3000');
+  });
+
+  it('keeps min at or below max when both URL values fall above the bounds', () => {
+    render(<PriceRangeField bounds={{ min: 500, max: 3000, step: 100 }} value={{ min: 8000, max: 9000 }} onChange={vi.fn()} copy={copy} />);
+    const [minField, maxField] = Array.from(document.querySelectorAll('md-outlined-text-field')) as (HTMLElement & { value: string })[];
+    expect(minField.value).toBe('3000');
+    expect(maxField.value).toBe('3000');
+  });
+
   it('treats an emptied field as no limit, not 0', () => {
     const onChange = vi.fn();
     render(<PriceRangeField bounds={{ min: 200, max: 3500, step: 100 }} value={{ min: 500, max: 2000 }} onChange={onChange} copy={copy} />);

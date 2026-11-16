@@ -20,4 +20,12 @@ describe('DealMap', () => {
     expect(screen.getByRole('region', { name: 'Deals on the map' })).toBeTruthy();
     expect(await screen.findByText('leaflet 1')).toBeTruthy();
   });
+
+  it('is full size by default and short with compact', async () => {
+    const { rerender } = render(<DealMap points={[point]} ariaLabel="Deals on the map" loadingLabel="Loading map" />);
+    expect(screen.getByRole('region').className).toBe('deal-map');
+    rerender(<DealMap points={[point]} ariaLabel="Deals on the map" loadingLabel="Loading map" compact />);
+    expect(screen.getByRole('region').className).toBe('deal-map deal-map--compact');
+    expect(await screen.findByText('leaflet 1')).toBeTruthy();
+  });
 });

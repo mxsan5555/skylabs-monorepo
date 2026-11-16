@@ -15,7 +15,7 @@ function adminToken() {
 }
 
 function grant(...keys: string[]) {
-  mockPrisma.role.findMany.mockResolvedValue([{ isSuperAdmin: false }]);
+  mockPrisma.role.findMany.mockResolvedValue([{ key: 'admin', isSuperAdmin: false }]);
   mockPrisma.rolePermission.findMany.mockResolvedValue(keys.map((key) => ({ permission: { key } })));
 }
 
@@ -138,5 +138,31 @@ describe('POST /customers/:id/create-user', () => {
 
     expect(res.status).toBe(422);
     expect(mockPrisma.user.create).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('Sales Customers independent action enforcement',()=>{
+  function sales(keys:string[]){
+    mockPrisma.role.findMany.mockResolvedValue([{key:'sales',isSuperAdmin:false}]);
+    mockPrisma.rolePermission.findMany.mockResolvedValue(keys.map(key=>({permission:{key}})));
+    return signAccessToken({sub:'sales-user',roles:['sales'],app:'mera-driver'});
+  }
+  it('keeps View while denying Create, Edit and Delete before any record mutation',async()=>{
+    const token=sales(['customers:view']);mockPrisma.customer.findMany.mockResolvedValue([{id:'owned',createdByUserId:'sales-user'}]);mockPrisma.customer.count.mockResolvedValue(1);
+    expect((await request(app).get('/customers').set('Authorization','Bearer '+token)).status).toBe(200);
+    const before=mockPrisma.customer.findMany.mock.calls[0][0];expect(before.where.createdByUserId).toBe('sales-user');
+    expect((await request(app).post('/customers').set('Authorization','Bearer '+token).send({firstName:'Denied',mobileNumber:'999'})).status).toBe(403);
+    expect((await request(app).patch('/customers/owned').set('Authorization','Bearer '+token).send({firstName:'Denied'})).status).toBe(403);
+    expect((await request(app).delete('/customers/owned').set('Authorization','Bearer '+token)).status).toBe(403);
+    expect(mockPrisma.customer.create).not.toHaveBeenCalled();expect(mockPrisma.customer.update).not.toHaveBeenCalled();expect(mockPrisma.customer.delete).not.toHaveBeenCalled();
+  });
+  it('re-enables Edit with an existing token, denies foreign ownership and observes later revocation',async()=>{
+    const token=sales(['customers:view']);mockPrisma.customer.findUnique.mockResolvedValue({id:'owned',firstName:'Before',createdByUserId:'sales-user'});mockPrisma.customer.update.mockResolvedValue({id:'owned'});
+    sales(['customers:view','customers:edit']);
+    expect((await request(app).patch('/customers/owned').set('Authorization','Bearer '+token).send({firstName:'After'})).status).toBe(200);
+    mockPrisma.customer.update.mockClear();mockPrisma.customer.findUnique.mockResolvedValue({id:'foreign',createdByUserId:'other'});
+    expect((await request(app).patch('/customers/foreign').set('Authorization','Bearer '+token).send({firstName:'Denied'})).status).toBe(404);expect(mockPrisma.customer.update).not.toHaveBeenCalled();
+    sales(['customers:view']);expect((await request(app).patch('/customers/owned').set('Authorization','Bearer '+token).send({firstName:'Denied'})).status).toBe(403);
   });
 });

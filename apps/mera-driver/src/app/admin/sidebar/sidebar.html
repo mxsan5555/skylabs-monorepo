@@ -1,4 +1,5 @@
-<aside class="admin-sidebar">
+<aside class="admin-sidebar" [class.is-open]="open()" [attr.aria-hidden]="open() ? null : 'true'" [attr.inert]="open() ? null : ''">
+  <md-icon-button class="md-sidebar-mobile-close" aria-label="Close navigation" title="Close navigation" (click)="close.emit()"><md-icon aria-hidden="true">close</md-icon></md-icon-button>
   <div class="admin-sidebar__brand">
     <span class="admin-sidebar__logo">
       <md-icon aria-hidden="true">directions_car</md-icon>
@@ -12,68 +13,43 @@
   <input
     class="admin-sidebar__search"
     type="search"
+    [value]="search()"
+    (input)="search.set($any($event.target).value)"
     placeholder="Search…"
     aria-label="Search"
   />
 
   <nav class="admin-sidebar__nav" aria-label="Console">
-    @for (node of menu(); track node.id) {
-      @if (node.children && node.children.length > 0) {
-        <div class="admin-nav-group flex flex-col w-full mb-2">
-          <button
-            type="button"
-            class="admin-nav-item flex items-center justify-between w-full cursor-pointer"
-            (click)="toggleGroup(node)"
-          >
-            <span class="flex items-center gap-2">
-              @if (node.icon) {
-                <md-icon aria-hidden="true">{{ node.icon }}</md-icon>
-              }
-              <span class="admin-nav-group__label" style="font-size: 0.75rem; margin: 0; padding: 0; line-height: 1;">{{ node.title }}</span>
-            </span>
-            <md-icon
-              style="font-size: 20px; --md-icon-size: 20px; color: var(--md-sys-color-on-surface-variant); transition: transform 0.2s;"
-              [style.transform]="isGroupExpanded(node) ? 'rotate(180deg)' : 'rotate(0deg)'"
-            >
-              expand_more
-            </md-icon>
-          </button>
-
-          <div
-            class="admin-sidebar__group-children flex flex-col gap-0.5 mt-1 overflow-hidden transition-all duration-200"
-            [class.hidden]="!isGroupExpanded(node)"
-          >
-            @for (child of node.children; track child.id) {
-              <a
-                class="admin-nav-item pl-8"
-                [routerLink]="accountPath(child)"
-                routerLinkActive="active"
-                [routerLinkActiveOptions]="{ exact: true }"
-              >
-                <md-icon aria-hidden="true">{{ child.icon }}</md-icon>
-                {{ child.title }}
-              </a>
+    <ng-container [ngTemplateOutlet]="tree" [ngTemplateOutletContext]="{ nodes: menu() }"></ng-container>
+    <ng-template #tree let-nodes="nodes">
+      @for (node of nodes; track node.id) {
+        @if (node.children?.length) {
+          <div class="admin-nav-group">
+            <button type="button" class="admin-nav-item w-full" [attr.aria-expanded]="isGroupExpanded(node)" (click)="toggleGroup(node)">
+              <md-icon aria-hidden="true">{{ node.icon }}</md-icon>
+              <span>{{ node.title }}</span>
+              <md-icon aria-hidden="true">{{ isGroupExpanded(node) ? 'expand_less' : 'expand_more' }}</md-icon>
+            </button>
+            @if (isGroupExpanded(node)) {
+              <div class="pl-3">
+                <ng-container [ngTemplateOutlet]="tree" [ngTemplateOutletContext]="{ nodes: node.children }"></ng-container>
+              </div>
             }
           </div>
-        </div>
-      } @else {
-        <a
-          class="admin-nav-item"
-          [routerLink]="accountPath(node)"
-          routerLinkActive="active"
-        >
-          <md-icon aria-hidden="true">{{ node.icon }}</md-icon>
-          {{ node.title }}
-        </a>
+        } @else {
+          <a class="admin-nav-item" [routerLink]="(accountPath(node) || '').split('?')[0]" [queryParams]="queryParams(node)" [class.active]="isActive(node)" [attr.aria-current]="isActive(node) ? 'page' : null">
+            <md-icon aria-hidden="true">{{ node.icon }}</md-icon>{{ node.title }}
+          </a>
+        }
       }
-    }
+    </ng-template>
   </nav>
 
   <div class="admin-sidebar__user">
     <span class="admin-sidebar__avatar">{{ initial() }}</span>
     <span class="admin-sidebar__user-info">
-      <div class="admin-sidebar__user-name">{{ user()?.name ?? 'Loading…' }}</div>
-      <div class="admin-sidebar__user-mail">{{ user()?.email ?? user()?.phone ?? '' }}</div>
+      <div class="admin-sidebar__user-name" [title]="user()?.name || ''">{{ user()?.name ?? 'Loading…' }}</div>
+      <div class="admin-sidebar__user-mail" [title]="roleNames()">{{ roleNames() }}</div>
     </span>
     <div class="sidebar-user-actions">
       <md-icon-button

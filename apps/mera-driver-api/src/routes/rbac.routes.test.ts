@@ -285,6 +285,7 @@ describe('rbac.routes', () => {
     });
 
     it('replaces the role grant set and writes an audit log for a valid request', async () => {
+      mockPrisma.permission.findMany.mockResolvedValue(validIds.map(id => ({id,key:'rbac.roles:view'})));
       mockPrisma.role.findUnique.mockResolvedValue(ROLE_ROW);
       mockPrisma.permission.count.mockResolvedValue(validIds.length);
       mockPrisma.rolePermission.deleteMany.mockResolvedValue({ count: 0 });
@@ -433,7 +434,9 @@ describe('rbac.routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.data.user.id).toBe('user-1');
-      expect(res.body.data.permissions).toContain('dashboard:view');
+      expect(res.body.data.permissions).toEqual([]);
+      expect(res.body.data.menu).toEqual([]);
+      expect(res.body.data.portalContext).toBe('driver');
       expect(res.body.data.roles).toEqual([{ id: 'role-driver', key: 'driver', name: 'Driver', isSuperAdmin: false }]);
     });
 

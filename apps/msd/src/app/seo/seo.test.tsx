@@ -20,6 +20,18 @@ describe('Seo', () => {
     expect(q('meta[name="robots"]')).toBeNull();
   });
 
+  it('falls back to the brand share card (PNG) when a page has no image', () => {
+    render(<Seo title="t" description="d" path="/x" />);
+    expect(q('meta[property="og:image"]')?.getAttribute('content')).toBe('https://www.myspadeal.in/brand/myspadeal-og.png');
+    expect(q('meta[name="twitter:image"]')?.getAttribute('content')).toBe('https://www.myspadeal.in/brand/myspadeal-og.png');
+    expect(q('meta[name="twitter:card"]')?.getAttribute('content')).toBe('summary_large_image');
+  });
+
+  it('uses the page image when one is given', () => {
+    render(<Seo title="t" description="d" path="/x" image="https://cdn.example.com/deal.jpg" />);
+    expect(q('meta[property="og:image"]')?.getAttribute('content')).toBe('https://cdn.example.com/deal.jpg');
+  });
+
   it('adds noindex and JSON-LD when asked', () => {
     render(<Seo title="t" description="d" path="/x" noindex jsonLd={{ '@type': 'Thing', name: 'x' }} />);
     expect(q('meta[name="robots"]')?.getAttribute('content')).toBe('noindex, nofollow');

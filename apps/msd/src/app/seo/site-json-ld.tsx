@@ -3,7 +3,7 @@ import { JsonLd } from './json-ld';
 import { organizationJsonLd, websiteJsonLd } from './jsonld';
 import { SITE_URL } from './site-url';
 import content from '../../content.json';
-import logo from '../../assets/logo.jpg';
+import { LOGO_RASTER_SRC as logo } from '../../brand';
 
 /** Organization + WebSite structured data for every public page. Needs VITE_SITE_URL. */
 export function SiteJsonLd() {

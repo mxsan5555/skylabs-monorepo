@@ -91,7 +91,7 @@
     <!-- Desktop auth actions -->
     <div class="site-header__actions">
       @if (auth.isAuthenticated()) {
-        <md-text-button (click)="go('/account')">My account</md-text-button>
+        <md-text-button [disabled]="auth.loading() || !auth.bootstrap()" (click)="goAccount()">My account</md-text-button>
         <md-filled-button (click)="signOut()">Log out</md-filled-button>
       } @else {
         <md-outlined-button (click)="goDriver()">Become a Driver</md-outlined-button>
@@ -158,7 +158,7 @@
 
         <div class="site-drawer__cta">
           @if (auth.isAuthenticated()) {
-            <md-outlined-button (click)="go('/account')">My account</md-outlined-button>
+            <md-outlined-button [disabled]="auth.loading() || !auth.bootstrap()" (click)="goAccount()">My account</md-outlined-button>
             <md-filled-button (click)="signOut()">Log out</md-filled-button>
           } @else {
             <md-outlined-button (click)="goDriver()">Become a Driver</md-outlined-button>
@@ -169,3 +169,5 @@
     </div>
   }
 </header>
+
+@if (applicationOpen()) { <md-driver-application (closed)="applicationOpen.set(false)"></md-driver-application> }

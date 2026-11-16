@@ -18,7 +18,8 @@
     "test": {
       "executor": "@nx/vitest:test",
       "options": {
-        "watch": false
+        "watch": false,
+        "passWithNoTests": true
       }
     }
   }

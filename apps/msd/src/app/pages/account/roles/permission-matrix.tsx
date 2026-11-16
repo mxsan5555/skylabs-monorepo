@@ -1,79 +1,221 @@
-import type { PermissionAction } from '@skylabs-monorepo/shared-types';
-import type { PermissionCatalogRow } from '../../../../api/rbac/roles';
+import type {
+  PermissionCatalogRow,
+  PermissionScope,
+  Role,
+} from '../../../../api/rbac/roles';
 
 interface PermissionMatrixProps {
   catalog: PermissionCatalogRow[];
-  selectedPermissionIds: ReadonlySet<string>;
-  onToggle: (permissionId: string) => void;
+  role: Role | null;
+  permissions: ReadonlyMap<string, PermissionScope>;
+  /** The last-persisted grant set for `role`, so an edited-but-unsaved cell can be told apart
+   *  from a saved one. Omit (e.g. while the initial load is in flight) to skip the highlight. */
+  savedPermissions?: ReadonlyMap<string, PermissionScope>;
+  onPermissionToggle: (
+    roleId: string,
+    permissionId: string,
+    checked: boolean,
+    scope: PermissionScope,
+  ) => void;
   disabled?: boolean;
 }
 
-/**
- * The Role Permission Matrix only ever exposes these 4 actions — legacy actions (export, import,
- * approve, reject, upload, download, print, assign, restore, permanent_delete, status_change,
- * custom) stay real `Permission` rows in the DB (other gates like `vendors:custom` still depend
- * on them) but are never rendered as columns here.
- */
-const ALLOWED_ACTIONS: PermissionAction[] = ['view', 'create', 'edit', 'delete'];
+const ACTIONS = [
+  { key: 'view', label: 'V', description: 'View' },
+  { key: 'create', label: 'C', description: 'Create' },
+  { key: 'edit', label: 'E', description: 'Edit' },
+  { key: 'delete', label: 'D', description: 'Delete' },
+] as const;
+
+function normalize(value: string): string {
+  return value.trim().toLowerCase().replace(/[\s-]+/g, '_');
+}
 
 /**
- * Menu x action grid, restricted to View/Create/Edit/Delete. A cell is a checkbox when the
- * catalog has a seeded `Permission` row for that `(menuKey, action)` pair (`permissionId`
- * present); otherwise it renders a disabled dash — that action isn't grantable yet because no
- * Permission row exists to reference (e.g. Branch has no `delete` endpoint, only status_change).
+ * Mirrors msd-api's `role.service.ts#SCOPE_ENFORCED_PERMISSION_KEYS` — the only permission keys
+ * a route actually enforces `OWN` scope for. `setRolePermissions` rejects `OWN` for anything
+ * else with a 422, so this UI never offers a scope control that would silently do nothing;
+ * every other resource shows a fixed "All" label instead.
  */
-export function PermissionMatrix({ catalog, selectedPermissionIds, onToggle, disabled }: PermissionMatrixProps) {
-  if (catalog.length === 0) {
-    return <p className="empty-state">The permission catalog is empty.</p>;
+const SCOPE_ENFORCED_PERMISSION_KEYS = ['rbac.audit-logs:view'];
+
+function findAction(resource: PermissionCatalogRow, actionKey: string) {
+  return (
+    resource.actions.find(
+      (item) =>
+        normalize(item.action) === actionKey ||
+        normalize(item.key) === actionKey ||
+        normalize(item.key).endsWith(`:${actionKey}`),
+    ) ?? null
+  );
+}
+
+function viewAction(resource: PermissionCatalogRow) {
+  return resource.actions.find((item) => item.action === 'view') ?? null;
+}
+
+/** Whether every record behind `ids` is granted — a resource backed by several real keys (e.g.
+ *  Content's ~10 `cms.*` leaves) is "checked" only once they're all granted, so the checkbox
+ *  always moves the whole group atomically rather than drifting into a partial state. */
+function allGranted(ids: readonly string[], permissions: ReadonlyMap<string, PermissionScope>): boolean {
+  return ids.length > 0 && ids.every((id) => permissions.has(id));
+}
+
+/** Whether `resource`'s scope is real and editable (its `view` key is on the enforced allowlist). */
+function isScopeEditable(resource: PermissionCatalogRow): boolean {
+  const key = viewAction(resource)?.key;
+  return key ? SCOPE_ENFORCED_PERMISSION_KEYS.includes(key) : false;
+}
+
+/** The scope actually saved for this resource, read from the real `GET .../permissions` data —
+ *  never guessed from the role's name or key. Defaults to `ALL`, matching the backend's default. */
+function currentScope(
+  resource: PermissionCatalogRow,
+  permissions: ReadonlyMap<string, PermissionScope>,
+): PermissionScope {
+  const permissionId = viewAction(resource)?.permissionIds[0];
+  return permissionId ? permissions.get(permissionId) ?? 'ALL' : 'ALL';
+}
+
+export function PermissionMatrix({
+  catalog,
+  role,
+  permissions,
+  savedPermissions,
+  onPermissionToggle,
+  disabled = false,
+}: PermissionMatrixProps) {
+  if (!role) {
+    return (
+      <p className="empty-state">
+        Select a role to view and manage its permissions.
+      </p>
+    );
   }
 
-  const catalogActions = new Set(catalog[0]?.actions.map((a) => a.action) ?? []);
-  const actionKeys = ALLOWED_ACTIONS.filter((action) => catalogActions.has(action));
+  const roleName = role.name;
 
   return (
-    <div className="perm-matrix-wrap">
-      <table className="perm-matrix">
-        <caption className="sr-only">Permission matrix by menu and action</caption>
-        <thead>
-          <tr>
-            <th scope="col">Menu</th>
-            {actionKeys.map((action) => (
-              <th scope="col" key={action}>
-                {action}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {catalog.map((row) => {
-            const cellByAction = new Map(row.actions.map((cell) => [cell.action, cell]));
-            return (
-              <tr key={row.id} data-row-id={row.id}>
-                <th scope="row">{row.title}</th>
-                {actionKeys.map((action) => {
-                  const cell = cellByAction.get(action);
-                  return (
-                    <td key={`${row.id}:${action}`}>
-                      {cell?.permissionId ? (
+    <div>
+      <p className="field-hint">
+        Editing permissions for <strong>{roleName}</strong>. Select a checkbox
+        to grant an action or clear it to remove the action. Changes are saved
+        when you click Save permissions.
+      </p>
+
+      <p className="field-hint">
+        <strong>Own</strong> restricts an action to the user's own records.
+        <strong> All</strong> applies it to every record. A highlighted cell
+        has an unsaved change.
+      </p>
+
+      <div className="perm-matrix-wrap">
+        <table className="perm-matrix">
+          <thead>
+            <tr>
+              <th scope="col">Resource</th>
+              {ACTIONS.map((action) => (
+                <th scope="col" key={action.key} title={action.description} aria-label={action.description}>
+                  {action.label}
+                </th>
+              ))}
+              <th scope="col">Scope</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {catalog.map((resource) => {
+              const scope = currentScope(resource, permissions);
+              const scopeEditable = isScopeEditable(resource);
+              const viewPermissionId = viewAction(resource)?.permissionIds[0] ?? null;
+              const savedScope = savedPermissions
+                ? currentScope(resource, savedPermissions)
+                : scope;
+
+              return (
+                <tr key={resource.id}>
+                  <th scope="row">{resource.title}</th>
+
+                  {ACTIONS.map((action) => {
+                    const definition = findAction(resource, action.key);
+
+                    if (!definition) {
+                      return (
+                        <td key={action.key} className="perm-matrix__cell--na">
+                          —
+                        </td>
+                      );
+                    }
+
+                    const ids = definition.permissionIds;
+                    const checked = allGranted(ids, permissions);
+                    const wasChecked = savedPermissions ? allGranted(ids, savedPermissions) : checked;
+                    const dirty = savedPermissions ? checked !== wasChecked : false;
+
+                    return (
+                      <td
+                        key={action.key}
+                        className={dirty ? 'perm-matrix__cell--dirty' : undefined}
+                      >
                         <input
                           type="checkbox"
-                          aria-label={`${row.title} — ${action}`}
-                          data-action-key={cell.key}
-                          checked={selectedPermissionIds.has(cell.permissionId)}
-                          disabled={disabled}
-                          onChange={() => cell.permissionId && onToggle(cell.permissionId)}
+                          aria-label={`${roleName}: ${resource.title}: ${action.description}`}
+                          checked={checked}
+                          disabled={disabled || ids.length === 0}
+                          title={
+                            ids.length === 0
+                              ? 'Permission record is missing. Refresh the permission catalog after backend seeding.'
+                              : `${action.description} — ${scope}${dirty ? ' (unsaved)' : ''}`
+                          }
+                          onChange={(event) => {
+                            if (ids.length === 0) return;
+                            const next = event.currentTarget.checked;
+                            for (const id of ids) {
+                              onPermissionToggle(role.id, id, next, scopeEditable ? scope : 'ALL');
+                            }
+                          }}
                         />
-                      ) : (
-                        <span aria-hidden="true">—</span>
-                      )}
-                    </td>
-                  );
-                })}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                      </td>
+                    );
+                  })}
+
+                  <td
+                    className={
+                      scopeEditable && scope !== savedScope
+                        ? 'perm-matrix__cell--dirty'
+                        : undefined
+                    }
+                  >
+                    {scopeEditable && viewPermissionId ? (
+                      <select
+                        aria-label={`${roleName}: ${resource.title}: scope`}
+                        value={scope}
+                        disabled={disabled || !permissions.has(viewPermissionId)}
+                        title="Own restricts this permission to the user's own records; All applies to every record."
+                        onChange={(event) =>
+                          onPermissionToggle(
+                            role.id,
+                            viewPermissionId,
+                            true,
+                            event.currentTarget.value as PermissionScope,
+                          )
+                        }
+                      >
+                        <option value="ALL">All</option>
+                        <option value="OWN">Own</option>
+                      </select>
+                    ) : (
+                      <span>All</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
+
+export default PermissionMatrix;

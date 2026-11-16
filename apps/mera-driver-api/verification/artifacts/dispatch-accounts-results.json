@@ -1,0 +1,28 @@
+{
+  "results": [
+    "Real password login with isolated customer, driver and verifier users",
+    "Both trip drivers passed current human KYC checks and received authorized backend final approval before matching",
+    "Independent compulsory fee, trusted staff confirmation, replay idempotency and online eligibility",
+    "Website creates a real owned, backend-priced booking; customer sees the selected-driver waiting state; cross-owner access denied",
+    "Admin Dispatch, real driver request accepted in UI, customer sees only approved public driver details",
+    "Preferred customer request, acceptance and synchronized OTP completion; COD driver cash excluded from platform receipts, 500 fee plus 150 commission counted once",
+    "Seven distinct canonical Accounts pages use bounded records without repeated tabs or dashboard forms",
+    "Real PostgreSQL concurrent acceptance: exactly one winner and one 409; authorized reassignment records reason and history",
+    "Preferred driver declines in UI, closed offer cannot accept, Admin Dispatch assigns another eligible driver in UI with reason"
+  ],
+  "before": {
+    "drivers": 7,
+    "customers": 2,
+    "bookings": 1
+  },
+  "after": {
+    "drivers": 7,
+    "customers": 2,
+    "bookings": 1
+  },
+  "limitations": [
+    "Admin browser uses a local signed token; fixture customer/driver/verifier password login exercised",
+    "No live payment-provider call; real offline confirmation fixtures and gateway unit tests",
+    "No production IDSPay call"
+  ]
+}

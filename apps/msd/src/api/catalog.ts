@@ -1,6 +1,7 @@
 import { apiGet } from './rbac/client';
 import type { MediaImage, MediaVideo } from './media';
 import type { BlogBlock } from '../types';
+import type { BannerColorRole, BannerSlot } from './rbac/promotions';
 
 /**
  * Public, unauthenticated customer catalogue client — mirrors msd-api's `/catalog/*` routes.
@@ -53,14 +54,21 @@ export interface CatalogDealPackage {
   originalPrice: string | null;
 }
 
+/** Card tag computed by msd-api (PLANNING §4 D30): one per deal or product, or null. */
+export type CatalogOfferTag = 'expire_soon' | 'hot' | 'new' | 'deal';
+export const CATALOG_OFFER_TAGS: CatalogOfferTag[] = ['expire_soon', 'hot', 'new', 'deal'];
+
 export interface CatalogDeal {
   id: string;
+  tag?: CatalogOfferTag | null;
   title: string;
   slug: string;
   shortDescription: string | null;
+  /** Rich HTML (sky-rich-text-editor), already server-sanitized — render via
+   *  `dangerouslySetInnerHTML`, never as plain text (see deal-detail.tsx). */
   description: string | null;
   termsAndConditions: string | null;
-  notes: string | null;
+  note: string | null;
   policy: string | null;
   /** A synced "from price"/default-duration display cache (kept in sync with the cheapest
    *  active `packages[]` entry server-side — see DealPackage's own schema doc comment in
@@ -89,6 +97,54 @@ export interface CatalogDeal {
   distanceKm?: number | null;
 }
 
+export type CatalogCancellationPolicy = 'FREE_24H' | 'FREE_48H' | 'NON_REFUNDABLE';
+
+/** A package on the deal page: the card fields plus name, people, inclusions and its discount. */
+export interface CatalogDealDetailPackage extends CatalogDealPackage {
+  name: string | null;
+  persons: number;
+  inclusions: string[];
+  discountPercent: number | null;
+}
+
+/** `GET /catalog/deals/:idOrSlug` (API.md §4): everything the deal page shows in one call. */
+export interface CatalogDealDetail extends Omit<CatalogDeal, 'packages' | 'branch' | 'vendor' | 'mediaImages'> {
+  tagline: string | null;
+  highlights: string[];
+  eligibility: string[];
+  currency: 'INR';
+  bookingRequired: boolean;
+  bookingInstructions: string | null;
+  validityDays: number | null;
+  limitPerCustomer: number | null;
+  cancellationPolicy: CatalogCancellationPolicy;
+  cancellationNote: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  /** Paid units, or null under 10 (the page shows "{n} bought" from 10). */
+  boughtCount: number | null;
+  isSoldOut: boolean;
+  /** Units left, or null without a stock limit. */
+  stockLeft: number | null;
+  packages: CatalogDealDetailPackage[];
+  faqs: { id: string; question: string; answer: string }[];
+  mediaImages?: (MediaImage & { altText?: string | null })[];
+  vendor: (NonNullable<CatalogDeal['vendor']> & { businessDescription: string | null; website: string | null; mediaImages?: MediaImage[] }) | null;
+  branch:
+    | (NonNullable<CatalogDeal['branch']> & {
+        addressLine2: string | null;
+        state: string | null;
+        pincode: string | null;
+        phone: string | null;
+        mapLocationUrl: string | null;
+        openingHours: CatalogOpeningHours | null;
+      })
+    | null;
+  therapists: CatalogTherapist[];
+}
+
 /** `Branch.openingHours` shape — keys are lowercase 3-letter day codes (`mon`…`sun`); `open:
  *  false` means closed all day (start/end are then meaningless). Mirrors the vendor-facing edit
  *  form's own `DayHours`/`OpeningHours` types (`apps/msd/src/api/rbac/vendors.ts`) exactly — kept
@@ -115,6 +171,7 @@ export interface CatalogTherapistPackage {
 
 export interface CatalogVendorTherapist {
   id: string;
+  slug: string | null;
   /** The service/role label a customer browses by (e.g. "Legs Therapist") — distinct from
    *  `personName` below, never merged into one field; the customer must see both clearly. */
   therapistType: string;
@@ -122,6 +179,8 @@ export interface CatalogVendorTherapist {
   personName: string;
   gender: string | null;
   specialization: string | null;
+  /** Rich HTML (sky-rich-text-editor), already server-sanitized — render via
+   *  `dangerouslySetInnerHTML`, never as plain text (see therapist-detail.tsx). */
   bio: string | null;
   experienceYears: number | null;
   photoUrl: string | null;
@@ -170,6 +229,9 @@ export interface CatalogVendorDetail {
   branches: CatalogVendorBranch[];
 }
 
+/** A comma-joined list param, or undefined when empty (so it is left out of the query). */
+const joinList = (values?: string[]) => (values?.length ? values.join(',') : undefined);
+
 function toQuery(params: Record<string, string | number | undefined>): string {
   const usp = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -204,34 +266,32 @@ export function listCatalogPopularTreatments() {
   return apiGet<CatalogPopularTreatmentGroup[]>('/catalog/popular-treatments', null);
 }
 
-/** One active Home page promotion card — server-filtered to `isActive` + within its (optional)
- *  visibility window (see msd-api's `promotion.service.ts#getPublicPromotions`). `image` is a raw
- *  `storageKey` (or `null`) — pass it through `resolveMediaUrl` from `api/media.ts` before
- *  rendering, same as every other media-backed entity. */
-export interface CatalogPromotion {
+/** One CTA banner for a slot (docs/msd/PLANNING.md §6): the visitor's state's banners, else the
+ *  Global/Default ones (msd-api `promotion.service.ts#getPublicBanners`). `image` is a raw
+ *  `storageKey` (or `null`) — pass it through `resolveMediaUrl` from `api/media.ts`. `href` is an
+ *  in-app path built by the server. */
+export interface CatalogBanner {
   id: string;
   title: string;
   description: string | null;
   buttonLabel: string | null;
-  destinationType: 'ROUTE' | 'CATEGORY' | 'DEAL';
-  destinationRoute: string | null;
-  category: { id: string; name: string; slug: string } | null;
-  deal: { id: string; title: string; slug: string } | null;
+  backgroundRole: BannerColorRole;
+  buttonRole: BannerColorRole;
+  href: string;
   image: string | null;
 }
 
-export function listCatalogPromotions() {
-  return apiGet<CatalogPromotion[]>('/catalog/promotions', null);
+export function listCatalogBanners(slot: BannerSlot, state?: string | null) {
+  const qs = new URLSearchParams({ slot, ...(state ? { state } : {}) });
+  return apiGet<CatalogBanner[]>(`/catalog/banners?${qs}`, null);
 }
 
-/** Public Home Hero Deal slider — `state: null` means the Global/Default slider served (either
- *  because the requested state has no publishable slider of its own yet, or none was requested).
- *  `slides` is empty when even the Global/Default slider isn't publishable yet (fewer than 5
- *  eligible Deals) — the frontend degrades gracefully, never crashes on an empty list. */
-export interface CatalogHomeHeroSlide {
-  id: string;
-  deal: CatalogDeal;
-}
+/** Public Home Hero slider of deals and products — `state: null` means the Global/Default slider
+ *  served (the requested state has no publishable slider yet, or none was requested). `slides` is
+ *  empty when even the Global/Default slider isn't publishable (fewer than 5 eligible items). */
+export type CatalogHomeHeroSlide =
+  | { id: string; type: 'deal'; deal: CatalogDeal }
+  | { id: string; type: 'product'; product: CatalogProduct };
 
 export interface CatalogHomeHero {
   state: string | null;
@@ -240,6 +300,22 @@ export interface CatalogHomeHero {
 
 export function getCatalogHomeHero(state?: string) {
   return apiGet<CatalogHomeHero>(`/catalog/home-hero${state ? `?state=${encodeURIComponent(state)}` : ''}`, null);
+}
+
+/** Public Home Tag Section rails — New / Deal / Hot Deal / Expire soon (docs/msd/PLANNING.md
+ *  §7.1). Each tag resolves independently to the visitor's state or Global/Default; a tag with
+ *  no eligible section anywhere is simply absent from the array. */
+export type CatalogHomeTagSectionTag = 'NEW' | 'DEAL' | 'HOT_DEAL' | 'EXPIRE_SOON';
+
+export interface CatalogHomeTagSection {
+  tag: CatalogHomeTagSectionTag;
+  title: string;
+  state: string | null;
+  deals: CatalogDeal[];
+}
+
+export function getCatalogHomeTagSections(state?: string) {
+  return apiGet<CatalogHomeTagSection[]>(`/catalog/home-tag-sections${state ? `?state=${encodeURIComponent(state)}` : ''}`, null);
 }
 
 export interface CatalogDealListOptions {
@@ -258,19 +334,21 @@ export interface CatalogDealListOptions {
   sort?: CatalogDealSort;
   minPrice?: number;
   maxPrice?: number;
-  /** From `useCurrentLocation`'s raw `coords` — when both are present, results come back
+  /** From `useVisitorLocation()`'s `coords` — when both are present, results come back
    *  nearest-first with a real `distanceKm` per item; omitted → unchanged behavior. */
   latitude?: number;
   longitude?: number;
   /** Radius in km around `latitude`/`longitude`; ignored without coordinates. */
   radiusKm?: number;
+  /** Only items whose card tag is one of these. */
+  tags?: CatalogOfferTag[];
 }
 
+const dealQuery = ({ vendorIds, branchIds, tags, ...rest }: Omit<CatalogDealListOptions, 'sort'> & { sort?: string }) =>
+  toQuery({ ...rest, vendorIds: joinList(vendorIds), branchIds: joinList(branchIds), tags: joinList(tags) });
+
 export function listCatalogDeals(opts: CatalogDealListOptions = {}) {
-  return apiGet<CatalogDeal[]>(
-    `/catalog/deals${toQuery({ ...opts, vendorIds: opts.vendorIds?.length ? opts.vendorIds.join(',') : undefined, branchIds: opts.branchIds?.length ? opts.branchIds.join(',') : undefined })}`,
-    null,
-  );
+  return apiGet<CatalogDeal[]>(`/catalog/deals${dealQuery(opts)}`, null);
 }
 
 export interface CatalogDealFacets {
@@ -278,19 +356,19 @@ export interface CatalogDealFacets {
   branches: { id: string; name: string; city: string | null; vendorName: string; count: number }[];
   distance: { km: number; count: number }[];
   price: { min: number; max: number } | null;
+  /** Count per card tag (every tag, zeros included); absent on therapist facets. */
+  tags?: { tag: CatalogOfferTag; count: number }[];
 }
 
 /** Filter-panel counts for the same filters as `listCatalogDeals` (no paging/sort). */
 export function getCatalogDealFacets(opts: Omit<CatalogDealListOptions, 'page' | 'pageSize' | 'sort'> = {}) {
-  const { vendorIds, branchIds, ...rest } = opts;
-  return apiGet<CatalogDealFacets>(
-    `/catalog/deals/facets${toQuery({ ...rest, vendorIds: vendorIds?.length ? vendorIds.join(',') : undefined, branchIds: branchIds?.length ? branchIds.join(',') : undefined })}`,
-    null,
-  );
+  return apiGet<CatalogDealFacets>(`/catalog/deals/facets${dealQuery(opts)}`, null);
 }
 
-export function getCatalogDeal(id: string) {
-  return apiGet<CatalogDeal>(`/catalog/deals/${id}`, null);
+/** The deal page (`GET /catalog/deals/:idOrSlug`): a UUID, the current slug or an old slug. The
+ *  response always carries the current `slug` (PLANNING §2.7 URLs). */
+export function getCatalogDeal(idOrSlug: string) {
+  return apiGet<CatalogDealDetail>(`/catalog/deals/${encodeURIComponent(idOrSlug)}`, null);
 }
 
 /** Product is a fully independent, directly-purchasable catalog entity (see msd-api's Product
@@ -298,11 +376,17 @@ export function getCatalogDeal(id: string) {
  *  fields (Product has no branchId) and no `packages` (no duration/tier concept applies). */
 export interface CatalogProduct {
   id: string;
+  tag?: CatalogOfferTag | null;
   name: string;
   slug: string;
   brand: string | null;
+  /** Rich HTML (sky-rich-text-editor), already server-sanitized — render via
+   *  `dangerouslySetInnerHTML`, never as plain text (see product-detail.tsx). */
   description: string | null;
   summary: string | null;
+  /** Rich HTML, same as `description` — previously saved by vendors but never exposed/rendered
+   *  on the public page; now shown in its own accordion section. */
+  returnPolicy: string | null;
   image: string | null;
   imageAlt: string | null;
   price: string;
@@ -316,22 +400,44 @@ export interface CatalogProduct {
   popularTags?: CatalogPopularTag[];
 }
 
-export function listCatalogProducts(opts: {
+export interface CatalogProductListOptions {
   page?: number;
   pageSize?: number;
   categoryId?: string;
+  /** Top-level category ids; win over `categoryId`. */
+  categoryIds?: string[];
   subcategoryId?: string;
   vendorId?: string;
+  /** Business (member) ids, the Business filter (item 4); win over `vendorId`. */
+  vendorIds?: string[];
   search?: string;
   sort?: CatalogProductSort;
   minPrice?: number;
   maxPrice?: number;
-} = {}) {
-  return apiGet<CatalogProduct[]>(`/catalog/products${toQuery(opts)}`, null);
+  tags?: CatalogOfferTag[];
 }
 
-export function getCatalogProduct(id: string) {
-  return apiGet<CatalogProduct>(`/catalog/products/${id}`, null);
+const productQuery = ({ categoryIds, vendorIds, tags, ...rest }: CatalogProductListOptions) =>
+  toQuery({ ...rest, categoryIds: joinList(categoryIds), vendorIds: joinList(vendorIds), tags: joinList(tags) });
+
+export function listCatalogProducts(opts: CatalogProductListOptions = {}) {
+  return apiGet<CatalogProduct[]>(`/catalog/products${productQuery(opts)}`, null);
+}
+
+export interface CatalogProductFacets {
+  categories: { id: string; name: string; slug: string; count: number }[];
+  vendors: { id: string; name: string; count: number }[];
+  tags: { tag: CatalogOfferTag; count: number }[];
+  price: { min: number; max: number } | null;
+}
+
+/** Filter-panel counts for the same filters as `listCatalogProducts` (no paging/sort). */
+export function getCatalogProductFacets(opts: Omit<CatalogProductListOptions, 'page' | 'pageSize' | 'sort'> = {}) {
+  return apiGet<CatalogProductFacets>(`/catalog/products/facets${productQuery(opts)}`, null);
+}
+
+export function getCatalogProduct(slugOrId: string) {
+  return apiGet<CatalogProduct>(`/catalog/products/${encodeURIComponent(slugOrId)}`, null);
 }
 
 /** Distinct `{state, city}` pairs from active branches — drives the public State/City picker
@@ -344,21 +450,40 @@ export function getCatalogVendor(slug: string, opts: { state?: string; city?: st
   return apiGet<CatalogVendorDetail>(`/catalog/vendors/${encodeURIComponent(slug)}${toQuery(opts)}`, null);
 }
 
-export function listCatalogTherapists(
-  opts: {
-    page?: number;
-    pageSize?: number;
-    categoryId?: string;
-    subcategoryId?: string;
-    vendorId?: string;
-    branchId?: string;
-    search?: string;
-    /** See `listCatalogDeals`'s identical param doc comment. */
-    latitude?: number;
-    longitude?: number;
-  } = {},
-) {
-  return apiGet<CatalogTherapist[]>(`/catalog/therapists${toQuery(opts)}`, null);
+export type CatalogTherapistSort = 'relevance' | 'price_asc' | 'price_desc' | 'distance';
+
+export interface CatalogTherapistListOptions {
+  page?: number;
+  pageSize?: number;
+  categoryId?: string;
+  subcategoryId?: string;
+  vendorId?: string;
+  branchId?: string;
+  vendorIds?: string[];
+  branchIds?: string[];
+  search?: string;
+  state?: string;
+  city?: string;
+  /** Price = the lowest active package; sorted and paged server-side. */
+  sort?: CatalogTherapistSort;
+  minPrice?: number;
+  maxPrice?: number;
+  radiusKm?: number;
+  /** See `listCatalogDeals`'s identical param doc comment. */
+  latitude?: number;
+  longitude?: number;
+}
+
+const therapistQuery = ({ vendorIds, branchIds, ...rest }: CatalogTherapistListOptions) =>
+  toQuery({ ...rest, vendorIds: joinList(vendorIds), branchIds: joinList(branchIds) });
+
+export function listCatalogTherapists(opts: CatalogTherapistListOptions = {}) {
+  return apiGet<CatalogTherapist[]>(`/catalog/therapists${therapistQuery(opts)}`, null);
+}
+
+/** Vendor, branch, distance and price ("From" price) counts for the therapist list. */
+export function getCatalogTherapistFacets(opts: Omit<CatalogTherapistListOptions, 'page' | 'pageSize' | 'sort'> = {}) {
+  return apiGet<CatalogDealFacets>(`/catalog/therapists/facets${therapistQuery(opts)}`, null);
 }
 
 export function getCatalogTherapist(id: string) {
@@ -450,6 +575,7 @@ export interface CatalogWebsitePage {
   content: BlogBlock[];
   metaTitle?: string | null;
   metaDescription?: string | null;
+  updatedAt?: string;
 }
 
 export function getCatalogPage(slug: string) {

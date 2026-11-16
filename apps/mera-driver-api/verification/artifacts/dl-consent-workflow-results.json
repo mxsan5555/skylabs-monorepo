@@ -1,0 +1,12 @@
+{
+  "status": "passed",
+  "ownerConsentViaCheckbox": true,
+  "actorSourceTimestampAndSubmission": true,
+  "reloadPersistence": true,
+  "reviewReadinessRefresh": true,
+  "staleConsentRejected": true,
+  "unauthorizedReviewerConsentDenied": true,
+  "providerRequests": 0,
+  "liveResult": "not tested: synthetic fixture never verified against IDSPay",
+  "fixturesCleaned": true
+}

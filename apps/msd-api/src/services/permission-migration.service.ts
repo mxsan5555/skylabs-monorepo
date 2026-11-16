@@ -19,6 +19,56 @@ export interface SharedKeySplit {
 type PrismaLike = Pick<PrismaClient, 'permission' | 'rolePermission'>;
 
 /**
+ * Idempotent, repeatable application of the internal User Management permission matrix (see
+ * `prisma/permission-matrix.ts`): for each role named in `grantsByRoleKey`, resets its grant on
+ * exactly `governedMenuKeys` to exactly the listed permission keys — delete-then-recreate, same
+ * exact-state discipline as `role.service.ts#setRolePermissions`, scoped to ONLY the governed
+ * keys so every other menuKey (and every role not named here — Super Admin, Customer, any future
+ * custom role) is left untouched. Safe to re-run on every seed: converges to the same exact grant
+ * set every time, including re-stripping a grant an older seed revision or a hand-edit via the
+ * Role Permission Matrix UI had added back on one of these specific keys.
+ *
+ * EXCLUDES the `custom` action from the delete, regardless of menuKey — `custom` is never a
+ * matrix-governed V/C/E/D grant, it's a separate "special operation" plumbing gate that happens
+ * to share a menuKey with a resource the matrix DOES govern (`vendors:custom` is the one gate
+ * every vendor self-service route runs on, see `vendor.service.ts`/`vendors.routes.ts`'s own
+ * doc comments — sharing the `vendors` menuKey with the matrix's "Members" admin-wide resource
+ * row purely by coincidence of the menu tree, not because it's part of that row's V/C/E/D).
+ * Without this exclusion, applying the matrix for the `vendor` ("Member") role — which legitimately
+ * holds `vendors:custom` via `grantStarterPermissions`'s `resetGrant`, run just before this —
+ * deleted it anyway, because the delete matched on menuKey alone: every Member login then failed
+ * every `/vendors/me/*` self-service request with "Missing permission vendors:custom" even though
+ * the matrix was never supposed to touch that permission at all. Same reasoning protects
+ * `rbac.users:custom` (the impersonation gate) from ever being swept by this function.
+ */
+export async function applyPermissionMatrix(
+  prisma: PrismaLike,
+  roles: Map<string, { id: string }>,
+  permissionIdByKey: Map<string, string>,
+  grantsByRoleKey: Record<string, string[]>,
+  governedMenuKeys: string[],
+): Promise<void> {
+  for (const [roleKey, permissionKeys] of Object.entries(grantsByRoleKey)) {
+    const role = roles.get(roleKey);
+    if (!role) continue;
+
+    await prisma.rolePermission.deleteMany({
+      where: { roleId: role.id, permission: { menuKey: { in: governedMenuKeys }, action: { not: 'custom' } } },
+    });
+
+    const permissionIds = permissionKeys
+      .map((key) => permissionIdByKey.get(key))
+      .filter((id): id is string => Boolean(id));
+    if (permissionIds.length > 0) {
+      await prisma.rolePermission.createMany({
+        data: permissionIds.map((permissionId) => ({ roleId: role.id, permissionId })),
+        skipDuplicates: true,
+      });
+    }
+  }
+}
+
+/**
  * One-time migration for a `menuKey` that used to be shared by several menu nodes and has since
  * been split into distinct per-node keys (see msd-menu.json's history — `cms.blog` used to be
  * shared by the "Pages" and "Articles" rows). Before a split, holding `${oldMenuKey}:${action}`

@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { normalizeIdentifier } from '../lib/normalizeIdentifier';
-import type { LoginMethod } from '../generated/prisma-client';
+import { HttpError } from '../middleware/errorHandler';
+import type { Prisma, LoginMethod } from '../generated/prisma-client';
 
 /** Role key auto-granted to a brand-new mera-driver user (see CLAUDE.md role table). */
 const DEFAULT_ROLE_KEY = 'customer';
@@ -14,10 +15,10 @@ export function loginMethodForIdentifier(identifier: string): LoginMethod {
   return isEmail(normalized) ? 'otp_email' : 'otp_phone';
 }
 
-async function ensureDefaultRole(userId: string): Promise<void> {
-  const role = await prisma.role.findUnique({ where: { key: DEFAULT_ROLE_KEY } });
-  if (!role) return; // seed not run yet — don't block auth in a fresh/unseeded DB
-  await prisma.userRole.upsert({
+async function ensureDefaultRole(userId: string, client: Prisma.TransactionClient = prisma): Promise<void> {
+  const role = await client.role.findUnique({ where: { key: DEFAULT_ROLE_KEY } });
+  if (!role || !role.isActive) throw new HttpError(503, 'CUSTOMER_ROLE_NOT_CONFIGURED', 'Customer portal role is unavailable. Contact your administrator.');
+  await client.userRole.upsert({
     where: { userId_roleId: { userId, roleId: role.id } },
     create: { userId, roleId: role.id },
     update: {},
@@ -41,14 +42,17 @@ export async function upsertUserByIdentifier(identifier: string) {
   });
   if (existing) return existing;
 
-  const user = await prisma.user.create({
+  return prisma.$transaction(async tx => {
+  const user = await tx.user.create({
     data: {
       [field]: field === 'email' ? normalized.toLowerCase() : normalized,
       name: identifier,
     },
   });
-  await ensureDefaultRole(user.id);
+  await ensureDefaultRole(user.id, tx);
+  await ensureCustomerProfile(user, tx);
   return user;
+  });
 }
 
 export interface GoogleProfileInput {
@@ -70,16 +74,19 @@ export async function upsertUserFromGoogle(profile: GoogleProfileInput) {
     return existing;
   }
 
-  const user = await prisma.user.create({
+  return prisma.$transaction(async tx => {
+  const user = await tx.user.create({
     data: { googleId: profile.googleId, email: profile.email, name: profile.name },
   });
-  await ensureDefaultRole(user.id);
+  await ensureDefaultRole(user.id, tx);
+  await ensureCustomerProfile(user, tx);
   return user;
+  });
 }
 
 export async function getRoleKeysForUser(userId: string): Promise<string[]> {
   const userRoles = await prisma.userRole.findMany({
-    where: { userId },
+    where: { userId, role: { isActive: true } },
     select: { role: { select: { key: true } } },
   });
   return userRoles.map((ur) => ur.role.key);
@@ -98,4 +105,13 @@ export async function recordLoginHistory(
 
 export async function touchLastLogin(userId: string): Promise<void> {
   await prisma.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } });
+}
+
+export async function ensureCustomerProfile(user: {id: string; name: string; phone: string | null; email: string | null}, client: Prisma.TransactionClient = prisma) {
+  if (await client.customer.findUnique({where: {userId: user.id}})) return;
+  const contacts = [...(user.phone ? [{mobileNumber: user.phone}, ...(user.phone.startsWith('+91') ? [{mobileNumber: user.phone.slice(3)}] : [])] : []), ...(user.email ? [{email: {equals: user.email, mode: 'insensitive' as const}}] : [])];
+  if (contacts.length && await client.customer.findFirst({where: {OR: contacts}, select: {id: true}})) {
+    throw new HttpError(409, 'CUSTOMER_LINK_REQUIRED', 'An existing customer record matches this account. Ask authorized staff to link it; no records have been merged.');
+  }
+  await client.customer.upsert({where: {userId: user.id}, update: {}, create: {userId: user.id, firstName: user.name, mobileNumber: user.phone, email: user.email, registrationSource: 'Website'}});
 }

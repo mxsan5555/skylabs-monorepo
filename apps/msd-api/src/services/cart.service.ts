@@ -3,6 +3,8 @@ import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
 import type { Prisma } from '../generated/prisma-client';
 import type { CartAddItemSchema } from '../schemas/cart.schema';
+import { VISIBLE_DEAL_WHERE, VISIBLE_THERAPIST_WHERE } from './catalog-visibility';
+import { assertDealPurchasable, hasPurchaseLimits } from './deal-limits';
 
 type CartAddItemInput = z.infer<typeof CartAddItemSchema>;
 
@@ -32,12 +34,14 @@ const CART_INCLUDE = {
           images: true,
           vendorId: true,
           branchId: true,
-          vendor: { select: { id: true, businessName: true } },
-          branch: { select: { id: true, name: true } },
+          status: true,
+          approvalStatus: true,
+          vendor: { select: { id: true, businessName: true, status: true } },
+          branch: { select: { id: true, name: true, isActive: true } },
           mediaImages: { orderBy: DEAL_IMAGE_ORDER_BY },
         },
       },
-      dealPackage: { select: { id: true, durationMinutes: true, sellingPrice: true } },
+      dealPackage: { select: { id: true, durationMinutes: true, sellingPrice: true, isActive: true } },
       therapist: {
         select: {
           id: true,
@@ -46,21 +50,24 @@ const CART_INCLUDE = {
           photoUrl: true,
           vendorId: true,
           branchId: true,
-          vendor: { select: { id: true, businessName: true } },
-          branch: { select: { id: true, name: true } },
+          isActive: true,
+          vendor: { select: { id: true, businessName: true, status: true } },
+          branch: { select: { id: true, name: true, isActive: true } },
         },
       },
-      therapistPackage: { select: { id: true, durationMinutes: true, sellingPrice: true } },
+      therapistPackage: { select: { id: true, durationMinutes: true, sellingPrice: true, isActive: true } },
       product: {
         select: {
           id: true,
+          slug: true,
           name: true,
           image: true,
           imageAlt: true,
           price: true,
           originalPrice: true,
           vendorId: true,
-          vendor: { select: { id: true, businessName: true } },
+          isActive: true,
+          vendor: { select: { id: true, businessName: true, status: true } },
           mediaImages: { orderBy: PRODUCT_IMAGE_ORDER_BY },
         },
       },
@@ -69,15 +76,41 @@ const CART_INCLUDE = {
   },
 } as const;
 
+type CartWithItems = Prisma.CartGetPayload<{ include: typeof CART_INCLUDE }>;
+
+/** Live availability for one cart line, re-derived from the SAME nested fields
+ *  `catalog.service.ts`'s `VISIBLE_DEAL_WHERE`/`VISIBLE_PRODUCT_WHERE`/`VISIBLE_THERAPIST_WHERE`
+ *  check — a line added before its Member was suspended (or its deal/product/therapist/branch
+ *  deactivated since) must read back as unavailable the next time the cart is fetched, not
+ *  silently look exactly like it did when it was added. This is a display flag only; checkout
+ *  re-validates independently server-side (`order.service.ts`) regardless of what this says. */
+function isItemAvailable(item: CartWithItems['items'][number]): boolean {
+  if (item.deal) {
+    return item.deal.status === 'ACTIVE' && item.deal.approvalStatus === 'APPROVED' && item.deal.vendor.status === 'ACTIVE' && item.deal.branch.isActive && (item.dealPackage?.isActive ?? true);
+  }
+  if (item.therapist) {
+    return item.therapist.isActive && item.therapist.vendor.status === 'ACTIVE' && item.therapist.branch.isActive && (item.therapistPackage?.isActive ?? true);
+  }
+  if (item.product) {
+    return item.product.isActive && item.product.vendor.status === 'ACTIVE';
+  }
+  return false;
+}
+
+function withAvailability(cart: CartWithItems) {
+  return { ...cart, items: cart.items.map((item) => ({ ...item, available: isItemAvailable(item) })) };
+}
+
 /** Lazily creates an empty cart for the caller if none exists — Cart.customerId is unique, so
  *  this is a plain upsert-by-customerId. customerId is always req.user.sub (route layer). */
 export async function getOrCreateCart(customerId: string) {
-  return prisma.cart.upsert({
+  const cart = await prisma.cart.upsert({
     where: { customerId },
     update: {},
     create: { customerId },
     include: CART_INCLUDE,
   });
+  return withAvailability(cart);
 }
 
 /** Product line — `productId` alone, entirely independent of any Deal (Product is a fully
@@ -94,23 +127,45 @@ async function assertProduct(productId: string) {
 
 /** Service-Deal line — `dealId` + `dealPackageId`. Never trusts a client-supplied price: the
  *  package's own live `sellingPrice` is authoritative, re-checked again at checkout
- *  (order.service.ts#createOrderFromCart) since CartItem.unitPrice is only provisional. */
+ *  (order.service.ts#createOrderFromCart) since CartItem.unitPrice is only provisional.
+ *  Mirrors `catalog.service.ts`'s `VISIBLE_DEAL_WHERE` bar (active + approved deal, active
+ *  vendor, active branch) — same "regression: only Product checked vendor status, Deal/
+ *  Therapist did not" fix as `assertTherapist` below. The `where` below already guarantees
+ *  status/approvalStatus/vendor.status/branch.isActive for any row it returns, so (unlike
+ *  `assertProduct`, which fetches unconditionally) there is no separate re-check here — mirrors
+ *  `assertTherapist` exactly. A re-check used to live here reading `deal.vendor.status`/
+ *  `deal.branch.isActive`, but neither relation is selected on this `findFirst`, so it crashed
+ *  every time a deal was actually found ("Cannot read properties of undefined (reading
+ *  'status')") instead of ever doing anything, since `where` already ruled out the only cases
+ *  it was trying to catch. */
 async function assertServiceDeal(dealId: string, dealPackageId: string) {
-  const deal = await prisma.deal.findUnique({ where: { id: dealId } });
+  // A deal the storefront hides (draft, unapproved, member not ACTIVE, branch off) 404s like a missing one.
+  const deal = await prisma.deal.findFirst({ where: { id: dealId, ...VISIBLE_DEAL_WHERE } });
   if (!deal) throw new ApiError('NOT_FOUND', 'Deal not found');
   const pkg = await prisma.dealPackage.findUnique({ where: { id: dealPackageId } });
   if (!pkg || pkg.dealId !== deal.id) throw new ApiError('NOT_FOUND', 'Deal package not found');
   if (!pkg.isActive) throw new ApiError('VALIDATION_ERROR', 'Selected package is not currently available');
-  return { unitPrice: pkg.sellingPrice };
+  return { unitPrice: pkg.sellingPrice, deal };
+}
+
+/** Units of `dealId` already in the cart (every package), minus one line when it is being replaced. */
+async function cartUnitsOfDeal(cartId: string, dealId: string, exceptItemId?: string) {
+  const result = await prisma.cartItem.aggregate({
+    where: { cartId, dealId, ...(exceptItemId ? { id: { not: exceptItemId } } : {}) },
+    _sum: { quantity: true },
+  });
+  return result._sum.quantity ?? 0;
 }
 
 /** Therapist line — `therapistId` + `therapistPackageId`, entirely independent of any Deal (see
  *  Therapist's own schema doc comment — a Deal and a Therapist are always separate cart lines,
- *  never coupled together on one CartItem). */
+ *  never coupled together on one CartItem). Mirrors `catalog.service.ts`'s
+ *  `VISIBLE_THERAPIST_WHERE` bar — same vendor/branch-active check `assertProduct` already had
+ *  and this one (and `assertServiceDeal`) was missing. */
 async function assertTherapist(therapistId: string, therapistPackageId: string) {
-  const therapist = await prisma.therapist.findUnique({ where: { id: therapistId } });
+  // A therapist the storefront hides (inactive, member not ACTIVE, branch off) 404s like a missing one.
+  const therapist = await prisma.therapist.findFirst({ where: { id: therapistId, ...VISIBLE_THERAPIST_WHERE } });
   if (!therapist) throw new ApiError('NOT_FOUND', 'Therapist not found');
-  if (!therapist.isActive) throw new ApiError('VALIDATION_ERROR', 'Selected therapist is not currently available');
   const pkg = await prisma.therapistPackage.findUnique({ where: { id: therapistPackageId } });
   if (!pkg || pkg.therapistId !== therapist.id) throw new ApiError('NOT_FOUND', 'Therapist package not found');
   if (!pkg.isActive) throw new ApiError('VALIDATION_ERROR', 'Selected package is not currently available');
@@ -147,13 +202,16 @@ export async function addItem(customerId: string, input: CartAddItemInput) {
   const isTherapistLine = !!input.therapistId;
   const isProductLine = !isTherapistLine && !!input.productId;
 
-  const { unitPrice } = isTherapistLine
-    ? await assertTherapist(input.therapistId!, input.therapistPackageId!)
-    : isProductLine
-      ? await assertProduct(input.productId!)
-      : await assertServiceDeal(input.dealId!, input.dealPackageId!);
+  const serviceDeal = isTherapistLine || isProductLine ? null : await assertServiceDeal(input.dealId!, input.dealPackageId!);
+  const { unitPrice } = serviceDeal
+    ?? (isTherapistLine ? await assertTherapist(input.therapistId!, input.therapistPackageId!) : await assertProduct(input.productId!));
 
   const cart = await prisma.cart.upsert({ where: { customerId }, update: {}, create: { customerId } });
+  // Stock and the per-customer limit count every unit of the deal in the cart (PLANNING §2.7).
+  if (serviceDeal && hasPurchaseLimits(serviceDeal.deal)) {
+    const { deal } = serviceDeal;
+    await assertDealPurchasable(deal, customerId, (await cartUnitsOfDeal(cart.id, deal.id)) + input.quantity);
+  }
 
   const matchWhere = {
     cartId: cart.id,
@@ -175,7 +233,11 @@ export async function addItem(customerId: string, input: CartAddItemInput) {
 }
 
 export async function updateItemQuantity(customerId: string, itemId: string, quantity: number) {
-  await getOwnedCartItemOrThrow(customerId, itemId);
+  const item = await getOwnedCartItemOrThrow(customerId, itemId);
+  if (item.dealId) {
+    const deal = await prisma.deal.findUnique({ where: { id: item.dealId }, select: { id: true, maxBookings: true, limitPerCustomer: true } });
+    if (deal && hasPurchaseLimits(deal)) await assertDealPurchasable(deal, customerId, (await cartUnitsOfDeal(item.cartId, deal.id, itemId)) + quantity);
+  }
   await prisma.cartItem.update({ where: { id: itemId }, data: { quantity } });
   return getOrCreateCart(customerId);
 }

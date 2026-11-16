@@ -1,0 +1,16 @@
+{
+  "mode": "Automated browser integration: real running frontend + real Express auth/upload/download routes; in-memory Prisma fixtures; not configured-database/existing-account login",
+  "injectedSessions": false,
+  "externalServices": false,
+  "results": [
+    "Normal password login and staff redirect; removed menus and nested Vehicle Types search",
+    "education: binary UI save, reopen, byte-identical protected download, replacement version and archive deletion",
+    "health: binary UI save, reopen, byte-identical protected download, replacement version and archive deletion",
+    "personal: binary UI save, reopen, byte-identical protected download, replacement version and archive deletion",
+    "police: binary UI save, reopen, byte-identical protected download, replacement version and archive deletion",
+    "Driver password login, portal upload/reload, authenticated PDF preview and matching browser download"
+  ],
+  "errors": [],
+  "fixtureFiles": "Retained under verification/continuation-binary-store; archived via supported document API",
+  "configuredAccountChecks": "Blocked: credentials/OTP access unavailable"
+}

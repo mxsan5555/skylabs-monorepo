@@ -1,11 +1,10 @@
+import { apiGet, ApiRequestError } from './client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { refreshMock } = vi.hoisted(() => ({ refreshMock: vi.fn() }));
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
   getTokenStore: () => ({ refresh: refreshMock }),
 }));
-
-import { apiGet, ApiRequestError } from './client';
 
 function jsonResponse(status: number, body: unknown): Response {
   return {

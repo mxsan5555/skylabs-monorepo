@@ -3,6 +3,8 @@ import { generateOpaqueToken, sha256Hex } from '../lib/crypto';
 import { signAccessToken } from '../lib/jwt';
 import { HttpError } from '../middleware/errorHandler';
 
+import { selectPortalContext, contextRoleKeys, type PortalContext } from './portal-context';
+
 const REFRESH_TTL_DAYS = Number(process.env.JWT_REFRESH_TTL_DAYS ?? 30);
 
 export interface RequestMeta {
@@ -16,14 +18,16 @@ export interface TokenPair {
 }
 
 /** Issues a fresh access+refresh pair and persists the refresh session (hashed). */
-export async function issueTokenPair(userId: string, roles: string[], meta: RequestMeta = {}): Promise<TokenPair> {
-  const accessToken = signAccessToken({ sub: userId, roles, app: 'mera-driver' });
+export async function issueTokenPair(userId: string, roles: string[], meta: RequestMeta = {}, requested?: PortalContext): Promise<TokenPair> {
+  const portalContext = selectPortalContext(roles, requested);
+  const accessToken = signAccessToken({ sub: userId, roles: contextRoleKeys(roles, portalContext), portalContext, app: 'mera-driver' });
   const refreshToken = generateOpaqueToken();
   const expiresAt = new Date(Date.now() + REFRESH_TTL_DAYS * 24 * 60 * 60_000);
 
   await prisma.refreshSession.create({
     data: {
       userId,
+      portalContext,
       hashedToken: sha256Hex(refreshToken),
       ip: meta.ip,
       userAgent: meta.userAgent,
@@ -64,18 +68,20 @@ export async function rotateRefreshToken(presentedToken: string, meta: RequestMe
   }
 
   const userRoles = await prisma.userRole.findMany({
-    where: { userId: session.userId },
+    where: { userId: session.userId, role: { isActive: true } },
     select: { role: { select: { key: true } } },
   });
   const roleKeys = userRoles.map((ur) => ur.role.key);
 
-  const accessToken = signAccessToken({ sub: session.userId, roles: roleKeys, app: 'mera-driver' });
+  const portalContext = selectPortalContext(roleKeys, session.portalContext as PortalContext | null);
+  const accessToken = signAccessToken({ sub: session.userId, roles: contextRoleKeys(roleKeys, portalContext), portalContext, app: 'mera-driver' });
   const refreshToken = generateOpaqueToken();
   const expiresAt = new Date(Date.now() + REFRESH_TTL_DAYS * 24 * 60 * 60_000);
 
   const newSession = await prisma.refreshSession.create({
     data: {
       userId: session.userId,
+      portalContext,
       hashedToken: sha256Hex(refreshToken),
       ip: meta.ip,
       userAgent: meta.userAgent,

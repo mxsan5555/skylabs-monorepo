@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { CatalogDeal } from '../api/catalog';
+import type { CatalogDealPackage } from '../api/catalog';
 
 /**
  * THE canonical duration/price selection logic for a service Deal — used by every purchase
@@ -16,7 +16,8 @@ import type { CatalogDeal } from '../api/catalog';
  * `useTherapistPurchaseSelection`/`TherapistPackageSelector`), never as an optional add-on
  * inside the Deal purchase flow.
  */
-export function useDealPurchaseSelection(deal: CatalogDeal | null) {
+/** Any deal shape with packages and the cached from price (card or deal page). */
+export function useDealPurchaseSelection<P extends CatalogDealPackage, D extends { packages: P[]; salePrice: string }>(deal: D | null) {
   const packages = deal?.packages ?? [];
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(packages[0]?.id ?? null);
 

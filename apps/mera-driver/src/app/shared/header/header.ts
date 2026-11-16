@@ -1,3 +1,5 @@
+import { DriverApplication } from '../driver-application/driver-application';
+import { portalDashboard } from '../../core/auth/portal-routing';
 import {
   Component,
   CUSTOM_ELEMENTS_SCHEMA,
@@ -68,7 +70,7 @@ const STAFFING: NavLink[] = [
  */
 @Component({
   selector: 'md-header',
-  imports: [RouterLink],
+  imports: [RouterLink, DriverApplication],
   templateUrl: './header.html',
   styleUrl: './header.css',
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -77,6 +79,8 @@ const STAFFING: NavLink[] = [
   }
 })
 export class Header implements OnInit {
+  protected readonly applicationOpen = signal(false);
+  protected goAccount(): void { void this.router.navigateByUrl(portalDashboard(this.auth.bootstrap())); }
   protected readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly http = inject(HttpClient);
@@ -147,7 +151,7 @@ export class Header implements OnInit {
   protected goDriver(): void {
     this.openMenu.set(null);
     this.closeDrawer();
-    this.router.navigate(['/sign-in'], { state: { role: 'driver' } });
+    this.applicationOpen.set(true);
   }
 
   protected signOut(): void {

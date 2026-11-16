@@ -1,0 +1,21 @@
+/* FormField: control + error. Error text takes the error role. */
+.form-field {
+  display: grid;
+  align-self: start;
+  gap: 4px;
+  min-inline-size: 0;
+}
+
+.form-field--wide {
+  grid-column: 1 / -1;
+}
+
+.form-field > md-outlined-text-field,
+.form-field > md-outlined-select {
+  inline-size: 100%;
+}
+
+.form-field__error {
+  margin: 0;
+  color: var(--md-sys-color-error);
+}

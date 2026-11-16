@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { CityPickerDialog } from './city-picker-dialog';
 import content from '../../../content.json';
@@ -46,10 +46,13 @@ describe('CityPickerDialog', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('uses the current browser location and closes', () => {
+  it('uses the current browser location and closes once located', async () => {
+    requestBrowser.mockResolvedValue('located');
     const onClose = vi.fn();
     render(<CityPickerDialog onClose={onClose} />);
-    fireEvent.click(screen.getByText(t.useCurrent).closest('md-filled-tonal-button') as HTMLElement);
+    await act(async () => {
+      fireEvent.click(screen.getByText(t.useCurrent).closest('md-filled-tonal-button') as HTMLElement);
+    });
     expect(requestBrowser).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
   });

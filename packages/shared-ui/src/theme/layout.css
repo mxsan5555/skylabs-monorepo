@@ -11,7 +11,6 @@
  *
  * Page-specific styles stay in each app/page.
  */
-
 /* App shell: header / scrollable content / footer. */
 .app-shell {
   min-height: 100vh;
@@ -62,8 +61,6 @@
   font-size: var(--md-sys-typescale-body-medium-size);
 }
 
-/* Auth screens (sign-in, otp). Layout follows the design reference; all colors
-   come from the active M3 theme. */
 .auth-layout {
   min-height: 100vh;
   display: flex;
@@ -106,7 +103,7 @@
 .auth-brand__logo-image--desktop {
   display: block;
   width: auto;
-  height: 64px;
+  height: 80px;
 }
 
 .auth-brand__logo-image--mobile {
@@ -125,8 +122,6 @@
   color: var(--md-sys-color-on-surface-variant);
 }
 
-/* Non-interactive pill showing where the code was sent (semantic span, not a
-   chip — it is display-only, so it must not be announced as a button). */
 .auth-destination {
   display: inline-flex;
   align-items: center;
@@ -220,17 +215,13 @@
   align-items: center;
 }
 
-/* ------------------------------------------------------------------ *
- * Admin / account console: sidebar + centered content. Reused for every
- * role (user/admin/marketing/sales). Themed by --md-sys-color-* tokens.
- * ------------------------------------------------------------------ */
 .admin-layout {
   min-height: 100vh;
   height: 100vh;
   width: 100%;
   max-width: 100%;
   display: grid;
-  grid-template-columns: 264px minmax(0, 1fr);
+  grid-template-columns: 300px minmax(0, 1fr);
   overflow-x: hidden;
   background-color: var(--md-sys-color-surface-container-lowest);
 }
@@ -239,7 +230,6 @@
   grid-template-columns: 0 1fr;
 }
 
-/* Sidebar */
 .admin-sidebar {
   position: sticky;
   top: 0;
@@ -247,12 +237,11 @@
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 20px;
   min-width: 0;
   overflow: hidden;
-  padding: 12px;
+  padding: 20px;
   border-right: 1px solid var(--md-sys-color-outline-variant);
-  background-color: var(--md-sys-color-surface);
 }
 
 .admin-sidebar__brand {
@@ -331,14 +320,24 @@
   color: var(--md-sys-color-on-surface-variant);
 }
 
+.admin-sidebar__nav,
+.admin-nav-item {
+  --admin-nav-icon-size: 20px;
+  --admin-nav-gap: 10px;
+  --admin-nav-pad-block: 9px;
+  --admin-nav-pad-inline: 10px;
+  --admin-nav-row-min: 40px;
+  --admin-nav-row-spacing: 2px;
+}
+
 .admin-nav-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--admin-nav-gap);
   width: 100%;
   box-sizing: border-box;
-  padding: 9px 10px;
-  margin-bottom: 2px;
+  padding: var(--admin-nav-pad-block) var(--admin-nav-pad-inline);
+  margin-bottom: var(--admin-nav-row-spacing);
   border: none;
   border-radius: var(--md-sys-shape-corner-medium);
   background: transparent;
@@ -348,7 +347,7 @@
   font-size: var(--md-sys-typescale-body-large-size);
   cursor: pointer;
   text-align: left;
-  --md-icon-size: 20px;
+  --md-icon-size: var(--admin-nav-icon-size);
 }
 
 .admin-sidebar__search:focus-visible,
@@ -362,10 +361,14 @@
   background-color: var(--md-sys-color-surface-container-high);
 }
 
-.admin-nav-item.active {
-  background-color: var(--md-sys-color-secondary-container);
+.admin-nav-item.active,
+.admin-nav-group__trigger.has-active[aria-expanded='false'] {
   color: var(--md-sys-color-on-secondary-container);
   font-weight: 600;
+}
+
+.admin-nav-item.active {
+  background-color: var(--md-sys-color-secondary-container);
 }
 
 .admin-sidebar__user {
@@ -445,7 +448,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 20px;
+  padding: 10px 50px;
   border-bottom: 1px solid var(--md-sys-color-outline-variant);
 }
 
@@ -468,7 +471,6 @@
 
 .admin-breadcrumb li+li::before {
   content: '\203A';
-  /* › separator, decorative */
   color: var(--md-sys-color-outline);
 }
 
@@ -477,7 +479,6 @@
   font-weight: 600;
 }
 
-/* Ancestor crumbs that link back (e.g. All Member > {business}). */
 .admin-breadcrumb a {
   color: inherit;
   text-decoration: underline;
@@ -494,12 +495,11 @@
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  padding: 32px 20px 64px;
+  padding: 50px;
   overflow-y: auto;
   overflow-x: hidden;
 }
 
-/* Centered page with headline + subheadline */
 .admin-page {
   margin: 0 auto;
   display: flex;
@@ -523,12 +523,11 @@
   color: var(--md-sys-color-on-surface-variant);
 }
 
-/* Account / profile content */
 .account-card {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 20px;
+  padding: 25px;
   border-radius: var(--md-sys-shape-corner-large);
   background-color: var(--md-sys-color-surface-container);
 }
@@ -548,15 +547,27 @@
 
 .account-fields {
   display: grid;
-  /* grid-template-columns: repeat(2, minmax(0, 1fr)); */
   gap: 16px;
 }
+
+.address-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.account-fields--readonly {
+  --md-sys-color-on-surface: var(--md-sys-color-on-surface-variant);
+  opacity: 0.55;
+}
+
 .account-card__actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
   width: 100%;
 }
+
 .account-fields md-outlined-text-field,
 .account-fields md-filled-text-field {
   width: 100%;
@@ -630,48 +641,42 @@
   width: 100%;
 }
 
-.admin-nav-group__header {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  min-height: 40px;
-}
-
-.admin-nav-group__title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 1;
-  min-width: 0;
-  padding: 9px 10px;
-  box-sizing: border-box;
-  color: var(--md-sys-color-on-surface);
-  font-size: var(--md-sys-typescale-body-large-size);
-}
-
-.admin-nav-group__title>md-icon,
-.admin-nav-item>md-icon {
-  width: 20px;
-  min-width: 20px;
-  flex: 0 0 20px;
-  --md-icon-size: 20px;
-}
-
-.admin-nav-group__toggle {
-  flex: 0 0 40px;
-  width: 40px;
-  height: 40px;
+.admin-nav-list,
+.admin-nav-group__children {
+  list-style: none;
   margin: 0;
+  padding: 0;
+}
+
+.admin-nav-item>md-icon {
+  flex: 0 0 var(--admin-nav-icon-size);
+}
+
+.admin-nav-group__trigger,
+.admin-nav-group__children .admin-nav-item {
+  min-height: var(--admin-nav-row-min);
+}
+
+.admin-nav-group__chevron {
+  margin-inline-start: auto;
+  transition: transform var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+}
+
+.admin-nav-group__trigger[aria-expanded='true'] .admin-nav-group__chevron {
+  transform: rotate(0.5turn);
 }
 
 .admin-nav-group__children {
-  margin-left: 20px;
-  padding-left: 10px;
+  margin-left: calc(var(--admin-nav-pad-inline) + var(--admin-nav-icon-size) / 2);
+  padding-left: var(--admin-nav-pad-inline);
   border-left: 1px solid var(--md-sys-color-outline-variant);
 }
 
+.admin-nav-group__children[hidden] {
+  display: none;
+}
+
 .admin-nav-group__children .admin-nav-item {
-  min-height: 40px;
   font-size: var(--md-sys-typescale-body-medium-size);
 }
 
@@ -728,7 +733,6 @@
     transform: translateX(0);
   }
 
-  /* Close icon: top-right of sidebar */
   .admin-sidebar__mobile-header {
     position: absolute;
     top: 12px;

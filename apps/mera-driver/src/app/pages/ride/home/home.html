@@ -27,16 +27,48 @@
           type="text"
           aria-label="Pickup location"
           autocomplete="off"
-          [value]="booking.pickup()?.label ?? ''"
+          [value]="pickupQuery()"
+          (input)="onPickupInput($any($event.target).value)"
+          (focus)="activeField.set('pickup')"
           placeholder="Enter pickup"
         />
+        @if (activeField() === 'pickup' && pickupSuggestions().length) {
+          <ul class="rider-list rider-suggestions">
+            @for (s of pickupSuggestions(); track s.placeId) {
+              <li><button type="button" class="rider-row" (click)="selectPickup(s)">
+                <span class="rider-row__body">
+                  <span class="rider-row__title">{{ s.name }}</span>
+                  <span class="rider-row__sub">{{ s.address }}</span>
+                </span>
+              </button></li>
+            }
+          </ul>
+        }
         <input
           class="rider-route__field"
           type="text"
           aria-label="Destination"
           autocomplete="off"
+          [value]="dropQuery()"
+          (input)="onDropInput($any($event.target).value)"
+          (focus)="activeField.set('drop')"
           placeholder="Where to?"
         />
+        @if (activeField() === 'drop' && dropSuggestions().length) {
+          <ul class="rider-list rider-suggestions">
+            @for (s of dropSuggestions(); track s.placeId) {
+              <li><button type="button" class="rider-row" (click)="selectDropSuggestion(s)">
+                <span class="rider-row__body">
+                  <span class="rider-row__title">{{ s.name }}</span>
+                  <span class="rider-row__sub">{{ s.address }}</span>
+                </span>
+              </button></li>
+            }
+          </ul>
+        }
+        @if (placesError()) {
+          <p class="rider-eyebrow" role="alert">{{ placesError() }}</p>
+        }
       </div>
     </div>
 

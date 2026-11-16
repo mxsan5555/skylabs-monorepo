@@ -18,6 +18,7 @@ function delegate() {
   return {
     findMany: vi.fn(),
     findUnique: vi.fn(),
+    findUniqueOrThrow: vi.fn(),
     findFirst: vi.fn(),
     create: vi.fn(),
     createMany: vi.fn(),
@@ -46,9 +47,20 @@ function createPrismaMock() {
     loginHistory: delegate(),
     impersonationSession: delegate(),
     driver: delegate(),
+    masterListItem: delegate(),
+    vehicleType: delegate(),
     driverDocument: delegate(),
+    driverKycCheck: delegate(),
+    driverKycDecision: delegate(),
+    $queryRaw: vi.fn(),
     customer: delegate(),
     booking: delegate(),
+    fareRule: delegate(),
+    tripOffer: delegate(),
+    tripEvent: delegate(),
+    moneyMovement: delegate(),
+    portalMessage: delegate(),
+    paymentIntent: delegate(),
     // Supports both `$transaction([...])` (array of already-created promises — just
     // await them as Prisma would) and `$transaction(async (tx) => ...)` (callback
     // form — invoke it with the mock itself standing in for `tx`).
@@ -76,6 +88,10 @@ export function resetPrismaMock(): void {
       (value as ReturnType<typeof vi.fn>).mockClear();
       continue;
     }
+    if (typeof value === 'function' && 'mockReset' in value) {
+      (value as ReturnType<typeof vi.fn>).mockReset();
+      continue;
+    }
     if (value && typeof value === 'object') {
       for (const fn of Object.values(value)) {
         if (typeof fn === 'function' && 'mockReset' in fn) {
@@ -84,4 +100,5 @@ export function resetPrismaMock(): void {
       }
     }
   }
+  mockPrisma.$queryRaw.mockResolvedValue([]);
 }

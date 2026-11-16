@@ -2,9 +2,14 @@
 
 Guidance for Claude Code when working in this repository.
 
-> Companion docs: **`PLANNING.md`** (scope, stack, conventions), **`ARCHITECTURE.md`**
-> (detailed layout + where things go), **`TASK.md`** (what's done / in progress / backlog).
-> Read `PLANNING.md` at the start of a session; update `TASK.md` as work completes.
+> Docs: start at **`docs/README.md`**. Each app has the same eight files in `docs/<app>/`
+> (`README`, `PLANNING`, `ARCHITECTURE`, `DATABASE`, `API`, `TASKS`, `TESTING`, `DEPLOYMENT`), with
+> the same module sections in each. Read the app's `README.md` and `PLANNING.md` at the start of a
+> session; tick `TASKS.md` and update the module's sections in `PLANNING`/`DATABASE`/`API`/`TESTING`
+> in the same commit as the work. Never add a new Markdown file: write designs into the module's
+> section of `PLANNING.md`. For every feature, change or bug fix, follow the step-by-step workflow in
+> `docs/README.md` ("How to work on a feature"): rules in `PLANNING.md` first, stop for review before
+> any schema or API change, test cases in `TESTING.md` before code, tick `TASKS.md` last.
 
 ## Repo State
 
@@ -13,8 +18,8 @@ shared packages.
 
 - **`apps/msd`** — React 19 + Vite, port **4200**. Business: **massage deals** (public storefront + the full RBAC admin console under `/account/*`). Theme: green (`#007C2B`).
 - **`apps/mera-driver`** — Angular 21 (standalone) + Tailwind, port **4400**. Business: **driver booking** (same public + admin-console split as msd). Theme: blue (`#1175BC`).
-- **`apps/msd-api`** — Express + TypeScript + Prisma + PostgreSQL (db `msd`), port **3333**, all routes under `/api/v1`. MSD's own RBAC + business modules: Customers, Vendors (+ KYC, branches, therapists), Products, Deals, Orders, Cart, Wishlist, Payments (Razorpay), Reports, Notifications, CMS (blog, FAQs, pages, site content) and the public storefront catalog are real; only **Inventory** is still a permission-gated stub.
-- **`apps/mera-driver-api`** — Express + TypeScript + Prisma + PostgreSQL (db `mera_driver`), port **3334**, routes mounted at root (no `/api/v1` prefix). MeraDriver's own RBAC + business modules: Drivers, Vehicles, Bookings, Trip types, Attendance, Customers and master data are real; **Payments** and **Reports** are still permission-gated stubs (see `docs/MERA_DRIVER_ARCHITECTURE.md` §20).
+- **`apps/msd-api`** — Express + TypeScript + Prisma + PostgreSQL (db `msd`), port **3333**, all routes under `/api/v1`. MSD's own RBAC + business modules: Customers, Members (+ KYC documents, branches, therapists), Products, Deals, Orders, Cart, Wishlist, Payments (Razorpay), Reports, Notifications, CMS (blog, FAQs, pages, site content) and the public storefront catalog are real; only **Inventory** is still a permission-gated stub.
+- **`apps/mera-driver-api`** — Express + TypeScript + Prisma + PostgreSQL (db `mera_driver`), port **3334**, routes mounted at root (no `/api/v1` prefix). MeraDriver's own RBAC + business modules: Drivers, Vehicles, Bookings, Trip types, Attendance, Customers and master data are real; **Payments** and **Reports** are still permission-gated stubs (see `docs/mera-driver/ARCHITECTURE.md`).
 - **`packages/shared-ui`** (`@skylabs-monorepo/shared-ui`) — Material 3 web components (Material Web + LIT), theme, React wrappers, test helpers. Presentational only and **app-neutral**: mera-driver consumes it with a different design and purpose, so only common components live here. App layout pieces (page bands, grids, filter panels) live in each app.
 - **`packages/shared-types`** — cross-app RBAC domain types (`Role`, `Permission`, `MenuNode`, `BootstrapResponse`, `ApiEnvelope<T>`, …). Types only, no runtime code, no business data.
 - **`packages/shared-permissions`** — pure functions `can()`, `filterMenuByPermissions()`, `permissionKeyFor()`.
@@ -26,7 +31,7 @@ The two apps are **different businesses** with **fully independent** backends �
 own routes/controllers/services/Prisma schema/database/env per API, never a
 shared table or shared identity DB. RBAC is duplicated **by pattern** (same
 Prisma schema template, same `shared-auth`/`shared-permissions` packages),
-never by shared data. See `ARCHITECTURE.md`.
+never by shared data. See `docs/ARCHITECTURE.md`.
 
 ## Commands
 
@@ -66,23 +71,23 @@ If pages render unstyled or an import 500s in dev, it's almost always a **stale
 - Register all M3 elements once per app: `import '@skylabs-monorepo/shared-ui';`
 - Theme: `import '@skylabs-monorepo/shared-ui/theme.css';` + `applyTheme('light' | 'dark', contrast?)`.
 - App-shell / auth layout styles: `@skylabs-monorepo/shared-ui/layout.css` (msd imports it in `main.tsx`; mera-driver lists it in `project.json` build `styles`).
-- **React (msd)** uses typed wrappers: `import { FilledButton } from '@skylabs-monorepo/shared-ui/react';`
+- **React (msd)** uses typed wrappers for `md-*`: `import { FilledButton } from '@skylabs-monorepo/shared-ui/react';`. `sky-*` elements have no wrappers: use raw tags, and write any option whose LIT attribute is kebab-case in that form (`price-first`, `image-alt`, `icon-style`, also as keys in `{...spread}` objects). Server rendering writes `priceFirst` as a `pricefirst` attribute and hydration never sets the property, so a camelCase option is lost on prerendered pages. `apps/msd/src/sky-element-props.test.ts` enforces this; element-valued props (`controlsElement`) and arrays stay camelCase properties.
 - **Angular (mera-driver)** uses raw `<md-*>` tags; any component using them needs `schemas: [CUSTOM_ELEMENTS_SCHEMA]`.
 - Custom in-house components live in `packages/shared-ui/src/components/` (e.g. `sky-badge`, `sky-card`), written in LIT **without decorators** for cross-framework source compatibility.
 - **Card components** (compose M3 web components inside, themed by `--md-sys-color-*`, primitive props → same usage in React/Angular):
-  - `sky-product-card` — listing card (image, badge, favorite, rating **stars** via `rating`+`reviews` _or_ a **score badge** via `score`+`score-label`, price/discount); `variant="outlined"` for the bordered look; `layout="horizontal"` for list rows (media left, content right; stacks under 600px of its own width via a container query).
+  - `sky-product-card` — listing card (image, badge, favorite, rating **stars** via `rating`+`reviews` _or_ a **score badge** via `score`+`score-label`, price/discount, optional `description`); `variant="outlined"` for the bordered look; `price-first` for the offer order (price + one-star rating row, heading, description, eyebrow, location + distance row, slotted actions spanning the card; showcase "Offer card"); with `divided`, a hairline then the member and place on one line each (no description, for services); `badge-color` (`primary|secondary|tertiary|error`) + `badge-tone="tonal"` draw the badge as a theme-role `sky-badge`; `color` (same `m3-surface` vocabulary as the feature card) colours the body, text, accents and slotted buttons (shared `actionRoles`); `layout="horizontal"` for list rows (media left, content right; stacks under 600px of its own width via a container query).
   - `sky-image-card` — full-bleed image with overlay `label` (+ optional `href`, `ratio`).
   - `sky-category-card` — rounded image + `heading`/`subheading` (+ optional `href`).
   - `sky-info-card` — surface card with an illustration (`media` slot) or `icon` + `heading`/`subheading`.
-  - React: `SkyProductCardReact`, `SkyImageCardReact`, `SkyCategoryCardReact`, `SkyInfoCardReact`. Angular: raw `<sky-*-card>` tags.
+  - Raw `<sky-*-card>` tags in both apps (typed in `apps/msd/src/types/sky-elements.d.ts`).
 - **M3 surface components** (`sky-image`, `sky-tile-card`, `sky-feature-card`, `sky-cta-banner`) share one option vocabulary from `components/m3-surface.ts`, every value mapped to an M3 token (no brand values in the components): `color` = `none|surface|surface-high|primary|secondary|tertiary|inverse` (container + on-container + accent roles), `variant` = `filled|outlined|elevated`, `shape` = M3 corner scale `none…extra-large|full`, `icon` + `icon-style` (`filled|tonal|surface|plain`) + `icon-shape`. Linked surfaces use `md-ripple` + `md-focus-ring` (M3 state layer).
   - `sky-image` — framed image/logo (`fit="contain"`, `ratio`) with a placeholder icon when `src` is missing or fails; `href` makes it one link.
-  - `sky-tile-card` — icon + headline + text tile (category grids); `href` = whole-tile link.
-  - `sky-feature-card` — icon + headline + text + CTA (`cta-label`/`cta-href`/`cta-icon`, accent-tinted `md-filled-button`) or an `actions` slot; `layout="horizontal"` for a strip.
+  - `sky-tile-card` — icon + headline + text tile (category grids); `href` = whole-tile link; a slotted `headline` holding a link (home category tiles) gets the same hover/press state layer.
+  - `sky-feature-card` — icon + headline + text + CTA (`cta-label`/`cta-href`/`cta-icon`, accent-tinted `md-filled-button`) or an `actions` slot (its buttons take the card's accent role too); `layout="horizontal"` for a strip; optional `image`/`image-alt` (leading media, decorative without alt, placeholder if it fails to load) and `cta-color` (`primary|secondary|tertiary|inverse` button role).
   - `sky-cta-banner` — `sky-feature-card` preset to horizontal (stacks under 600px of its own width).
   - All four are raw tags in both apps (typed in `apps/msd/src/types/sky-elements.d.ts`). msd's `useShadowLinkNavigation` (in `AppRoutes`) routes same-origin shadow-DOM `href` clicks through React Router, so these links don't reload the page.
-- **Action field** (`sky-action-field`): M3 text field with an attached action button, for any "type, then act" UI (site search, newsletter, coupon, pincode). Options: `icon` (leading), `action-label` → `md-filled-button` / `action-icon` alone → `md-filled-icon-button`, `variant="filled|outlined"`, `shape` (default `full`), `dense` (48dp), plus native `type`/`name`/`autocomplete`/`enterkeyhint`/`required`/`disabled`. Fires `sky-submit` `{ value }` (trimmed); in React 19 bind it with the `onsky-submit` prop. Put `role="search"` on the host for a search landmark. Used by the msd header and home hero.
-- **Accordion** (`sky-accordion` + `sky-accordion-item`): expandable card panels with a rotating `md-icon` chevron. Each header is one accessible trigger (`aria-expanded`/`aria-controls`); collapsed bodies are `hidden`. `sky-accordion single` keeps only one item open. React: `SkyAccordionReact`/`SkyAccordionItemReact`; Angular: raw `<sky-accordion>`/`<sky-accordion-item>`.
+- **Action field** (`sky-action-field`): M3 text field with an attached action button, for any "type, then act" UI (site search, newsletter, coupon, pincode). Options: `icon` (leading), `action-label` → `md-filled-button` / `action-icon` alone → `md-filled-icon-button`, `variant="filled|outlined"`, `shape` (default `full`), `dense` (48dp), `clearable` (+ `clear-label`), `combobox` + `expanded` + `controlsElement`/`activeOption` (ARIA element reflection for a popup listbox in the page), plus native `type`/`name`/`autocomplete`/`enterkeyhint`/`required`/`disabled`. Fires `sky-submit` `{ value }` (trimmed); in React 19 bind it with the `onsky-submit` prop. Put `role="search"` on the host for a search landmark. Used by the msd header and home hero.
+- **Accordion** (`sky-accordion` + `sky-accordion-item`): expandable card panels with a rotating `md-icon` chevron. Each header is one accessible trigger (`aria-expanded`/`aria-controls`); collapsed bodies are `hidden`. `sky-accordion single` keeps only one item open. Raw `<sky-accordion>`/`<sky-accordion-item>` tags in both apps.
   - All cards are **fluid** (fill their container — wrap them in a responsive grid/flex), support **`align="left|center|right"`**, and are **semantic + accessible by default**: `figure`/`figcaption` (image & category), `article` + `h3`/`p`, `<img alt>`, `href` renders one labelled stretched link, and `aria` on the rating and favorite button.
 - Icons: self-hosted Material Symbols Outlined (the `material-symbols` package, imported in `theme/base.css`). Use `<md-icon>name</md-icon>` and `aria-hidden="true"` when decorative.
 
@@ -97,6 +102,9 @@ slide content is app-specific, so a wrapper would add surface for no reuse.
   base bundle). Then use raw `<swiper-container>` / `<swiper-slide>` tags.
 - **React (msd)**: tags work in JSX; `apps/msd/src/types/swiper-elements.d.ts` types them.
 - **Angular (mera-driver)**: the component needs `schemas: [CUSTOM_ELEMENTS_SCHEMA]`.
+- **Card carousels clip at `::part(container)`** (Swiper's inner `overflow: hidden`), not the
+  host: put room for hover shadows / focus rings in `swiper-container::part(container) { padding }`
+  and cancel it with a negative host margin (see `card-rail.css`, `.home-hero__carousel`).
 - **Theming is automatic**: `theme/base.css` maps `--swiper-theme-color` to
   `--md-sys-color-primary`, so pagination/scrollbar/arrows match each app's brand.
 - **Features are attributes** (`slides-per-view="auto"`, `space-between`, `loop`,
@@ -109,8 +117,8 @@ slide content is app-specific, so a wrapper would add surface for no reuse.
 Public pages (home, category, explore, ...) are **composition only**: shared-ui components plus the
 msd building blocks below. No page-specific CSS files with hardcoded colours, sizes or copy;
 copy lives in `apps/msd/src/content.json`. Page-level CSS that still exists (`home.css` for
-hero/steps/offers, `category.css` for `/categories`, therapists, orders, invoices, payments) is
-legacy and is being migrated (see `TASK.md`).
+hero/steps/offers) is legacy and is being migrated. Static pages compose `StaticPage`
+(`components/static-page/`); CMS body blocks render through `components/blog-blocks/`.
 
 **Colour split (60/30/10, M3 roles only):** 60 = `surface` (page base); 30 = `surface-container`
 bands (`PageSection tone="tint"`) + `secondary-container` fills (category tiles, step markers,
@@ -124,7 +132,15 @@ No hex values in app code; brand colour comes from each app's generated M3 theme
 | `PageSection` | Full-bleed band (`tone="surface"` or `"tint"`, `flush`, `stack`) + 1280px / 16px container. Every page section uses it. |
 | `SectionHead` | Section header row (h2, or `as="h1"` for a page title), subheading (string or node), See all link, actions. |
 | `CardRail` / `CardGrid` | Swiper carousel / responsive grid (272px min columns, `layout="list"` one per row; `above`, `panel` tabpanel, `fallback`). |
-| `ChipNav` | Single-select pill row (`md-filter-chip`), scrolls sideways on phones. |
+| `ChipNav` | Single-select pill row (`md-filter-chip`), or a `<nav>` of real links when items have `href` (category chips); `end` = the result count at the row end. Scrolls sideways on phones. |
+| `listing/` | `ListingBody` (toolbar, filter panel, grid or map, load more), `useListingParams` (URL state), `listingCards`, `useListingFacets`: the shared results band of category, `/deals`, `/products`, `/therapists` and explore. |
+| `StatusPanel` | Outcome panel for a finished task (order result): `tone` picks an M3 role pair for panel and text plus the icon badge (`success` = primary-container / primary, the brand green; `error` = error-container / error; `neutral` = surface-container), filled and outlined actions recoloured to keep contrast on that container, h1, text, `facts` description list, `actions`, `footer`. `compact` for a notice inside a page (refund, failed payment). |
+| `SummaryPanel` | Totals panel beside a list (cart, checkout, order result): surface-container, optional `meta` (text or nodes, e.g. a status badge) and child lines (`PurchaseLineList variant="receipt"`), rows and total as a `dl`, total in primary, note, full-width actions (`inlineActions` for one end-aligned button, the order list); `as="h3"` under a section heading. |
+| `QuantityStepper` | Minus / value / plus as one named group (`groupLabel` or `labelledBy`), `min` / `max` guarded in code; cart lines and detail pages. |
+| `FormPanel` / `FormPanelSection` | One form step on the page surface (the 60, no card, no corners): h2 + intro, sections and footer split by dividers (optional h3 with icon and an action such as Edit details); the footer holds `footerLead`, `actions` and `note`. Checkout steps. |
+| `StepIndicator` | Read-only progress through a short flow (checkout, order page): named `ol`, `aria-current="step"`, check on done steps; `tone="error"` marks the current step in the error role (a cancellation). |
+| `RadioCardGroup` | Single choice as cards (payment method): fieldset + legend, raw `md-radio` per option, chosen card on secondary-container. |
+| `FormField` (`form-controls`) | One control with its error as an alert; `wide` spans a `.form-grid` row. `renderSelect` takes `selectKey` to remount a dependent list (City by State). |
 | `ClampText` | Two-line clamped description with More / Less. |
 | `ListingToolbar` | Toolbar row above a listing (`start` / `end` slots). |
 | `ChoiceMenu` | Trigger (assist chip or text button) + `md-menu` of single choices (sort). |
@@ -135,16 +151,22 @@ No hex values in app code; brand colour comes from each app's generated M3 theme
 | `CheckboxFacet` / `PriceRangeField` | Searchable checkbox list with counts / range slider + Min/Max fields. |
 | `CityPickerDialog` | City picker (used by the header `CityChip` and the filter panel). |
 | `DealMap` | Deal price markers on a map (see Maps below). |
+| `OfferCard` | Deal or product as `sky-product-card price-first` (tag, price, two-line title; services: no description, then `divided` member, place and distance; products: two-line description, then the business name; Add to cart, wishlist; whole card opens the detail page). Options: `tag`, `color`, `variant`, `layout`, `slider` (image slider with previous / next buttons and dots via `ProductCardGallery fill`, when the item has 2+ images; default off). Used by the home hero (`color="surface-high" variant="plain"`). |
+| `TherapistCard` | Therapist listing card (image slider, member, area, distance, From price; optional actions); helpers `lowestPackagePrice`, `formatDistance`. Home, search, category, therapists, related rails. |
+| `detail-page/` | Detail page blocks shared by `/deal/:id` and `/therapist/:id`: `DetailGallery`, `DetailPrice`, `DetailPurchase` (quantity, total, Add to cart, share), `BranchPanels` (location + hours), `DetailNotFound`; with `DurationPackageSelector` for packages. |
 
 Hooks: `usePagedList` (page-by-page lists keyed by the filter set, seeded from prerender),
 `useMediaQuery(query, fallback)`, `useVisitorLocation()` (the one visitor location: city +
 coordinates, also drives the header "Set location"), `useCustomEvent` (listen to `sky-*` / `md-*`
 events on elements React hydrated from prerendered HTML).
 
-**Category page** (`/category/:slug`, `/category/:slug/:city`): h1 + total (`meta.total`),
-clamped description, subcategory pills, toolbar (Filters, List/Grid/Map, Sort: Relevance, Price
-low-high / high-low, Distance when the visitor has coordinates), filter panel, 12 cards per page.
-All view state is in the URL: `sub`, `sort`, `view`, `radius`, `vendor`, `branch`, `min`, `max`.
+**Listing pages** (category `/category/:slug[/:city]`, `ListingPage` for `/deals[/:city]`,
+`/products`, `/therapists[/:city]`, explore `/explore`): h1, description, chip row with the total
+(`meta.total`) at its end, toolbar (Filters, List/Grid/Map, Sort per kind), filter panel per kind
+(deals: location, distance, price, tags, business, branches; products: category on `/products`,
+price, tags, business; therapists: deals minus tags; explore "All": location, distance, price), 12 cards per
+page. Card images carry the API's tag (New, Deal, Hot, Expire soon). All view state is in the
+URL: `sub`, `sort`, `view`, `radius`, `vendor`, `branch`, `min`, `max`, `tag`, `cat`, `kind`.
 No ratings anywhere until a review system exists.
 
 **Maps:** `DealMap` lazy-loads its engine only when a map view opens. `VITE_MAP_PROVIDER=leaflet`
@@ -156,8 +178,12 @@ No ratings anywhere until a review system exists.
 `GET /deals` (`sort=relevance|price_asc|price_desc|distance|newest|discount`, `vendorIds`,
 `branchIds` comma lists, `radiusKm` with `latitude`/`longitude`, `minPrice`/`maxPrice`, paging
 with `meta.total`), `GET /deals/facets` (vendor / branch / distance-bucket counts + price range,
-each facet ignoring its own selection), `GET /products` (price sorts), `GET /therapists`. With
-coordinates the deal list is ranked in memory (`services/deal-ranking.ts`).
+each facet ignoring its own selection, plus tag counts), `GET /products` (sorts, `categoryIds`,
+`vendorIds`, `tags`) + `GET /products/facets` (category / business / tag / price), `GET /therapists` (server-side `sort`, price = lowest package,
+`radiusKm`, `city`, `vendorIds`, `branchIds`) + `GET /therapists/facets`. Deals and products carry
+a computed `tag` (`services/offer-tag.ts`, rule in `docs/msd/PLANNING.md` §4) and accept `tags=`.
+With coordinates the deal and therapist lists are ranked in memory (`deal-ranking.ts`,
+`therapist-ranking.ts`).
 
 **Testing gotchas (msd, Vitest + jsdom):**
 - `@lit/react` resolves to its Node/SSR build under Vitest, so shared-ui React **wrappers**
@@ -174,6 +200,7 @@ coordinates the deal list is ranked in memory (`services/deal-ranking.ts`).
 - **Pages live in each app**, never as shared web components. Reuse happens at the component level (`shared-ui`) and as app-local logic. Compose pages from `shared-ui` pieces.
 - **shared-ui stays app-neutral.** Add only components both apps could use; app layout components (bands, grids, toolbars, filter panels) go in that app's `components/`. A new option on a shared component must leave its default rendering unchanged.
 - **No page CSS on storefront pages**: compose `PageSection`, `SectionHead`, `CardGrid` and friends (see "msd storefront"). Colour through M3 roles only, following the 60/30/10 split.
+- **Notifications (msd)**: one `<sky-snackbar>` mounted in `app.tsx` (`SnackbarHost`); screens call `showSnackbar(message, { variant })` from `apps/msd/src/snackbar/snackbar.tsx` after the action resolved. No React toast, no per-page snackbar element. Unit tests that assert snackbar copy render `<SnackbarHost />` next to the page.
 - Each app owns its **routing, layouts, auth, api client, and models** (logic is app-local, not shared between apps).
 - **Accessibility** (WCAG 2.2 AA): semantic landmarks (`<main>`, `<header>`, `<nav>`), labelled controls, `aria-hidden` on decorative icons, `autocomplete` hints on inputs, keyboard-navigable.
 - **SEO**: per-route `<title>` (React 19 hoists `<title>`/`<meta>`; Angular uses the route `title`), default `<meta name="description">` in each `index.html`, `noindex` on auth pages.
@@ -190,15 +217,15 @@ not from a fixed role→page mapping in the frontend.
 ### Default roles (seeded, both apps' DBs independently)
 
 `super_admin` (flagged `isSuperAdmin`, auto-granted every permission),
-`admin`, `customer`, `vendor`, `marketing`, `sales` — all `isSystem: true`
+`admin`, `customer`, `member` (msd; mera-driver keeps `vendor`), `marketing`, `sales`, `support` — all `isSystem: true`
 (undeletable). SuperAdmin can create unlimited additional custom roles
 (HR, Dispatcher, Warehouse, …) at runtime; nothing about a custom role
 requires a code change.
 
 ### The permission model
 
-- A **permission** is a `${menuKey}:${action}` pair, e.g. `orders:create`,
-  `rbac.roles:view`. `action` is one of 16 fixed kinds (`view create edit
+- A **permission** is a `${menuKey}:${action}` pair, e.g. `members:create`,
+  `members:status_change`. `action` is one of 16 fixed kinds (`view create edit
   delete export import approve reject upload download print assign restore
   permanent_delete status_change custom` — see `PermissionAction` in
   `packages/shared-types`).
@@ -258,7 +285,8 @@ requires a code change.
   /roles/:id/permissions`, `PUT /roles/:id/widgets`, users CRUD/status/
   role-assign/session-revoke/OTP-reset/login-history/device-sessions, `GET
   /audit-logs`, `POST /impersonate`, `GET /bootstrap`.
-- `prisma/seed.ts` — seeds the 6 default roles + a starter permission set
+- `prisma/seed.ts` — seeds the default roles (7 in msd-api: super_admin, admin,
+  marketing, sales, member, support, customer; 13 in mera-driver-api) + a starter permission set
   walked from that app's `shared-menu` JSON, auto-granting everything to
   the `isSuperAdmin`-flagged role.
 
@@ -307,7 +335,8 @@ stores uploaded media on **Cloudflare R2** (Railway's disk is wiped on redeploy)
 `release → main`, **back-merge into `develop`** (`git checkout develop && git pull
 && git pull origin main --no-edit && git push`) so the release's version bump +
 changelog don't leave `develop` behind. Full detail (Vercel `vercel.json` per app,
-dashboard settings, domains, env vars, back-merge): see **`DEPLOYMENT.md`**.
+dashboard settings, domains, env vars, back-merge): see **`docs/DEPLOYMENT.md`** and each app's
+`docs/<app>/DEPLOYMENT.md`.
 
 ## AI Dev Team
 
@@ -379,8 +408,8 @@ msd map vars: `VITE_MAP_PROVIDER` (`leaflet` default or `google`), optional `VIT
   `git stash`, `git reset`, `git checkout -- <file>`, `git restore`, `git clean`, `git apply`,
   `git worktree`, or delete directories to "compare with an old version". Read old files with
   `git show <rev>:<path> > <temp file>` instead. Stage only the files a task names.
-- Known pre-existing test failures (not caused by storefront work): msd `app.spec.tsx` (1) and
-  `otp.test.tsx` (2); mera-driver RBAC route / users "Login As" / drivers specs (12). Tracked in `TASK.md`.
+- Known pre-existing test failures: listed once in `docs/msd/TESTING.md` §3 (msd, msd-api,
+  shared-menu) and `docs/mera-driver/TESTING.md` §3 (12 specs). They must not grow.
 
 - `nx.json` `defaultBase` is `"main"` (matches the active branch) — `nx affected`
-  in CI and `nx-ignore` on Vercel both compare against it. See `DEPLOYMENT.md`.
+  in CI and `nx-ignore` on Vercel both compare against it. See `docs/DEPLOYMENT.md`.

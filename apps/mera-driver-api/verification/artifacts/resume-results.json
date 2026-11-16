@@ -1,0 +1,20 @@
+{
+  "fullFilename": "Resume_Full_Fixture_Driver_Resume.pdf",
+  "partialFilename": "Resume_Partial_Fixture_Driver_Resume.pdf",
+  "employmentEntries": 3,
+  "previewAndPdfSameSnapshot": true,
+  "ownAndStaffAuthorization": true,
+  "mobileNoHorizontalOverflow": true,
+  "baseline": {
+    "drivers": 7,
+    "users": 12
+  },
+  "after": {
+    "drivers": 7,
+    "users": 12
+  },
+  "limitations": [
+    "Local signed test tokens; login itself not exercised",
+    "No Ramesh sample asset available"
+  ]
+}

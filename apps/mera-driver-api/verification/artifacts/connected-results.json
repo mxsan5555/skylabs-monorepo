@@ -1,0 +1,31 @@
+{
+  "results": [
+    "Real password login with isolated customer, driver and verifier users",
+    "Both trip drivers passed current human KYC checks and received authorized backend final approval before matching",
+    "Independent compulsory fee, trusted staff confirmation, replay idempotency and online eligibility",
+    "Website creates a real owned, backend-priced booking; customer sees Finding a driver; cross-owner access denied",
+    "Admin Dispatch, real driver request accepted in UI, customer sees only approved public driver details",
+    "Customer and driver share trip progression through OTP start and completion; offline collection yields ₹1000 collected, ₹150 commission, ₹850 payable, ₹350 platform income including ₹200 fee exactly once",
+    "Real PostgreSQL concurrent acceptance: exactly one winner and one 409; authorized reassignment records reason and history",
+    "Invoice PDF, restricted verifier Accounts access, completed payout reducing payable, registration refund reversing platform fee income",
+    "Real derived fee/licence/readiness list filters; payout recovery required before customer refund; refund reverses earned commission and driver share",
+    "Decline and expiry return an unassigned booking to dispatch; late acceptance and ineligible manual assignment rejected; audited waiver settles the required fee independently",
+    "Customer Payments & Invoices and support use owned records; driver notifications and registration fee show real saved workflow data; customer mobile sidebar verified",
+    "Suspended driver login and own-trip access revoked without deleting history; suspension filter works; blocked customer own access denied"
+  ],
+  "before": {
+    "drivers": 6,
+    "customers": 2,
+    "bookings": 1
+  },
+  "after": {
+    "drivers": 6,
+    "customers": 2,
+    "bookings": 1
+  },
+  "limitations": [
+    "Admin browser uses a local signed token; fixture customer/driver/verifier password login exercised",
+    "No live payment-provider call; real offline confirmation fixtures and gateway unit tests",
+    "No production IDSPay call"
+  ]
+}

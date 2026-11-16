@@ -22,7 +22,10 @@ import { ensureUniqueSlug } from '../src/lib/slug';
 import { getMenuForApp } from '@skylabs-monorepo/shared-menu';
 import { normalizeIdentifier } from '../src/lib/normalizeIdentifier';
 import { migrateSharedKeySplitGrants } from '../src/services/permission-migration.service';
+import { syncDealPriceFromPackages } from '../src/services/deal.service';
 import { CATEGORY_TAXONOMY } from './category-taxonomy';
+import { PERMISSION_MATRIX_GRANTS, MATRIX_GOVERNED_MENU_KEYS } from './permission-matrix';
+import { auditAndMigrateMultiRoleAccounts } from './role-migration';
 
 const prisma = new PrismaClient();
 
@@ -34,13 +37,14 @@ interface RoleSeed {
   isSuperAdmin: boolean;
 }
 
-const ROLES: RoleSeed[] = [
+export const ROLES: RoleSeed[] = [
   { key: 'super_admin', name: 'Super Admin', description: 'Full unrestricted access to every module.', isSystem: true, isSuperAdmin: true },
-  { key: 'admin', name: 'Admin', description: 'MSD staff — full moderation and CRUD.', isSystem: true, isSuperAdmin: false },
+  { key: 'admin', name: 'Admin', description: 'MSD staff. Same as Super Admin except delete.', isSystem: true, isSuperAdmin: false },
+  { key: 'marketing', name: 'Marketing', description: 'View members and catalog. Manages website content.', isSystem: true, isSuperAdmin: false },
+  { key: 'sales', name: 'Sales', description: 'Creates members and their catalog.', isSystem: true, isSuperAdmin: false },
+  { key: 'member', name: 'Member', description: 'Deal company that manages its own profile and catalog.', isSystem: true, isSuperAdmin: false },
+  { key: 'support', name: 'Support', description: 'Contacts customers and members. View only.', isSystem: true, isSuperAdmin: false },
   { key: 'customer', name: 'Customer', description: 'Consumer-facing base role.', isSystem: true, isSuperAdmin: false },
-  { key: 'vendor', name: 'Vendor', description: 'Company/vendor owner or manager.', isSystem: true, isSuperAdmin: false },
-  { key: 'marketing', name: 'Marketing', description: 'Content, promotions, categories.', isSystem: true, isSuperAdmin: false },
-  { key: 'sales', name: 'Sales', description: 'Vendor accounts and reporting.', isSystem: true, isSuperAdmin: false },
 ];
 
 /**
@@ -66,14 +70,14 @@ const EXTRA_ACTIONS_BY_MENU_KEY: Record<string, PermissionAction[]> = {
   // Product/Therapist sub-resources moved to their own `vendors.*` keys below so each admin
   // sidebar item (and its Role Permission Matrix row) is independently grantable, matching
   // `vendors.routes.ts`'s per-resource `requirePermission` calls.
-  vendors: ['create', 'edit', 'delete', 'export', 'approve', 'reject', 'status_change', 'custom'],
+  members: ['create', 'edit', 'delete', 'export', 'approve', 'reject', 'status_change', 'custom'],
   // Admin-on-behalf Branch CRUD — no delete endpoint exists (Branch is only ever soft-disabled
   // via `status_change`, see Branch's own schema doc comment), so no `delete` action is seeded;
   // the Role Permission Matrix shows a disabled dash for that cell, same as any other
   // not-yet-grantable action (see permission-matrix.tsx's own doc comment).
   'vendors.branches': ['create', 'edit', 'status_change'],
-  // Admin-on-behalf Deal CRUD, including the admin-only approve/reject moderation actions.
-  'vendors.deals': ['create', 'edit', 'delete', 'status_change', 'approve', 'reject'],
+  // Admin-on-behalf Deal CRUD. No approve/reject: deals publish without approval (D6).
+  'vendors.deals': ['create', 'edit', 'delete', 'status_change'],
   // Admin-on-behalf Therapist CRUD — no delete-via-status distinction beyond status_change/delete
   // both existing as real endpoints.
   'vendors.therapists': ['create', 'edit', 'delete', 'status_change'],
@@ -94,6 +98,7 @@ const EXTRA_ACTIONS_BY_MENU_KEY: Record<string, PermissionAction[]> = {
   'masters.popular-treatments': ['create', 'edit', 'delete'],
   'masters.promotions': ['create', 'edit', 'delete'],
   'masters.home-hero': ['create', 'edit', 'delete'],
+  'masters.home-tag-sections': ['create', 'edit', 'delete'],
   'rbac.roles': ['create', 'edit', 'delete', 'status_change'],
   'rbac.users': ['create', 'edit', 'delete', 'assign', 'status_change', 'custom'],
   'rbac.audit-logs': [],
@@ -131,7 +136,20 @@ const EXTRA_ACTIONS_BY_MENU_KEY: Record<string, PermissionAction[]> = {
   'vendor-portal.products': ['create', 'edit', 'delete'],
   'vendor-portal.therapists': ['create', 'edit', 'status_change'],
   'vendor-portal.customers': [],
-  'vendor-portal.orders': [],
+  // 'custom' gates the Purchase Verification surface on the same page (voucher verify/start/
+  // OTP/complete/ship/evidence) — mirrors `vendors:custom`'s "plumbing gate shares a menuKey
+  // with a resource the matrix also governs" pattern (see vouchers.routes.ts, PERMISSION_MATRIX_
+  // GRANTS's `vendor` row, and `applyPermissionMatrix`'s own `custom`-exclusion doc comment).
+  'vendor-portal.orders': ['custom'],
+  // ── Accounts, Member Settlements & Purchase Verification (net-new domain) ──────────────────
+  // Overview is read-only (stat tiles) — baseline view/create/edit/delete stays inert like any
+  // other read-only screen (see `rbac.audit-logs`'s identical empty-array convention above).
+  'accounts.overview': [],
+  'accounts.customer-payments': ['export'],
+  'accounts.member-settlements': ['approve', 'status_change', 'export'],
+  // Deliberately NOT added to `admin`'s PERMISSION_MATRIX_GRANTS below — refunds/disputes power
+  // stays Super-Admin-only for v1 (the plan's own explicit list never grants this key to admin).
+  'accounts.refunds-disputes': ['approve', 'reject', 'status_change'],
 };
 
 function flattenMenu(nodes: readonly MenuNode[]): MenuNode[] {
@@ -203,12 +221,28 @@ async function seedPermissions(): Promise<Map<string, string>> {
  * this seed-time grant only matters for what the Role Permission Matrix editor *displays* as
  * checked for the Super Admin role.)
  */
+// Same caps as `permission-resolver.service.ts`'s `applySuperAdminMatrixCaps` — kept in sync so
+// the Role Permission Matrix UI displays exactly what SuperAdmin's live-resolved access actually
+// is, even though THAT function (not this seed-time grant) is what governs it at runtime.
+const SUPER_ADMIN_VIEW_ONLY_MENU_KEYS = ['orders', 'reports', 'payments'];
+const SUPER_ADMIN_VIEW_EDIT_ONLY_MENU_KEYS = ['system-settings'];
+const SUPER_ADMIN_VIEW_CREATE_ONLY_MENU_KEYS = ['customers'];
+
 async function grantAllPermissionsToSuperAdmins(
   roles: Map<string, { id: string; isSuperAdmin: boolean }>,
   permissionIdByKey: Map<string, string>,
 ) {
   const allPermissionIds = [...permissionIdByKey.entries()]
-    .filter(([key]) => !key.startsWith('vendor-portal.'))
+    .filter(([key]) => {
+      if (key.startsWith('vendor-portal.')) return false;
+      const splitAt = key.lastIndexOf(':');
+      const menuKey = key.slice(0, splitAt);
+      const action = key.slice(splitAt + 1);
+      if (SUPER_ADMIN_VIEW_ONLY_MENU_KEYS.includes(menuKey)) return action === 'view';
+      if (SUPER_ADMIN_VIEW_EDIT_ONLY_MENU_KEYS.includes(menuKey)) return action === 'view' || action === 'edit';
+      if (SUPER_ADMIN_VIEW_CREATE_ONLY_MENU_KEYS.includes(menuKey)) return action === 'view' || action === 'create';
+      return true;
+    })
     .map(([, id]) => id);
   for (const role of roles.values()) {
     if (!role.isSuperAdmin) continue;
@@ -219,6 +253,42 @@ async function grantAllPermissionsToSuperAdmins(
     });
   }
 }
+
+/** The `members` row of the role matrix. Super Admin gets everything through its role flag. */
+export const MEMBER_GRANTS: Record<'admin' | 'sales' | 'marketing' | 'support' | 'member', string[]> = {
+  admin: ['members:view', 'members:create', 'members:edit', 'members:status_change', 'members:approve', 'members:reject'],
+  sales: ['members:view', 'members:create', 'members:edit'],
+  marketing: ['members:view'],
+  support: ['members:view'],
+  // `custom` gates the member's own /vendors/me/* surface. `view` would expose the admin list
+  // until own-scope enforcement exists, so it is deliberately not granted here.
+  member: ['members:custom'],
+};
+
+/**
+ * PLANNING.md §1.2's Masters row: `VCE / dashboard` for Admin (never delete — matches
+ * Branches/Deals/Therapists/Products' own no-delete-for-Admin discipline), `V / dashboard` for
+ * Marketing (view only, never create/edit/delete). `masters` is NOT in
+ * `MATRIX_GOVERNED_MENU_KEYS`, so this is read by `grantStarterPermissions`'s exact-state
+ * `resetGrant`, not `applyPermissionMatrix` — kept here as a flat, directly testable data
+ * constant (same reasoning as `MEMBER_GRANTS` above) rather than inline in that function.
+ */
+const MASTERS_SUB_KEYS = ['categories', 'sub-categories', 'tags', 'popular-treatments', 'promotions', 'home-hero', 'home-tag-sections'];
+export const MASTERS_GRANTS: Record<'admin' | 'marketing', string[]> = {
+  admin: [
+    'masters:view',
+    ...MASTERS_SUB_KEYS.flatMap((k) => [`masters.${k}:view`, `masters.${k}:create`, `masters.${k}:edit`]),
+  ],
+  marketing: ['masters:view', ...MASTERS_SUB_KEYS.map((k) => `masters.${k}:view`)],
+};
+
+/**
+ * PLANNING.md §1.2's Logs row: `V O` for every non-SuperAdmin staff role (SuperAdmin gets `V A`
+ * via its blanket bypass). `rbac.audit-logs` is ungoverned, so this is only ever read by
+ * `grantStarterPermissions`'s `grantOwnScope` loop. Member excluded — see that loop's own doc
+ * comment for why.
+ */
+export const LOGS_OWN_SCOPE_ROLES: string[] = ['admin', 'marketing', 'sales', 'support'];
 
 /** A reasonable starter grant for the non-super-admin staff roles, so the app isn't empty on first login. */
 async function grantStarterPermissions(
@@ -236,13 +306,13 @@ async function grantStarterPermissions(
   };
 
   /**
-   * Authoritative (delete-then-recreate) variant of `grant` above — used only for `vendor`.
+   * Authoritative (delete-then-recreate) variant of `grant` above — used only for `member`.
    * `grant`'s additive `createMany`/`skipDuplicates` can only ever ADD permissions on a re-run;
    * it can never retract a grant that was added by an older seed revision or hand-edited via the
-   * Role Permission Matrix UI. That matters specifically for `vendor`: it must never hold
-   * `vendors:view`/`customers:view`/`products:view`/`orders:view` etc. (those would leak the
+   * Role Permission Matrix UI. That matters specifically for `member`: it must never hold
+   * `members:view`/`customers:view`/`products:view`/`orders:view` etc. (those would leak the
    * admin-wide Vendor List/Customers/Products/Orders sidebar nodes and their backing endpoints to
-   * every vendor owner — see CLAUDE.md's vendor-isolation rules), so its RolePermission set is
+   * every member owner — see CLAUDE.md's vendor-isolation rules), so its RolePermission set is
    * reset to exactly this list on every seed run rather than only ever growing.
    */
   const resetGrant = async (roleKey: string, keys: string[]) => {
@@ -256,78 +326,110 @@ async function grantStarterPermissions(
     });
   };
 
-  await grant('admin', [
+  /**
+   * Sets exactly one permission to `scope: 'OWN'` for a role, independent of whatever
+   * `grant()`/`resetGrant()` already wrote for that key (`upsert` so it works whether the bare
+   * grant ran first or not). Used for `rbac.audit-logs:view` below — PLANNING.md §1.2's Logs row
+   * is `V O` (own actions only) for every non-SuperAdmin role; `RolePermission.scope` defaults to
+   * `ALL`, so this is the one place that default needs overriding.
+   */
+  const grantOwnScope = async (roleKey: string, key: string) => {
+    const role = roles.get(roleKey);
+    const permissionId = permissionIdByKey.get(key);
+    if (!role || !permissionId) return;
+    await prisma.rolePermission.upsert({
+      where: { roleId_permissionId: { roleId: role.id, permissionId } },
+      update: { scope: 'OWN' },
+      create: { roleId: role.id, permissionId, scope: 'OWN' },
+    });
+  };
+
+  // Every `admin`/`marketing`/`sales`/`support` key that is also a row in the User Management
+  // permission matrix (`prisma/permission-matrix.ts`) is deliberately NOT listed here — it would
+  // otherwise be re-added by an additive `grant()` on every seed run, silently undoing the
+  // matrix's caps (that bug — `orders`/`customers`/`products` literals left over here from before
+  // this function used `resetGrant` — is exactly what let Admin lose `orders:status_change`/
+  // `customers:status_change` and Marketing/Admin gain stray Masters create/edit/delete rights
+  // the matrix never granted; fixed 2026-10-26, see permission-matrix.ts for Admin's corrected
+  // Orders/Customers/Reports/System-settings cells). Only genuinely ungoverned menuKeys
+  // (Dashboard, Masters, Services, Inventory) stay here, and now via the same exact-state
+  // `resetGrant` as `member` already used — additive `grant()` can only ever grow a role's access,
+  // never retract a stray grant from an earlier seed revision.
+  await resetGrant('admin', [
     'dashboard:view',
-    'customers:view', 'customers:create', 'customers:edit', 'customers:delete', 'customers:status_change',
-    'vendors:view', 'vendors:create', 'vendors:edit', 'vendors:delete',
-    'vendors:approve', 'vendors:reject', 'vendors:status_change',
-    'orders:view', 'orders:edit', 'orders:status_change',
-    'products:view', 'products:create', 'products:edit', 'products:delete',
+    ...MEMBER_GRANTS.admin,
     'services:view', 'services:create', 'services:edit', 'services:delete',
     'inventory:view', 'inventory:create', 'inventory:edit', 'inventory:delete',
-    'reports:view',
-    'masters:view', 'masters.categories:view', 'masters.categories:create', 'masters.categories:edit', 'masters.categories:delete',
-    'masters.sub-categories:view', 'masters.sub-categories:create', 'masters.sub-categories:edit', 'masters.sub-categories:delete',
-    'masters.tags:view', 'masters.tags:create', 'masters.tags:edit', 'masters.tags:delete',
-    'masters.popular-treatments:view', 'masters.popular-treatments:create', 'masters.popular-treatments:edit', 'masters.popular-treatments:delete',
-    'masters.promotions:view', 'masters.promotions:create', 'masters.promotions:edit', 'masters.promotions:delete',
-    'masters.home-hero:view', 'masters.home-hero:create', 'masters.home-hero:edit', 'masters.home-hero:delete',
-    'settings:view', 'settings:edit',
-    'cms:view',
-    'cms.blog.pages:view', 'cms.blog.pages:create', 'cms.blog.pages:edit', 'cms.blog.pages:delete',
-    'cms.blog.articles:view', 'cms.blog.articles:create', 'cms.blog.articles:edit', 'cms.blog.articles:delete',
-    'cms.about-us:view', 'cms.about-us:edit', 'cms.contact-us:view', 'cms.contact-us:edit',
+    ...MASTERS_GRANTS.admin,
   ]);
 
-  await grant('marketing', [
+  await resetGrant('marketing', [
     'dashboard:view',
-    'masters:view', 'masters.categories:view', 'masters.categories:create', 'masters.categories:edit',
-    'masters.sub-categories:view', 'masters.sub-categories:create', 'masters.sub-categories:edit',
-    'masters.tags:view', 'masters.tags:create', 'masters.tags:edit', 'masters.tags:delete',
-    'masters.popular-treatments:view', 'masters.popular-treatments:create', 'masters.popular-treatments:edit', 'masters.popular-treatments:delete',
-    'masters.promotions:view', 'masters.promotions:create', 'masters.promotions:edit', 'masters.promotions:delete',
-    'masters.home-hero:view', 'masters.home-hero:create', 'masters.home-hero:edit', 'masters.home-hero:delete',
-    'reports:view',
-    // No 'cms.blog.pages:delete'/'cms.blog.articles:delete' — mirrors this same role's
-    // create/edit-but-no-delete grant on 'masters.categories' above.
-    'cms:view',
-    'cms.blog.pages:view', 'cms.blog.pages:create', 'cms.blog.pages:edit',
-    'cms.blog.articles:view', 'cms.blog.articles:create', 'cms.blog.articles:edit',
-    'cms.about-us:view', 'cms.about-us:edit', 'cms.contact-us:view', 'cms.contact-us:edit',
-    // No 'cms.faq:delete' — same create/edit-but-no-delete grant as this role's blog grants above.
-    'cms.faq:view', 'cms.faq:create', 'cms.faq:edit',
+    ...MEMBER_GRANTS.marketing,
+    ...MASTERS_GRANTS.marketing,
   ]);
 
-  await grant('sales', [
+  await resetGrant('sales', [
     'dashboard:view',
-    'vendors:view', 'vendors:edit',
-    'orders:view', 'orders:export',
-    'reports:view', 'reports:export',
+    ...MEMBER_GRANTS.sales,
   ]);
+
+  await resetGrant('support', [
+    'dashboard:view',
+    ...MEMBER_GRANTS.support,
+  ]);
+
+  // See `LOGS_OWN_SCOPE_ROLES`'s own doc comment (PLANNING.md §1.2's Logs row, and why Member is
+  // excluded) — `rbac.audit-logs` is ungoverned, so nothing else ever touches these roles' grant
+  // on this one key, making a plain `grantOwnScope` call safe without `resetGrant`'s blanket wipe.
+  for (const roleKey of LOGS_OWN_SCOPE_ROLES) {
+    await grantOwnScope(roleKey, 'rbac.audit-logs:view');
+  }
 
   await grant('customer', ['dashboard:view']);
-  // Deliberately NOT 'vendors:view'/'customers:view'/'products:*'/'orders:*' — any of those would
+  // Deliberately NOT 'members:view'/'customers:view'/'products:*'/'orders:*' — any of those would
   // also unlock the matching admin-wide sidebar node AND its backing endpoint (requirePermission
-  // only checks the boolean grant, not who's asking): 'vendors:custom' is the one gate every
-  // vendor self-service route (`/vendors/me/*`, including its own Order/Product access via the
-  // `orders`/`vendors` OR-checks in orders.routes.ts and vendors.routes.ts) already runs on, and
-  // the `vendor-portal.*` keys below are the separate, narrower per-node menu keys that only
-  // surface the "Business" sidebar group's own children — never granted to admin/customer/etc.,
-  // so they can't leak the admin Vendor List/Customers/Products/Orders nav or their endpoints to
-  // a vendor owner. Uses `resetGrant` (not `grant`) so a re-seed always converges back to exactly
-  // this set, even if an older seed revision or a hand-edit via the Role Permission Matrix UI had
-  // granted this role more.
-  await resetGrant('vendor', [
+  // only checks the boolean grant, not who's asking): 'members:custom' is the one gate every
+  // member self-service route (`/vendors/me/*`, including its own Order/Product access via the
+  // `orders`/`vendors` OR-checks in orders.routes.ts and vendors.routes.ts) already runs on, so
+  // it's included directly here (there's no other call site that grants it — `MEMBER_GRANTS.
+  // member` documents the same list for reference but is never spread elsewhere). The
+  // `vendor-portal.*` keys (the matrix's "Member" row) are owned by `applyPermissionMatrix`
+  // below, not here — only the plumbing gates and `dashboard:view` stay in this resetGrant.
+  await resetGrant('member', [
     'dashboard:view',
     'vendors:custom',
-    'vendor-portal.profile:view', 'vendor-portal.profile:edit',
-    'vendor-portal.branches:view', 'vendor-portal.branches:create', 'vendor-portal.branches:edit', 'vendor-portal.branches:status_change',
-    'vendor-portal.deals:view', 'vendor-portal.deals:create', 'vendor-portal.deals:edit', 'vendor-portal.deals:status_change',
-    'vendor-portal.products:view', 'vendor-portal.products:create', 'vendor-portal.products:edit', 'vendor-portal.products:delete',
-    'vendor-portal.therapists:view', 'vendor-portal.therapists:create', 'vendor-portal.therapists:edit', 'vendor-portal.therapists:status_change',
-    'vendor-portal.customers:view',
-    'vendor-portal.orders:view',
+    ...MEMBER_GRANTS.member,
   ]);
+}
+
+async function applyPermissionMatrix(
+  roles: Map<string, { id: string; isSuperAdmin: boolean }>,
+  permissionIdByKey: Map<string, string>,
+  grants: Record<string, string[]>,
+  governedMenuKeys: string[],
+): Promise<void> {
+  const governedKeys = new Set(governedMenuKeys);
+  const governedPermissionIds = [...permissionIdByKey.entries()]
+    .filter(([key]) => governedKeys.has(key.slice(0, key.lastIndexOf(':'))))
+    .map(([, id]) => id);
+
+  for (const [roleKey, role] of roles) {
+    if (role.isSuperAdmin) continue;
+    await prisma.rolePermission.deleteMany({
+      where: { roleId: role.id, permissionId: { in: governedPermissionIds } },
+    });
+    const permissionIds = (grants[roleKey] ?? [])
+      .filter((key) => governedKeys.has(key.slice(0, key.lastIndexOf(':'))))
+      .map((key) => permissionIdByKey.get(key))
+      .filter((id): id is string => Boolean(id));
+    if (permissionIds.length) {
+      await prisma.rolePermission.createMany({
+        data: permissionIds.map((permissionId) => ({ roleId: role.id, permissionId })),
+        skipDuplicates: true,
+      });
+    }
+  }
 }
 
 async function seedDashboardWidgets(roles: Map<string, { id: string; isSuperAdmin: boolean }>) {
@@ -400,8 +502,8 @@ async function seedDashboardWidgets(roles: Map<string, { id: string; isSuperAdmi
   await assign('sales', ['revenue-summary', 'orders-recent']);
   await assign('marketing', ['customers-count']);
   // Vendor's own entry point to /account/vendors — the sidebar item itself is admin-only
-  // (see the `vendors:custom` note above), so this widget is how a vendor user reaches it.
-  await assign('vendor', ['vendor-profile']);
+  // (see the `members:custom` note above), so this widget is how a vendor user reaches it.
+  await assign('member', ['vendor-profile']);
 }
 
 /**
@@ -410,36 +512,38 @@ async function seedDashboardWidgets(roles: Map<string, { id: string; isSuperAdmi
  * customer" path (see auth.service.ts). Identifier comes from SUPERADMIN_PHONE/
  * SUPERADMIN_EMAIL in .env.local — skipped (not guessed) if neither is set.
  */
-async function seedSuperAdminUser(roles: Map<string, { id: string; isSuperAdmin: boolean }>) {
-  const rawPhone = process.env.SUPERADMIN_PHONE || undefined;
-  const email = process.env.SUPERADMIN_EMAIL || undefined;
+async function seedSuperAdminUser(roles: Map<string, { id: string; isSuperAdmin: boolean }>): Promise<string | undefined> {
+  const rawPhone = process.env.SUPERADMIN_PHONE?.trim() || undefined;
+  const email = process.env.SUPERADMIN_EMAIL?.trim() || undefined;
   if (!rawPhone && !email) {
     console.log('SUPERADMIN_PHONE/SUPERADMIN_EMAIL not set — skipping SuperAdmin user seed.');
-    return;
+    return undefined;
   }
-  // Normalized to the same canonical form every real login identifier is now normalized to
-  // at the auth boundary (see src/lib/normalizeIdentifier.ts) — without this, a SuperAdmin
-  // seeded from the env var's raw bare-digit phone would never match a real login again.
-  const phone = rawPhone ? normalizeIdentifier(rawPhone) : undefined;
 
   const superAdminRole = roles.get('super_admin');
   if (!superAdminRole) return;
 
-  // One-time backfill: a seed run from before normalization existed may already have created
-  // this user under the old, un-normalized phone — reuse that row instead of creating a
-  // second "Super Admin" user.
-  if (phone && rawPhone && phone !== rawPhone) {
-    const legacy = await prisma.user.findUnique({ where: { phone: rawPhone } });
-    if (legacy && legacy.phone !== phone) {
-      await prisma.user.update({ where: { id: legacy.id }, data: { phone } });
-    }
+  const normalizedPhone = rawPhone ? normalizeIdentifier(rawPhone) : undefined;
+  const lookupWhere = rawPhone
+    ? { OR: [{ phone: rawPhone }, { phone: normalizedPhone ?? rawPhone }] }
+    : { email: email! };
+
+  let user = await prisma.user.findFirst({ where: lookupWhere, select: { id: true, phone: true, email: true } });
+
+  if (user && rawPhone && user.phone !== rawPhone) {
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: { phone: rawPhone },
+      select: { id: true, phone: true, email: true },
+    });
   }
 
-  const user = await prisma.user.upsert({
-    where: phone ? { phone } : { email: email! },
-    update: {},
-    create: { name: 'Super Admin', phone, email },
-  });
+  if (!user) {
+    user = await prisma.user.create({
+      data: { name: 'Super Admin', phone: rawPhone, email },
+      select: { id: true, phone: true, email: true },
+    });
+  }
 
   await prisma.userRole.upsert({
     where: { userId_roleId: { userId: user.id, roleId: superAdminRole.id } },
@@ -447,7 +551,8 @@ async function seedSuperAdminUser(roles: Map<string, { id: string; isSuperAdmin:
     create: { userId: user.id, roleId: superAdminRole.id },
   });
 
-  console.log(`Seeded SuperAdmin user (${phone ?? email}).`);
+  console.log(`Seeded SuperAdmin user (${rawPhone ?? email}).`);
+  return user.id;
 }
 
 /**
@@ -600,39 +705,74 @@ async function seedCategoryTaxonomy(): Promise<Map<string, string>> {
  * fallback logic; now there's one implementation.
  */
 async function backfillVendorSlugs(): Promise<number> {
-  const vendorsMissingSlug = await prisma.vendor.findMany({ where: { slug: null } });
+  const vendorsMissingSlug = await prisma.member.findMany({ where: { slug: null } });
   for (const v of vendorsMissingSlug) {
     const slug = await ensureUniqueSlug(v.businessName ?? v.id, v.id, (candidate) =>
-      prisma.vendor.findUnique({ where: { slug: candidate } }).then(Boolean),
+      prisma.member.findUnique({ where: { slug: candidate } }).then(Boolean),
     );
-    await prisma.vendor.update({ where: { id: v.id }, data: { slug } });
+    await prisma.member.update({ where: { id: v.id }, data: { slug } });
   }
   return vendorsMissingSlug.length;
 }
 
+/** Same pattern as `backfillVendorSlugs` above, for `Therapist.slug` — every existing Therapist
+ *  row predates this column. Walks every row with `slug: null` and assigns one derived from
+ *  `personName` (or the row's own `id` if that's somehow unset). Idempotent and safe to re-run. */
+async function backfillTherapistSlugs(): Promise<number> {
+  const therapistsMissingSlug = await prisma.therapist.findMany({ where: { slug: null } });
+  for (const t of therapistsMissingSlug) {
+    const slug = await ensureUniqueSlug(t.personName || t.id, t.id, (candidate) =>
+      prisma.therapist.findUnique({ where: { slug: candidate } }).then(Boolean),
+    );
+    await prisma.therapist.update({ where: { id: t.id }, data: { slug } });
+  }
+  return therapistsMissingSlug.length;
+}
+
 /** Same demo hours every weekday, a shorter Saturday, closed Sunday — good enough for local dev. */
+/** Written in the `{ open, start, end }` shape `OpeningHoursSchema` accepts and the storefront reads. */
+const WEEKDAY_HOURS = { open: true, start: '09:00', end: '20:00' };
 const DEMO_OPENING_HOURS = {
-  mon: '09:00-20:00',
-  tue: '09:00-20:00',
-  wed: '09:00-20:00',
-  thu: '09:00-20:00',
-  fri: '09:00-20:00',
-  sat: '10:00-18:00',
-  sun: 'closed',
+  mon: WEEKDAY_HOURS,
+  tue: WEEKDAY_HOURS,
+  wed: WEEKDAY_HOURS,
+  thu: WEEKDAY_HOURS,
+  fri: WEEKDAY_HOURS,
+  sat: { open: true, start: '10:00', end: '18:00' },
+  sun: { open: false },
 };
 
-/** One-off backfill for `Branch.openingHours` (same migration as Vendor.slug) — every existing
- *  Branch row predates this column. Fetches the (small, demo-sized) branch list and filters in
- *  application code rather than a Prisma Json-null `where` clause (Json columns need
- *  `Prisma.DbNull`/`Prisma.JsonNull`, not a bare `null`, and this dataset is small enough that
- *  the extra round-trip cost is irrelevant). Idempotent and safe to re-run. */
+const LEGACY_HOURS = /^(\d{2}:\d{2})-(\d{2}:\d{2})$/;
+
+/** Earlier seeds wrote each day as a string (`"09:00-20:00"` / `"closed"`), which the storefront
+ *  shows as closed. Returns the structured shape, or null when the value needs no change. */
+function upgradeLegacyHours(hours: Prisma.JsonValue): Prisma.InputJsonValue | null {
+  if (!hours || typeof hours !== 'object' || Array.isArray(hours)) return null;
+  const days = Object.entries(hours);
+  if (!days.some(([, v]) => typeof v === 'string')) return null;
+  return Object.fromEntries(
+    days.map(([day, v]) => {
+      if (typeof v !== 'string') return [day, v];
+      const match = LEGACY_HOURS.exec(v);
+      return [day, match ? { open: true, start: match[1], end: match[2] } : { open: false }];
+    }),
+  ) as Prisma.InputJsonValue;
+}
+
+/** Fills `Branch.openingHours` where it is empty and upgrades legacy string days. Fetches the
+ *  (small, demo-sized) branch list and filters in application code rather than a Prisma Json-null
+ *  `where` clause (Json columns need `Prisma.DbNull`/`Prisma.JsonNull`, not a bare `null`).
+ *  Idempotent and safe to re-run. */
 async function backfillBranchOpeningHours(): Promise<number> {
-  const branches = await prisma.branch.findMany();
-  const missing = branches.filter((b) => b.openingHours === null);
-  for (const b of missing) {
-    await prisma.branch.update({ where: { id: b.id }, data: { openingHours: DEMO_OPENING_HOURS as Prisma.InputJsonValue } });
+  const branches = await prisma.branch.findMany({ select: { id: true, openingHours: true } });
+  let changed = 0;
+  for (const b of branches) {
+    const next = b.openingHours === null ? (DEMO_OPENING_HOURS as Prisma.InputJsonValue) : upgradeLegacyHours(b.openingHours);
+    if (!next) continue;
+    await prisma.branch.update({ where: { id: b.id }, data: { openingHours: next } });
+    changed++;
   }
-  return missing.length;
+  return changed;
 }
 
 // ─── Demo marketplace dataset ────────────────────────────────────────────────
@@ -800,7 +940,7 @@ const VENDOR_SEEDS: VendorSeed[] = [
 async function seedVendorsAndBranches(
   roles: Map<string, { id: string; isSuperAdmin: boolean }>,
 ): Promise<{ vendorIdByKey: Map<string, string>; branchIdByKey: Map<string, string> }> {
-  const vendorRole = roles.get('vendor');
+  const vendorRole = roles.get('member');
   const vendorIdByKey = new Map<string, string>();
   const branchIdByKey = new Map<string, string>();
 
@@ -838,14 +978,15 @@ async function seedVendorsAndBranches(
       panNumber: `DEMOPAN${v.key.toUpperCase()}`,
       businessRegistrationNumber: `DEMOREG${v.key.toUpperCase()}2024`,
       logoUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(v.businessName)}&size=600&background=0D8ABC&color=fff&bold=true`,
-      kycStatus: 'VERIFIED' as const,
       status: 'ACTIVE' as const,
+      statusChangedAt: new Date(),
+      documentsDueAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
     };
 
-    // Find-or-create: businessName/address/kycStatus/status/etc. are admin- and vendor-editable
+    // Find-or-create: businessName/address/status/etc. are admin- and vendor-editable
     // (KYC approval, profile edits) — never overwrite them on a re-run.
-    const vendor = (await prisma.vendor.findUnique({ where: { ownerUserId: ownerUser.id } }))
-      ?? (await prisma.vendor.create({ data: { ...vendorData, ownerUserId: ownerUser.id } }));
+    const vendor = (await prisma.member.findUnique({ where: { ownerUserId: ownerUser.id } }))
+      ?? (await prisma.member.create({ data: { ...vendorData, ownerUserId: ownerUser.id } }));
     vendorIdByKey.set(v.key, vendor.id);
 
     for (const b of v.branches) {
@@ -976,7 +1117,7 @@ async function seedVendorModulesAndCategoryAccess(
 ):Promise<void>{
   const grant=async(vendorKey:string,opts:{offersService?:boolean;offersProduct?:boolean;offersTherapy?:boolean},categorySlugs:string[])=>{
     const vendorId=vendorIdByKey.get(vendorKey); if(!vendorId)return;
-    await prisma.vendor.update({where:{id:vendorId},data:{offersService:opts.offersService??false,offersProduct:opts.offersProduct??false,offersTherapy:opts.offersTherapy??false}});
+    await prisma.member.update({where:{id:vendorId},data:{offersService:opts.offersService??false,offersProduct:opts.offersProduct??false,offersTherapy:opts.offersTherapy??false}});
     for(const slug of categorySlugs){const categoryId=categoryIdBySlug.get(slug); if(!categoryId)continue; await prisma.vendorCategoryAccess.upsert({where:{vendorId_categoryId:{vendorId,categoryId}},update:{},create:{vendorId,categoryId}});}
   };
   await grant('glow',{offersService:true},['massage','skin-beauty']);
@@ -1093,29 +1234,65 @@ const PACKAGE_MULTIPLIERS = [1, 1.6, 2.2] as const;
  *  requires selecting a package before a service Deal can be added to cart (see CartItem's own
  *  schema doc comment), so demo data needs real packages to exercise that flow. Priced as a
  *  multiple of the deal's own base price, rounded to a clean ten. Idempotent via DealPackage's
- *  own `@@unique([dealId, durationMinutes])` upsert key. */
+ *  own `@@unique([dealId, durationMinutes])` key. */
 async function seedDealPackages(): Promise<number> {
-  const serviceDeals = await prisma.deal.findMany({ select: { id: true, salePrice: true, originalPrice: true } });
+  const serviceDeals = await prisma.deal.findMany({
+    select: {
+      id: true,
+      salePrice: true,
+      originalPrice: true,
+    },
+  });
+
   let created = 0;
+
   for (const deal of serviceDeals) {
     const base = deal.salePrice.toNumber();
-    const baseOriginal = deal.originalPrice ? deal.originalPrice.toNumber() : null;
+    const baseOriginal = deal.originalPrice
+      ? deal.originalPrice.toNumber()
+      : null;
+
     for (const [i, durationMinutes] of PACKAGE_DURATIONS.entries()) {
-      const existing = await prisma.dealPackage.findUnique({ where: { dealId_durationMinutes: { dealId: deal.id, durationMinutes } } });
-      if (existing) continue;
+      const persons = 1;
+
+      const existing = await prisma.dealPackage.findUnique({
+        where: {
+          dealId_durationMinutes_persons: {
+            dealId: deal.id,
+            durationMinutes,
+            persons,
+          },
+        },
+      });
+
+      // Skip packages that already exist.
+      if (existing) {
+        continue;
+      }
+
       const multiplier = PACKAGE_MULTIPLIERS[i];
+
       await prisma.dealPackage.create({
         data: {
           dealId: deal.id,
           durationMinutes,
+          persons,
           sellingPrice: Math.round((base * multiplier) / 10) * 10,
-          originalPrice: baseOriginal ? Math.round((baseOriginal * multiplier) / 10) * 10 : null,
+          originalPrice: baseOriginal
+            ? Math.round((baseOriginal * multiplier) / 10) * 10
+            : null,
           sortOrder: i,
         },
       });
+
       created++;
     }
+
+    // Same rule as the console package-save flow:
+    // the cheapest package sets the deal's price.
+    await syncDealPriceFromPackages(prisma, deal.id);
   }
+
   return created;
 }
 
@@ -1460,20 +1637,49 @@ function validateDemoSeedDataset():void{
 async function main() {
   validateDemoSeedDataset();
   const roles = await seedRoles();
+  // The User Management permission matrix (`prisma/permission-matrix.ts`) also governs `support`
+  // — a live, already-created custom role (`isSystem: false`, made via the Role Management UI,
+  // not one of this file's hardcoded `ROLES`) — so it isn't in `roles` yet from `seedRoles()`
+  // above. Merge in any already-existing role named in the matrix that `seedRoles()` didn't
+  // create, read-only (never upserted/created here — a role the matrix names but that doesn't
+  // exist yet in this environment is simply skipped, same as any unmatched key elsewhere in this
+  // file).
+  for (const roleKey of Object.keys(PERMISSION_MATRIX_GRANTS)) {
+    if (roles.has(roleKey)) continue;
+    const existing = await prisma.role.findUnique({ where: { key: roleKey } });
+    if (existing) roles.set(existing.key, { id: existing.id, isSuperAdmin: existing.isSuperAdmin });
+  }
   const permissionIdByKey = await seedPermissions();
   // Every menuKey that used to be shared by multiple menu nodes and has since been split into
   // distinct per-node keys — add a new `{ oldMenuKey, newMenuKeys }` entry here whenever another
   // such split happens, so every role's (including custom roles') existing access is preserved.
   await migrateSharedKeySplitGrants(
     prisma,
-    [{ oldMenuKey: 'cms.blog', newMenuKeys: ['cms.blog.pages', 'cms.blog.articles'] }],
+    [
+      { oldMenuKey: 'cms.blog', newMenuKeys: ['cms.blog.pages', 'cms.blog.articles'] },
+      { oldMenuKey: 'vendors', newMenuKeys: ['members'] },
+    ],
     permissionIdByKey,
   );
   await grantAllPermissionsToSuperAdmins(roles, permissionIdByKey);
   await grantStarterPermissions(roles, permissionIdByKey);
+  // Applied LAST (after grantStarterPermissions) so its exact-state reset on the matrix's
+  // governed keys is always what's left standing — see `permission-matrix.ts`'s own doc comment.
+  await applyPermissionMatrix(roles, permissionIdByKey, PERMISSION_MATRIX_GRANTS, MATRIX_GOVERNED_MENU_KEYS);
   await seedDashboardWidgets(roles);
-  await seedSuperAdminUser(roles);
+  const superAdminUserId = await seedSuperAdminUser(roles);
   console.log(`Seeded ${roles.size} roles and ${permissionIdByKey.size} permissions.`);
+
+  // Single-role migration sweep (see role-migration.ts's own doc comment) — idempotent, safe to
+  // re-run on every seed: already-resolved accounts (down to exactly one role) are skipped,
+  // already-flagged accounts aren't re-flagged or re-logged.
+  const roleMigrationSummary = await auditAndMigrateMultiRoleAccounts(prisma, superAdminUserId);
+  if (roleMigrationSummary.autoConverted > 0 || roleMigrationSummary.flaggedForReview > 0) {
+    console.log(
+      `Role migration: ${roleMigrationSummary.autoConverted} account(s) auto-resolved to a single role, ` +
+        `${roleMigrationSummary.flaggedForReview} account(s) flagged for manual review (Role Conflicts screen).`,
+    );
+  }
 
   const categoryIdBySlug = await seedCategoryTaxonomy();
   const retiredTaxonomyRows = await deactivateRemovedTaxonomyRows();
@@ -1491,6 +1697,7 @@ async function main() {
   const backfilledSlugs = await backfillVendorSlugs();
   const backfilledHours = await backfillBranchOpeningHours();
   const therapistsCreated = await seedTherapists(vendorIdByKey, branchIdByKey, categoryIdBySlug);
+  const backfilledTherapistSlugs = await backfillTherapistSlugs();
   // Every SERVICE deal and every Therapist needs a real 30/60/90-min package before the demo
   // customer's cart/orders below (or the unified Add-to-Cart flow) can select one.
   const dealPackagesCreated = await seedDealPackages();
@@ -1515,7 +1722,7 @@ async function main() {
     prisma.category.count(),
     prisma.category.count({ where: { parentId: { not: null } } }),
     prisma.product.count(),
-    prisma.vendor.count(),
+    prisma.member.count(),
     prisma.branch.count(),
     prisma.deal.count(),
     prisma.cartItem.count({ where: { cart: { customerId: demoCustomerId } } }),
@@ -1534,7 +1741,7 @@ async function main() {
   console.log(`Vendors:         ${vendorCount} (${VENDOR_SEEDS.length} vendor owner users, ${backfilledSlugs} slug(s) backfilled)`);
   console.log(`Branches:        ${branchCount} (${backfilledHours} openingHours backfilled)`);
   console.log(`Deals:           ${serviceDealCount} (${dealPackagesCreated} packages created this run)`);
-  console.log(`Therapists:      ${therapistCount} (${therapistsCreated} created this run, ${therapistPackagesCreated} packages created this run)`);
+  console.log(`Therapists:      ${therapistCount} (${therapistsCreated} created this run, ${therapistPackagesCreated} packages created this run, ${backfilledTherapistSlugs} slug(s) backfilled)`);
   console.log(`Cart items:      ${cartItemCount} (demo customer)`);
   console.log(`Wishlist items:  ${wishlistItemCount} (demo customer)`);
   console.log(`Orders:          ${orderCount} (demo customer)`);
@@ -1547,11 +1754,13 @@ async function main() {
   console.log('Sign in via OTP (POST /auth/otp/send then /auth/otp/verify) using any identifier above.');
 }
 
-main()
-  .catch((err) => {
-    console.error(err);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+if (require.main === module) {
+  main()
+    .catch((err) => {
+      console.error(err);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

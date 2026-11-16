@@ -1,72 +1,95 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import type { UserRecord } from '../../../../api/rbac/users';
-import { UserList } from './user-list';
+import { UserList, userDisplayName } from './user-list';
 
-const users: UserRecord[] = [
-  {
-    id: 'user-1',
-    name: 'Ada Lovelace',
-    email: 'ada@example.com',
-    phone: null,
-    status: 'active',
-    lastLoginAt: null,
-    createdAt: '2026-01-01T00:00:00Z',
-    updatedAt: '2026-01-01T00:00:00Z',
-    roles: [],
-  },
-  {
-    id: 'user-2',
-    name: 'Grace Hopper',
-    email: null,
-    phone: '+911234567890',
-    status: 'blocked',
-    lastLoginAt: null,
-    createdAt: '2026-01-01T00:00:00Z',
-    updatedAt: '2026-01-01T00:00:00Z',
-    roles: [],
-  },
-];
+const ACTIVE_USER: UserRecord = {
+  id: 'user-1',
+  name: 'Ada Lovelace',
+  email: 'ada@example.com',
+  phone: null,
+  status: 'active',
+  lastLoginAt: '2026-05-01T00:00:00Z',
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+  roles: [{ id: 'role-1', key: 'admin', name: 'Admin' }],
+};
+
+function table(): HTMLElement {
+  const el = document.querySelector('sky-data-table');
+  if (!el) throw new Error('sky-data-table not found');
+  return el as HTMLElement;
+}
+
+function renderList(overrides: Partial<React.ComponentProps<typeof UserList>> = {}) {
+  return render(
+    <UserList
+      users={[ACTIVE_USER]}
+      total={1}
+      page={1}
+      pageSize={20}
+      loading={false}
+      onSelect={vi.fn()}
+      onParamsChange={vi.fn()}
+      {...overrides}
+    />,
+  );
+}
 
 describe('UserList', () => {
-  it('renders a row per user with name and email/phone', () => {
-    render(<UserList users={users} selectedId={null} onSelect={vi.fn()} />);
-    expect(screen.getByText('Ada Lovelace')).toBeTruthy();
-    expect(screen.getByText('ada@example.com')).toBeTruthy();
-    expect(screen.getByText('Grace Hopper')).toBeTruthy();
-    expect(screen.getByText('+911234567890')).toBeTruthy();
+  it('renders the "User / Contact" composite cell, Roles, Status, and Last Login columns', () => {
+    renderList();
+    const rows = JSON.parse(table().getAttribute('rows') ?? '[]') as Record<string, string>[];
+    expect(rows[0].User).toBe('Ada Lovelace');
+    expect(rows[0]['Contact Detail']).toBe('ada@example.com');
+    expect(rows[0].Roles).toBe('Admin');
+    expect(rows[0].Status).toBe('Active');
+    expect(rows[0]['Last Login']).not.toBe('Not visible');
   });
 
-  it('renders the status pill text for each user', () => {
-    render(<UserList users={users} selectedId={null} onSelect={vi.fn()} />);
-    expect(screen.getByText('active')).toBeTruthy();
-    expect(screen.getByText('blocked')).toBeTruthy();
+  it('renders "Not visible" for Last Login when the server stripped lastLoginAt (null)', () => {
+    renderList({ users: [{ ...ACTIVE_USER, lastLoginAt: null }] });
+    const rows = JSON.parse(table().getAttribute('rows') ?? '[]') as Record<string, string>[];
+    expect(rows[0]['Last Login']).toBe('Not visible');
   });
 
-  it('marks the selected row with aria-current', () => {
-    render(<UserList users={users} selectedId="user-2" onSelect={vi.fn()} />);
-    const button = screen.getByRole('button', { name: /Grace Hopper/ });
-    expect(button.getAttribute('aria-current')).toBe('true');
-    const otherButton = screen.getByRole('button', { name: /Ada Lovelace/ });
-    expect(otherButton.getAttribute('aria-current')).toBeNull();
+  it('renders "No role assigned" when a user has no roles', () => {
+    renderList({ users: [{ ...ACTIVE_USER, roles: [] }] });
+    const rows = JSON.parse(table().getAttribute('rows') ?? '[]') as Record<string, string>[];
+    expect(rows[0].Roles).toBe('No role assigned');
   });
 
-  it('calls onSelect with the clicked user id', () => {
+  it('userDisplayName falls back to "Name not added" when name duplicates phone or email, or is empty', () => {
+    expect(userDisplayName({ name: '+919876543210', phone: '+919876543210', email: null })).toBe('Name not added');
+    expect(userDisplayName({ name: 'ada@example.com', phone: null, email: 'ada@example.com' })).toBe('Name not added');
+    expect(userDisplayName({ name: '', phone: null, email: null })).toBe('Name not added');
+    expect(userDisplayName({ name: 'Ada Lovelace', phone: null, email: 'ada@example.com' })).toBe('Ada Lovelace');
+  });
+
+  it('only ever shows the "View User" action', () => {
+    renderList();
+    const actions = JSON.parse(table().getAttribute('actions') ?? '[]') as { event: string }[];
+    expect(actions.map((a) => a.event)).toEqual(['select']);
+  });
+
+  it('clicking "select" resolves the row id via onSelect', () => {
     const onSelect = vi.fn();
-    render(<UserList users={users} selectedId={null} onSelect={onSelect} />);
-    fireEvent.click(screen.getByRole('button', { name: /Ada Lovelace/ }));
-    expect(onSelect).toHaveBeenCalledExactlyOnceWith('user-1');
+    renderList({ onSelect });
+    fireEvent(table(), new CustomEvent('sky-dt-row-action', { detail: { action: 'select', row: { 'User ID': 'user-1' } } }));
+    expect(onSelect).toHaveBeenCalledWith('user-1');
   });
 
-  // Edge cases
-  it('shows an empty-state message when there are no users', () => {
-    render(<UserList users={[]} selectedId={null} onSelect={vi.fn()} />);
-    expect(screen.getByText('No users match.')).toBeTruthy();
+  it('forwards sky-dt-params-change (page/pageSize/search) to onParamsChange', () => {
+    const onParamsChange = vi.fn();
+    renderList({ onParamsChange });
+    fireEvent(table(), new CustomEvent('sky-dt-params-change', { detail: { page: 2, pageSize: 20, search: 'ada' } }));
+    expect(onParamsChange).toHaveBeenCalledWith({ page: 2, pageSize: 20, search: 'ada' });
   });
 
   it('renders exactly one row per user (no duplication/omission) for a larger list', () => {
-    const many = Array.from({ length: 5 }, (_, i) => ({ ...users[0], id: `user-${i}`, name: `User ${i}` }));
-    render(<UserList users={many} selectedId={null} onSelect={vi.fn()} />);
-    expect(screen.getAllByRole('button')).toHaveLength(5);
+    const many = Array.from({ length: 5 }, (_, i) => ({ ...ACTIVE_USER, id: `user-${i}`, name: `User ${i}` }));
+    renderList({ users: many, total: 5 });
+    const rows = JSON.parse(table().getAttribute('rows') ?? '[]') as Record<string, string>[];
+    expect(rows).toHaveLength(5);
   });
 });

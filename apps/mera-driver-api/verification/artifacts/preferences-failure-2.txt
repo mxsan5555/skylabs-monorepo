@@ -1,0 +1,23 @@
+directions_car
+mera-driver
+Driver console
+dashboard
+Dashboard
+fact_check
+KYC Assignments
+P
+Preference verifier fixture
+person
+logout
+dock_to_right
+Account
+KYC Assignments
+KYC Assignments
+
+Permission-scoped KYC assignments and current review state.
+
+All
+Unassigned (0)
+Assigned (0)
+Issues Raised (1)
+Completed (0)

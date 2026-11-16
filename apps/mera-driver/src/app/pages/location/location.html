@@ -29,6 +29,7 @@
           </md-icon-button>
         </div>
 
+        <md-text-button (click)="lookupAddress()" [disabled]="searchQuery().trim().length < 3">Find address</md-text-button>
         <!-- Suggestions Dropdown using md-list -->
         @if (showSuggestions() && suggestions().length > 0) {
           <md-list class="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-[999] max-h-[200px] overflow-y-auto">
@@ -62,7 +63,7 @@
     <div class="bg-red-50 border-b border-red-200 p-3 px-6 flex items-center justify-between z-10 shrink-0">
       <div class="flex items-center gap-3 text-red-800 text-xs font-semibold">
         <md-icon>warning</md-icon>
-        <span><strong>Google API Error:</strong> {{ apiError() }}</span>
+        <span><strong>Address lookup:</strong> {{ apiError() }}</span>
       </div>
       <md-icon-button (click)="apiError.set(null)">
         <md-icon>close</md-icon>

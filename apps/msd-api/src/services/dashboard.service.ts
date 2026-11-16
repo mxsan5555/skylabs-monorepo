@@ -28,7 +28,7 @@ export async function getDashboardStats(
   userId?: string
 ): Promise<DashboardStats> {
   const vendor = userId
-    ? await prisma.vendor.findUnique({
+    ? await prisma.member.findUnique({
         where: {
           ownerUserId: userId,
         },
@@ -69,7 +69,7 @@ async function getMarketplaceDashboardStats(): Promise<DashboardStats> {
     therapists,
     revenueAgg,
   ] = await Promise.all([
-    prisma.vendor.count(),
+    prisma.member.count(),
 
     prisma.user.count({
       where: {
@@ -234,63 +234,39 @@ async function getVendorDashboardStats(
     }),
 
     /*
-     * Payment belongs to an Order.
-     *
-     * We scope the payment through OrderItem.vendorId rather than
-     * Order.vendorId for the same multi-vendor reason explained above.
+     * Revenue = this member's own lines on paid orders. A payment covers the whole order, which
+     * can hold other members' lines, so summing payments would show their money (item 5).
      */
-    prisma.payment.aggregate({
-      _sum: {
-        amount: true,
-      },
-      where: {
-        status: 'PAID',
-        order: {
-          items: {
-            some: {
-              vendorId,
-            },
-          },
-        },
-      },
+    prisma.orderItem.aggregate({
+      _sum: { lineTotal: true },
+      where: { vendorId, order: { payments: { some: { status: 'PAID' } } } },
     }),
   ]);
 
-  const revenue = (
-    revenueAgg._sum.amount ?? new Prisma.Decimal(0)
-  ).toString();
+  const revenue = (revenueAgg._sum.lineTotal ?? new Prisma.Decimal(0)).toString();
 
   /*
-   * Vendor category access is queried separately because the
-   * category counts are based on VendorCategoryAccess.
+   * Categories and subcategories this member actually uses across its deals, products and
+   * therapists (D10: categories are open to every member, so there are no grants to count).
    */
-  const categories = await prisma.vendorCategoryAccess.count({
-    where: {
-      vendorId,
-      category: {
-        parentId: null,
-      },
-    },
-  });
-
-  /*
-   * Subcategories are inherited from the vendor's granted
-   * top-level categories.
-   */
-  const subCategories = await prisma.category.count({
-    where: {
-      parentId: {
-        not: null,
-      },
-      parent: {
-        vendorAccess: {
-          some: {
-            vendorId,
-          },
-        },
-      },
-    },
-  });
+  const [dealCats, productCats, therapistCats] = await Promise.all([
+    prisma.deal.findMany({ where: { vendorId }, select: { categoryId: true, subcategoryId: true }, distinct: ['categoryId', 'subcategoryId'] }),
+    prisma.product.findMany({ where: { vendorId }, select: { categoryId: true, subcategoryId: true }, distinct: ['categoryId', 'subcategoryId'] }),
+    prisma.therapist.findMany({ where: { vendorId, specializationCategoryId: { not: null } }, select: { specializationCategoryId: true }, distinct: ['specializationCategoryId'] }),
+  ]);
+  const usedCategoryIds = [
+    ...new Set(
+      [
+        ...dealCats.flatMap((d) => [d.categoryId, d.subcategoryId]),
+        ...productCats.flatMap((p) => [p.categoryId, p.subcategoryId]),
+        ...therapistCats.map((t) => t.specializationCategoryId),
+      ].filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const [categories, subCategories] = await Promise.all([
+    prisma.category.count({ where: { id: { in: usedCategoryIds }, parentId: null } }),
+    prisma.category.count({ where: { id: { in: usedCategoryIds }, parentId: { not: null } } }),
+  ]);
 
   return {
     /*
@@ -311,13 +287,12 @@ async function getVendorDashboardStats(
     branches,
 
     /*
-     * Number of top-level categories granted to this vendor.
+     * Number of top-level categories this member uses.
      */
     categories,
 
     /*
-     * Number of subcategories belonging to the vendor's
-     * granted top-level categories.
+     * Number of subcategories this member uses.
      */
     subCategories,
 

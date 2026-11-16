@@ -1,108 +1,93 @@
-import { useCallback, useMemo, useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { FilledButton, Tabs, SecondaryTab, } from '@skylabs-monorepo/shared-ui/react';
-import { CustomerOrderCard } from './customer-order-card';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate , useSearchParams} from 'react-router-dom';
+import { FilledButton } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { listMyOrders, type Order, type OrderStatus, } from '../../../api/orders';
+import { listMyOrders, type Order } from '../../../api/orders';
 import { ApiRequestError } from '../../../api/rbac/client';
-import './orders.css';
-import content from '../../../content.json';
+import { CustomerOrderCard } from './customer-order-card';
+import { SectionHead } from '../../components/section-head/section-head';
+import { ChipNav } from '../../components/chip-nav/chip-nav';
 import { CardGrid } from '../../components/card-grid/card-grid';
-import { Breadcrumb } from '../../components/breadcrumb';
+import { StatusPanel } from '../../components/status-panel/status-panel';
+import { Seo } from '../../seo/seo';
+import content from '../../../content.json';
 
-/** Customer's own orders — the Cart convergence point (every purchase kind, Deal/Product/
- *  Therapist alike, becomes an Order here). Reuses `entity-list`/`status-pill`. Relocated here
- *  from the old marketplace orders route now that the marketplace route namespace is retired —
- *  this page never had a mock/static equivalent, so it moved rather than merged. */
 
+const t = content.orders;
+type Filter = 'ALL' | 'CANCELLED';
+
+/** Customer's own orders, newest first: every purchase kind (deal, product, therapist) from one
+ *  checkout is one order; each shows as a receipt panel with all its lines. */
 export function Orders() {
   const { token } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const selectedType = searchParams.get('type');
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState<OrderStatus | 'ALL'>('ALL');
-  const { orders: ordersContent } = content;
-  const [searchParams] = useSearchParams();
-  const typeFilter = searchParams.get('type');
-  const filteredOrders = useMemo(() => {
-    return orders.filter((order) => {
-      const matchesStatus =
-        selectedStatus === 'ALL' || order.status === selectedStatus;
+  const [filter, setFilter] = useState<Filter>('ALL');
 
-      const matchesType =
-        !typeFilter || order.type === typeFilter;
-
-      return matchesStatus && matchesType;
-    });
-  }, [orders, selectedStatus, typeFilter]);
+  // All: every order except those still awaiting payment. Cancelled: cancelled only.
+  const shown = useMemo(
+    () => orders.filter((order) => (filter === 'CANCELLED' ? order.status === 'CANCELLED' : order.status !== 'PENDING_PAYMENT')),
+    [orders, filter],
+  );
   const load = useCallback(() => {
     setLoading(true);
     setError('');
     listMyOrders(token, { pageSize: 50 })
       .then(({ data }) => setOrders(data))
-      .catch((err) => setError(err instanceof ApiRequestError ? err.message : ordersContent.errors.load))
+      .catch((err) =>
+        setError(err instanceof ApiRequestError ? err.message : t.errors.load,),)
       .finally(() => setLoading(false));
   }, [token]);
-
   useEffect(() => {
     load();
   }, [load]);
 
   return (
-    <div className="category-page">
-      <title>{ordersContent.metaTitle}</title>
-      <meta name="robots" content="noindex" />
-
-      <Breadcrumb
+    <>
+      <Seo title={t.metaTitle} description={content.meta.orders.description} path={content.meta.orders.path} noindex="follow" />
+      <SectionHead as="h1" id="orders-heading" titleClassName="headline-medium" heading={t.title} subheading={t.subtitle} />
+      <ChipNav
+        ariaLabel={t.filtersLabel}
         items={[
-          { label: 'Home', to: '/' },
-          { label: 'Orders' },
+          { value: 'ALL', label: t.filters.all },
+          { value: 'CANCELLED', label: t.filters.cancelled },
         ]}
+        value={filter}
+        onSelect={(value) => setFilter(value as Filter)}
       />
-      <div className="customer-orders-filters">
-        <Tabs>
-          <SecondaryTab
-            onClick={() => setSelectedStatus('ALL')}
-          >
-            All
-          </SecondaryTab>
-
-          <SecondaryTab
-            onClick={() => setSelectedStatus('CANCELLED')}
-          >
-            Cancelled
-          </SecondaryTab>
-        </Tabs>
-      </div>
-      <section className="category-page__grid-wrap">
-        <div className="category-page__grid-inner">
-          {loading ? (
-            <p className="loading-state">{ordersContent.loading}</p>
+      <CardGrid
+        layout="list"
+        fallback={
+          loading ? (
+            <p className="loading-state" role="status">
+              {t.loading}
+            </p>
           ) : error ? (
-            <p className="error-state" role="alert">{error || ordersContent.errors.load}</p>
-          ) : filteredOrders.length === 0 ? (
-            <div className="category-page__empty">
-              <sky-info-card icon="receipt_long" heading={ordersContent.empty.title} subheading={ordersContent.empty.description} />
-              <FilledButton onClick={() => navigate('/categories')}>{ordersContent.empty.cta}</FilledButton>
-            </div>
-          ) : (
-
-            <CardGrid layout="list">
-              {filteredOrders.map((order) => (
-                <CustomerOrderCard
-                  key={order.id}
-                  order={order}
-                  onViewDetails={(selectedOrder) =>
-                    navigate(`/orders/${selectedOrder.id}`)
-                  }
-                />
-              ))}
-            </CardGrid>
-          )}
-        </div>
-      </section>
-    </div>
+            <p className="error-state" role="alert">
+              {error}
+            </p>
+          ) : shown.length === 0 ? (
+            <StatusPanel
+              id="orders-empty"
+              as="h2"
+              icon="receipt_long"
+              tone="neutral"
+              heading={t.empty.title}
+              text={t.empty.description}
+              actions={<FilledButton onClick={() => navigate('/deals')}>{t.empty.cta}</FilledButton>}
+            />
+          ) : undefined
+        }
+      >
+        {shown.map((order) => (
+          <CustomerOrderCard key={order.id} order={order} onViewDetails={(selected) => navigate(`/orders/${selected.id}`)} />
+        ))}
+      </CardGrid>
+    </>
   );
 }
 

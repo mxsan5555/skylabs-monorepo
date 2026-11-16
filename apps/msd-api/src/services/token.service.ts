@@ -36,17 +36,25 @@ export async function issueRefreshSession(userId: string, meta: SessionMeta = {}
   return token;
 }
 
+/**
+ * Finds the session matching `presentedToken`, under an optional extra `where` (e.g. only
+ * non-expired). Tries the O(1) `lookupHash` index first — every session issued by
+ * `issueRefreshSession` above has one. Falls back to the historical O(n) bcrypt-compare scan
+ * only across sessions that DON'T have a `lookupHash` yet (issued before this column existed —
+ * see schema.prisma's own doc comment); those get a `lookupHash` for free the next time they
+ * rotate via `issueRefreshSession`, so the fallback set shrinks to zero over time on its own.
+ */
 async function findSessionByToken(
-  token: string,
+  presentedToken: string,
   where: Prisma.RefreshSessionWhereInput,
 ): Promise<Prisma.RefreshSessionGetPayload<object> | null> {
-  const lookupHash = computeLookupHash(token);
-  const indexedMatch = await prisma.refreshSession.findFirst({ where: { ...where, lookupHash } });
-  if (indexedMatch) return indexedMatch;
+  const lookupHash = computeLookupHash(presentedToken);
+  const fast = await prisma.refreshSession.findFirst({ where: { ...where, lookupHash } });
+  if (fast) return fast;
 
-  const legacySessions = await prisma.refreshSession.findMany({ where: { ...where, lookupHash: null } });
-  for (const session of legacySessions) {
-    if (await bcrypt.compare(token, session.hashedToken)) return session;
+  const legacyCandidates = await prisma.refreshSession.findMany({ where: { ...where, lookupHash: null } });
+  for (const candidate of legacyCandidates) {
+    if (await bcrypt.compare(presentedToken, candidate.hashedToken)) return candidate;
   }
   return null;
 }
@@ -104,8 +112,12 @@ export async function revokeRefreshToken(presentedToken: string): Promise<void> 
   });
 }
 
-export async function revokeAllRefreshTokens(userId: string): Promise<void> {
-  await prisma.refreshSession.updateMany({
+/** Pass a transaction client to revoke inside a caller's transaction. */
+export async function revokeAllRefreshTokens(
+  userId: string,
+  client: Pick<Prisma.TransactionClient, 'refreshSession'> = prisma,
+): Promise<void> {
+  await client.refreshSession.updateMany({
     where: { userId, revokedAt: null },
     data: { revokedAt: new Date() },
   });

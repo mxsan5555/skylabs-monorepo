@@ -1,0 +1,17 @@
+{
+  "realApi": true,
+  "realDatabase": true,
+  "actualLogin": false,
+  "fixture": "temporary unlinked driver; metadata only; no provider calls",
+  "passed": [
+    "concurrent create: one succeeds, one rejects",
+    "direct duplicate field error",
+    "explicit version replacement",
+    "stale replacement rejected",
+    "failed delete retains reservation",
+    "array payload rejected (no supported batch endpoint)",
+    "archive releases type",
+    "legacy sibling and history preserved"
+  ],
+  "cleanup": "temporary driver, its documents and its test audit logs removed; no existing records modified"
+}

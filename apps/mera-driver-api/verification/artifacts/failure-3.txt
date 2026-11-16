@@ -1,0 +1,352 @@
+directions_car
+mera-driver
+Driver console
+dashboard
+Dashboard
+people
+Customers
+sports_motorsports
+Drivers
+directions_car
+Vehicles
+route
+TRIPS & BOOKINGS
+expand_more
+route
+Admin Dispatch
+sell
+Pricing
+event_available
+Attendance
+account_balance
+ACCOUNTS
+expand_more
+payments
+PAYMENTS & WALLETS
+expand_more
+local_offer
+PROMOTIONS
+expand_more
+quiz
+FAQs
+rate_review
+Feedback
+insights
+Reports
+category
+DRIVER MASTERS
+expand_more
+admin_panel_settings
+ADMINISTRATION
+expand_more
+fact_check
+KYC Assignments
+settings
+Settings
+S
+Super Admin
+9889259224
+person
+logout
+dock_to_right
+Account
+← Back to Drivers
+Photo: Not provided or unavailable
+Corrected Driver — Driver Details
+
+4a8ba9c9-302b-4140-88aa-affacd86b783
+
+Read-only saved profile
+
+Download Driver Resume
+Download Full Driver Report (internal)
+Account, verification & trip readiness
+Account
+Active
+KYC
+Non-Verified
+Licence validity
+Valid expiry date (human KYC approval remains separate)
+DL API verification
+Manual review required
+Registration fee
+Unpaid · Optional
+Trip Eligibility
+Not ready for trips
+Exact blocking reasons
+
+Required onboarding pills are incomplete
+
+Final KYC approval is required
+
+Driver is offline
+
+Live IDSPay verification is disabled: exact srv2 response samples and their provenance, HTTP method, required headers and token expiry/refresh behavior must be confirmed. Parsing remains fail-closed and separate from final human KYC approval.
+
+Personal Details · Personal & Identity Details
+
+Completed
+
+First Name
+Corrected Driver
+Last Name
+Not provided
+Father Name
+Not provided
+Mother Name
+Not provided
+Dob
+1990-02-01
+Gender
+Male
+Marital Status
+Not provided
+Language
+Not provided
+Languages
+Not provided
+Personal Details · Contact & Address Info
+
+Incomplete / additional saved information
+
+Email
+fixture@example.org
+Phone
+9876543210
+Emergency Number
+Not provided
+Pincode
+Not provided
+State
+Not provided
+City
+Verification City
+Address
+Not provided
+Personal Details · Physical & Demographics
+
+Incomplete / additional saved information
+
+Height
+Not provided
+Weight
+Not provided
+Religion
+Not provided
+Color
+Not provided
+Personal Details · Account & Lead Info
+
+Incomplete / additional saved information
+
+Source Type
+Not provided
+Job Type
+Not provided
+Experience
+Not provided
+Driver Type
+Not provided
+Avatar
+Not provided
+Education & Health Details · Education & Training Profile
+
+Incomplete / additional saved information
+
+Education
+Not provided
+Training Status
+Not provided
+Training Certificate
+Not provided
+Current document · Training certificate · Version 1
+
+certificate.pdf · education
+
+Registration / document number: Not provided | File type: application/pdf | Size: 49149 bytes
+
+Uploaded: 10/1/2026, 1:34:08 PM · Expiry: Not provided
+
+KYC: Pending · Issue reason: None recorded
+
+Open larger / zoom
+Download original
+Education & Health Details · Health & Medical Specifications
+
+Incomplete / additional saved information
+
+Eye Vision
+Not provided
+Blood Group
+Not provided
+Health Insurance
+Not provided
+Current document · Missing-file fixture · Version 1
+
+missing.png · health
+
+Registration / document number: Not provided | File type: image/png | Size: Not provided bytes
+
+Uploaded: 10/1/2026, 1:34:12 PM · Expiry: Not provided
+
+KYC: Pending · Issue reason: None recorded
+
+HTTP 404: No route for GET /uploads/drivers/4a8ba9c9-302b-4140-88aa-affacd86b783/missing.png
+
+Current document · Damaged-file fixture · Version 1
+
+damaged.png · health
+
+Registration / document number: Not provided | File type: image/png | Size: Not provided bytes
+
+Uploaded: 10/1/2026, 1:34:12 PM · Expiry: Not provided
+
+KYC: Pending · Issue reason: None recorded
+
+File is damaged or its preview format is unsupported
+
+Download original
+Documents Details · Driving License Details
+
+Incomplete / additional saved information
+
+License Details
+Not provided
+Vehicle Type
+Not provided
+Dl No
+DL1420110012345
+Dl Issue Date
+Not provided
+Dl Expiry Date
+2099-01-01
+Previous version history · Driving License · Version 1
+
+fixture.png · personal
+
+Registration / document number: Not provided | File type: image/png | Size: 68 bytes
+
+Uploaded: 10/1/2026, 1:33:56 PM · Expiry: Not provided
+
+Replaced / archived: 10/1/2026, 1:34:07 PM
+
+KYC: Pass · Issue reason: None recorded
+
+Open larger / zoom
+Download original
+Current document · Driving License · Version 2
+
+replacement.png · personal
+
+Registration / document number: Not provided | File type: image/png | Size: 68 bytes
+
+Uploaded: 10/1/2026, 1:34:07 PM · Expiry: Not provided
+
+KYC: Pending · Issue reason: None recorded
+
+Open larger / zoom
+Download original
+Documents Details · Police Verification & Employment
+
+Incomplete / additional saved information
+
+Police Verified Status
+Not provided
+Police Verified No
+Not provided
+Current Salary
+Not provided
+Expected Salary
+Not provided
+Documents Details · Personal & Category Docs
+
+Incomplete / additional saved information
+
+Payment Details · Account Details
+
+Incomplete / additional saved information
+
+Account Payment Method
+Not provided
+Bank Name
+Not provided
+Bank Account No
+Not provided
+Ifsc Code
+Not provided
+Branch Name
+Not provided
+Upi Id Or Cheque No
+Not provided
+Payment Details · Registration Fees
+
+Incomplete / additional saved information
+
+Preferred Payment Mode
+Not provided
+Amount
+Not provided
+Payment Receipt Date
+Not provided
+Additional saved fields & progress
+
+Incomplete / additional saved information
+
+Id
+4a8ba9c9-302b-4140-88aa-affacd86b783
+Created At
+2026-10-01T08:03:56.517Z
+Updated At
+2026-10-01T08:04:08.208Z
+User Id
+e9f906b1-f5e6-4ab4-8626-dafdc5997a55
+Passport Number
+Not provided
+Age
+36
+Country
+Not provided
+Status
+Non-Verified
+Verification Notes
+Correct the name spelling
+Account Status
+Active
+Assigned Verifier Id
+3509d3ff-35d4-4b3f-9dcf-83d38ae55cc7
+Personal Docs Status
+Pending
+Personal Docs Notes
+Not provided
+Health Docs Status
+Pending
+Health Docs Notes
+Not provided
+Education Docs Status
+Pending
+Education Docs Notes
+Not provided
+Police Docs Status
+Pending
+Police Docs Notes
+Not provided
+Vehicle
+Not provided
+Online
+false
+Registration Fee Required
+false
+Registration Fee Paise
+0
+Onboarding Status
+in_progress
+Current Step
+1
+Current Sub Step
+1
+Completed Steps
+Not provided
+Completed Sub Steps
+10
+Completion Percentage
+9

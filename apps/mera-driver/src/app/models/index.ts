@@ -123,24 +123,43 @@ export interface RideOption {
   language?: string;
   /** Highlighted as the recommended pick. */
   recommended?: boolean;
+  /** The backend FareRule's zone/vehicle-category names — needed (not shown) to request
+   *  real candidate drivers and a real quote for this option. */
+  zoneName: string;
+  vehicleCategoryName: string;
 }
 
-/** A driver a rider can pick or bookmark. */
+/** Great-circle distance in km — a reasonable, real (not fabricated) distance estimate for
+ *  showing eligible drivers before the authoritative server-side quote. */
+export function haversineKm(a: LatLng, b: LatLng): number {
+  const R = 6371;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const sinLat = Math.sin(dLat / 2), sinLng = Math.sin(dLng / 2);
+  const h = sinLat * sinLat + Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * sinLng * sinLng;
+  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+/** A driver a rider can pick or bookmark — sourced from the real public-safe candidates
+ *  endpoint. Rating/reviews/plate/ETA/police-verified aren't modeled anywhere in the backend
+ *  today, so they're optional here and the card hides them rather than inventing values. */
 export interface DriverSummary {
   id: string;
   name: string;
-  /** Avatar URL (mock/remote today). */
-  photo: string;
-  rating: number;
-  reviews: number;
+  /** Real externally-hosted avatar URL, or null if the driver has none set. */
+  photo: string | null;
   vehicle: string;
-  plate: string;
-  priceINR: number;
-  etaMinutes: number;
+  rating?: number;
+  reviews?: number;
+  plate?: string;
+  priceINR?: number;
+  etaMinutes?: number;
   /** Passed police background verification. */
-  policeVerified: boolean;
+  policeVerified?: boolean;
   /** Languages the driver speaks (supports the language-based option). */
-  languages: string[];
+  languages?: string[];
+  /** Free-text years/summary of driving experience, as saved on the driver's profile. */
+  experience?: string | null;
   bookmarked: boolean;
 }
 

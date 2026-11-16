@@ -2,15 +2,23 @@ import type { BootstrapResponse } from '@skylabs-monorepo/shared-types';
 
 /**
  * Post-login routing for msd. Every signed-in user is one of: staff (admin console),
- * customer, vendor, or — the common case, since self-registering as a vendor only adds the
- * `vendor` role on top of the `customer` role every user gets on first login, never removing
- * it (see `ensureVendorRoleAssigned` in msd-api's `vendor.service.ts`) — both at once.
+ * customer, member, or both a customer and a member (the `member` role is added on top of the
+ * `customer` role every user gets on first login, never replacing it — see
+ * `ensureVendorRoleAssigned` in msd-api's `vendor.service.ts`).
  *
  * Kept app-local (not shared-auth) because the destinations (`/`, `/account/dashboard`,
  * `/choose-experience`) are msd-specific routes.
  */
 
-const STAFF_ROLE_KEYS = ['super_admin', 'admin', 'marketing', 'sales'] as const;
+/** Role keys seeded by msd-api (`prisma/seed.ts`); the member role was renamed from `vendor`
+ *  (P1-02). Support is staff and always uses the console. */
+const STAFF_ROLE_KEYS = ['super_admin', 'admin', 'marketing', 'sales', 'support'] as const;
+const CUSTOMER_ROLE_KEY = 'customer';
+
+/** Role keys that mean "this account owns a member business" — mirrors msd-api's
+ *  `lib/role-keys.ts#MEMBER_ROLE_KEYS` ('member' is canonical; 'vendor' tolerated during the
+ *  in-progress rename so a bootstrap carrying either key still routes correctly). */
+const MEMBER_ROLE_KEYS = ['member', 'vendor'] as const;
 
 export function getRoleKeys(bootstrap: BootstrapResponse): string[] {
   return bootstrap.roles.map((r) => r.key);
@@ -22,26 +30,37 @@ export function isStaffUser(bootstrap: BootstrapResponse): boolean {
 }
 
 export function isCustomerUser(bootstrap: BootstrapResponse): boolean {
-  return getRoleKeys(bootstrap).includes('customer');
+  return getRoleKeys(bootstrap).includes(CUSTOMER_ROLE_KEY);
 }
 
 export function isVendorUser(bootstrap: BootstrapResponse): boolean {
-  return getRoleKeys(bootstrap).includes('vendor');
+  return isMemberUser(bootstrap);
+}
+
+export function isMemberUser(bootstrap: BootstrapResponse): boolean {
+  const roleKeys = getRoleKeys(bootstrap);
+  return (MEMBER_ROLE_KEYS as readonly string[]).some((k) => roleKeys.includes(k));
+}
+
+/** Who gets the storefront "My Account" area (`/my-dashboard`, `/my-account/*`, `/orders`):
+ *  customers, including customer + member. Staff always use the admin console. */
+export function isCustomerAccountUser(bootstrap: BootstrapResponse): boolean {
+  return isCustomerUser(bootstrap) && !isStaffUser(bootstrap);
 }
 
 /** True only for the "holds both, needs to choose" case — never true for staff. */
 export function isDualRoleUser(bootstrap: BootstrapResponse): boolean {
-  return !isStaffUser(bootstrap) && isCustomerUser(bootstrap) && isVendorUser(bootstrap);
+  return !isStaffUser(bootstrap) && isCustomerUser(bootstrap) && isMemberUser(bootstrap);
 }
 
 /**
  * Where a freshly-signed-in user should land. Staff is unaffected (unchanged behavior);
- * a dual customer+vendor user is sent to the chooser instead of guessing for them.
+ * a dual customer + member user is sent to the chooser instead of guessing for them.
  */
 export function resolvePostLoginPath(bootstrap: BootstrapResponse): string {
   if (isStaffUser(bootstrap)) return '/account/dashboard';
   if (isDualRoleUser(bootstrap)) return '/choose-experience';
-  if (isVendorUser(bootstrap)) return '/account/dashboard';
+  if (isMemberUser(bootstrap)) return '/account/dashboard';
   if (isCustomerUser(bootstrap)) return '/';
   // No recognized role at all (shouldn't happen — every user gets `customer` by default) —
   // fall back to the storefront rather than a blank/guarded page.
@@ -95,8 +114,32 @@ export function extractReturnUrl(location: { search?: string; state?: unknown })
  *  Exported so `otp.tsx` can re-validate a `returnUrl` it received via `location.state` right
  *  before actually navigating to it — defense in depth on top of `extractReturnUrl` already
  *  sanitizing it once, on the way in. */
+/** ASCII control characters: everything below space (tab, newline, ...) plus DEL. */
+const FIRST_PRINTABLE_CODE = 0x20;
+const DELETE_CODE = 0x7f;
+
+/** A backslash or an ASCII control character. */
+function hasUnsafeChar(value: string): boolean {
+  for (const char of value) {
+    const code = char.charCodeAt(0);
+    if (char === '\\' || code < FIRST_PRINTABLE_CODE || code === DELETE_CODE) return true;
+  }
+  return false;
+}
+
 export function sanitizeReturnUrl(url: string): string | null {
   if (!url || !url.startsWith('/') || url.startsWith('//')) return null;
+  // Browsers read `/\host`, `/<tab>/host` and their encoded forms as `//host` (P10-38): refuse any
+  // backslash or control character, and any path whose decoded start leaves this origin.
+  if (hasUnsafeChar(url)) return null;
+  let decoded = url;
+  try {
+    decoded = decodeURIComponent(url);
+  } catch {
+    return null;
+  }
+  if (decoded.startsWith('//') || hasUnsafeChar(decoded)) return null;
+  if (typeof window !== 'undefined' && new URL(url, window.location.origin).origin !== window.location.origin) return null;
   if (url === '/sign-in' || url.startsWith('/sign-in?') || url.startsWith('/sign-in/')) return null;
   if (url === '/otp' || url.startsWith('/otp?') || url.startsWith('/otp/')) return null;
   return url;

@@ -1,5 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { extractReturnUrl, sanitizeReturnUrl, signInPathWithNext, signInPathWithReturnTo } from './role-routing';
+import type { BootstrapResponse } from '@skylabs-monorepo/shared-types';
+import {
+  extractReturnUrl,
+  isCustomerAccountUser,
+  isDualRoleUser,
+  isStaffUser,
+  isVendorUser,
+  resolvePostLoginPath,
+  sanitizeReturnUrl,
+  signInPathWithNext,
+  signInPathWithReturnTo,
+} from './role-routing';
+
+const withRoles = (...keys: string[]) => ({ roles: keys.map((key) => ({ key })) }) as unknown as BootstrapResponse;
 
 describe('extractReturnUrl', () => {
   it('reads a plain ?next= path', () => {
@@ -80,6 +93,20 @@ describe('sanitizeReturnUrl', () => {
     expect(sanitizeReturnUrl('//evil.example.com')).toBeNull();
   });
 
+  it('rejects backslash and control-character tricks browsers read as another host (P10-38)', () => {
+    expect(sanitizeReturnUrl('/\\evil.example.com')).toBeNull();
+    expect(sanitizeReturnUrl('/\\/evil.example.com')).toBeNull();
+    expect(sanitizeReturnUrl('/\t/evil.example.com')).toBeNull();
+    expect(sanitizeReturnUrl('/\n/evil.example.com')).toBeNull();
+    expect(sanitizeReturnUrl('/%2F%2Fevil.example.com')).toBeNull();
+    expect(sanitizeReturnUrl('/%5Cevil.example.com')).toBeNull();
+  });
+
+  it('only returns paths that stay on this site', () => {
+    expect(sanitizeReturnUrl('/deal/spa-day?x=1#faq')).toBe('/deal/spa-day?x=1#faq');
+    expect(sanitizeReturnUrl('/./evil')).toBe('/./evil');
+  });
+
   it('rejects a path back into /sign-in or /otp', () => {
     expect(sanitizeReturnUrl('/sign-in')).toBeNull();
     expect(sanitizeReturnUrl('/otp')).toBeNull();
@@ -112,5 +139,72 @@ describe('signInPathWithReturnTo', () => {
   it('preserves a multi-value query string exactly, per requirement 1\'s /explore example', () => {
     const location = { pathname: '/explore', search: '?q=Swedish%20Massage', hash: '' };
     expect(signInPathWithReturnTo(location)).toBe(`/sign-in?next=${encodeURIComponent('/explore?q=Swedish%20Massage')}`);
+  });
+});
+
+describe('isCustomerAccountUser', () => {
+  it('is true for a customer', () => {
+    expect(isCustomerAccountUser(withRoles('customer'))).toBe(true);
+  });
+
+  it('is true for a customer who is also a member (dual role)', () => {
+    expect(isCustomerAccountUser(withRoles('customer', 'member'))).toBe(true);
+  });
+
+  it('is false for staff, even with the customer role', () => {
+    expect(isCustomerAccountUser(withRoles('super_admin', 'customer'))).toBe(false);
+  });
+
+  it('is false for a member without the customer role', () => {
+    expect(isCustomerAccountUser(withRoles('member'))).toBe(false);
+  });
+});
+
+/**
+ * Regression coverage for the msd-api `vendor` -> `member` role-key rename (see
+ * `lib/role-keys.ts#MEMBER_ROLE_KEYS` server-side): a real Member account's bootstrap carries
+ * whichever key its Role row currently has, so this must recognize both during the transition —
+ * never only the pre-rename `'vendor'` key.
+ */
+describe('isVendorUser', () => {
+  it('is true for the canonical `member` key', () => {
+    expect(isVendorUser(withRoles('member'))).toBe(true);
+  });
+
+  it('is true for the pre-rename `vendor` key (transitional)', () => {
+    expect(isVendorUser(withRoles('vendor'))).toBe(true);
+  });
+
+  it('is false for a plain customer', () => {
+    expect(isVendorUser(withRoles('customer'))).toBe(false);
+  });
+});
+
+/** ST-06: where each role lands after sign-in. The member role key is `member` (P1-02); support
+ *  is staff and always uses the console. */
+describe('resolvePostLoginPath and the role checks', () => {
+  it.each([
+    [['super_admin'], '/account/dashboard'],
+    [['admin', 'customer'], '/account/dashboard'],
+    [['sales'], '/account/dashboard'],
+    [['marketing'], '/account/dashboard'],
+    [['support', 'customer'], '/account/dashboard'],
+    [['member'], '/account/dashboard'],
+    [['customer', 'member'], '/choose-experience'],
+    [['customer'], '/'],
+    [[], '/'],
+  ])('%j lands on %s', (roles, path) => {
+    expect(resolvePostLoginPath(withRoles(...roles))).toBe(path);
+  });
+
+  it('treats support as staff', () => {
+    expect(isStaffUser(withRoles('support'))).toBe(true);
+    expect(isCustomerAccountUser(withRoles('support', 'customer'))).toBe(false);
+  });
+
+  it('a customer who is also a member chooses an experience; staff never do', () => {
+    expect(isDualRoleUser(withRoles('customer', 'member'))).toBe(true);
+    expect(isDualRoleUser(withRoles('admin', 'customer', 'member'))).toBe(false);
+    expect(isDualRoleUser(withRoles('member'))).toBe(false);
   });
 });

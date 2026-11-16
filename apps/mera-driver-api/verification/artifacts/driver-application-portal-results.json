@@ -1,0 +1,30 @@
+{
+  "status": "passed",
+  "before": {
+    "users": 14,
+    "drivers": 7,
+    "customers": 3,
+    "bookings": 1,
+    "movements": 0,
+    "otp": 24
+  },
+  "after": {
+    "users": 14,
+    "drivers": 7,
+    "customers": 3,
+    "bookings": 1,
+    "movements": 0,
+    "otp": 24
+  },
+  "evidence": [
+    "Anonymous three-field Master-backed application; backend-confirmed success; duplicate and concurrent normalized-phone requests create one incomplete Driver and no login",
+    "Existing DataTable All Drivers and four database counts, same-record Create Driver User, Driver Users refresh, no staff User Management leak, atomic concurrent activation",
+    "Real OTP verification and token issuance using an isolated local challenge; own Driver dashboard/menu; saved basic fields; onboarding partial save/reload; staff routes/APIs and cross-driver detail denied",
+    "Customer password login auto-links own email-only profile, authorized booking return, own-only bookings/invoices/profile APIs, refresh and direct staff URLs denied, external return rejected, mixed roles stay customer until explicit staff selection, refresh preserves context, staff logout/customer login has no stale admin sidebar, mobile"
+  ],
+  "limitations": [
+    "OTP delivery isolated with a local hashed challenge; real SMS delivery not tested",
+    "No real payment, payout, refund, IDSPay or paid location-provider call",
+    "Original users/roles were not reassigned or stripped"
+  ]
+}

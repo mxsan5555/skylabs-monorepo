@@ -76,7 +76,7 @@ describe('getVendorWiseReport', () => {
       { id: 'order-3', status: 'CANCELLED', vendorNameSnapshot: 'B' },
     ] as never);
     prismaMock.payment.findMany.mockResolvedValue([{ orderId: 'order-1', amount: new Prisma.Decimal('100') }] as never);
-    prismaMock.vendor.findMany.mockResolvedValue([
+    prismaMock.member.findMany.mockResolvedValue([
       { id: 'vendor-a', businessName: 'Vendor A' },
       { id: 'vendor-b', businessName: 'Vendor B' },
     ] as never);

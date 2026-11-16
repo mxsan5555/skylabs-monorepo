@@ -54,6 +54,7 @@ function configure() {
 
 beforeEach(() => {
   localStorage.clear();
+  sessionStorage.clear();
 });
 
 afterEach(() => {
@@ -276,5 +277,118 @@ describe('AuthService.loadBootstrap — transient failures must not sign the use
 
     expect(auth.isAuthenticated()).toBe(true);
     expect(auth.bootstrap()).toEqual(BOOTSTRAP_BODY.data); // stale-but-valid data kept, not wiped
+  });
+});
+
+/**
+ * P10-38 (same rules as the React AuthProvider): a "Login As" preview token lives in this tab
+ * only (sessionStorage); localStorage keeps the real token; a refused preview falls back to the
+ * real session; sign-out clears the preview and sends the access token with the revoke call.
+ */
+describe('AuthService "Login As" preview', () => {
+  const REAL = () => validToken({ sub: 'admin' });
+  const PREVIEW = () => validToken({ sub: 'member', isPreview: true });
+
+  function stubApi(previewToken: string, bootstrapStatus: (bearer: string | null) => number = () => 200) {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      const bearer = new Headers(init?.headers).get('Authorization');
+      if (url.includes('/rbac/bootstrap')) {
+        const status = bootstrapStatus(bearer);
+        return status === 200 ? jsonRes(200, BOOTSTRAP_BODY) : jsonRes(status, {});
+      }
+      if (url.includes('/rbac/impersonate')) return jsonRes(200, { data: { previewToken } });
+      if (url.includes('/auth/logout')) return jsonRes(200, { data: { message: 'ok' } });
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  it('keeps the preview token in this tab only; localStorage keeps the real token', async () => {
+    const real = REAL();
+    const preview = PREVIEW();
+    localStorage.setItem('test_app_auth_token', real);
+    localStorage.setItem('test_app_auth_refresh_token', 'refresh-1');
+    stubApi(preview);
+    configure();
+    const auth = TestBed.inject(AuthService);
+    await auth.whenReady();
+    await auth.loginAsUser('member');
+
+    expect(auth.token()).toBe(preview);
+    expect(sessionStorage.getItem('test_app_auth_preview_token')).toBe(preview);
+    expect(localStorage.getItem('test_app_auth_token')).toBe(real);
+    expect(localStorage.getItem('test_app_auth_real_token')).toBeNull();
+  });
+
+  it('a new tab (no sessionStorage) starts with the real session; the same tab resumes the preview', () => {
+    const real = REAL();
+    const preview = PREVIEW();
+    localStorage.setItem('test_app_auth_token', real);
+    sessionStorage.setItem('test_app_auth_preview_token', preview);
+    stubApi(preview);
+    configure();
+    expect(TestBed.inject(AuthService).token()).toBe(preview);
+
+    TestBed.resetTestingModule();
+    sessionStorage.clear();
+    configure();
+    expect(TestBed.inject(AuthService).token()).toBe(real);
+  });
+
+  it('returning to Super Admin drops the preview and restores the real token', async () => {
+    const real = REAL();
+    localStorage.setItem('test_app_auth_token', real);
+    sessionStorage.setItem('test_app_auth_preview_token', PREVIEW());
+    stubApi(PREVIEW());
+    configure();
+    const auth = TestBed.inject(AuthService);
+    await auth.returnToSuperAdmin();
+    expect(auth.token()).toBe(real);
+    expect(sessionStorage.getItem('test_app_auth_preview_token')).toBeNull();
+  });
+
+  it('a refused preview falls back to the real session instead of signing out', async () => {
+    const real = REAL();
+    const preview = PREVIEW();
+    localStorage.setItem('test_app_auth_token', real);
+    localStorage.setItem('test_app_auth_refresh_token', 'refresh-1');
+    sessionStorage.setItem('test_app_auth_preview_token', preview);
+    stubApi(preview, (bearer) => (bearer === `Bearer ${preview}` ? 401 : 200));
+    configure();
+    const auth = TestBed.inject(AuthService);
+    await vi.waitFor(() => expect(auth.token()).toBe(real));
+    await auth.whenReady();
+    expect(auth.sessionExpired()).toBe(false);
+    expect(localStorage.getItem('test_app_auth_refresh_token')).toBe('refresh-1');
+    expect(sessionStorage.getItem('test_app_auth_preview_token')).toBeNull();
+  });
+
+  it('moves a preview that an older build left in localStorage out of the way', () => {
+    const real = REAL();
+    localStorage.setItem('test_app_auth_token', PREVIEW());
+    localStorage.setItem('test_app_auth_real_token', real);
+    stubApi(PREVIEW());
+    configure();
+    expect(TestBed.inject(AuthService).token()).toBe(real);
+    expect(localStorage.getItem('test_app_auth_token')).toBe(real);
+    expect(localStorage.getItem('test_app_auth_real_token')).toBeNull();
+  });
+
+  it('sign-out clears the preview and revokes with the real access token', async () => {
+    const real = REAL();
+    localStorage.setItem('test_app_auth_token', real);
+    localStorage.setItem('test_app_auth_refresh_token', 'refresh-1');
+    sessionStorage.setItem('test_app_auth_preview_token', PREVIEW());
+    const fetchMock = stubApi(PREVIEW());
+    configure();
+    const auth = TestBed.inject(AuthService);
+    auth.signOut();
+    expect(auth.token()).toBeNull();
+    expect(sessionStorage.getItem('test_app_auth_preview_token')).toBeNull();
+    await vi.waitFor(() => {
+      const call = fetchMock.mock.calls.find(([url]) => String(url).includes('/auth/logout'));
+      expect(new Headers(call?.[1]?.headers).get('Authorization')).toBe(`Bearer ${real}`);
+    });
   });
 });

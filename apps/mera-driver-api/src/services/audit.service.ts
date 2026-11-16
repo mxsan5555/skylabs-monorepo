@@ -11,8 +11,8 @@ export interface WriteAuditLogInput {
   userAgent?: string;
 }
 
-export async function writeAuditLog(input: WriteAuditLogInput) {
-  return prisma.auditLog.create({
+export async function writeAuditLog(input: WriteAuditLogInput, client: Pick<typeof prisma,'auditLog'> = prisma) {
+  return client.auditLog.create({
     data: {
       actorUserId: input.actorUserId,
       action: input.action,

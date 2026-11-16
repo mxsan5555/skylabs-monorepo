@@ -2,10 +2,49 @@
    @skylabs-monorepo/shared-ui/layout.css (imported in main.tsx). M3 theme
    tokens come from the loaded theme (also main.tsx). Add msd-only global
    overrides here. */
+/* Page content width and side gutter (ST-19): every full-width container (header, footer, page
+   sections, breadcrumb) centres its content with these, so the width can't drift. */
+/* Prevent intrinsic sizing from expanding the viewport. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
 
-/* ── Breadcrumb (shared component) ─────────────────────────────────────────── */
+html,
+body,
+#root {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+
+img,
+video,
+iframe,
+canvas {
+  max-width: 100%;
+}
+
+.admin-layout,
+.admin-content,
+.admin-page,
+.page-head,
+.two-pane,
+.summary-layout,
+.dashboard-page,
+.form-grid {
+  min-width: 0;
+}
+
+:root {
+  --sky-content-max: 1280px;
+  --sky-content-gutter: 16px;
+}
+
 .breadcrumb {
-  max-width: 1280px;
+  max-width: var(--sky-content-max);
   margin: 0 auto;
   list-style: none;
   padding: 0;
@@ -40,12 +79,97 @@
   font-size: 16px;
 }
 
+.text-muted {
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.prose {
+  max-inline-size: 70ch;
+  color: var(--md-sys-color-on-surface);
+}
+
+.prose>* {
+  margin-block: 0 16px;
+}
+
+.prose> :last-child {
+  margin-block-end: 0;
+}
+
+.prose :is(h2, h3, h4) {
+  margin-block: 32px 8px;
+  color: var(--md-sys-color-on-surface);
+}
+
+.prose> :is(h2, h3, h4):first-child {
+  margin-block-start: 0;
+}
+
+.prose h2 {
+  font: var(--md-sys-typescale-headline-small-weight) var(--md-sys-typescale-headline-small-size) / var(--md-sys-typescale-headline-small-line-height) var(--md-sys-typescale-headline-small-font);
+}
+
+.prose h3 {
+  font: var(--md-sys-typescale-title-large-weight) var(--md-sys-typescale-title-large-size) / var(--md-sys-typescale-title-large-line-height) var(--md-sys-typescale-title-large-font);
+}
+
+.prose h4 {
+  font: var(--md-sys-typescale-title-medium-weight) var(--md-sys-typescale-title-medium-size) / var(--md-sys-typescale-title-medium-line-height) var(--md-sys-typescale-title-medium-font);
+}
+
+.prose ul {
+  padding-inline-start: 24px;
+}
+
+.prose li+li {
+  margin-block-start: 8px;
+}
+
+.prose blockquote {
+  margin-inline: 0;
+  padding-inline-start: 16px;
+  border-inline-start: 1px solid var(--md-sys-color-outline);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.text-link,
+.prose a {
+  color: var(--md-sys-color-primary);
+  text-underline-offset: 3px;
+}
+
+.text-link:focus-visible,
+.prose a:focus-visible {
+  outline: 3px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+  border-radius: var(--md-sys-shape-corner-extra-small);
+}
+
+.map-frame {
+  display: block;
+  inline-size: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: var(--md-sys-shape-corner-large);
+  background-color: var(--md-sys-color-surface-container-high);
+}
+
+.map-frame--tall {
+  aspect-ratio: 4 / 3;
+}
+
+@media (min-width: 840px) {
+  .map-frame--tall {
+    aspect-ratio: 4 / 5;
+  }
+}
+
 /* ── RBAC console (dashboard, Role Management, User Management, Audit Logs) ──
    Shared shell classes (.admin-layout, .admin-sidebar, .admin-topbar,
    .admin-content, .admin-page, .auth-*, ...) come from
    @skylabs-monorepo/shared-ui/layout.css — only console-specific pieces live
    here, ported from the (now-deleted) standalone msd-admin app. */
-
 input[type='checkbox'] {
   width: 18px;
   height: 18px;
@@ -70,8 +194,8 @@ input[type='checkbox'] {
   align-items: center;
   gap: 12px;
   padding: 10px 20px;
-  background-color: var(--md-sys-color-tertiary-container, #ffdbcb);
-  color: var(--md-sys-color-on-tertiary-container, #331200);
+  background-color: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
   font-size: 0.9rem;
 }
 
@@ -79,7 +203,6 @@ input[type='checkbox'] {
   flex: 1;
 }
 
-/* Wider variant of the shared `.admin-page` for grid-heavy screens (dashboard, tables). */
 .admin-page--wide {
   max-width: none;
 }
@@ -91,6 +214,11 @@ input[type='checkbox'] {
   gap: 16px;
   flex-wrap: wrap;
   margin-bottom: 24px;
+}
+
+.member-avatar {
+  width: 56px;
+  flex-shrink: 0;
 }
 
 .page-head h1 {
@@ -110,15 +238,169 @@ input[type='checkbox'] {
   flex-wrap: wrap;
 }
 
+/* Dashboard (dashboard.tsx, dashboard-groups.tsx). Mobile first: one column, then from 900px
+   two rows of two columns: Members | Customers, then Admin | Quick actions.
+   Stat cards fill each column at 200px minimum, so wide screens fit 3 across. */
 .dashboard-page {
-  gap: 24px;
+  gap: 40px;
+}
+
+.dashboard-page .page-head {
+  margin-bottom: 0;
+}
+
+.dashboard-group h2 {
+  margin: 0 0 16px;
+  color: var(--md-sys-color-on-surface);
+}
+
+.dashboard-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 40px 32px;
+  align-items: start;
+}
+
+.dashboard-stats,
+.dashboard-links {
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .dashboard-stats {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 16px;
-  width: 100%;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+  gap: 12px;
+}
+
+.dashboard-stat,
+.dashboard-links {
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-large);
+  background-color: var(--md-sys-color-surface);
+}
+
+.dashboard-stat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+
+a.dashboard-stat:hover {
+  background-color: color-mix(in srgb,
+      var(--md-sys-color-on-surface) calc(var(--md-sys-state-hover-state-layer-opacity) * 100%),
+      transparent);
+}
+
+a.dashboard-stat:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
+.dashboard-stat__text {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.dashboard-stat__value,
+.dashboard-stat__label,
+.dashboard-stat__detail {
+  display: block;
+  margin: 0;
+}
+
+.dashboard-stat__detail {
+  color: var(--md-sys-color-on-surface-variant);
+  overflow-wrap: anywhere;
+}
+
+.member-summary {
+  display: grid;
+  gap: 12px;
+  margin-block: 8px 24px;
+}
+
+.member-summary>h2 {
+  margin: 0;
+}
+
+.dashboard-stat__value {
+  color: var(--md-sys-color-on-surface);
+}
+
+.dashboard-stat__label {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.dashboard-stat__icon,
+.dashboard-stat__go {
+  display: grid;
+  place-items: center;
+  flex: none;
+  inline-size: 40px;
+  block-size: 40px;
+}
+
+.dashboard-stat__icon {
+  border-radius: var(--md-sys-shape-corner-medium);
+  background-color: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+.dashboard-stat__go {
+  border-radius: var(--md-sys-shape-corner-full);
+}
+
+.dashboard-links {
+  overflow: hidden;
+}
+
+.dashboard-links li+li {
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.dashboard-links a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-block-size: 52px;
+  padding: 0 16px;
+  color: var(--md-sys-color-on-surface);
+  text-decoration: none;
+}
+
+.dashboard-links__go {
+  margin-inline-start: auto;
+}
+
+.dashboard-stat__go,
+.dashboard-links__go {
+  color: var(--md-sys-color-primary);
+}
+
+.dashboard-links a:hover {
+  background-color: color-mix(in srgb,
+      var(--md-sys-color-on-surface) calc(var(--md-sys-state-hover-state-layer-opacity) * 100%),
+      transparent);
+}
+
+.dashboard-links a:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
+.dashboard-links a:focus-visible {
+  outline-offset: -2px;
+}
+
+@media (min-width: 900px) {
+  .dashboard-pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .two-pane {
@@ -128,8 +410,6 @@ input[type='checkbox'] {
   align-items: start;
 }
 
-/* Member summary tab (vendor-detail-page.tsx): 70/30 split — setup-progress cards left,
-   the member's profile summary card right. Structural only, same pattern as `.two-pane` above. */
 .summary-layout {
   display: grid;
   grid-template-columns: 7fr 3fr;
@@ -137,9 +417,13 @@ input[type='checkbox'] {
   align-items: start;
 }
 
+.summary-layout--balanced {
+  grid-template-columns: 1fr 1fr;
+}
+
 .panel {
   border-radius: 16px;
-  background-color: var(--md-sys-color-surface-container, #eef1f6);
+  background-color: var(--md-sys-color-surface-container);
   padding: 16px;
 }
 
@@ -149,20 +433,14 @@ input[type='checkbox'] {
   color: var(--md-sys-color-on-surface);
 }
 
-/* Vendor Management page (vendors.tsx): the Vendors list panel now sits full-width above the
-   selected vendor's detail panel (rather than beside it in `.two-pane`), so the detail panel
-   needs its own top spacing instead of `.two-pane`'s grid `gap`. */
 .vendor-detail {
   margin-top: 20px;
   scroll-margin-top: 90px;
 }
 
-/* Vendor Detail (and similar) full-width tabbed panels: a Tabs strip switching between several
-   already-existing sub-views (e.g. Overview/Branches & Deals/Therapists/Customers/Orders/Bookings)
-   rendered below the shared header actions, instead of stacking every section vertically. */
 .admin-tabs-wrap {
   margin: 4px 0 16px;
-  border-bottom: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -173,6 +451,111 @@ input[type='checkbox'] {
 
 .admin-tab-panel {
   padding-top: 4px;
+}
+
+.member-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.member-actions__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 16px;
+  background-color: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+}
+
+.member-actions__title,
+.member-actions__body,
+.member-actions__hint {
+  margin: 0;
+}
+
+.member-actions__hint {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.member-actions__body {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.member-actions__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.member-actions__confirm md-outlined-text-field,
+.document-row__reject md-outlined-text-field {
+  width: 100%;
+}
+
+.document-list,
+.activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.document-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--md-sys-color-surface-container);
+}
+
+.document-row__info {
+  flex: 1 1 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.document-row__info h3,
+.document-row__info p,
+.activity-list p {
+  margin: 0;
+}
+
+.document-row__upload,
+.document-row__review,
+.document-row__reject {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.document-row__reject {
+  flex-basis: 100%;
+}
+
+.document-row__file {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.document-row__file input {
+  min-height: 44px;
+}
+
+.activity-list__item {
+  padding: 12px 16px;
+  border-radius: 12px;
+  background-color: var(--md-sys-color-surface-container);
 }
 
 .entity-list {
@@ -202,7 +585,7 @@ input[type='checkbox'] {
 }
 
 .entity-list__item:hover {
-  background-color: var(--md-sys-color-surface-container-high, #e7e8ee);
+  background-color: var(--md-sys-color-surface-container-high);
 }
 
 .role-list__name {
@@ -213,15 +596,15 @@ input[type='checkbox'] {
 }
 
 .entity-list__item.active {
-  background-color: var(--md-sys-color-secondary-container, #d7e3ff);
-  color: var(--md-sys-color-on-secondary-container, #101c2b);
+  background-color: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
   font-weight: 600;
 }
 
 .entity-list__item--highlighted {
   outline: 2px solid var(--md-sys-color-primary);
   outline-offset: -2px;
-  background-color: var(--md-sys-color-primary-container, #d7e3ff);
+  background-color: var(--md-sys-color-primary-container);
 }
 
 .status-pill {
@@ -235,27 +618,25 @@ input[type='checkbox'] {
 }
 
 .status-pill--active {
-  background-color: var(--md-sys-color-primary-container, #cee5ff);
-  color: var(--md-sys-color-on-primary-container, #001d33);
+  background-color: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
 }
 
 .status-pill--inactive {
-  background-color: var(--md-sys-color-surface-container-highest, #e2e2e2);
-  color: var(--md-sys-color-on-surface-variant, #43483e);
+  background-color: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface-variant);
 }
 
 .status-pill--blocked {
-  background-color: var(--md-sys-color-error-container, #ffdad6);
-  color: var(--md-sys-color-on-error-container, #410002);
+  background-color: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
 }
 
-/* Reports — simple CSS-width bar next to a revenue figure in a data-table cell (no chart
-   library installed for this; see reports.tsx's own doc comment). */
 .bar-viz {
   margin-top: 4px;
   height: 6px;
   border-radius: 3px;
-  background-color: var(--md-sys-color-surface-container-highest, #e2e2e2);
+  background-color: var(--md-sys-color-surface-container-highest);
   overflow: hidden;
 }
 
@@ -279,7 +660,7 @@ input[type='checkbox'] {
 .data-table td {
   padding: 10px 12px;
   text-align: left;
-  border-bottom: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
   color: var(--md-sys-color-on-surface);
 }
 
@@ -310,7 +691,7 @@ input[type='checkbox'] {
 .perm-matrix th,
 .perm-matrix td {
   padding: 8px 10px;
-  border-bottom: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
   text-align: center;
 }
 
@@ -327,6 +708,15 @@ input[type='checkbox'] {
   color: var(--md-sys-color-on-surface);
   font-weight: 600;
   white-space: nowrap;
+}
+
+.perm-matrix__cell--dirty {
+  background-color: var(--md-sys-color-tertiary-container);
+  border-radius: 8px;
+}
+
+.perm-matrix__cell--na {
+  color: var(--md-sys-color-outline);
 }
 
 .widget-assign-row {
@@ -356,7 +746,7 @@ input[type='checkbox'] {
   width: 56px;
   padding: 4px 6px;
   border-radius: 6px;
-  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  border: 1px solid var(--md-sys-color-outline-variant);
 }
 
 .section-title {
@@ -377,14 +767,22 @@ input[type='checkbox'] {
   width: 100%;
 }
 
-/* Elements that must always span every column, never squeeze into a single field-width cell —
-   section headers, hints/errors, fieldsets (packages, KYC documents, etc.), and the save/cancel
-   action row. */
+.form-grid>h2.form-grid__full {
+  margin: 0;
+  color: var(--md-sys-color-on-surface);
+}
+
+.form-grid--stack {
+  grid-template-columns: minmax(0, 1fr);
+  max-inline-size: 640px;
+}
+
 .form-grid>.section-title,
 .form-grid>.field-hint,
 .form-grid>.error-state,
 .form-grid>fieldset,
 .form-grid>.form-actions,
+.form-grid>.form-grid__full,
 .form-grid>section {
   grid-column: 1 / -1;
 }
@@ -409,8 +807,9 @@ input[type='checkbox'] {
   gap: 12px;
   margin-top: 8px;
   padding-top: 20px;
-  border-top: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  border-top: 1px solid var(--md-sys-color-outline-variant);
 }
+
 .empty-state,
 .error-state,
 .loading-state {
@@ -420,7 +819,7 @@ input[type='checkbox'] {
 }
 
 .error-state {
-  color: var(--md-sys-color-error, #ba1a1a);
+  color: var(--md-sys-color-error);
 }
 
 .field-hint {
@@ -429,8 +828,6 @@ input[type='checkbox'] {
   color: var(--md-sys-color-on-surface-variant);
 }
 
-/* Branch operating-hours editor (vendor-branches.tsx's OpeningHoursEditor) — one row per
-   weekday, each at least a 44px touch target per the app's accessibility baseline. */
 .opening-hours-editor__row {
   display: flex;
   align-items: center;
@@ -450,8 +847,8 @@ input[type='checkbox'] {
   min-height: 44px;
   padding: 4px 8px;
   border-radius: 8px;
-  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
-  background: var(--md-sys-color-surface, #fff);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-surface);
   color: var(--md-sys-color-on-surface);
   font: inherit;
 }
@@ -473,7 +870,7 @@ input[type='checkbox'] {
   flex-direction: column;
   gap: 8px;
   padding: 12px;
-  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  border: 1px solid var(--md-sys-color-outline-variant);
   border-radius: 12px;
 }
 
@@ -509,7 +906,7 @@ input[type='checkbox'] {
   padding: 8px 16px;
   min-height: 44px;
   border-radius: 999px;
-  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  border: 1px solid var(--md-sys-color-outline-variant);
   background: transparent;
   color: var(--md-sys-color-on-surface-variant);
   font: inherit;
@@ -518,12 +915,12 @@ input[type='checkbox'] {
 }
 
 .wizard-steps__item:hover {
-  background-color: var(--md-sys-color-surface-container-high, #e7e8ee);
+  background-color: var(--md-sys-color-surface-container-high);
 }
 
 .wizard-steps__item[aria-current='step'] {
-  background-color: var(--md-sys-color-primary-container, #cee5ff);
-  color: var(--md-sys-color-on-primary-container, #001d33);
+  background-color: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
   border-color: transparent;
 }
 
@@ -538,8 +935,14 @@ input[type='checkbox'] {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background-color: var(--md-sys-color-surface-container-high, #e7e8ee);
+  background-color: var(--md-sys-color-surface-container-high);
   font-size: 0.7rem;
+}
+
+/* The checkmark rendered inside `.wizard-steps__num` for a completed step (Voucher Verification
+   page) — sized to fit the 22px circle, same way the step number itself fits. */
+.wizard-steps__num md-icon {
+  --md-icon-size: 16px;
 }
 
 .wizard-steps__item[aria-current='step'] .wizard-steps__num {
@@ -547,18 +950,31 @@ input[type='checkbox'] {
   color: var(--md-sys-color-on-primary);
 }
 
-/* Category Access grant grid (vendor-wizard-modules.tsx) — one checkbox list per enabled
-   business module. */
+.wizard-steps__item--done .wizard-steps__num {
+  background-color: var(--md-sys-color-primary-container);
+}
+
+/* Voucher Code lookup row (Member Orders page, Verify & Complete tab) — a text field that grows
+   plus a content-sized button that never stretches full-width, same "label above, field + button
+   in one row" shape as the old Verify Purchase panel, just not forced into `.form-grid`'s
+   even-column grid (which would stretch the button too). */
+.voucher-lookup-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.voucher-lookup-row md-outlined-text-field {
+  flex: 1;
+  min-width: 220px;
+}
+
 .category-grant-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
-}
-
-.category-grant-grid__group {
-  border-radius: 12px;
-  background-color: var(--md-sys-color-surface-container, #eef1f6);
-  padding: 12px 16px;
 }
 
 .category-grant-grid__option {
@@ -568,34 +984,140 @@ input[type='checkbox'] {
   min-height: 44px;
 }
 
-/* Branch-level Category → Subcategory tree (branch-category-access-dialog.tsx) — subcategories
-   nest under their parent category's checkbox, indented rather than in their own grid group. */
-.category-grant-grid__subgroup {
+.string-list-field {
   display: flex;
   flex-direction: column;
-  margin-left: 24px;
+  gap: 8px;
 }
 
-.category-grant-grid__option--indented {
-  min-height: 40px;
+.string-list-field__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
-/* ── Vendor Profile Form ─────────────────────────────────────────────── */
-.vendor-fields-grid md-outlined-text-field {
-  width: 100%;
-  min-width: 0;
+
+.string-list-field__items li {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-inline-start: 12px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-small, 8px);
+  color: var(--md-sys-color-on-surface);
 }
-.form-grid > sky-tile-card {
+
+.string-list-field__add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.string-list-field__add md-outlined-text-field {
+  flex: 1 1 240px;
+}
+
+.deal-packages {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.deal-packages__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.deal-packages__card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-medium, 12px);
+  background-color: var(--md-sys-color-surface);
+}
+
+.deal-packages__summary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.deal-packages__name {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--md-sys-color-on-surface);
+}
+
+.deal-packages__price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.deal-packages__price strong {
+  font-size: 1.1rem;
+  color: var(--md-sys-color-primary);
+}
+
+.deal-faq {
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-medium, 12px);
+}
+
+.deal-readiness {
+  margin: 4px 0 0;
+  padding-inline-start: 20px;
+}
+
+/* ── Member profile form (vendor-profile-form.tsx, item 8) ───────────────
+   Plain titled sections separated by space and a hairline (no card inside a card), a two
+   column grid capped in width so fields stay readable, one column on phones, and a save bar
+   that stays at the bottom while the form scrolls. */
+.vendor-section {
   grid-column: 1 / -1;
-  width: 100%;
-  display: block;
-  box-sizing: border-box;
+  display: grid;
+  gap: 16px;
+  padding-block: 24px;
+  border-top: 1px solid var(--md-sys-color-outline-variant);
 }
+
+.vendor-section:first-of-type {
+  border-top: 0;
+  padding-top: 8px;
+}
+
+.vendor-section__title,
+.vendor-section__hint {
+  margin: 0;
+}
+
+.vendor-section__title {
+  color: var(--md-sys-color-on-surface);
+}
+
+.vendor-section__hint {
+  margin-top: -12px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
 .vendor-fields-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: 28px;
-  row-gap: 24px;
-  width: 100%;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 20px 24px;
+  max-inline-size: 960px;
 }
 
 .vendor-field {
@@ -603,10 +1125,10 @@ input[type='checkbox'] {
   flex-direction: column;
   gap: 6px;
   min-width: 0;
-  width: 100%;
 }
 
-.vendor-field md-outlined-text-field {
+.vendor-field md-outlined-text-field,
+.vendor-field md-outlined-select {
   width: 100%;
   min-width: 0;
 }
@@ -614,25 +1136,49 @@ input[type='checkbox'] {
 .vendor-field .error-state {
   margin: 0;
   padding: 0;
-  text-align: left;
+  text-align: start;
   font-size: 0.75rem;
 }
 
-.form-grid > sky-tile-card {
+.vendor-form__summary {
   grid-column: 1 / -1;
-  width: 100%;
-  box-sizing: border-box;
+  max-inline-size: 960px;
+  padding: 12px 16px;
+  border-radius: var(--md-sys-shape-corner-medium, 12px);
+  background-color: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
 }
 
-.form-grid > sky-tile-card .vendor-fields-grid {
-  margin-top: 16px;
+.vendor-form__summary p,
+.vendor-form__summary ul {
+  margin: 0;
 }
+
+.vendor-form__summary ul {
+  margin-top: 4px;
+  padding-inline-start: 20px;
+}
+
+.vendor-form__actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  padding-bottom: 16px;
+  background-color: var(--md-sys-color-surface);
+}
+
+.vendor-form__dirty {
+  margin: 0 auto 0 0;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
 .vendor-section-content {
   display: flex;
   flex-direction: column;
   gap: 20px;
   width: 100%;
 }
+
 .kyc-document-list {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -650,55 +1196,8 @@ input[type='checkbox'] {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   width: 100%;
-}/* ── KYC Review ─────────────────────────────────────────────────────── */
-
-.kyc-review {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  width: 100%;
-  box-sizing: border-box;
-  margin: 4px 0 0;
-  padding: 16px;
-  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
-  border-radius: 12px;
-  background: var(--md-sys-color-surface-container-low, #f7f8fa);
 }
 
-.kyc-review legend {
-  padding: 0 8px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--md-sys-color-on-surface);
-}
-
-.kyc-review-status {
-  margin-left: 8px;
-  color: var(--md-sys-color-on-surface-variant);
-  font-weight: 400;
-}
-
-/* Rejection reason on first row */
-.kyc-review-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  width: 100%;
-}
-
-.kyc-review-actions md-outlined-text-field {
-  width: 100%;
-  min-width: 0;
-}
-
-/* Buttons on second row */
-.kyc-review-buttons {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-}
 .vendor-kyc-document-card {
   width: 100%;
   margin-top: 4px;
@@ -710,52 +1209,28 @@ input[type='checkbox'] {
   gap: 12px;
   width: 100%;
 }
+
 @media (max-width: 700px) {
   .vendor-fields-grid {
     grid-template-columns: 1fr;
     row-gap: 20px;
   }
-  .kyc-review-actions {
+
+  .vendor-kyc-document-card .kyc-document-list {
     grid-template-columns: 1fr;
-  }
-
-  .kyc-review-actions md-outlined-text-field {
-    width: 100%;
-  }
-    .vendor-kyc-document-card .kyc-document-list {
-    grid-template-columns: 1fr;
-  }
-    .kyc-review {
-    padding: 14px;
-  }
-
-  .kyc-review-buttons {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .kyc-review-buttons md-filled-button,
-  .kyc-review-buttons md-outlined-button {
-    width: 100%;
   }
 }
+
 @media (max-width: 900px) {
+
   .two-pane,
   .summary-layout {
     grid-template-columns: 1fr;
   }
-
-  .dashboard-stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
 }
 
 @media (max-width: 600px) {
-  .dashboard-stats {
-    grid-template-columns: 2fr;
-  }
-   .form-actions {
+  .form-actions {
     flex-direction: column-reverse;
     align-items: stretch;
   }
@@ -765,3 +1240,40 @@ input[type='checkbox'] {
     width: 100%;
   }
 }
+
+@media (min-width: 768px) {
+
+  html:has(.admin-layout),
+  body:has(.admin-layout),
+  #root:has(.admin-layout) {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .admin-layout {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  .admin-sidebar {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .admin-main {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .admin-content {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+  }
+}                                                                                                               

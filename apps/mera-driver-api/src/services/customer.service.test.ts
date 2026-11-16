@@ -4,6 +4,8 @@ import { mockPrisma, resetPrismaMock } from '../test-utils/prisma-mock';
 vi.mock('../lib/prisma', () => ({ prisma: mockPrisma }));
 
 import {
+  updateCustomer,
+  searchCustomers,
   assertCustomerAccountActive,
   updateOwnCustomer,
   listOwnBookings,
@@ -29,6 +31,7 @@ describe('customer account status (login gate)', () => {
     mockPrisma.customer.findUnique.mockResolvedValue({ accountStatus: 'Active' });
     await expect(assertCustomerAccountActive('user-1')).resolves.toBeUndefined();
   });
+  it('blocked customers cannot log in',async()=>{mockPrisma.customer.findUnique.mockResolvedValue({accountStatus:'Blocked'});await expect(assertCustomerAccountActive('user-1')).rejects.toMatchObject({status:403,code:'CUSTOMER_DEACTIVATED'});});
 
   it('assertCustomerAccountActive is a no-op for a User with no linked Customer record', async () => {
     mockPrisma.customer.findUnique.mockResolvedValue(null);
@@ -113,4 +116,18 @@ describe('Customer <-> User linkage', () => {
     await expect(createAndLinkCustomerUser('customer-1')).rejects.toMatchObject({ status: 422 });
     expect(mockPrisma.user.create).not.toHaveBeenCalled();
   });
+});
+
+
+describe('audited customer status transitions',()=>{
+  it('requires a reason and active-trip acknowledgement before disabling',async()=>{
+    mockPrisma.customer.findUnique.mockResolvedValue({id:'customer-1',accountStatus:'Active'});mockPrisma.booking.count.mockResolvedValue(2);
+    await expect(updateCustomer('customer-1',{accountStatus:'Inactive'})).rejects.toMatchObject({code:'REASON_REQUIRED'});
+    await expect(updateCustomer('customer-1',{accountStatus:'Inactive',statusReason:'Customer requested'})).rejects.toMatchObject({code:'ACTIVE_BOOKINGS_ACK_REQUIRED'});
+    expect(mockPrisma.customer.update).not.toHaveBeenCalled();
+    await updateCustomer('customer-1',{accountStatus:'Inactive',statusReason:'Customer requested',acknowledgeActiveBookings:true});
+    expect(mockPrisma.customer.update).toHaveBeenCalledWith({where:{id:'customer-1'},data:{accountStatus:'Inactive'}});expect(mockPrisma.booking.update).not.toHaveBeenCalled();
+  });
+  it('ordinary edits carrying unchanged status do not require a transition reason',async()=>{mockPrisma.customer.findUnique.mockResolvedValue({id:'customer-1',accountStatus:'Active'});await updateCustomer('customer-1',{accountStatus:'Active',firstName:'Edited'});expect(mockPrisma.booking.count).not.toHaveBeenCalled();});
+  it('combines database search/status and bounded pagination with status counts',async()=>{mockPrisma.customer.findMany.mockResolvedValue([]);mockPrisma.customer.count.mockResolvedValue(4);const result=await searchCustomers({page:2,pageSize:25,search:'Ravi',status:'Inactive'});expect(result.meta).toMatchObject({total:4,counts:{Active:4,Inactive:4,Blocked:4}});expect(mockPrisma.customer.findMany).toHaveBeenCalledWith(expect.objectContaining({skip:25,take:25,where:expect.objectContaining({accountStatus:'Inactive',OR:expect.any(Array)})}));});
 });

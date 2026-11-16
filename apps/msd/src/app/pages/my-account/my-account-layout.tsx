@@ -1,10 +1,18 @@
-import { NavLink, Outlet } from 'react-router-dom';
-import { Icon } from '@skylabs-monorepo/shared-ui/react';
+import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Divider, Icon } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { AccountProvider } from '../../../account/account-context';
-import { isDualRoleUser, setExperienceMode } from '../../../auth/role-routing';
+import {
+  isCustomerAccountUser,
+  isDualRoleUser,
+  setExperienceMode,
+} from '../../../auth/role-routing';
 import './my-account.css';
-import { useToast } from '../../../toast/toast-context';
+import { showSnackbar } from '../../../snackbar/snackbar';
+import { Breadcrumb } from '../../components/breadcrumb';
+import content from '../../../content.json';
+
+const t = content.myAccount;
 interface NavItem {
   to: string;
   label: string;
@@ -14,14 +22,16 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: '/my-dashboard', label: 'Dashboard', icon: 'dashboard' },
-  { to: '/my-account', label: 'Profile', icon: 'person', end: true },
-  { to: '/orders', label: 'Orders', icon: 'receipt_long' },
- { to: '/my-account/wishlist', label: 'Wishlist', icon: 'favorite_border' },
-{ to: '/my-account/cart', label: 'Cart', icon: 'shopping_cart' },
-  { to: '/my-account/support', label: 'Support', icon: 'support' },
-  // { to: '/my-account/invoices', label: 'Invoices', icon: 'description' },
-  // { to: '/my-account/settings', label: 'Settings', icon: 'settings' },
+  { to: '/my-dashboard', label: t.nav.dashboard, icon: 'dashboard' },
+  { to: '/my-account', label: t.nav.profile, icon: 'person', end: true },
+  { to: '/orders', label: t.nav.orders, icon: 'receipt_long' },
+  {
+    to: '/my-account/wishlist',
+    label: t.nav.wishlist,
+    icon: 'favorite_border',
+  },
+  { to: '/my-account/cart', label: t.nav.cart, icon: 'shopping_cart' },
+  { to: '/my-account/support', label: t.nav.support, icon: 'support' },
 ];
 
 /**
@@ -34,35 +44,75 @@ const NAV_ITEMS: NavItem[] = [
  */
 export function MyAccountLayout() {
   const { bootstrap, signOut } = useAuth();
+  const location = useLocation();
+
+  // The breadcrumb names the page from the nav item that matches the path.
+  const currentPage =
+    NAV_ITEMS.find((item) => item.to === location.pathname)?.label ??
+    t.fallbackPage;
+
   const dualRole = bootstrap ? isDualRoleUser(bootstrap) : false;
-  const switchToVendor = () => { setExperienceMode('vendor'); };
-  const { showToast } = useToast();
+  const switchToVendor = () => {
+    setExperienceMode('vendor');
+  };
+
   const handleLogout = () => {
     signOut();
-    showToast('You have been logged out successfully.', 'success');
+    showSnackbar(t.loggedOut, { variant: 'success' });
   };
+
+  // Staff use the admin console; a pasted /my-dashboard (or any customer account URL) goes there.
+  if (bootstrap && !isCustomerAccountUser(bootstrap)) {
+    return <Navigate to="/account/dashboard" replace />;
+  }
+
   return (
     <AccountProvider>
       <div className="my-account-shell">
-        <meta name="robots" content="noindex" />
-        <nav className="my-account-nav" aria-label="My account">
+        <div className="my-account-shell__breadcrumb">
+          <Breadcrumb
+            items={[{ label: t.home, to: '/' }, { label: currentPage }]}
+          />
+        </div>
+        <nav className="my-account-nav" aria-label={t.navLabel}>
           <ul className="entity-list">
+            {/* Profile */}
+            <li className="my-account-nav__profile">
+              <sky-tile-card
+                icon="person"
+                icon-shape="full"
+                headline={bootstrap?.user.email ?? bootstrap?.user.phone ?? ''}
+                align="center"
+                color="none"
+                variant="filled"
+              />
+            </li>
+
+            <Divider />
+
+            {/* Navigation */}
             {NAV_ITEMS.map((item) => (
               <li key={item.to}>
                 <NavLink
                   to={item.to}
                   end={item.end}
                   className={({ isActive }) =>
-                    `entity-list__item my-account-nav__link${isActive ? ' active' : ''}`
+                    `entity-list__item my-account-nav__link${
+                      isActive ? ' active' : ''
+                    }`
                   }
                 >
                   <span className="role-list__name">
-                    <Icon aria-hidden="true">{item.icon}</Icon>
+                    <Icon className="my-account-nav__icon" aria-hidden="true">
+                      {item.icon}
+                    </Icon>
                     {item.label}
                   </span>
                 </NavLink>
               </li>
             ))}
+
+            {/* Vendor dashboard */}
             {dualRole && (
               <li>
                 <NavLink
@@ -71,26 +121,38 @@ export function MyAccountLayout() {
                   className="entity-list__item my-account-nav__link"
                 >
                   <span className="role-list__name">
-                    <Icon aria-hidden="true">storefront</Icon>
-                    Switch to Vendor Dashboard
+                    <Icon className="my-account-nav__icon" aria-hidden="true">
+                      storefront
+                    </Icon>
+                    {t.switchToMember}
                   </span>
                 </NavLink>
               </li>
             )}
-              <li className="my-account-nav__logout">
-                <button
-                  type="button"
-                  className="entity-list__item"
-                  onClick={handleLogout}
-                >
-                  <span className="role-list__name">
-                    <Icon aria-hidden="true">logout</Icon>
-                    Logout
-                  </span>
-                </button>
-              </li>
+
+            {/* Divider before logout */}
+            <li className="my-account-nav__divider">
+              <Divider />
+            </li>
+
+            {/* Logout */}
+            <li className="my-account-nav__logout">
+              <button
+                type="button"
+                className="entity-list__item"
+                onClick={handleLogout}
+              >
+                <span className="role-list__name">
+                  <Icon className="my-account-nav__icon" aria-hidden="true">
+                    logout
+                  </Icon>
+                  {t.logout}
+                </span>
+              </button>
+            </li>
           </ul>
         </nav>
+
         <div className="my-account-shell__content">
           <Outlet />
         </div>

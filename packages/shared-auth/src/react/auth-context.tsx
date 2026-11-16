@@ -17,6 +17,7 @@ import {
   isJwtExpired,
   isPreviewToken,
   msUntilJwtExpiry,
+  readSessionValue,
   readStorageValue,
   resolveInitialToken,
   writeSessionValue,
@@ -154,7 +155,7 @@ export function AuthProvider({
   useEffect(
     () =>
       tokenStore.subscribe((nextToken) => {
-        writeSessionValue(keys.previewToken, null);
+        if (readSessionValue(keys.previewToken)) return;
         setTokenState(nextToken);
       }),
     [keys.previewToken, tokenStore],
@@ -168,6 +169,8 @@ export function AuthProvider({
     [setToken, loadBootstrap],
   );
 
+  /** Revokes the refresh token on the server (best effort), then clears every token, any
+   *  preview and the bootstrap, whatever the server answered (P10-38). */
   const signOut = useCallback(() => {
     writeStorageValue(keys.realToken, null);
     writeSessionValue(keys.previewToken, null);

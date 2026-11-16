@@ -9,8 +9,10 @@ import '@material/web/progress/linear-progress.js';
 import '@material/web/textfield/outlined-text-field.js';
 import '@material/web/select/outlined-select.js';
 import '@material/web/select/select-option.js';
+import '@material/web/divider/divider.js';
 // In-house — status chips use sky-badge
 import '../sky-badge/sky-badge.js';
+import type { SkyStatusTone } from '../sky-badge/sky-badge.js';
 
 // ── Public types ────────────────────────────────────────────────────────────
 
@@ -23,10 +25,26 @@ export interface SkyDataTableColumn {
   type?: 'text' | 'number' | 'date' | 'status' | 'image';
   /** Backwards compatibility for status columns */
   status?: boolean;
-  /** Maps status string → badge variant. Used when type === 'status'. */
-  statusMap?: Record<string, 'success' | 'warning' | 'error' | 'info'>;
+  /** Maps status string → status tone. Used when type === 'status'. */
+  statusMap?: Record<string, SkyStatusTone>;
+  /**
+   * 'filled' (default) keeps the solid badge colours; 'tonal' renders `sky-badge status=<tone>`,
+   * a soft container chip with a distinct colour per tone.
+   */
+  statusStyle?: 'filled' | 'tonal';
   /** Starts the column as hidden in the selector */
   hidden?: boolean;
+  /** Renders `row[secondaryKey]` as a smaller, muted line under the primary value — for a
+   *  column that packs a heading plus supporting detail (e.g. business name with owner/mobile/
+   *  city underneath) into one cell without a bespoke column type per consumer. */
+  secondaryKey?: string;
+}
+
+/** One filter select option. Consecutive options sharing a `group` get a heading and a divider. */
+export interface SkyDataTableFilterOption {
+  label: string;
+  value: string;
+  group?: string;
 }
 
 export interface SkyDataTableAction {
@@ -69,7 +87,7 @@ export interface SkyDataTableParamsDetail {
  * @prop {boolean} searchable        — Renders the search text field in the toolbar.
  * @prop {string}  search-placeholder — Label / placeholder for the search field.
  * @prop {string}  filter-label      — Label for the filter select dropdown.
- * @prop {string}  filter-options    — JSON array of {label, value} objects for the filter.
+ * @prop {string}  filter-options    — JSON array of {label, value, group?} objects for the filter.
  * @prop {boolean} selectable        — Adds a checkbox column for row selection.
  * @prop {string}  actions           — JSON array of SkyDataTableAction.
  * @prop {boolean} exportable        — Shows the PDF export icon button in the toolbar.
@@ -78,6 +96,9 @@ export interface SkyDataTableParamsDetail {
  * @fires sky-dt-row-action    — action button clicked; detail: { action, row, rowIndex }
  * @fires sky-dt-row-select    — selection changed; detail: { selected: row[] }
  * @fires sky-dt-export-pdf    — PDF export triggered
+ * @fires sky-dt-column-error  — tried to hide the last visible column; detail: { message }. The
+ *   column-selector menu already shows this as an inline role="alert" message on its own — this
+ *   event is only for consumers who want to react further (e.g. also show a toast).
  *
  * @example
  * <sky-data-table
@@ -118,6 +139,7 @@ export class SkyDataTable extends LitElement {
     _detailOpen:       { state: true },
     _hiddenCols:       { state: true },
     _showColSelector:  { state: true },
+    _columnError:      { state: true },
   };
 
   declare columns: string;
@@ -145,16 +167,22 @@ export class SkyDataTable extends LitElement {
   private declare _lastFocus: Element | null;
   private declare _hiddenCols: Set<string>;
   private declare _showColSelector: boolean;
+  private declare _columnError: string;
 
   private readonly _pageSizeOptions = [10, 25, 50, 100];
 
   /** Maps internal status variant → sky-badge variant prop. */
-  private readonly _statusVariant: Record<string, 'primary' | 'secondary' | 'tertiary' | 'error'> = {
+  private readonly _statusVariant: Record<SkyStatusTone, 'primary' | 'secondary' | 'tertiary' | 'error'> = {
     success: 'tertiary',
     warning: 'secondary',
     error:   'error',
     info:    'primary',
+    neutral: 'secondary',
   };
+
+  private _isTone(value: string): value is SkyStatusTone {
+    return value in this._statusVariant;
+  }
 
   constructor() {
     super();
@@ -181,6 +209,7 @@ export class SkyDataTable extends LitElement {
     this._detailOpen       = false;
     this._hiddenCols       = new Set();
     this._showColSelector  = false;
+    this._columnError      = '';
     this._lastFocus        = null;
   }
 
@@ -196,7 +225,7 @@ export class SkyDataTable extends LitElement {
   private get _rowData(): Record<string, unknown>[] {
     try { return JSON.parse(this.rows) || []; } catch { return []; }
   }
-  private get _filterOpts(): { label: string; value: string }[] {
+  private get _filterOpts(): SkyDataTableFilterOption[] {
     try { return JSON.parse(this.filterOptions) || []; } catch { return []; }
   }
   private get _actionDefs(): SkyDataTableAction[] {
@@ -307,6 +336,7 @@ export class SkyDataTable extends LitElement {
   private _toggleColSelector(e: Event) {
     e.stopPropagation();
     this._showColSelector = !this._showColSelector;
+    this._columnError = '';
   }
 
   private _onColToggle(key: string, e: Event) {
@@ -314,10 +344,15 @@ export class SkyDataTable extends LitElement {
     const next = new Set(this._hiddenCols);
     if (checked) {
       next.delete(key);
+      this._columnError = '';
     } else {
       if (next.size >= this._allCols.length - 1 && !this._hiddenCols.has(key)) {
-        alert("At least one column must remain visible!");
         (e.target as HTMLInputElement).checked = true;
+        // A blocking alert() would interrupt the page and can't be themed. The menu shows its
+        // own inline role="alert" message (below) so every consumer gets feedback for free —
+        // sky-dt-column-error is also emitted for apps that want to react further (e.g. a toast).
+        this._columnError = 'At least one column must remain visible.';
+        this._emit('sky-dt-column-error', { message: this._columnError });
         return;
       }
       next.add(key);
@@ -334,8 +369,40 @@ export class SkyDataTable extends LitElement {
     }
   };
 
+  /** Focusable elements inside the open detail drawer, in DOM order — for the Tab trap below. */
+  private _drawerFocusable(): HTMLElement[] {
+    const drawer = this.shadowRoot?.querySelector('.drawer');
+    if (!drawer) return [];
+    return Array.from(
+      drawer.querySelectorAll<HTMLElement>(
+        'a[href], button, md-icon-button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      ),
+    ).filter(el => !el.hasAttribute('disabled'));
+  }
+
   private readonly _onKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape' && this._detailOpen) this._closeDetail();
+    if (!this._detailOpen) return;
+    if (e.key === 'Escape') {
+      this._closeDetail();
+      return;
+    }
+    // Trap Tab/Shift+Tab inside the open modal drawer (WAI-ARIA dialog pattern) — without
+    // this, tabbing past the last (or before the first) focusable element lands keyboard
+    // focus on the page content behind the scrim, which is still visually obscured.
+    if (e.key === 'Tab') {
+      const focusable = this._drawerFocusable();
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = this.shadowRoot?.activeElement;
+      if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
   };
 
   override connectedCallback(): void {
@@ -413,12 +480,16 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
       : html`<md-icon class="sort-icon sort-icon--on" aria-hidden="true">arrow_downward</md-icon>`;
   }
 
-  private _cellContent(value: unknown, col: SkyDataTableColumn) {
+  private _cellContent(value: unknown, col: SkyDataTableColumn, row: Record<string, unknown>) {
+    const secondary = col.secondaryKey ? String(row[col.secondaryKey] ?? '') : '';
+    const secondaryLine = secondary ? html`<div class="cell-secondary">${secondary}</div>` : nothing;
+
     if (col.status || col.type === 'status') {
       const str = String(value ?? '');
-      const statusVariant = col.statusMap?.[str] ?? (['success', 'warning', 'error', 'info'].includes(str) ? str : 'info');
-      const badgeVariant  = this._statusVariant[statusVariant] ?? 'primary';
-      return html`<sky-badge variant=${badgeVariant} size="small">${str}</sky-badge>`;
+      const tone = col.statusMap?.[str] ?? (this._isTone(str) ? str : 'info');
+      return col.statusStyle === 'tonal'
+        ? html`<sky-badge status=${tone} size="small">${str}</sky-badge>`
+        : html`<sky-badge variant=${this._statusVariant[tone]} size="small">${str}</sky-badge>`;
     }
     if (col.type === 'image') {
       const src = String(value ?? '');
@@ -427,7 +498,8 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
       }
       return html`<md-icon class="cell-avatar cell-avatar--empty" aria-hidden="true">account_circle</md-icon>`;
     }
-    return html`${value ?? ''}`;
+    if (!secondary) return html`${value ?? ''}`;
+    return html`<div class="cell-main"><span>${value ?? ''}</span>${secondaryLine}</div>`;
   }
 
   private _skeletonRows() {
@@ -525,6 +597,16 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
     .filter-select {
       min-inline-size: 150px;
     }
+    /* Visual group heading in the filter menu; md-select skips it in keyboard navigation. */
+    .filter-group {
+      padding-block: var(--md-menu-item-top-space, 12px) var(--md-menu-item-bottom-space, 4px);
+      padding-inline: var(--md-menu-item-leading-space, 16px);
+      color: var(--md-sys-color-on-surface-variant);
+      font-family: var(--md-sys-typescale-label-medium-font);
+      font-size: var(--md-sys-typescale-label-medium-size);
+      font-weight: var(--md-sys-typescale-label-medium-weight);
+      letter-spacing: var(--md-sys-typescale-label-medium-tracking);
+    }
     .rpp-select {
       min-inline-size: 90px;
     }
@@ -566,6 +648,10 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
       color: var(--md-sys-color-on-surface);
       cursor: pointer;
       user-select: none;
+    }
+    .col-error {
+      margin: 4px 0 0;
+      color: var(--md-sys-color-error);
     }
 
     /* ── Progress bar ────────────────────────────────────────────────────── */
@@ -692,6 +778,21 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
     .cell-avatar--empty {
       --md-icon-size: 32px;
       color: var(--md-sys-color-outline);
+    }
+    .cell-main {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+    }
+    .cell-secondary {
+      font-size: var(--md-sys-typescale-label-small-size);
+      color: var(--md-sys-color-on-surface-variant);
+    }
+    @media (min-width: 600px) {
+      .cell-main {
+        align-items: flex-start;
+      }
     }
     .col-cb {
       inline-size: 52px;
@@ -1005,7 +1106,11 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
                 <md-select-option value="" ?selected=${this._filter === ''}>
                   All
                 </md-select-option>
-                ${filterOpts.map(o => html`
+                ${filterOpts.map((o, i) => html`
+                  ${o.group && o.group !== filterOpts[i - 1]?.group ? html`
+                    <md-divider role="separator"></md-divider>
+                    <div class="filter-group" aria-hidden="true">${o.group}</div>
+                  ` : nothing}
                   <md-select-option value=${o.value} ?selected=${o.value === this._filter}>
                     ${o.label}
                   </md-select-option>
@@ -1047,6 +1152,9 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
                       ${col.label}
                     </label>
                   `)}
+                  ${this._columnError
+                    ? html`<p class="col-error label-medium" role="alert">${this._columnError}</p>`
+                    : nothing}
                 </div>
               ` : nothing}
             </div>
@@ -1145,7 +1253,7 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
                           ` : nothing}
 
                           ${cols.map(col => html`
-                            <td data-label=${col.label}>${this._cellContent(row[col.key], col)}</td>
+                            <td data-label=${col.label}>${this._cellContent(row[col.key], col, row)}</td>
                           `)}
 
                           ${actionDefs.length ? html`

@@ -8,6 +8,7 @@ export interface AccessTokenPayload {
   sub: string; // userId (or the impersonation target's userId for a preview token)
   roles: string[]; // role keys granted to `sub`
   app: 'mera-driver';
+  portalContext?: 'customer' | 'driver' | 'staff';
   /** Present only on a superadmin "Login As" preview token. */
   isPreview?: true;
   impersonatedBy?: string;

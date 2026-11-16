@@ -109,6 +109,8 @@ export const appRoutes: Routes = [
         loadComponent: () =>
           import('./pages/account/customers/customers').then((m) => m.Customers),
       },
+      { path: 'drivers/:id/resume', canActivate: [permissionGuard], data: {permission:{menuKey:'drivers',action:'view'}}, loadComponent:()=>import('./pages/account/drivers/resume-preview').then(m=>m.ResumePreview) },
+      { path: 'drivers/:id/details', canActivate: [permissionGuard], data: {permission:{menuKey:'drivers',action:'view'}}, loadComponent:()=>import('./pages/account/drivers/driver-details').then(m=>m.DriverDetails) },
       {
         path: 'drivers',
         title: 'Drivers · mera-driver',
@@ -185,36 +187,18 @@ export const appRoutes: Routes = [
           import('./pages/account/attendance/attendance').then((m) => m.Attendance),
       },
 
+      { path: 'dispatch', canActivate: [permissionGuard], data: { permission: { menuKey: 'trips.bookings', action: 'view' }, mode: 'dispatch', title: 'Admin Dispatch' }, loadComponent: () => import('./pages/workflow/workflow').then(m => m.Workflow) },
+      ...['overview','booking-payments','commissions','driver-payouts','registration-fees','refunds-adjustments','reports'].map(path => ({ path: `accounts/${path}`, canActivate: [permissionGuard], data: { permission: { menuKey: 'payments.overview', action: 'view' }, mode: 'accounts', title: 'Accounts', section: ({'overview':'Overview','booking-payments':'Booking Payments','commissions':'Commissions','driver-payouts':'Driver Payouts','registration-fees':'Registration Fees','refunds-adjustments':'Refunds & Adjustments','reports':'Reports'} as Record<string,string>)[path] }, loadComponent: () => import('./pages/workflow/accounts/accounts').then(m => m.Accounts) })),
+      { path: 'accounts', pathMatch: 'full', redirectTo: 'accounts/overview' },
       // Payments Section
       {
         path: 'payments',
         pathMatch: 'full',
         redirectTo: 'payments/payments',
       },
-      {
-        path: 'payments/payments',
-        title: 'Payments · mera-driver',
-        canActivate: [permissionGuard],
-        data: { permission: { menuKey: 'payments.overview', action: 'view' }, title: 'Payments', subtitle: 'Fares, receipts, and payment transactions.' },
-        loadComponent: () =>
-          import('./pages/account/payments/payments').then((m) => m.Payments),
-      },
-      {
-        path: 'payments/wallet-transactions',
-        title: 'Wallet Transactions · mera-driver',
-        canActivate: [permissionGuard],
-        data: { permission: { menuKey: 'payments.wallet-transactions', action: 'view' }, title: 'Wallet Transactions', subtitle: 'Driver and user wallet log.' },
-        loadComponent: () =>
-          import('./pages/account/payments/wallet-transactions/wallet-transactions').then((m) => m.WalletTransactions),
-      },
-      {
-        path: 'payments/driver-payouts',
-        title: 'Driver Payouts · mera-driver',
-        canActivate: [permissionGuard],
-        data: { permission: { menuKey: 'payments.driver-payouts', action: 'view' }, title: 'Driver Payouts', subtitle: 'Driver earnings and payout transfers.' },
-        loadComponent: () =>
-          import('./pages/account/payments/driver-payouts/driver-payouts').then((m) => m.DriverPayouts),
-      },
+      { path:'payments/payments',pathMatch:'full',redirectTo:'accounts/booking-payments' },
+      { path:'payments/driver-payouts',pathMatch:'full',redirectTo:'accounts/driver-payouts' },
+      { path:'payments/wallet-transactions',pathMatch:'full',redirectTo:'accounts/reports' },
 
       // Promotions Section
       {
@@ -278,6 +262,10 @@ export const appRoutes: Routes = [
         loadComponent: () =>
           import('./pages/account/masters/zones/zones').then((m) => m.ZonesMaster),
       },
+      {path:'masters/job-types',canActivate:[permissionGuard],data:{permission:{menuKey:'masters.source-types',action:'view'},category:'job-types',title:'Job Types'},loadComponent:()=>import('./pages/account/masters/source-types/source-types').then(m=>m.SourceTypesMaster)},
+      {path:'masters/job-choices',canActivate:[permissionGuard],data:{permission:{menuKey:'masters.source-types',action:'view'},category:'job-choices',title:'Job Choices'},loadComponent:()=>import('./pages/account/masters/source-types/source-types').then(m=>m.SourceTypesMaster)},
+      {path:'masters/states',canActivate:[permissionGuard],data:{permission:{menuKey:'masters.source-types',action:'view'},category:'states',title:'Work States'},loadComponent:()=>import('./pages/account/masters/source-types/source-types').then(m=>m.SourceTypesMaster)},
+      {path:'masters/driver-account-statuses',canActivate:[permissionGuard],data:{permission:{menuKey:'masters.source-types',action:'view'},category:'driver-account-statuses',title:'Driver Statuses'},loadComponent:()=>import('./pages/account/masters/source-types/source-types').then(m=>m.SourceTypesMaster)},
       {
         path: 'masters/source-types',
         title: 'Source Type · mera-driver',
@@ -429,23 +417,18 @@ export const appRoutes: Routes = [
       },
       {
         path: 'verify',
-        title: 'Start trip · mera-driver',
-        loadComponent: () =>
-          import('./pages/ride/verify/verify').then((m) => m.RideVerify),
+        pathMatch: 'full', redirectTo: 'payment',
       },
       {
         path: 'payment',
+        canActivate: [authGuard, customerPortalGuard],
         title: 'Payment · mera-driver',
         loadComponent: () =>
           import('./pages/ride/payment/payment').then((m) => m.RidePayment),
       },
       {
         path: 'confirmed',
-        title: 'Booking confirmed · mera-driver',
-        loadComponent: () =>
-          import('./pages/ride/confirmed/confirmed').then(
-            (m) => m.RideConfirmed,
-          ),
+        pathMatch: 'full', redirectTo: '/customer/bookings',
       },
     ],
   },
@@ -454,6 +437,11 @@ export const appRoutes: Routes = [
     component: DriverLayout,
     canActivate: [authGuard, driverPortalGuard],
     children: [
+      { path: 'resume', loadComponent:()=>import('./pages/account/drivers/resume-preview').then(m=>m.ResumePreview) },
+      { path: 'fee', title: 'Registration Fee · Driver Portal', loadComponent: () => import('./pages/driver/fee/fee').then(m => m.DriverFee) },
+      { path: 'availability', title: 'Availability · Driver Portal', loadComponent: () => import('./pages/driver/availability/availability').then(m => m.DriverAvailability) },
+      { path: 'requests', title: 'Trip Requests · Driver Portal', loadComponent: () => import('./pages/driver/requests/requests').then(m => m.DriverRequests) },
+      { path: 'earnings', title: 'Earnings · Driver Portal', loadComponent: () => import('./pages/driver/earnings/earnings').then(m => m.DriverEarnings) },
       {
         path: '',
         title: 'Dashboard · Driver Portal',
@@ -488,20 +476,18 @@ export const appRoutes: Routes = [
       {
         path: 'trips',
         title: 'My Trips · Driver Portal',
-        data: { title: 'My Trips', description: "Trip history isn't linked to driver accounts yet." },
         loadComponent: () =>
-          import('./pages/driver/coming-soon/coming-soon').then((m) => m.DriverComingSoon),
+          import('./pages/driver/trips/trips').then((m) => m.DriverTrips),
       },
       {
         path: 'notifications',
         title: 'Notifications · Driver Portal',
-        data: { title: 'Notifications', description: 'Notifications are on the way.' },
         loadComponent: () =>
-          import('./pages/driver/coming-soon/coming-soon').then((m) => m.DriverComingSoon),
+          import('./pages/driver/notifications/notifications').then((m) => m.DriverNotifications),
       },
       {
         path: 'support',
-        title: 'Support · Driver Portal',
+        title: 'Help & Support · Driver Portal',
         loadComponent: () =>
           import('./pages/driver/support/support').then((m) => m.DriverSupport),
       },
@@ -512,6 +498,7 @@ export const appRoutes: Routes = [
     component: CustomerLayout,
     canActivate: [authGuard, customerPortalGuard],
     children: [
+      ...['book','payments'].map(path => ({ path, data: { mode: path }, loadComponent: () => import('./pages/workflow/workflow').then(m => m.Workflow) })),
       {
         path: '',
         title: 'Dashboard · Customer Portal',
@@ -527,24 +514,26 @@ export const appRoutes: Routes = [
       {
         path: 'bookings',
         title: 'My Bookings · Customer Portal',
+        data: { mode: 'bookings' },
         loadComponent: () =>
-          import('./pages/customer/bookings/bookings').then((m) => m.CustomerBookings),
+          import('./pages/workflow/workflow').then((m) => m.Workflow),
       },
       {
         path: 'notifications',
         title: 'Notifications · Customer Portal',
-        data: { title: 'Notifications', description: 'Notifications are on the way.' },
+        data: { title: 'Notifications', mode: 'notifications' },
         // Reuses the Driver portal's generic placeholder component directly — it's already
         // fully generic (driven by route `data.title`/`data.description`), no new component
         // needed just to say "not built yet".
         loadComponent: () =>
-          import('./pages/driver/coming-soon/coming-soon').then((m) => m.DriverComingSoon),
+          import('./pages/workflow/workflow').then((m) => m.Workflow),
       },
       {
         path: 'support',
         title: 'Support · Customer Portal',
+        data: { mode: 'support' },
         loadComponent: () =>
-          import('./pages/customer/support/support').then((m) => m.CustomerSupport),
+          import('./pages/workflow/workflow').then((m) => m.Workflow),
       },
     ],
   },
@@ -559,6 +548,7 @@ export const appRoutes: Routes = [
         title: 'mera-driver — Book a trusted driver, your way',
         loadComponent: () => import('./pages/home/home').then((m) => m.Home),
       },
+      {path:'become-driver',title:'Become a Driver ? mera-driver',loadComponent:()=>import('./shared/driver-application/driver-application').then(m=>m.DriverApplication)},
       {
         path: 'about',
         title: 'About Us · mera-driver',

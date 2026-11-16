@@ -1,0 +1,84 @@
+{
+  "before": {
+    "drivers": 7,
+    "users": 12,
+    "movements": 0
+  },
+  "after": {
+    "drivers": 7,
+    "users": 12,
+    "movements": 0
+  },
+  "evidence": [
+    {
+      "action": "Save & Register Driver",
+      "path": "/drivers",
+      "status": 201,
+      "payload": {
+        "firstName": "Registration Add Fixture",
+        "phone": "",
+        "gender": "Male",
+        "vehicle": "",
+        "registrationFeeEntryChoice": "Unpaid",
+        "stepCompleted": 4,
+        "subStepCompleted": 1
+      }
+    },
+    {
+      "action": "Save draft",
+      "path": "/drivers/b505f95a-ef41-46fe-a04e-b72762638712",
+      "status": 200,
+      "payload": {
+        "registrationFeeEntryChoice": "Unpaid",
+        "stepCompleted": 4,
+        "subStepCompleted": 1,
+        "completeStep": false
+      }
+    },
+    {
+      "action": "Save draft",
+      "path": "/drivers/b505f95a-ef41-46fe-a04e-b72762638712",
+      "status": 200,
+      "payload": {
+        "driverStatusMasterId": "b6283b35-f664-449f-88f7-c9142970bec1",
+        "driverStatusChangeReason": "Administrative Master selection; no KYC approval",
+        "registrationFeeEntryChoice": "Paid",
+        "preferredPaymentMode": "Cash",
+        "amount": "370",
+        "paymentReceiptDate": "2026-10-03",
+        "stepCompleted": 4,
+        "subStepCompleted": 1,
+        "completeStep": false
+      }
+    },
+    {
+      "flow": "Cash confirmation uses existing audited Accounts endpoint",
+      "movement": "registration_payment",
+      "reference": "registration-smoke-b505f95a-ef41-46fe-a04e-b72762638712",
+      "amountPaise": 37000
+    },
+    {
+      "action": "Save draft",
+      "path": "/drivers/b505f95a-ef41-46fe-a04e-b72762638712",
+      "status": 200,
+      "payload": {
+        "registrationFeeEntryChoice": "Paid",
+        "preferredPaymentMode": "Cash",
+        "amount": "370",
+        "paymentReceiptDate": "2026-10-03",
+        "stepCompleted": 4,
+        "subStepCompleted": 1,
+        "completeStep": false
+      }
+    },
+    {
+      "flow": "New/Edit Paid/Unpaid, conditional validation, reload, fee policy, Master ID, inactive history, reason, details and mobile",
+      "status": "passed"
+    }
+  ],
+  "limitations": [
+    "Local isolated fixture cash ledger only; no real funds or gateway call",
+    "Paid form details are a draft until trusted settlement; reopening uses actual ledger status",
+    "Existing statuses Master currently has only Verified; it is not a KYC decision"
+  ]
+}

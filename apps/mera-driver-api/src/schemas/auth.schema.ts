@@ -18,6 +18,7 @@ export const OtpVerifySchema = z
   .object({
     identifier: z.string().min(3),
     otp: z.string().length(6),
+    portalContext: z.enum(['customer','driver','staff']).optional(),
     purpose: OtpPurposeSchema.default('login'),
   })
   .openapi('OtpVerify');
@@ -56,6 +57,7 @@ export const PasswordLoginSchema = z
   .object({
     identifier: z.string().min(3).openapi({ example: 'admin@example.com' }),
     password: z.string().min(1),
+    portalContext: z.enum(['customer','driver','staff']).optional(),
   })
   .openapi('PasswordLogin');
 
@@ -69,6 +71,7 @@ export const ResetPasswordSchema = z
   .object({
     identifier: z.string().min(3),
     otp: z.string().length(6),
+    portalContext: z.enum(['customer','driver','staff']).optional(),
     newPassword: z.string().min(8),
   })
   .openapi('ResetPassword');

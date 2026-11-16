@@ -8,6 +8,7 @@ vi.mock('../lib/prisma', async () => {
 
 import app from '../app';
 import { prisma } from '../lib/prisma';
+import { clearHotCache } from '../services/catalog.service';
 
 const prismaMock = vi.mocked(prisma, true);
 
@@ -25,6 +26,8 @@ const serviceDealFixture = {
   originalPrice: '399.00',
   salePrice: '299.00',
   durationMinutes: 30,
+  createdAt: new Date('2026-01-01T00:00:00Z'),
+  endDate: null,
   category: { id: CATEGORY_ID, name: 'Salon & Grooming', slug: 'salon-grooming' },
   subcategory: null,
   vendor: { id: 'vendor-1', businessName: 'ABC Salon', city: 'Gorakhpur' },
@@ -45,6 +48,7 @@ const productFixture = {
   price: '499.00',
   originalPrice: '599.00',
   discount: 17,
+  createdAt: new Date('2026-01-01T00:00:00Z'),
   category: { id: CATEGORY_ID, name: 'Salon & Grooming', slug: 'salon-grooming' },
   subcategory: null,
   vendor: { id: 'vendor-1', businessName: 'ABC Salon', city: 'Gorakhpur' },
@@ -60,6 +64,9 @@ beforeEach(() => {
   prismaMock.popularTagProduct.findMany.mockResolvedValue([]);
   prismaMock.popularTagTherapist.findMany.mockResolvedValue([]);
   prismaMock.popularTagCategory.findMany.mockResolvedValue([]);
+  // Card tags (ST-40): no paid order lines unless a test arranges some; fresh hot list per test.
+  clearHotCache();
+  prismaMock.orderItem.groupBy.mockResolvedValue([] as never);
 });
 
 describe('GET /api/v1/catalog/categories', () => {
@@ -111,7 +118,7 @@ describe('GET /api/v1/catalog/deals', () => {
     expect(res.body.data[0].product).toBeUndefined();
   });
 
-  it('5/6/7/8/9. always filters to ACTIVE + APPROVED + active vendor + active branch (inactive/rejected/unapproved/inactive-vendor/inactive-branch all excluded by construction)', async () => {
+  it('5/6/7/8/9. always filters to ACTIVE + active vendor + active branch, with no approval step (D6)', async () => {
     prismaMock.deal.findMany.mockResolvedValue([]);
     prismaMock.deal.count.mockResolvedValue(0);
     await request(app).get('/api/v1/catalog/deals');
@@ -119,12 +126,12 @@ describe('GET /api/v1/catalog/deals', () => {
       expect.objectContaining({
         where: expect.objectContaining({
           status: 'ACTIVE',
-          approvalStatus: 'APPROVED',
           vendor: { status: 'ACTIVE' },
           branch: { isActive: true },
         }),
       }),
     );
+    expect(prismaMock.deal.findMany.mock.calls[0][0]!.where).not.toHaveProperty('approvalStatus');
   });
 
   it('never filters by productId — Deal has no Product concept (fully independent catalog entities)', async () => {
@@ -381,9 +388,9 @@ describe('GET /api/v1/catalog/deals sorts and filters', () => {
 
 describe('GET /api/v1/catalog/deals/facets', () => {
   const facetRows = [
-    { id: 'deal-a', vendorId: 'vendor-1', branchId: 'branch-1', salePrice: '500', vendor: { businessName: 'Glow Beauty Studio' }, branch: { name: 'Taramandal Branch', city: 'Gorakhpur', latitude: '26.7606', longitude: '83.3732' } },
-    { id: 'deal-b', vendorId: 'vendor-1', branchId: 'branch-2', salePrice: '900', vendor: { businessName: 'Glow Beauty Studio' }, branch: { name: 'East Branch', city: 'Gorakhpur', latitude: '26.77', longitude: '83.3732' } },
-    { id: 'deal-c', vendorId: 'vendor-2', branchId: 'branch-3', salePrice: '1500', vendor: { businessName: 'Zen Spa' }, branch: { name: 'Basti Branch', city: 'Basti', latitude: '26.5', longitude: '83.3732' } },
+    { id: 'deal-a', createdAt: new Date('2026-01-01T00:00:00Z'), endDate: null, discountPercent: null, vendorId: 'vendor-1', branchId: 'branch-1', salePrice: '500', vendor: { businessName: 'Glow Beauty Studio' }, branch: { name: 'Taramandal Branch', city: 'Gorakhpur', latitude: '26.7606', longitude: '83.3732' } },
+    { id: 'deal-b', createdAt: new Date('2026-01-01T00:00:00Z'), endDate: null, discountPercent: null, vendorId: 'vendor-1', branchId: 'branch-2', salePrice: '900', vendor: { businessName: 'Glow Beauty Studio' }, branch: { name: 'East Branch', city: 'Gorakhpur', latitude: '26.77', longitude: '83.3732' } },
+    { id: 'deal-c', createdAt: new Date('2026-01-01T00:00:00Z'), endDate: null, discountPercent: null, vendorId: 'vendor-2', branchId: 'branch-3', salePrice: '1500', vendor: { businessName: 'Zen Spa' }, branch: { name: 'Basti Branch', city: 'Basti', latitude: '26.5', longitude: '83.3732' } },
   ];
 
   it('1. returns vendors/branches/distance/price facets computed from the base-filtered rows', async () => {
@@ -415,6 +422,9 @@ describe('GET /api/v1/catalog/deals/facets', () => {
       vendorId: true,
       branchId: true,
       salePrice: true,
+      discountPercent: true,
+      createdAt: true,
+      endDate: true,
       vendor: { select: { businessName: true } },
       branch: { select: { name: true, city: true, latitude: true, longitude: true } },
     });
@@ -534,8 +544,41 @@ describe('GET /api/v1/catalog/products/:id', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.name).toBe('Face Cream');
     expect(prismaMock.product.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ id: PRODUCT_ID, isActive: true, vendor: { status: 'ACTIVE' } }) }),
+      expect.objectContaining({
+        where: expect.objectContaining({ id: PRODUCT_ID, isActive: true, vendor: { status: 'ACTIVE' } }),
+      }),
     );
+  });
+
+  it('also resolves by the product\'s own slug (SEO-friendly URL), same visibility bar', async () => {
+    prismaMock.product.findFirst.mockResolvedValue(productFixture);
+    const res = await request(app).get('/api/v1/catalog/products/face-cream');
+    expect(res.status).toBe(200);
+    expect(prismaMock.product.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ slug: 'face-cream' }),
+      }),
+    );
+  });
+});
+
+describe('GET /api/v1/catalog/deals?search= (PLANNING §2.7)', () => {
+  const row = (id: string, title: string, member: string) => ({ ...serviceDealFixture, id, title, vendor: { ...serviceDealFixture.vendor, businessName: member } });
+
+  it('matches title, member, category, subcategory and city, and ranks title first, then member', async () => {
+    prismaMock.deal.findMany.mockResolvedValue([
+      row('a', 'Hair spa', 'Glow Salon'),
+      row('b', 'Head massage', 'Massage Hub'),
+      row('c', 'Massage for two', 'Zen'),
+      row('d', 'Swedish massage', 'Zen'),
+    ]);
+    prismaMock.deal.count.mockResolvedValue(4);
+    const res = await request(app).get('/api/v1/catalog/deals?search=massage');
+    expect(res.status).toBe(200);
+    expect(res.body.data.map((d: { id: string }) => d.id)).toEqual(['c', 'b', 'd', 'a']);
+    const where = prismaMock.deal.findMany.mock.calls[0][0]!.where as { OR: Record<string, unknown>[] };
+    expect(where.OR.map((clause) => Object.keys(clause)[0])).toEqual(['title', 'vendor', 'category', 'subcategory', 'branch']);
+    expect(prismaMock.deal.findMany.mock.calls[0][0]).toMatchObject({ take: 500 });
   });
 });
 
@@ -546,15 +589,67 @@ describe('GET /api/v1/catalog/deals/:id', () => {
     expect(res.status).toBe(404);
   });
 
+  const detailFixture = {
+    ...serviceDealFixture,
+    discountPercent: 25,
+    shortDescription: 'Sharp cut in 30 minutes',
+    maxBookings: 20,
+    packages: [
+      { id: 'pkg-1', durationMinutes: 30, persons: 1, name: null, inclusions: [], sellingPrice: '299.00', originalPrice: '399.00' },
+      { id: 'pkg-2', durationMinutes: 60, persons: 2, name: 'Couple', inclusions: ['Hair wash'], sellingPrice: '500.00', originalPrice: null },
+    ],
+    faqs: [{ id: 'faq-1', question: 'Walk-ins?', answer: 'Book first.' }],
+    therapistLinks: [{ therapist: { id: 'th-1', personName: 'Asha' } }],
+  };
+
   it('returns a visible deal by id, applying the same visibility where-clause as the list', async () => {
-    prismaMock.deal.findFirst.mockResolvedValue(serviceDealFixture);
+    prismaMock.deal.findFirst.mockResolvedValue(detailFixture);
+    prismaMock.orderItem.aggregate.mockResolvedValue({ _sum: { quantity: 3 } } as never);
     const res = await request(app).get(`/api/v1/catalog/deals/${DEAL_ID}`);
     expect(res.status).toBe(200);
-    expect(prismaMock.deal.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ id: DEAL_ID, status: 'ACTIVE', approvalStatus: 'APPROVED' }),
-      }),
-    );
+    const where = prismaMock.deal.findFirst.mock.calls[0][0]!.where;
+    expect(where).toMatchObject({ id: DEAL_ID, status: 'ACTIVE', vendor: { status: 'ACTIVE' }, branch: { isActive: true } });
+    expect(where).not.toHaveProperty('approvalStatus');
+  });
+
+  it('carries the deal page fields: tagline, currency, per-package discount, stock, therapists (PLANNING §2.7)', async () => {
+    prismaMock.deal.findFirst.mockResolvedValue(detailFixture);
+    prismaMock.orderItem.aggregate.mockResolvedValue({ _sum: { quantity: 3 } } as never);
+    const res = await request(app).get(`/api/v1/catalog/deals/${DEAL_ID}`);
+    const deal = res.body.data;
+    expect(deal.tagline).toBe('Sharp cut in 30 minutes');
+    expect(deal.currency).toBe('INR');
+    expect(deal.packages.map((p: { discountPercent: number | null }) => p.discountPercent)).toEqual([25, null]);
+    expect(deal.stockLeft).toBe(17);
+    expect(deal.isSoldOut).toBe(false);
+    expect(deal.boughtCount).toBeNull(); // under 10 paid units
+    expect(deal.therapists).toEqual([{ id: 'th-1', personName: 'Asha' }]);
+    expect(deal).not.toHaveProperty('therapistLinks');
+    expect(deal).not.toHaveProperty('maxBookings');
+  });
+
+  it('shows the bought count from 10 paid units and sold out at 0 stock', async () => {
+    prismaMock.deal.findFirst.mockResolvedValue(detailFixture);
+    prismaMock.orderItem.aggregate.mockResolvedValue({ _sum: { quantity: 20 } } as never);
+    const res = await request(app).get(`/api/v1/catalog/deals/${DEAL_ID}`);
+    expect(res.body.data.boughtCount).toBe(20);
+    expect(res.body.data.isSoldOut).toBe(true);
+  });
+
+  it('opens a deal by its current or an old slug (PLANNING §2.7 URLs)', async () => {
+    prismaMock.deal.findFirst.mockResolvedValue(detailFixture);
+    prismaMock.orderItem.aggregate.mockResolvedValue({ _sum: { quantity: 0 } } as never);
+    const res = await request(app).get('/api/v1/catalog/deals/old-haircut-slug');
+    expect(res.status).toBe(200);
+    expect(res.body.data.slug).toBe('haircut-deal');
+    expect(prismaMock.deal.findFirst.mock.calls[0][0]!.where).toMatchObject({
+      OR: [{ slug: 'old-haircut-slug' }, { previousSlugs: { has: 'old-haircut-slug' } }],
+    });
+  });
+
+  it('422s for a malformed id or slug', async () => {
+    const res = await request(app).get('/api/v1/catalog/deals/bad%20slug!');
+    expect(res.status).toBe(422);
   });
 });
 
@@ -562,24 +657,24 @@ describe('GET /api/v1/catalog/vendors/:slug', () => {
   const vendorFixture = { id: 'vendor-1', slug: 'abc-salon', businessName: 'ABC Salon', branches: [] };
 
   it('404s for an unknown or non-ACTIVE vendor', async () => {
-    prismaMock.vendor.findFirst.mockResolvedValue(null);
+    prismaMock.member.findFirst.mockResolvedValue(null);
     const res = await request(app).get('/api/v1/catalog/vendors/abc-salon');
     expect(res.status).toBe(404);
   });
 
   it('narrows nested branches by state/city when given, merging into the active-branch filter', async () => {
-    prismaMock.vendor.findFirst.mockResolvedValue(vendorFixture);
+    prismaMock.member.findFirst.mockResolvedValue(vendorFixture);
     const res = await request(app).get('/api/v1/catalog/vendors/abc-salon?state=Uttar%20Pradesh&city=Gorakhpur');
     expect(res.status).toBe(200);
-    const call = prismaMock.vendor.findFirst.mock.calls[0][0];
+    const call = prismaMock.member.findFirst.mock.calls[0][0];
     expect(call.select.branches.where).toEqual({ isActive: true, state: 'Uttar Pradesh', city: 'Gorakhpur' });
   });
 
   it('omitting state/city leaves the plain active-branch filter unchanged (backward-compat regression guard)', async () => {
-    prismaMock.vendor.findFirst.mockResolvedValue(vendorFixture);
+    prismaMock.member.findFirst.mockResolvedValue(vendorFixture);
     const res = await request(app).get('/api/v1/catalog/vendors/abc-salon');
     expect(res.status).toBe(200);
-    const call = prismaMock.vendor.findFirst.mock.calls[0][0];
+    const call = prismaMock.member.findFirst.mock.calls[0][0];
     expect(call.select.branches.where).toEqual({ isActive: true });
   });
 });
@@ -729,7 +824,12 @@ describe('GET /api/v1/catalog/therapists/:id', () => {
     expect(res.status).toBe(404);
     expect(prismaMock.therapist.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ id: THERAPIST_ID, isActive: true, vendor: { status: 'ACTIVE' }, branch: { isActive: true } }),
+        where: expect.objectContaining({
+          id: THERAPIST_ID,
+          isActive: true,
+          vendor: { status: 'ACTIVE' },
+          branch: { isActive: true },
+        }),
       }),
     );
   });
@@ -741,10 +841,21 @@ describe('GET /api/v1/catalog/therapists/:id', () => {
     expect(res.body.data).toEqual({ ...therapistFixture, popularTags: [] });
   });
 
-  it('422s a non-uuid :id param', async () => {
-    const res = await request(app).get('/api/v1/catalog/therapists/not-a-uuid');
-    expect(res.status).toBe(422);
-    expect(prismaMock.therapist.findFirst).not.toHaveBeenCalled();
+  it('also resolves by the therapist\'s own slug (SEO-friendly URL), same visibility bar', async () => {
+    prismaMock.therapist.findFirst.mockResolvedValue(therapistFixture);
+    const res = await request(app).get('/api/v1/catalog/therapists/amit-verma');
+    expect(res.status).toBe(200);
+    expect(prismaMock.therapist.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ slug: 'amit-verma' }),
+      }),
+    );
+  });
+
+  it('a plain non-uuid, non-existent identifier 404s rather than 422ing — slugs are not UUIDs by design', async () => {
+    prismaMock.therapist.findFirst.mockResolvedValue(null);
+    const res = await request(app).get('/api/v1/catalog/therapists/no-such-therapist');
+    expect(res.status).toBe(404);
   });
 });
 
@@ -1111,5 +1222,190 @@ describe('GET /api/v1/catalog/social-links', () => {
     const res = await request(app).get('/api/v1/catalog/social-links');
     expect(res.status).toBe(200);
     expect(res.body.data).toEqual([]);
+  });
+});
+
+/**
+ * ST-40 (PLANNING §4 D29/D30, TESTING §4.4): card tags, product facets and server-side
+ * therapist sorting for the listing pages.
+ */
+describe('ST-40 card tags on deals and products', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+
+  it('returns each deal with its tag (Expire soon wins over 30% off)', async () => {
+    const ending = { ...serviceDealFixture, id: 'ending', endDate: new Date(Date.now() + 2 * DAY), discountPercent: 50 };
+    const plain = { ...serviceDealFixture, id: 'plain', discountPercent: 35 };
+    prismaMock.deal.findMany.mockResolvedValue([ending, plain] as never);
+    prismaMock.deal.count.mockResolvedValue(2);
+    const res = await request(app).get('/api/v1/catalog/deals');
+    expect(res.status).toBe(200);
+    expect(res.body.data.map((d: { tag: string }) => d.tag)).toEqual(['expire_soon', 'deal']);
+  });
+
+  it('marks a deal hot from paid order lines only (top 10%, at least 5)', async () => {
+    prismaMock.orderItem.groupBy.mockResolvedValue([{ dealId: DEAL_ID, _count: { _all: 6 } }] as never);
+    prismaMock.deal.findMany.mockResolvedValue([serviceDealFixture] as never);
+    prismaMock.deal.count.mockResolvedValue(1);
+    const res = await request(app).get('/api/v1/catalog/deals');
+    expect(res.body.data[0].tag).toBe('hot');
+    const groupBy = prismaMock.orderItem.groupBy.mock.calls[0][0] as unknown as {
+      where: { order: { status: { in: string[] }; payments: { some: { status: string } } } };
+    };
+    expect(groupBy.where.order.status.in).toEqual(['CONFIRMED', 'COMPLETED']);
+    expect(groupBy.where.order.payments.some.status).toBe('PAID');
+  });
+
+  it('tags=hot,new narrows the SQL where with one clause per tag', async () => {
+    prismaMock.deal.findMany.mockResolvedValue([]);
+    prismaMock.deal.count.mockResolvedValue(0);
+    const res = await request(app).get('/api/v1/catalog/deals?tags=hot,new');
+    expect(res.status).toBe(200);
+    const where = prismaMock.deal.findMany.mock.calls[0][0]?.where as unknown as { AND: { OR: unknown[] }[] };
+    expect(where.AND[0].OR).toHaveLength(2);
+  });
+
+  it('422s an unknown tag', async () => {
+    const res = await request(app).get('/api/v1/catalog/deals?tags=foo');
+    expect(res.status).toBe(422);
+    expect(prismaMock.deal.findMany).not.toHaveBeenCalled();
+  });
+
+  it('no new params: products keep their order and gain only `tag`', async () => {
+    prismaMock.product.findMany.mockResolvedValue([productFixture] as never);
+    prismaMock.product.count.mockResolvedValue(1);
+    const res = await request(app).get('/api/v1/catalog/products');
+    expect(res.body.data).toEqual([{ ...productFixture, createdAt: productFixture.createdAt.toISOString(), popularTags: [], tag: null }]);
+  });
+
+  it('deal facets count tags, each ignoring its own selection', async () => {
+    const rows = [
+      { id: 'a', vendorId: 'v1', branchId: 'b1', salePrice: '100', discountPercent: 40, createdAt: new Date('2026-01-01'), endDate: null, vendor: { businessName: 'A' }, branch: null },
+      { id: 'b', vendorId: 'v1', branchId: 'b1', salePrice: '200', discountPercent: null, createdAt: new Date(), endDate: null, vendor: { businessName: 'A' }, branch: null },
+    ];
+    prismaMock.deal.findMany.mockResolvedValue(rows as never);
+    const res = await request(app).get('/api/v1/catalog/deals/facets?tags=new');
+    expect(res.body.data.tags).toEqual([
+      { tag: 'expire_soon', count: 0 },
+      { tag: 'hot', count: 0 },
+      { tag: 'new', count: 1 },
+      { tag: 'deal', count: 1 },
+    ]);
+    expect(res.body.data.price).toEqual({ min: 200, max: 200 });
+  });
+});
+
+describe('ST-40 product listing filters', () => {
+  const OTHER_CATEGORY_ID = 'a0a0a0a0-0000-4000-8000-000000000009';
+
+  it('categoryIds narrows to those categories', async () => {
+    prismaMock.product.findMany.mockResolvedValue([]);
+    prismaMock.product.count.mockResolvedValue(0);
+    await request(app).get(`/api/v1/catalog/products?categoryIds=${CATEGORY_ID},${OTHER_CATEGORY_ID}`);
+    expect(prismaMock.product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ categoryId: { in: [CATEGORY_ID, OTHER_CATEGORY_ID] } }) }),
+    );
+  });
+
+  it('vendorIds narrows the list to those businesses (item 4) and rejects a bad id', async () => {
+    const VENDOR_A = 'f1f1f1f1-0000-4000-8000-000000000001';
+    const VENDOR_B = 'f1f1f1f1-0000-4000-8000-000000000002';
+    prismaMock.product.findMany.mockResolvedValue([]);
+    prismaMock.product.count.mockResolvedValue(0);
+    await request(app).get(`/api/v1/catalog/products?vendorIds=${VENDOR_A},${VENDOR_B}`);
+    expect(prismaMock.product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ vendorId: { in: [VENDOR_A, VENDOR_B] } }) }),
+    );
+    expect((await request(app).get('/api/v1/catalog/products?vendorIds=bad')).status).toBe(422);
+  });
+
+  it('GET /products/facets returns category, tag, price and business counts', async () => {
+    const VENDOR_A = 'f1f1f1f1-0000-4000-8000-000000000001';
+    prismaMock.product.findMany.mockResolvedValue([
+      { id: 'p1', price: '100', discount: 50, createdAt: new Date('2026-01-01'), category: { id: CATEGORY_ID, name: 'Skin', slug: 'skin' }, vendorId: VENDOR_A, vendor: { businessName: 'Calm Spa' } },
+      { id: 'p2', price: '300', discount: null, createdAt: new Date('2026-01-01'), category: { id: OTHER_CATEGORY_ID, name: 'Hair', slug: 'hair' }, vendorId: VENDOR_A, vendor: { businessName: 'Calm Spa' } },
+    ] as never);
+    const res = await request(app).get(`/api/v1/catalog/products/facets?categoryIds=${CATEGORY_ID}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.categories).toEqual([
+      { id: CATEGORY_ID, name: 'Skin', slug: 'skin', count: 1 },
+      { id: OTHER_CATEGORY_ID, name: 'Hair', slug: 'hair', count: 1 },
+    ]);
+    expect(res.body.data.tags.find((t: { tag: string }) => t.tag === 'deal').count).toBe(1);
+    expect(res.body.data.price).toEqual({ min: 100, max: 100 });
+    // The category selection stays out of SQL so its own counts can ignore it.
+    expect((prismaMock.product.findMany.mock.calls[0][0]?.where as { categoryId?: unknown }).categoryId).toBeUndefined();
+    expect(res.body.data.vendors).toEqual([{ id: VENDOR_A, name: 'Calm Spa', count: 1 }]);
+  });
+
+  it('GET /products/facets keeps the business selection out of SQL so its own counts ignore it', async () => {
+    prismaMock.product.findMany.mockResolvedValue([]);
+    await request(app).get('/api/v1/catalog/products/facets?vendorIds=f1f1f1f1-0000-4000-8000-000000000001');
+    expect((prismaMock.product.findMany.mock.calls[0][0]?.where as { vendorId?: unknown }).vendorId).toBeUndefined();
+  });
+});
+
+describe('ST-40 therapist listing', () => {
+  const t = (id: string, price: number | null, latitude: string | null) => ({
+    ...therapistFixture,
+    id,
+    packages: price === null ? [] : [{ id: `${id}-p`, durationMinutes: 60, sellingPrice: String(price), originalPrice: String(price) }],
+    branch: { ...therapistFixture.branch, latitude, longitude: latitude === null ? null : '83.3732' },
+  });
+  const rows = [t('t1', 900, '26.7606'), t('t2', 300, '28.6139'), t('t3', null, '26.77'), t('t4', 500, null)];
+  const ids = (body: { data: { id: string }[] }) => body.data.map((x) => x.id);
+
+  it('sort=price_asc orders by the lowest package across pages (page 2 continues page 1)', async () => {
+    prismaMock.therapist.findMany.mockResolvedValue(rows as never);
+    const page1 = await request(app).get('/api/v1/catalog/therapists?sort=price_asc&pageSize=2&page=1');
+    const page2 = await request(app).get('/api/v1/catalog/therapists?sort=price_asc&pageSize=2&page=2');
+    expect([...ids(page1.body), ...ids(page2.body)]).toEqual(['t2', 't4', 't1', 't3']);
+    expect(page1.body.meta.total).toBe(4);
+    expect(prismaMock.therapist.findMany).toHaveBeenCalledWith(expect.not.objectContaining({ skip: expect.anything() }));
+  });
+
+  it('sort=distance without coordinates behaves like relevance (SQL paging)', async () => {
+    prismaMock.therapist.findMany.mockResolvedValue([therapistFixture] as never);
+    prismaMock.therapist.count.mockResolvedValue(1);
+    await request(app).get('/api/v1/catalog/therapists?sort=distance');
+    expect(prismaMock.therapist.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 0 }));
+  });
+
+  it('minPrice/maxPrice and radiusKm narrow, and meta.total matches', async () => {
+    prismaMock.therapist.findMany.mockResolvedValue(rows as never);
+    const priced = await request(app).get('/api/v1/catalog/therapists?minPrice=400&maxPrice=1000');
+    expect(ids(priced.body)).toEqual(['t1', 't4']);
+    expect(priced.body.meta.total).toBe(2);
+    const near = await request(app).get('/api/v1/catalog/therapists?latitude=26.7606&longitude=83.3732&radiusKm=5');
+    expect(ids(near.body)).toEqual(['t1', 't3']);
+  });
+
+  it('city, vendorIds and branchIds go to the SQL where', async () => {
+    prismaMock.therapist.findMany.mockResolvedValue([]);
+    prismaMock.therapist.count.mockResolvedValue(0);
+    const V = '11111111-0000-4000-8000-000000000000';
+    await request(app).get(`/api/v1/catalog/therapists?city=Gorakhpur&vendorIds=${V}&branchIds=${V}`);
+    expect(prismaMock.therapist.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ vendorId: { in: [V] }, branchId: { in: [V] }, branch: { isActive: true, city: 'Gorakhpur' } }),
+      }),
+    );
+  });
+
+  it('GET /therapists/facets returns vendor, branch and price counts from the lowest package', async () => {
+    prismaMock.therapist.findMany.mockResolvedValue(
+      rows.map((r) => ({
+        id: r.id,
+        vendorId: 'v1',
+        branchId: 'b1',
+        packages: r.packages,
+        vendor: { businessName: 'ABC' },
+        branch: { name: 'Main', city: 'Gorakhpur', latitude: r.branch.latitude, longitude: r.branch.longitude },
+      })) as never,
+    );
+    const res = await request(app).get('/api/v1/catalog/therapists/facets');
+    expect(res.status).toBe(200);
+    expect(res.body.data.vendors).toEqual([{ id: 'v1', name: 'ABC', count: 4 }]);
+    expect(res.body.data.price).toEqual({ min: 300, max: 900 });
+    expect(res.body.data).not.toHaveProperty('tags');
   });
 });

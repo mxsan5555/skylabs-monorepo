@@ -1,3 +1,5 @@
+import { AuthService } from '@skylabs-monorepo/shared-auth/angular';
+import { portalContext, portalDashboard } from '../../core/auth/portal-routing';
 import { Component, CUSTOM_ELEMENTS_SCHEMA, inject } from '@angular/core';
 import { Router } from '@angular/router';
 
@@ -10,9 +12,16 @@ import { Router } from '@angular/router';
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
 export class Unauthorized {
+  protected readonly auth = inject(AuthService);
+  protected missingLink(): string | null {
+    const b = this.auth.bootstrap(); const context = portalContext(b);
+    if(context === 'customer' && !b?.customer) return 'Your customer account is not linked to a Customer record. Contact support to link your account.';
+    if(context === 'driver' && !b?.driver) return 'Your driver account is not linked to a Driver record. Contact authorized staff to link your account.';
+    return null;
+  }
   private readonly router = inject(Router);
 
   protected goToDashboard(): void {
-    this.router.navigate(['/account/dashboard']);
+    this.router.navigateByUrl(portalDashboard(this.auth.bootstrap()));
   }
 }

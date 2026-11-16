@@ -1,0 +1,15 @@
+{
+  "status": "passed",
+  "noLoginConsent": true,
+  "noUserOrSessionCreated": true,
+  "explicitAgreement": true,
+  "replayRejected": true,
+  "unassignedDenied": true,
+  "reviewerNoLoginVerification": true,
+  "fixtureProviderRequests": 1,
+  "realIdspayRequests": 0,
+  "realSmsRequests": 0,
+  "optionalLoginBeforeVerification": true,
+  "changedDetailsBlocked": true,
+  "fixturesCleaned": true
+}

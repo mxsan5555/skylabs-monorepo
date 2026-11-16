@@ -1,0 +1,19 @@
+{
+  "mode": "Read-only real running UI with signed session fixture for an existing active account; configured password/OTP login not verified",
+  "mockedApi": false,
+  "mutations": false,
+  "errors": [],
+  "menu": [
+    "Dashboard",
+    "Drivers & KYC",
+    "Customers",
+    "Trips & Bookings",
+    "Accounts",
+    "Promotions",
+    "Website & Support",
+    "Reports",
+    "Masters",
+    "Administration",
+    "Settings"
+  ]
+}
