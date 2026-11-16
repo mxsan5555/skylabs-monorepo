@@ -8,9 +8,9 @@ import {
   isJwtExpired,
   isPreviewToken,
   msUntilJwtExpiry,
+  resolveInitialToken,
   readStorageValue,
   refreshAccessToken,
-  resolveInitialToken,
   revokeSession,
   writeSessionValue,
   writeStorageValue,
@@ -28,7 +28,6 @@ export class AuthService {
   private readonly config = inject(AUTH_CONFIG);
   private readonly keys = authStorageKeys(this.config.appPrefix);
 
-  /** A live "Login As" preview from sessionStorage (this tab only), else the real token (P10-38). */
   private readonly _token = signal<string | null>(resolveInitialToken(this.keys));
   private readonly _bootstrap = signal<BootstrapResponse | null>(null);
   private readonly _loading = signal<boolean>(!!this._token());
@@ -89,7 +88,6 @@ export class AuthService {
       this._loading.set(false);
     } catch (err) {
       const status = err instanceof AuthRequestError ? err.status : undefined;
-      // An expired or revoked preview ends the preview, not the Super Admin's own session.
       if ((status === 401 || status === 403) && isPreviewToken(token)) {
         await this.returnToSuperAdmin();
         return;
@@ -205,7 +203,6 @@ export class AuthService {
    *  effort revokes the refresh session server-side. Safe to call with no refresh token stored
    *  (nothing to revoke — just clears local state). */
   signOut(): void {
-    // The real token (localStorage), never a preview: the revoke call authenticates as the user.
     const realToken = readStorageValue(this.keys.token);
     const storedRefreshToken = readStorageValue(this.keys.refreshToken);
     this.clearSession();
@@ -241,8 +238,6 @@ export class AuthService {
     // The preview token is fixed-lifetime and never refreshed — stop any timer armed for the
     // real (super admin) token while it's dormant; `returnToSuperAdmin` re-arms it.
     if (this.refreshTimer) clearTimeout(this.refreshTimer);
-    // This tab only: localStorage keeps the real token, so other tabs and a closed tab never
-    // carry the preview (P10-38).
     writeSessionValue(this.keys.previewToken, body.data.previewToken);
     this._token.set(body.data.previewToken);
     await this.loadBootstrap(body.data.previewToken);

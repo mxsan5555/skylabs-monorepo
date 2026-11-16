@@ -3,7 +3,7 @@ import { z } from 'zod';
 import {
   OtpRequestSchema,
   OtpVerifySchema,
-  RefreshRequestSchema,
+  CsrfTokenResponseSchema,
   AuthTokensResponseSchema,
 } from '../schemas/auth.schema';
 import {
@@ -114,9 +114,20 @@ export function buildOpenApiDocument() {
     scheme: 'bearer',
     bearerFormat: 'JWT',
   });
-
+  registry.registerComponent('securitySchemes', 'refreshCookie', {
+    type: 'apiKey',
+    in: 'cookie',
+    name: 'msd_refresh_token',
+  });
+  registry.registerComponent('securitySchemes', 'csrfHeader', {
+    type: 'apiKey',
+    in: 'header',
+    name: 'X-CSRF-Token',
+  });
   const bearer = [{ bearerAuth: [] }];
+  const cookieAuth = [{ refreshCookie: [], csrfHeader: [] }];
   const errorResponse = { description: 'Error', content: { 'application/json': { schema: ErrorObjectSchema } } };
+  const successEnvelope = (schema: z.ZodTypeAny) => z.object({ data: schema, error: z.null() });
 
   // ─── Auth ──────────────────────────────────────────────────────────────────
 
@@ -136,13 +147,13 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'post',
     path: '/auth/otp/verify',
-    summary: 'Verify an OTP and receive a JWT pair',
+    summary: 'Verify an OTP and receive an access token; the refresh token is an HttpOnly cookie',
     tags: ['Auth'],
     request: { body: { content: { 'application/json': { schema: OtpVerifySchema } } } },
     responses: {
       200: {
         description: 'Authenticated',
-        content: { 'application/json': { schema: AuthTokensResponseSchema } },
+        content: { 'application/json': { schema: successEnvelope(AuthTokensResponseSchema) } },
       },
       401: errorResponse,
       429: errorResponse,
@@ -160,30 +171,57 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/auth/google/callback',
-    summary: 'Google OAuth callback — issues a JWT pair',
+    summary: 'Google OAuth callback — issues an access token and HttpOnly refresh cookie',
     tags: ['Auth'],
     responses: {
-      200: { description: 'Authenticated', content: { 'application/json': { schema: AuthTokensResponseSchema } } },
+      200: {
+        description: 'Authenticated',
+        content: { 'application/json': { schema: successEnvelope(AuthTokensResponseSchema) } },
+      },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/auth/csrf',
+    summary: 'Get a CSRF token for cookie-authenticated auth requests',
+    tags: ['Auth'],
+    responses: {
+      200: {
+        description: 'CSRF token',
+        content: { 'application/json': { schema: successEnvelope(CsrfTokenResponseSchema) } },
+      },
     },
   });
 
   registry.registerPath({
     method: 'post',
     path: '/auth/refresh',
-    summary: 'Rotate the refresh token and issue a new access token',
+    summary: 'Rotate the HttpOnly refresh cookie and issue a new access token',
     tags: ['Auth'],
-    request: { body: { content: { 'application/json': { schema: RefreshRequestSchema } } } },
-    responses: { 200: { description: 'Rotated' }, 401: errorResponse },
+    security: cookieAuth,
+    responses: {
+      200: {
+        description: 'Rotated',
+        content: { 'application/json': { schema: successEnvelope(z.object({ accessToken: z.string() })) } },
+      },
+      401: errorResponse,
+      403: errorResponse,
+    },
   });
 
   registry.registerPath({
     method: 'post',
     path: '/auth/logout',
-    summary: 'Revoke the current refresh session',
+    summary: 'Revoke the current refresh session and clear auth cookies',
     tags: ['Auth'],
-    security: bearer,
-    request: { body: { content: { 'application/json': { schema: RefreshRequestSchema } } } },
-    responses: { 200: { description: 'Logged out' } },
+    security: cookieAuth,
+    responses: {
+      200: {
+        description: 'Logged out',
+        content: { 'application/json': { schema: successEnvelope(z.object({ message: z.string() })) } },
+      },
+    },
   });
 
   registry.registerPath({

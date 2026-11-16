@@ -12,8 +12,6 @@ function generateOpaqueToken(): string {
   return crypto.randomBytes(REFRESH_TOKEN_BYTES).toString('base64url');
 }
 
-/** Fast, deterministic O(1)-indexed lookup key — see RefreshSession.lookupHash's own schema
- *  doc comment for why SHA-256 (not bcrypt) is the right tool for this specific value. */
 function computeLookupHash(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
