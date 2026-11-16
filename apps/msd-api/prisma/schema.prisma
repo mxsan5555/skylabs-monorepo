@@ -156,6 +156,9 @@ model RefreshSession {
   id          String    @id @default(uuid())
   userId      String
   hashedToken String    @unique
+  /// SHA-256 lookup key for the high-entropy opaque token. Nullable so existing sessions can
+  /// continue to rotate through the bcrypt fallback until they are next used.
+  lookupHash  String?   @unique
   deviceInfo  String?
   ip          String?
   userAgent   String?

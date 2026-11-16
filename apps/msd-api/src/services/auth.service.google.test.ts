@@ -61,7 +61,10 @@ describe('loginWithGoogle', () => {
     expect(typeof result.refreshToken).toBe('string');
     expect(result.refreshToken.length).toBeGreaterThan(0);
     expect(prismaMock.refreshSession.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ userId: 'new-user-id' }),
+      data: expect.objectContaining({
+        userId: 'new-user-id',
+        lookupHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      }),
     });
 
     expect(prismaMock.loginHistory.create).toHaveBeenCalledWith({

@@ -12,7 +12,6 @@ export interface AuthUser {
 
 export interface AuthTokensResponse {
   accessToken: string;
-  refreshToken: string;
   user: AuthUser;
 }
 
@@ -21,7 +20,7 @@ export function requestOtp(identifier: string, purpose: OtpPurpose = 'login') {
   return apiPost<{ message: string }>('/auth/otp/request', null, { identifier, purpose });
 }
 
-/** `POST /auth/otp/verify` — verifies the code and logs in, returning a fresh access/refresh token pair. */
+/** `POST /auth/otp/verify` — verifies the code and logs in; the refresh token is an HttpOnly cookie. */
 export function verifyOtp(identifier: string, otp: string) {
   return apiPost<AuthTokensResponse>('/auth/otp/verify', null, { identifier, otp });
 }

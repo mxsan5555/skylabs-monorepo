@@ -9,8 +9,10 @@ import type { BootstrapResponse } from '@skylabs-monorepo/shared-types';
 export interface AuthStorageKeys {
   /** The live bearer token the app sends on every request. */
   token: string;
-  /** During a SuperAdmin "Login As" preview, the real SuperAdmin token is stashed here. */
+  /** Legacy key used by older builds to stash the real token during a preview. */
   realToken: string;
+  /** A "Login As" preview token, scoped to this tab. */
+  previewToken: string;
   /** The rotated opaque refresh token paired with `token` — absent for preview tokens (a
    *  "Login As" preview is never refreshed; see CLAUDE.md's Login As section). */
   refreshToken: string;
@@ -20,23 +22,47 @@ export function authStorageKeys(appPrefix: string): AuthStorageKeys {
   return {
     token: `${appPrefix}_auth_token`,
     realToken: `${appPrefix}_auth_real_token`,
+    previewToken: `${appPrefix}_auth_preview_token`,
     refreshToken: `${appPrefix}_auth_refresh_token`,
   };
 }
 
-function safeLocalStorage(): Storage | null {
-  return typeof localStorage === 'undefined' ? null : localStorage;
+type StorageKind = 'localStorage' | 'sessionStorage';
+
+function safeStorage(kind: StorageKind): Storage | null {
+  return typeof globalThis[kind] === 'undefined' ? null : globalThis[kind];
 }
 
-export function readStorageValue(key: string): string | null {
-  return safeLocalStorage()?.getItem(key) ?? null;
+function readValue(kind: StorageKind, key: string): string | null {
+  return safeStorage(kind)?.getItem(key) ?? null;
 }
 
-export function writeStorageValue(key: string, value: string | null): void {
-  const storage = safeLocalStorage();
+function writeValue(kind: StorageKind, key: string, value: string | null): void {
+  const storage = safeStorage(kind);
   if (!storage) return;
   if (value) storage.setItem(key, value);
   else storage.removeItem(key);
+}
+
+export const readStorageValue = (key: string) => readValue('localStorage', key);
+export const writeStorageValue = (key: string, value: string | null) => writeValue('localStorage', key, value);
+export const readSessionValue = (key: string) => readValue('sessionStorage', key);
+export const writeSessionValue = (key: string, value: string | null) => writeValue('sessionStorage', key, value);
+
+/** Restores this tab's preview if present, otherwise the shared real access token. */
+export function resolveInitialToken(keys: AuthStorageKeys): string | null {
+  const preview = readSessionValue(keys.previewToken);
+  if (preview && !isJwtExpired(preview)) return preview;
+  if (preview) writeSessionValue(keys.previewToken, null);
+
+  const stored = readStorageValue(keys.token);
+  if (stored && isPreviewToken(stored)) {
+    const realToken = readStorageValue(keys.realToken);
+    writeStorageValue(keys.token, realToken);
+    writeStorageValue(keys.realToken, null);
+    return realToken;
+  }
+  return stored;
 }
 
 /** Decodes the JWT payload for read-only UI hints (e.g. `preview`). Never trust this for access control — the server re-verifies on every request. */
@@ -122,6 +148,20 @@ export async function refreshAccessToken(
   }
   const body = (await res.json()) as { data: { accessToken: string; refreshToken: string } };
   return body.data;
+}
+
+/** Best-effort revoke for the legacy bearer + JSON refresh-token flow used by mera-driver. */
+export async function revokeSession(apiBaseUrl: string, accessToken: string, refreshToken: string): Promise<void> {
+  try {
+    await fetch(`${apiBaseUrl}/auth/logout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ refreshToken }),
+      keepalive: true,
+    });
+  } catch {
+    // Local sign-out must still complete if the API is unavailable.
+  }
 }
 
 export type { BootstrapResponse };

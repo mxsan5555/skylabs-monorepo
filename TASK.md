@@ -128,7 +128,7 @@ Original plan file: `~/.claude/plans/our-backend-admin-layout-snug-sloth.md`. Ea
 - [x] (e) decided: gift/member `sky-feature-card` copy stays in shadow DOM. It is promotional, not a search landing target; the crawlable content on home is the h1, tiles, deals JSON-LD, How it works, directory and FAQ. See spec section 8.1.
 
 ### Account & admin — both apps (remaining)
-- [ ] Logout from inside the console (currently in the public header)
+- [x] Console sign-out revokes the MSD refresh session; refresh credentials use HttpOnly cookies and coordinated rotation — 2026-11-16
 - [ ] Admin/marketing/sales feature pages (real content, not stubs)
 - [ ] Real role assignment + enforcement once backends exist (JWT claim + per-request API check); remove the "View as" demo switcher
 - [ ] Replace localStorage account store with profile API

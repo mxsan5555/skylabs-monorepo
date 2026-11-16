@@ -82,7 +82,7 @@ describe('POST /api/v1/auth/otp/verify', () => {
     });
   }
 
-  it('returns 200 with access/refresh tokens on a correct OTP (happy path)', async () => {
+  it('returns an access token and HttpOnly refresh cookie on a correct OTP', async () => {
     const realOtp = '123456';
     const hashedOtp = await bcrypt.hash(realOtp, 10);
     mockPendingChallenge({ hashedOtp });
@@ -104,8 +104,12 @@ describe('POST /api/v1/auth/otp/verify', () => {
 
     expect(res.status).toBe(200);
     expect(typeof res.body.data.accessToken).toBe('string');
-    expect(typeof res.body.data.refreshToken).toBe('string');
+    expect(res.body.data.refreshToken).toBeUndefined();
     expect(res.body.data.user.email).toBe(identifier);
+    expect(res.headers['set-cookie']).toEqual(
+      expect.arrayContaining([expect.stringContaining('msd_refresh_token=')]),
+    );
+    expect(res.headers['set-cookie'].join(';')).toContain('HttpOnly');
   });
 
   it('returns 422 when the OTP is not exactly 6 digits', async () => {
@@ -159,25 +163,76 @@ describe('POST /api/v1/auth/otp/verify', () => {
 });
 
 describe('POST /api/v1/auth/refresh', () => {
-  it('returns 422 when refreshToken is missing/too short', async () => {
-    const res = await request(app).post('/api/v1/auth/refresh').send({ refreshToken: 'short' });
-    expect(res.status).toBe(422);
+  it('returns 401 and clears auth cookies when the refresh cookie is missing', async () => {
+    const res = await request(app).post('/api/v1/auth/refresh');
+    expect(res.status).toBe(401);
+    expect(res.headers['set-cookie'].join(';')).toContain('Max-Age=0');
   });
 
-  it('returns 401 when the refresh token does not match any active session', async () => {
+  it('rejects a request without the matching CSRF header', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/refresh')
+      .set('Cookie', ['msd_refresh_token=refresh-value', 'msd_csrf_token=csrf-value']);
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 401 when the refresh cookie does not match any active session', async () => {
     prismaMock.refreshSession.findMany.mockResolvedValue([]);
     const res = await request(app)
       .post('/api/v1/auth/refresh')
-      .send({ refreshToken: 'a-refresh-token-that-is-long-enough' });
+      .set('Cookie', ['msd_refresh_token=a-refresh-token-that-is-long-enough', 'msd_csrf_token=csrf-value'])
+      .set('X-CSRF-Token', 'csrf-value');
     expect(res.status).toBe(401);
+    expect(res.headers['set-cookie'].join(';')).toContain('Max-Age=0');
   });
 });
 
 describe('POST /api/v1/auth/logout', () => {
-  it('returns 401 with no bearer token even with a valid-shaped body', async () => {
+  it('revokes from the refresh cookie without requiring a still-valid access token', async () => {
+    const refreshToken = 'refresh-value';
+    const now = new Date();
+    prismaMock.refreshSession.findMany.mockResolvedValue([
+      {
+        id: 'session-1',
+        userId: USER_ID,
+        hashedToken: await bcrypt.hash(refreshToken, 10),
+        deviceInfo: null,
+        ip: null,
+        userAgent: null,
+        expiresAt: new Date(now.getTime() + 60_000),
+        revokedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ]);
+    prismaMock.refreshSession.update.mockResolvedValue({});
     const res = await request(app)
       .post('/api/v1/auth/logout')
-      .send({ refreshToken: 'a-refresh-token-that-is-long-enough' });
-    expect(res.status).toBe(401);
+      .set('Cookie', [`msd_refresh_token=${refreshToken}`, 'msd_csrf_token=csrf-value'])
+      .set('X-CSRF-Token', 'csrf-value');
+    expect(res.status).toBe(200);
+    expect(res.body.data.message).toBe('Logged out');
+    expect(prismaMock.refreshSession.update).toHaveBeenCalledWith({
+      where: { id: 'session-1' },
+      data: { revokedAt: expect.any(Date) },
+    });
+    expect(res.headers['set-cookie'].join(';')).toContain('Max-Age=0');
+  });
+
+  it('rejects logout when the CSRF cookie and header do not match', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/logout')
+      .set('Cookie', ['msd_refresh_token=refresh-value', 'msd_csrf_token=csrf-value'])
+      .set('X-CSRF-Token', 'other-value');
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('GET /api/v1/auth/csrf', () => {
+  it('returns the token paired with the CSRF cookie', async () => {
+    const res = await request(app).get('/api/v1/auth/csrf');
+    expect(res.status).toBe(200);
+    expect(typeof res.body.data.csrfToken).toBe('string');
+    expect(res.headers['set-cookie'].join(';')).toContain('msd_csrf_token=');
   });
 });

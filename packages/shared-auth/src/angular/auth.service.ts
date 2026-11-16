@@ -8,8 +8,11 @@ import {
   isJwtExpired,
   isPreviewToken,
   msUntilJwtExpiry,
+  resolveInitialToken,
   readStorageValue,
   refreshAccessToken,
+  revokeSession,
+  writeSessionValue,
   writeStorageValue,
 } from '../index';
 import { AUTH_CONFIG } from './auth-config';
@@ -25,9 +28,9 @@ export class AuthService {
   private readonly config = inject(AUTH_CONFIG);
   private readonly keys = authStorageKeys(this.config.appPrefix);
 
-  private readonly _token = signal<string | null>(readStorageValue(this.keys.token));
+  private readonly _token = signal<string | null>(resolveInitialToken(this.keys));
   private readonly _bootstrap = signal<BootstrapResponse | null>(null);
-  private readonly _loading = signal<boolean>(!!readStorageValue(this.keys.token));
+  private readonly _loading = signal<boolean>(!!this._token());
 
   /** True once a session that was previously live ends involuntarily (a dead refresh token,
    *  or a 401/403 on bootstrap) — as opposed to a deliberate `signOut()`. `authGuard` reads
@@ -85,6 +88,10 @@ export class AuthService {
       this._loading.set(false);
     } catch (err) {
       const status = err instanceof AuthRequestError ? err.status : undefined;
+      if ((status === 401 || status === 403) && isPreviewToken(token)) {
+        await this.returnToSuperAdmin();
+        return;
+      }
       // Only a genuine auth failure (401/403) is a real "session ended" — sign out. A network
       // blip, 5xx, or other transient failure must not clear an otherwise-valid token (same fix
       // as the React AuthProvider's loadBootstrap).
@@ -113,6 +120,8 @@ export class AuthService {
     this.refreshPromise = null;
     writeStorageValue(this.keys.token, null);
     writeStorageValue(this.keys.refreshToken, null);
+    writeStorageValue(this.keys.realToken, null);
+    writeSessionValue(this.keys.previewToken, null);
     this._bootstrap.set(null);
     this._token.set(null);
     this._loading.set(false);
@@ -183,6 +192,7 @@ export class AuthService {
   async signIn(token: string, refreshToken?: string): Promise<void> {
     writeStorageValue(this.keys.token, token);
     writeStorageValue(this.keys.refreshToken, refreshToken ?? null);
+    writeSessionValue(this.keys.previewToken, null);
     this._token.set(token);
     this._sessionExpired.set(false);
     this.scheduleRefresh(token);
@@ -193,18 +203,10 @@ export class AuthService {
    *  effort revokes the refresh session server-side. Safe to call with no refresh token stored
    *  (nothing to revoke — just clears local state). */
   signOut(): void {
+    const realToken = readStorageValue(this.keys.token);
     const storedRefreshToken = readStorageValue(this.keys.refreshToken);
-    const apiBaseUrl = this.config.apiBaseUrl;
     this.clearSession();
-    writeStorageValue(this.keys.realToken, null);
-    if (storedRefreshToken) {
-      fetch(`${apiBaseUrl}/auth/logout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: storedRefreshToken }),
-        keepalive: true,
-      }).catch(() => undefined);
-    }
+    if (realToken && storedRefreshToken) void revokeSession(this.config.apiBaseUrl, realToken, storedRefreshToken);
   }
 
   async refreshBootstrap(): Promise<void> {
@@ -236,17 +238,18 @@ export class AuthService {
     // The preview token is fixed-lifetime and never refreshed — stop any timer armed for the
     // real (super admin) token while it's dormant; `returnToSuperAdmin` re-arms it.
     if (this.refreshTimer) clearTimeout(this.refreshTimer);
-    writeStorageValue(this.keys.realToken, token);
-    writeStorageValue(this.keys.token, body.data.previewToken);
+    writeSessionValue(this.keys.previewToken, body.data.previewToken);
     this._token.set(body.data.previewToken);
     await this.loadBootstrap(body.data.previewToken);
   }
 
   async returnToSuperAdmin(): Promise<void> {
-    const realToken = readStorageValue(this.keys.realToken);
-    if (!realToken) return;
-    writeStorageValue(this.keys.realToken, null);
-    writeStorageValue(this.keys.token, realToken);
+    writeSessionValue(this.keys.previewToken, null);
+    const realToken = readStorageValue(this.keys.token);
+    if (!realToken) {
+      this.clearSession('expired');
+      return;
+    }
     this._token.set(realToken);
     // The real token may itself have expired while previewing (the preview session has no
     // fixed relation to the real token's 15-minute TTL) — if so, use the refresh token that's

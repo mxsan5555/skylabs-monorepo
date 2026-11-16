@@ -22,6 +22,9 @@ https://api.myspadeal.com/api/v1
 
 - **JWT Bearer** in `Authorization: Bearer <accessToken>`.
 - Access token TTL **15 min**; refresh token TTL **30 days**, rotated on use (see 01-auth).
+- The access token is held by the SPA; the refresh credential is an **HttpOnly cookie** and is
+  never returned to page JavaScript. Cookie-authenticated auth requests include the CSRF header
+  returned by `GET /auth/csrf`.
 - JWT payload: `{ sub: userId, roles: UserRole[], iat, exp }`.
 
 ### Roles

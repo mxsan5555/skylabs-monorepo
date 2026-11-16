@@ -3,12 +3,17 @@ import bcrypt from 'bcrypt';
 import { prisma } from '../lib/prisma';
 import { env } from '../config/env';
 import { ApiError } from '../lib/http';
+import type { Prisma } from '../generated/prisma-client';
 
 const REFRESH_TOKEN_BYTES = 48;
 const REFRESH_HASH_ROUNDS = 10;
 
 function generateOpaqueToken(): string {
   return crypto.randomBytes(REFRESH_TOKEN_BYTES).toString('base64url');
+}
+
+function computeLookupHash(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
 }
 
 interface SessionMeta {
@@ -21,13 +26,29 @@ interface SessionMeta {
 export async function issueRefreshSession(userId: string, meta: SessionMeta = {}): Promise<string> {
   const token = generateOpaqueToken();
   const hashedToken = await bcrypt.hash(token, REFRESH_HASH_ROUNDS);
+  const lookupHash = computeLookupHash(token);
   const expiresAt = new Date(Date.now() + env.jwtRefreshTtlDays * 24 * 60 * 60 * 1000);
 
   await prisma.refreshSession.create({
-    data: { userId, hashedToken, expiresAt, ...meta },
+    data: { userId, hashedToken, lookupHash, expiresAt, ...meta },
   });
 
   return token;
+}
+
+async function findSessionByToken(
+  token: string,
+  where: Prisma.RefreshSessionWhereInput,
+): Promise<Prisma.RefreshSessionGetPayload<object> | null> {
+  const lookupHash = computeLookupHash(token);
+  const indexedMatch = await prisma.refreshSession.findFirst({ where: { ...where, lookupHash } });
+  if (indexedMatch) return indexedMatch;
+
+  const legacySessions = await prisma.refreshSession.findMany({ where: { ...where, lookupHash: null } });
+  for (const session of legacySessions) {
+    if (await bcrypt.compare(token, session.hashedToken)) return session;
+  }
+  return null;
 }
 
 /**
@@ -40,17 +61,7 @@ export async function rotateRefreshToken(
   presentedToken: string,
   meta: SessionMeta = {},
 ): Promise<{ userId: string; roles: string[]; token: string }> {
-  const candidates = await prisma.refreshSession.findMany({
-    where: { expiresAt: { gt: new Date() } },
-  });
-
-  let matched: (typeof candidates)[number] | undefined;
-  for (const candidate of candidates) {
-    if (await bcrypt.compare(presentedToken, candidate.hashedToken)) {
-      matched = candidate;
-      break;
-    }
-  }
+  const matched = await findSessionByToken(presentedToken, { expiresAt: { gt: new Date() } });
 
   if (!matched) {
     throw new ApiError('UNAUTHORIZED', 'Invalid or expired refresh token');
@@ -85,16 +96,12 @@ export async function rotateRefreshToken(
 }
 
 export async function revokeRefreshToken(presentedToken: string): Promise<void> {
-  const candidates = await prisma.refreshSession.findMany({ where: { revokedAt: null } });
-  for (const candidate of candidates) {
-    if (await bcrypt.compare(presentedToken, candidate.hashedToken)) {
-      await prisma.refreshSession.update({
-        where: { id: candidate.id },
-        data: { revokedAt: new Date() },
-      });
-      return;
-    }
-  }
+  const matched = await findSessionByToken(presentedToken, { revokedAt: null });
+  if (!matched) return;
+  await prisma.refreshSession.update({
+    where: { id: matched.id },
+    data: { revokedAt: new Date() },
+  });
 }
 
 export async function revokeAllRefreshTokens(userId: string): Promise<void> {
