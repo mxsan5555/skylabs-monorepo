@@ -8,13 +8,21 @@ import {
   otpIdentifierRateLimiter,
   otpRequestRateLimiter,
 } from '../middleware/rateLimiter';
-import { OtpRequestSchema, OtpVerifySchema, RefreshRequestSchema } from '../schemas/auth.schema';
+import { OtpRequestSchema, OtpVerifySchema } from '../schemas/auth.schema';
 import { requestOtp, verifyOtp } from '../services/otp.service';
 import { loginWithIdentifier } from '../services/auth.service';
 import { normalizeIdentifier } from '../lib/normalizeIdentifier';
 import { rotateRefreshToken, revokeRefreshToken, revokeAllRefreshTokens } from '../services/token.service';
 import { signAccessToken } from '../lib/jwt';
-import { sendData, ApiError } from '../lib/http';
+import { ApiError, sendData, sendError } from '../lib/http';
+import {
+  clearAuthCookies,
+  ensureCsrfCookie,
+  readCsrfCookie,
+  readRefreshCookie,
+  requireCsrfHeader,
+  setAuthCookies,
+} from '../lib/auth-cookies';
 import { prisma } from '../lib/prisma';
 import { getMemberAccessState } from '../services/member-access.service';
 import { suspendedMessage } from '../lib/member-messages';
@@ -62,7 +70,8 @@ router.post(
     const { otp } = req.body as { identifier: string; otp: string };
     const identifier = normalizeIdentifier(req.body.identifier as string);
     await verifyOtp(identifier, otp);
-    const result = await loginWithIdentifier(identifier, requestMeta(req));
+    const { refreshToken, ...result } = await loginWithIdentifier(identifier, requestMeta(req));
+    setAuthCookies(res, refreshToken);
     sendData(res, result);
   } catch (err) {
     next(err);
@@ -79,7 +88,8 @@ router.get(
     // passport attaches the value returned by the strategy's `done(null, value)` to req.user;
     // lib/passport.ts casts the login result (accessToken/refreshToken/user) through
     // Express.User to get it here — cast it back to its real shape.
-    const result = req.user as unknown as Awaited<ReturnType<typeof loginWithIdentifier>>;
+    const { refreshToken, ...result } = req.user as unknown as Awaited<ReturnType<typeof loginWithIdentifier>>;
+    setAuthCookies(res, refreshToken);
     sendData(res, result);
   },
 );
@@ -88,9 +98,23 @@ router.get('/google/failure', (_req, res) => {
   sendData(res, null, { status: 401 });
 });
 
-router.post('/refresh', validateBody(RefreshRequestSchema), async (req, res, next) => {
+router.get('/csrf', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  sendData(res, { csrfToken: ensureCsrfCookie(req, res) });
+});
+
+router.post('/refresh', async (req, res, next) => {
   try {
-    const { refreshToken } = req.body as { refreshToken: string };
+    const refreshToken = readRefreshCookie(req);
+    if (!refreshToken) {
+      clearAuthCookies(res);
+      sendError(res, 'UNAUTHORIZED', 'No refresh session');
+      return;
+    }
+    if (!requireCsrfHeader(req)) {
+      sendError(res, 'FORBIDDEN', 'Missing or invalid CSRF token');
+      return;
+    }
     const rotated = await rotateRefreshToken(refreshToken, requestMeta(req));
     try {
       await assertRefreshedUserMayContinue(rotated.userId);
@@ -100,16 +124,23 @@ router.post('/refresh', validateBody(RefreshRequestSchema), async (req, res, nex
       throw err;
     }
     const accessToken = signAccessToken({ sub: rotated.userId, roles: rotated.roles, app: 'msd' });
-    sendData(res, { accessToken, refreshToken: rotated.token });
+    setAuthCookies(res, rotated.token, readCsrfCookie(req));
+    sendData(res, { accessToken });
   } catch (err) {
+    if (err instanceof ApiError && err.code === 'UNAUTHORIZED') clearAuthCookies(res);
     next(err);
   }
 });
 
-router.post('/logout', authenticate, validateBody(RefreshRequestSchema), async (req, res, next) => {
+router.post('/logout', async (req, res, next) => {
   try {
-    const { refreshToken } = req.body as { refreshToken: string };
-    await revokeRefreshToken(refreshToken);
+    const refreshToken = readRefreshCookie(req);
+    if (refreshToken && !requireCsrfHeader(req)) {
+      sendError(res, 'FORBIDDEN', 'Missing or invalid CSRF token');
+      return;
+    }
+    if (refreshToken) await revokeRefreshToken(refreshToken);
+    clearAuthCookies(res);
     sendData(res, { message: 'Logged out' });
   } catch (err) {
     next(err);
@@ -119,6 +150,7 @@ router.post('/logout', authenticate, validateBody(RefreshRequestSchema), async (
 router.post('/logout-all', authenticate, async (req, res, next) => {
   try {
     await revokeAllRefreshTokens(req.user!.sub);
+    clearAuthCookies(res);
     sendData(res, { message: 'All sessions revoked' });
   } catch (err) {
     next(err);

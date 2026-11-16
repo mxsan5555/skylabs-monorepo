@@ -9,11 +9,9 @@ import type { BootstrapResponse } from '@skylabs-monorepo/shared-types';
 export interface AuthStorageKeys {
   /** The live bearer token the app sends on every request. */
   token: string;
-  /** Legacy: older builds stashed the real SuperAdmin token here during a preview. Only read to
-   *  migrate such a session, then cleared. */
+  /** Legacy key used by older builds to stash the real token during a preview. */
   realToken: string;
-  /** A "Login As" preview token, in sessionStorage only: it never outlives its tab and never
-   *  replaces the real token in localStorage (P10-38). */
+  /** A "Login As" preview token, scoped to this tab. */
   previewToken: string;
   /** The rotated opaque refresh token paired with `token` — absent for preview tokens (a
    *  "Login As" preview is never refreshed; see CLAUDE.md's Login As section). */
@@ -24,14 +22,13 @@ export function authStorageKeys(appPrefix: string): AuthStorageKeys {
   return {
     token: `${appPrefix}_auth_token`,
     realToken: `${appPrefix}_auth_real_token`,
-    refreshToken: `${appPrefix}_auth_refresh_token`,
     previewToken: `${appPrefix}_auth_preview_token`,
+    refreshToken: `${appPrefix}_auth_refresh_token`,
   };
 }
 
 type StorageKind = 'localStorage' | 'sessionStorage';
 
-/** The browser storage, or null outside a browser (server rendering, tests without jsdom). */
 function safeStorage(kind: StorageKind): Storage | null {
   return typeof globalThis[kind] === 'undefined' ? null : globalThis[kind];
 }
@@ -40,7 +37,6 @@ function readValue(kind: StorageKind, key: string): string | null {
   return safeStorage(kind)?.getItem(key) ?? null;
 }
 
-/** Writes `value`, or removes the key when `value` is null or empty. */
 function writeValue(kind: StorageKind, key: string, value: string | null): void {
   const storage = safeStorage(kind);
   if (!storage) return;
@@ -50,24 +46,21 @@ function writeValue(kind: StorageKind, key: string, value: string | null): void 
 
 export const readStorageValue = (key: string) => readValue('localStorage', key);
 export const writeStorageValue = (key: string, value: string | null) => writeValue('localStorage', key, value);
-
-/** Tab-scoped value (sessionStorage): gone when the tab closes, never seen by other tabs. */
 export const readSessionValue = (key: string) => readValue('sessionStorage', key);
 export const writeSessionValue = (key: string, value: string | null) => writeValue('sessionStorage', key, value);
 
-/** The token this tab starts with: a live "Login As" preview from sessionStorage, else the real
- *  token from localStorage. Drops an expired preview, and moves a preview that an older build
- *  left in localStorage back out of the way (P10-38). */
+/** Restores this tab's preview if present, otherwise the shared real access token. */
 export function resolveInitialToken(keys: AuthStorageKeys): string | null {
   const preview = readSessionValue(keys.previewToken);
   if (preview && !isJwtExpired(preview)) return preview;
   if (preview) writeSessionValue(keys.previewToken, null);
+
   const stored = readStorageValue(keys.token);
   if (stored && isPreviewToken(stored)) {
-    const real = readStorageValue(keys.realToken);
-    writeStorageValue(keys.token, real);
+    const realToken = readStorageValue(keys.realToken);
+    writeStorageValue(keys.token, realToken);
     writeStorageValue(keys.realToken, null);
-    return real;
+    return realToken;
   }
   return stored;
 }
@@ -157,8 +150,7 @@ export async function refreshAccessToken(
   return body.data;
 }
 
-/** Best-effort server sign-out: revokes `refreshToken` via `POST /auth/logout`. Never throws;
- *  the caller clears local state either way. */
+/** Best-effort revoke for the legacy bearer + JSON refresh-token flow used by mera-driver. */
 export async function revokeSession(apiBaseUrl: string, accessToken: string, refreshToken: string): Promise<void> {
   try {
     await fetch(`${apiBaseUrl}/auth/logout`, {
@@ -168,7 +160,7 @@ export async function revokeSession(apiBaseUrl: string, accessToken: string, ref
       keepalive: true,
     });
   } catch {
-    // Offline or server down: the refresh token simply expires on its own.
+    // Local sign-out must still complete if the API is unavailable.
   }
 }
 

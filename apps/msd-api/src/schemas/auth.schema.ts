@@ -22,12 +22,6 @@ export const OtpVerifySchema = z
   .strict()
   .openapi('OtpVerify');
 
-export const RefreshRequestSchema = z
-  .object({
-    refreshToken: z.string().min(10),
-  })
-  .openapi('RefreshRequest');
-
 export const AuthUserSchema = z
   .object({
     id: z.string().uuid(),
@@ -41,7 +35,10 @@ export const AuthUserSchema = z
 export const AuthTokensResponseSchema = z
   .object({
     accessToken: z.string(),
-    refreshToken: z.string(),
     user: AuthUserSchema,
   })
   .openapi('AuthTokensResponse');
+
+export const CsrfTokenResponseSchema = z
+  .object({ csrfToken: z.string() })
+  .openapi('CsrfTokenResponse');
