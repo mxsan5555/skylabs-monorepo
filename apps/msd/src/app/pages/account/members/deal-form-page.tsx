@@ -299,12 +299,33 @@ export function DealFormPage({ token, surface = 'staff' }: DealFormPageProps) {
       applyDeal((await api.addPackage(branchId, deal.id, value)).data);
       showSnackbar('Package added.');
     },
-    onUpdate: async (index: number, value: DealPackageInput) => {
-      const current = packages[index];
-      if (!deal || !current.id) return setPackages((prev) => prev.map((p, i) => (i === index ? { ...value, id: p.id } : p)));
-      applyDeal((await api.updatePackage(branchId, deal.id, current.id, { ...value, name: value.name ?? null, originalPrice: value.originalPrice ?? null })).data);
-      showSnackbar('Package saved.');
-    },
+   onUpdate: async (index: number, value: DealPackageInput) => {
+  const current = packages[index];
+
+  if (!deal || !current.id) {
+    return setPackages((prev) =>
+      prev.map((p, i) =>
+        i === index ? { ...value, id: p.id } : p
+      )
+    );
+  }
+
+  const { id: _id, ...packageFields } = value as DealPackageInput & {
+    id?: string;
+  };
+
+  applyDeal(
+    (
+      await api.updatePackage(branchId, deal.id, current.id, {
+        ...packageFields,
+        name: value.name ?? null,
+        originalPrice: value.originalPrice ?? null,
+      })
+    ).data
+  );
+
+  showSnackbar('Package saved.');
+},
     onDelete: async (index: number) => {
       const current = packages[index];
       if (!deal || !current.id) return setPackages((prev) => prev.filter((_, i) => i !== index));
@@ -341,45 +362,61 @@ export function DealFormPage({ token, surface = 'staff' }: DealFormPageProps) {
     }
   };
 
-  const save = async () => {
-    const nextErrors = validate(form, packages, isEdit);
-    setErrors(nextErrors);
-    if (Object.values(nextErrors).some(Boolean)) return setSaveError('Fix the highlighted fields before saving.');
-    setSaving(true);
-    setSaveError('');
-    try {
-      const fields = fieldsFromForm(form);
-      if (deal) {
-        const input: DealUpdateInput = {
-          ...fields,
-          ...(form.slug !== deal.slug && canEditSlug ? { slug: form.slug } : {}),
-          therapistIds: [...therapistIds],
-        };
-        const { data } = await api.update(deal.branchId, deal.id, input);
-        applyDeal(data);
-        setForm(formFromDeal(data));
-        showSnackbar('Deal saved.');
-      } else {
-        const input: DealInput = {
-          ...(withoutEmpty(fields) as Omit<DealInput, 'packages'>),
-          ...(form.slug ? { slug: form.slug } : {}),
-          bookingRequired: form.bookingRequired,
-          therapistIds: [...therapistIds],
-          packages: packages.map(({ id: _id, ...p }) => p),
-        };
-        const { data } = await api.create(form.branchId, input);
-        applyDeal(data);
-        setForm(formFromDeal(data));
-        showSnackbar('Deal saved as a draft. Add images, then go live.');
-        navigate(editPath(data.id), { replace: true });
-      }
-    } catch (err) {
-      setSaveError(err instanceof ApiRequestError ? err.message : 'Could not save this deal.');
-    } finally {
-      setSaving(false);
-    }
-  };
+const save = async () => {
+  const nextErrors = validate(form, packages, isEdit);
+  setErrors(nextErrors);
 
+  if (Object.values(nextErrors).some(Boolean)) {
+    return setSaveError('Fix the highlighted fields before saving.');
+  }
+
+  setSaving(true);
+  setSaveError('');
+
+  try {
+    const fields = fieldsFromForm(form);
+
+    if (deal) {
+      // Edit existing deal
+      const input: DealUpdateInput = {
+        ...fields,
+        ...(form.slug !== deal.slug && canEditSlug ? { slug: form.slug } : {}),
+        therapistIds: [...therapistIds],
+      };
+
+      const { data } = await api.update(deal.branchId, deal.id, input);
+      applyDeal(data);
+      setForm(formFromDeal(data));
+
+      showSnackbar('Deal updated successfully.', {
+        variant: 'success',
+      });
+    } else {
+      // Create new deal
+      const input: DealInput = {
+        ...(withoutEmpty(fields) as Omit<DealInput, 'packages'>),
+        ...(form.slug ? { slug: form.slug } : {}),
+        bookingRequired: form.bookingRequired,
+        therapistIds: [...therapistIds],
+        packages: packages.map(({ id: _id, ...p }) => p),
+      };
+
+      const { data } = await api.create(form.branchId, input);
+      applyDeal(data);
+      setForm(formFromDeal(data));
+
+      showSnackbar('Deal created successfully.', {
+        variant: 'success',
+      });
+
+      navigate(editPath(data.id), { replace: true });
+    }
+  } catch (err) {
+    setSaveError(err instanceof ApiRequestError ? err.message : 'Could not save this deal.');
+  } finally {
+    setSaving(false);
+  }
+};
   const changeStatus = async (status: 'DRAFT' | 'ACTIVE' | 'INACTIVE') => {
     if (!deal) return;
     setStatusError('');

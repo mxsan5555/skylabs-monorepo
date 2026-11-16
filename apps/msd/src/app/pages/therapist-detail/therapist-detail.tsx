@@ -20,7 +20,7 @@ import { therapistPath } from '../../seo/public-urls';
 import { fillTemplate, formatINR } from '../../../utils/format';
 import { resolveTherapistMedia } from '../../../utils/media';
 import content from '../../../content.json';
-
+import DOMPurify from 'isomorphic-dompurify';
 const t = content.therapistDetail;
 const d = content.detailPage;
 
@@ -102,7 +102,14 @@ export function TherapistDetail() {
   const vendorName = therapist.vendor?.businessName;
   const experience = therapist.experienceYears;
   const place = [therapist.branch?.name, therapist.branch?.city].filter(Boolean).join(', ');
-
+const rawBio = therapist.bio ?? '';
+const sanitizedBio = DOMPurify.sanitize(rawBio, {
+  USE_PROFILES: { html: true },
+});
+const plainTextBio = DOMPurify.sanitize(rawBio, {
+  ALLOWED_TAGS: [],
+  ALLOWED_ATTR: [],
+}).replace(/\s+/g, ' ').trim();
   const handleAddToCart = async () => {
     if (!requireSignIn()) return;
     const activePackage = selection.activePackage;
@@ -135,7 +142,7 @@ export function TherapistDetail() {
           '@context': 'https://schema.org',
           '@type': 'Service',
           name: `${therapist.therapistType} – ${therapist.personName}`,
-          ...(therapist.bio ? { description: therapist.bio } : {}),
+          ...(plainTextBio ? { description: plainTextBio } : {}),
           ...(vendorName ? { provider: { '@type': 'Organization', name: vendorName } } : {}),
           ...(fromPrice != null
             ? { offers: { '@type': 'AggregateOffer', lowPrice: fromPrice, priceCurrency: 'INR', offerCount: therapist.packages.length } }
@@ -205,11 +212,14 @@ export function TherapistDetail() {
           <div className="detail-page__content">
             <h2 id="detail-details-heading" className="detail-page__heading title-large">{d.details}</h2>
             <sky-accordion>
-              {therapist.bio && (
-                <sky-accordion-item header={t.about} level={3} open>
-                  <p className="detail-page__text body-large">{therapist.bio}</p>
-                </sky-accordion-item>
-              )}
+             {sanitizedBio && (
+  <sky-accordion-item header={t.about} level={3} open>
+    <div
+      className="detail-page__text body-large"
+      dangerouslySetInnerHTML={{ __html: sanitizedBio }}
+    />
+  </sky-accordion-item>
+)}
               {therapist.specialization && (
                 <sky-accordion-item header={t.specialization} level={3} {...(!therapist.bio ? { open: true } : {})}>
                   <p className="detail-page__text body-large">{therapist.specialization}</p>

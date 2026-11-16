@@ -15,7 +15,7 @@ import { Breadcrumb } from '../../components/breadcrumb';
 import { PageSection } from '../../components/page-section/page-section';
 import { formatINR } from '../../../utils/format';
 import { resolveProductMedia, primaryImage } from '../../../utils/media';
-import { htmlToPlainText } from '../../../utils/rich-text';
+import DOMPurify from 'isomorphic-dompurify';
 import { productPath } from '../../seo/public-urls';
 import content from '../../../content.json';
 import './product-detail.css';
@@ -131,9 +131,18 @@ export function ProductDetail() {
   const productMedia = resolveProductMedia(product);
   const gallery = productMedia.images;
   const video = productMedia.video;
-  const description = product.description ?? product.summary ?? '';
+const rawDescription = product.description ?? product.summary ?? '';
+const sanitizedDescription = DOMPurify.sanitize(rawDescription, { USE_PROFILES: { html: true },
+});
+const plainTextDescription = DOMPurify.sanitize(rawDescription, {
+  ALLOWED_TAGS: [],
+  ALLOWED_ATTR: [],
+}).replace(/\s+/g, ' ').trim();
   const salePrice = Number(product.price);
-  const originalPrice = product.originalPrice ? Number(product.originalPrice) : undefined;
+const originalPrice =
+  product.originalPrice != null && product.originalPrice !== ''
+    ? Number(product.originalPrice)
+    : undefined;
   const productId = product.id;
   function showPrevImage() { setActiveImg((current) => (current - 1 + gallery.length) % gallery.length); }
   function showNextImage() { setActiveImg((current) => (current + 1) % gallery.length); }
@@ -162,7 +171,9 @@ export function ProductDetail() {
     } catch { setCopied(false); }
   }
   const seoName = name.length > 50 ? `${name.slice(0, 47)}…` : name;
-  const seoDesc = description ? `${description.slice(0, 120)} Shop now at MSD.` : `Shop ${name} at MSD.`;
+const seoDesc = plainTextDescription
+  ? `${plainTextDescription.slice(0, 120)} Shop now at MSD.`
+  : `Shop ${name} at MSD.`;
   const canonicalUrl = `${SITE_URL}${productPath(product)}`;
   return (
     <div className="product-detail">
@@ -171,7 +182,7 @@ export function ProductDetail() {
       <link rel="canonical" href={canonicalUrl} />
       <meta property="og:type" content="product" />
       <meta property="og:title" content={name} />
-      <meta property="og:description" content={description.slice(0, 155)} />
+      <meta property="og:description" content={plainTextDescription.slice(0, 155)} />
       {gallery[0] && (
         <meta
           property="og:image"
@@ -196,7 +207,7 @@ export function ProductDetail() {
 
       <meta
         name="twitter:description"
-        content={description.slice(0, 155)}
+        content={plainTextDescription.slice(0, 155)}
       />
 
       {gallery[0] && (
@@ -211,7 +222,7 @@ export function ProductDetail() {
           '@context': 'https://schema.org',
           '@type': 'Product',
           name,
-          description,
+          description: plainTextDescription,
           image: gallery,
           brand: product.brand ? { '@type': 'Brand', name: product.brand, } : undefined,
           sku: product.id,
@@ -378,13 +389,18 @@ export function ProductDetail() {
             <h2 id="product-details-heading" className="product-detail__panel-heading">
               {products.detail.detailsHeading}
             </h2>
-            {description && (
-              <sky-accordion single className="product-detail__accordion">
-                <sky-accordion-item header={products.detail.accordionSummary} open>
-                  <p className="product-detail__summary">{description}</p>
-                </sky-accordion-item>
-              </sky-accordion>
-            )}
+           {sanitizedDescription && (
+  <sky-accordion single className="product-detail__accordion">
+    <sky-accordion-item header={products.detail.accordionSummary} open>
+      <div
+        className="product-detail__summary"
+        dangerouslySetInnerHTML={{
+          __html: sanitizedDescription,
+        }}
+      />
+    </sky-accordion-item>
+  </sky-accordion>
+)}
           </div>
           <aside className="product-detail__sidebar" aria-label="Seller and shipping">
             {product.vendor?.businessName && (
