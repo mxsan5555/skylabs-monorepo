@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { FilledButton, CircularProgress, OutlinedButton, Icon, } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
+import { Seo } from '../../seo/seo';
 import { getMyOrder, type Order } from '../../../api/orders';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { InvoiceDocument } from '../../components/invoice-document';
 import content from '../../../content.json';
 import './invoice.css';
-
 /**
  * Real, printable/downloadable invoice for a customer's own order — `GET /orders/me/:id`
  * (already ownership-scoped: 404s for another customer's order, same as every other `/me/*`
@@ -54,7 +54,7 @@ export function Invoice() {
   if (error || !order) {
     return (
       <div className="invoice-page invoice-page--empty">
-        <title>{invoice.notFound.metaTitle}</title>
+        <Seo title={invoice.notFound.metaTitle} description={content.meta.invoice.description} path={content.meta.invoice.pathTemplate.replace('{id}', id)} noindex="follow" />
         <sky-info-card
           icon="receipt_long"
           heading={invoice.notFound.heading}
@@ -66,8 +66,12 @@ export function Invoice() {
   }
   return (
     <div className="invoice-page">
-      <title>{invoice.metaTitleTemplate.replace('{id}', order.id)}</title>
-      <meta name="robots" content="noindex" />
+      <Seo
+        title={invoice.metaTitleTemplate.replace('{id}', order.id)}
+        description={content.meta.invoice.description}
+        path={content.meta.invoice.pathTemplate.replace('{id}', order.id)}
+        noindex="follow"
+      />
       <div className="invoice-page__actions">
         <OutlinedButton onClick={() => navigate(`/orders/${order.id}`)}>
           <Icon slot="icon" aria-hidden="true">arrow_back</Icon>{invoice.backToOrder}

@@ -1,3 +1,9 @@
+import { seed } from '../assets/theme/json/msd-m3.json';
+
+/** Brand colour for Razorpay's own checkout window: the seed of msd's generated M3 theme, so the
+ *  colour has one source (Razorpay takes a hex value, not a CSS variable). */
+export const RAZORPAY_THEME_COLOR = seed;
+
 /** Minimal typing for the one Razorpay Checkout.js surface this app actually uses. */
 export interface RazorpayCheckoutOptions {
   key: string;
@@ -13,6 +19,8 @@ export interface RazorpayCheckoutOptions {
 
 interface RazorpayInstance {
   open: () => void;
+  /** Razorpay keeps its window open after a failed attempt so the customer can retry. */
+  on: (event: 'payment.failed', handler: (response: unknown) => void) => void;
 }
 
 declare global {

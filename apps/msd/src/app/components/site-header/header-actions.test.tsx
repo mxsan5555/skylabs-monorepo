@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
@@ -44,6 +46,28 @@ describe('HeaderActions hydration', () => {
     const { container } = render(ui);
     expect(container.querySelector(`[aria-label="${content.header.accountMenuLabel}"]`)).not.toBeNull();
     expect(container.textContent).not.toContain(content.header.signIn);
+  });
+});
+
+/** ST-01: "Become a Member" opens the public member sign-up page. */
+describe('HeaderActions Become a Member link', () => {
+  it('opens /become-member', () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <HeaderActions />
+        <Routes>
+          <Route path="*" element={<CurrentPath />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole('link', { name: content.header.becomeMember }));
+    expect(screen.getByTestId('path').textContent).toBe('/become-member');
+  });
+
+  it('points at a route the app serves with the member sign-up page', () => {
+    const routes = readFileSync(join(__dirname, '../../routes.tsx'), 'utf8');
+    expect(content.header.becomeMemberTo).toBe('/become-member');
+    expect(routes).toContain(`<Route path="${content.header.becomeMemberTo}" element={<BecomeVendor />} />`);
   });
 });
 

@@ -224,6 +224,15 @@ export class SkyRichTextEditor extends LitElement {
     this._activeFormats = range && this._quill ? this._quill.getFormat(range) : {};
   };
 
+  /** Loads stored HTML through Quill's clipboard parser (an inert `DOMParser` document, only the
+   *  registered formats survive) instead of `innerHTML`, so event handlers, scripts and
+   *  `javascript:` links in the value never reach the page (P10-36). Silent: not a user edit. */
+  private _load(html: string): void {
+    const quill = this._quill;
+    if (!quill) return;
+    quill.setContents(quill.clipboard.convert({ html }), 'silent');
+  }
+
   protected override firstUpdated(): void {
     ensureGlobalStyles();
     const editorEl = this.querySelector<HTMLDivElement>('.sky-rte-editor');
@@ -233,7 +242,7 @@ export class SkyRichTextEditor extends LitElement {
       placeholder: this.placeholder,
       readOnly: this.readOnly,
     });
-    if (this.value) this._quill.root.innerHTML = this.value;
+    if (this.value) this._load(this.value);
     this._quill.root.setAttribute('role', 'textbox');
     this._quill.root.setAttribute('aria-multiline', 'true');
     if (this.label) this._quill.root.setAttribute('aria-label', this.label);
@@ -245,7 +254,7 @@ export class SkyRichTextEditor extends LitElement {
     if (!this._quill) return;
     if (changed.has('value') && !this._isInternalChange) {
       const next = this.value ?? '';
-      if (this._quill.root.innerHTML !== next) this._quill.root.innerHTML = next;
+      if (this._quill.root.innerHTML !== next) this._load(next);
     }
     if (changed.has('readOnly')) this._quill.enable(!this.readOnly);
     if (changed.has('placeholder')) {

@@ -1,5 +1,6 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { isComponentFile, listSourceFiles } from './testing/source-files';
 import { describe, expect, it } from 'vitest';
 import '@skylabs-monorepo/shared-ui';
 import '@skylabs-monorepo/shared-ui/editor';
@@ -17,10 +18,7 @@ import '@skylabs-monorepo/shared-ui/editor';
 const SRC = join(__dirname, 'app');
 const PASS_THROUGH = new Set(['className', 'class', 'id', 'style', 'key', 'ref', 'slot', 'role', 'hidden', 'title', 'tabIndex', 'lang', 'dir', 'inert', 'part', 'children']);
 
-const tsxFiles = (dir: string): string[] =>
-  readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
-    e.isDirectory() ? tsxFiles(join(dir, e.name)) : e.name.endsWith('.tsx') && !e.name.endsWith('.test.tsx') ? [join(dir, e.name)] : [],
-  );
+const tsxFiles = (dir: string) => listSourceFiles(dir, isComponentFile);
 
 /** Keys of the object literals in a `{...(cond ? { a, 'b-c': x } : {})}` spread. */
 function spreadKeys(expr: string): string[] {

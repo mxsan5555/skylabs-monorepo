@@ -205,9 +205,13 @@ export async function getSectionsForState(state: string | null) {
   );
 }
 
+async function findSectionByStateAndTag(state: string | null, tag: HomeTagSectionTag) {
+  return prisma.homeTagSection.findFirst({ where: { state, tag } });
+}
+
 /** Upserts the one (state, tag) row the Enabled switch controls — creating it on first use. */
 export async function setSectionEnabled(state: string | null, tag: HomeTagSectionTag, isEnabled: boolean) {
-  const existing = await prisma.homeTagSection.findFirst({ where: { state, tag } });
+  const existing = await findSectionByStateAndTag(state, tag);
   if (existing) {
     return prisma.homeTagSection.update({ where: { id: existing.id }, data: { isEnabled } });
   }
@@ -282,9 +286,8 @@ export async function getPublicHomeTagSections(state?: string | null): Promise<P
   const result: PublicHomeTagSection[] = [];
   for (const tag of STOREFRONT_TAG_ORDER) {
     const row = state
-      ? (await prisma.homeTagSection.findUnique({ where: { state_tag: { state, tag } } })) ??
-        (await prisma.homeTagSection.findFirst({ where: { state: null, tag } }))
-      : await prisma.homeTagSection.findFirst({ where: { state: { equals: null }, tag } });
+      ? (await findSectionByStateAndTag(state, tag)) ?? (await findSectionByStateAndTag(null, tag))
+      : await findSectionByStateAndTag(null, tag);
     if (!row || !row.isEnabled) continue;
     const deals = await publicDealsForSection(row.id, tag);
     if (deals.length >= MIN_ELIGIBLE_ITEMS_PER_TAG_SECTION) {

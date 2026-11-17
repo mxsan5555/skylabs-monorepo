@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { PERMISSION_ACTIONS, type PermissionAction } from '@skylabs-monorepo/shared-types';
-import { PaginationQuerySchema } from './common.schema';
+import { PaginationQuerySchema, PincodeSchema } from './common.schema';
 import { normalizeIdentifier } from '../lib/normalizeIdentifier';
+import { isIndiaLocation } from '@skylabs-monorepo/shared-utils';
 
 extendZodWithOpenApi(z);
 
@@ -49,23 +50,18 @@ export const RoleCreateSchema = z
 
 export const RoleUpdateSchema = RoleCreateSchema.omit({ key: true }).partial().openapi('RoleUpdate');
 
+export const RoleCloneSchema = z
+  .object({
+    key: RoleCreateSchema.shape.key,
+    name: RoleCreateSchema.shape.name,
+  })
+  .openapi('RoleClone');
+
 export const RoleStatusUpdateSchema = z
   .object({
     isActive: z.boolean(),
   })
   .openapi('RoleStatusUpdate');
-
-export const RoleCloneSchema = z
-  .object({
-    key: z
-      .string()
-      .min(2)
-      .max(50)
-      .regex(/^[a-z][a-z0-9_]*$/, 'key must be a lower_snake_case slug'),
-    name: z.string().min(1).max(100),
-  })
-  .openapi('RoleClone');
-
 
 export const RolePermissionAssignmentSchema = z.object({
   permissionId: z.string().uuid(),
@@ -139,6 +135,18 @@ export const UserUpdateSchema = z
     phone: userPhoneSchema,
   })
   .openapi('UserUpdate');
+
+/** The caller's own saved delivery address (item 2.2, D37): state and city from the India list. */
+export const MyAddressSchema = z
+  .object({
+    address: z.string().trim().min(1).max(500),
+    state: z.string().trim().min(1).max(100),
+    city: z.string().trim().min(1).max(100),
+    pincode: PincodeSchema,
+  })
+  .strict()
+  .refine((a) => isIndiaLocation(a.state, a.city), { message: 'Pick the city from the list for the chosen state.', path: ['city'] })
+  .openapi('MyAddress');
 
 export const UserStatusUpdateSchema = z
   .object({

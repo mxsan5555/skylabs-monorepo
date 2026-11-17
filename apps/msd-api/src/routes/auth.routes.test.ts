@@ -14,11 +14,15 @@ const { sendSmsOtpMock, sendOtpEmailMock } = vi.hoisted(() => ({
   sendSmsOtpMock: vi.fn().mockResolvedValue(true),
   sendOtpEmailMock: vi.fn().mockResolvedValue(true),
 }));
-vi.mock('../providers/sms/connectExpress.provider', () => ({ sendOtp: sendSmsOtpMock }));
+vi.mock('../providers/sms/connectExpress.provider', () => ({
+  sendOtp: sendSmsOtpMock,
+  missingOtpConfiguration: vi.fn().mockReturnValue([]),
+}));
 vi.mock('../providers/email/smtp.provider', () => ({ sendOtpEmail: sendOtpEmailMock }));
 
 import app from '../app';
 import { prisma } from '../lib/prisma';
+import { env } from '../config/env';
 
 const prismaMock = vi.mocked(prisma, true);
 
@@ -27,13 +31,15 @@ const OTP_CHALLENGE_ID = '3c8ac548-50c2-41ce-83eb-5e5c6249cfd2';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  env.otpProvider = 'sms';
   sendSmsOtpMock.mockReset().mockResolvedValue(true);
   sendOtpEmailMock.mockReset().mockResolvedValue(true);
+  prismaMock.user.findFirst.mockResolvedValue(null);
 });
 
 describe('POST /api/v1/auth/otp/request', () => {
   it('returns 200 with a generic message for a valid identifier (no user enumeration)', async () => {
-    prismaMock.otpChallenge.create.mockResolvedValue({});
+    prismaMock.otpChallenge.create.mockResolvedValue({} as any);
     const res = await request(app)
       .post('/api/v1/auth/otp/request')
       .send({ identifier: 'happy-path@example.com' });
@@ -55,9 +61,29 @@ describe('POST /api/v1/auth/otp/request', () => {
     expect(res.status).toBe(422);
   });
 
+  it('does not return or persist role OTP credentials in dummy mode', async () => {
+    env.otpProvider = 'dummy';
+    env.adminLoginOtp = '222222';
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: USER_ID,
+      status: 'active',
+      deletedAt: null,
+      roles: [{ role: { key: 'admin' } }],
+    } as never);
+    prismaMock.member.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).post('/api/v1/auth/otp/request').send({ identifier: '+919111111111' });
+
+    expect(res.status).toBe(200);
+    expect(JSON.stringify(res.body)).not.toContain('222222');
+    expect(JSON.stringify(res.body)).not.toContain('+919111111111');
+    expect(prismaMock.otpChallenge.create).not.toHaveBeenCalled();
+    expect(sendSmsOtpMock).not.toHaveBeenCalled();
+  });
+
   // Edge case: rate limiting — 5/10min per (ip + identifier) per apps/msd-api/.env.local.
   it('returns 429 after exceeding the per-identifier OTP request rate limit', async () => {
-    prismaMock.otpChallenge.create.mockResolvedValue({});
+    prismaMock.otpChallenge.create.mockResolvedValue({} as any);
     const identifier = 'rate-limited@example.com';
     let lastStatus = 0;
     for (let i = 0; i < 6; i++) {
@@ -75,28 +101,32 @@ describe('POST /api/v1/auth/otp/verify', () => {
     prismaMock.otpChallenge.findFirst.mockResolvedValue({
       id: OTP_CHALLENGE_ID,
       identifier,
-      attempts: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      purpose: 'login',
       expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      attempts: 0,
       hashedOtp: '$2b$10$invalidPlaceholderHashForMismatchTests..................',
+      verifiedAt: null,
       ...overrides,
-    });
+    } as any);
   }
 
-  it('returns 200 with access/refresh tokens on a correct OTP (happy path)', async () => {
+  it('returns an access token and HttpOnly refresh cookie on a correct OTP', async () => {
     const realOtp = '123456';
     const hashedOtp = await bcrypt.hash(realOtp, 10);
     mockPendingChallenge({ hashedOtp });
-    prismaMock.otpChallenge.update.mockResolvedValue({});
+    prismaMock.otpChallenge.update.mockResolvedValue({} as any);
     prismaMock.user.upsert.mockResolvedValue({
       id: USER_ID,
       name: identifier,
       email: identifier,
       phone: null,
       roles: [{ role: { key: 'customer' } }],
-    });
-    prismaMock.userRole.findMany.mockResolvedValue([{ role: { key: 'customer' } }]);
-    prismaMock.loginHistory.create.mockResolvedValue({});
-    prismaMock.refreshSession.create.mockResolvedValue({});
+    } as any);
+    prismaMock.userRole.findMany.mockResolvedValue([{ role: { key: 'customer' } }] as any);
+    prismaMock.loginHistory.create.mockResolvedValue({} as any);
+    prismaMock.refreshSession.create.mockResolvedValue({} as any);
 
     const res = await request(app)
       .post('/api/v1/auth/otp/verify')
@@ -104,8 +134,12 @@ describe('POST /api/v1/auth/otp/verify', () => {
 
     expect(res.status).toBe(200);
     expect(typeof res.body.data.accessToken).toBe('string');
-    expect(typeof res.body.data.refreshToken).toBe('string');
+    expect(res.body.data.refreshToken).toBeUndefined();
     expect(res.body.data.user.email).toBe(identifier);
+    expect(res.headers['set-cookie']).toEqual(
+      expect.arrayContaining([expect.stringContaining('msd_refresh_token=')]),
+    );
+    expect(String(res.headers['set-cookie'])).toContain('HttpOnly');
   });
 
   it('returns 422 when the OTP is not exactly 6 digits', async () => {
@@ -114,9 +148,19 @@ describe('POST /api/v1/auth/otp/verify', () => {
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
   });
 
+  it('rejects a frontend-supplied role instead of trusting it during login', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/otp/verify')
+      .send({ identifier, otp: '123456', role: 'super_admin' });
+
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(prismaMock.user.upsert).not.toHaveBeenCalled();
+  });
+
   it('returns 401 for a wrong OTP code', async () => {
     mockPendingChallenge();
-    prismaMock.otpChallenge.update.mockResolvedValue({});
+    prismaMock.otpChallenge.update.mockResolvedValue({} as any);
     const res = await request(app)
       .post('/api/v1/auth/otp/verify')
       .send({ identifier, otp: '000000' });
@@ -156,28 +200,95 @@ describe('POST /api/v1/auth/otp/verify', () => {
     expect(res.status).toBe(401);
     expect(res.body.error.message).toMatch(/No pending OTP/);
   });
+
+  it('rate-limits repeated dummy OTP failures without storing the fixed value', async () => {
+    env.otpProvider = 'dummy';
+    const identifier = `+9192222${String(Date.now()).slice(-5)}`;
+    prismaMock.user.findFirst.mockResolvedValue(null);
+    let lastStatus = 0;
+    for (let i = 0; i < 6; i++) {
+      const res = await request(app).post('/api/v1/auth/otp/verify').send({ identifier, otp: '000000' });
+      lastStatus = res.status;
+    }
+    expect(lastStatus).toBe(429);
+    expect(prismaMock.otpChallenge.findFirst).not.toHaveBeenCalled();
+    expect(prismaMock.otpChallenge.create).not.toHaveBeenCalled();
+  });
 });
 
 describe('POST /api/v1/auth/refresh', () => {
-  it('returns 422 when refreshToken is missing/too short', async () => {
-    const res = await request(app).post('/api/v1/auth/refresh').send({ refreshToken: 'short' });
-    expect(res.status).toBe(422);
+  it('returns 401 and clears auth cookies when the refresh cookie is missing', async () => {
+    const res = await request(app).post('/api/v1/auth/refresh');
+    expect(res.status).toBe(401);
+    expect(String(res.headers['set-cookie'])).toContain('Max-Age=0');
   });
 
-  it('returns 401 when the refresh token does not match any active session', async () => {
+  it('rejects a request without the matching CSRF header', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/refresh')
+      .set('Cookie', ['msd_refresh_token=refresh-value', 'msd_csrf_token=csrf-value']);
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 401 when the refresh cookie does not match any active session', async () => {
+    prismaMock.refreshSession.findFirst.mockResolvedValue(null);
     prismaMock.refreshSession.findMany.mockResolvedValue([]);
     const res = await request(app)
       .post('/api/v1/auth/refresh')
-      .send({ refreshToken: 'a-refresh-token-that-is-long-enough' });
+      .set('Cookie', ['msd_refresh_token=a-refresh-token-that-is-long-enough', 'msd_csrf_token=csrf-value'])
+      .set('X-CSRF-Token', 'csrf-value');
     expect(res.status).toBe(401);
+    expect(String(res.headers['set-cookie'])).toContain('Max-Age=0');
   });
 });
 
 describe('POST /api/v1/auth/logout', () => {
-  it('returns 401 with no bearer token even with a valid-shaped body', async () => {
+  it('revokes from the refresh cookie without requiring a still-valid access token', async () => {
+    const refreshToken = 'refresh-value';
+    const now = new Date();
+    prismaMock.refreshSession.findMany.mockResolvedValue([
+      {
+        id: 'session-1',
+        userId: USER_ID,
+        hashedToken: await bcrypt.hash(refreshToken, 10),
+        lookupHash: null,
+        deviceInfo: null,
+        ip: null,
+        userAgent: null,
+        expiresAt: new Date(now.getTime() + 60_000),
+        revokedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ]);
+    prismaMock.refreshSession.update.mockResolvedValue({} as never);
     const res = await request(app)
       .post('/api/v1/auth/logout')
-      .send({ refreshToken: 'a-refresh-token-that-is-long-enough' });
-    expect(res.status).toBe(401);
+      .set('Cookie', [`msd_refresh_token=${refreshToken}`, 'msd_csrf_token=csrf-value'])
+      .set('X-CSRF-Token', 'csrf-value');
+    expect(res.status).toBe(200);
+    expect(res.body.data.message).toBe('Logged out');
+    expect(prismaMock.refreshSession.update).toHaveBeenCalledWith({
+      where: { id: 'session-1' },
+      data: { revokedAt: expect.any(Date) },
+    });
+    expect(String(res.headers['set-cookie'])).toContain('Max-Age=0');
+  });
+
+  it('rejects logout when the CSRF cookie and header do not match', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/logout')
+      .set('Cookie', ['msd_refresh_token=refresh-value', 'msd_csrf_token=csrf-value'])
+      .set('X-CSRF-Token', 'other-value');
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('GET /api/v1/auth/csrf', () => {
+  it('returns the token paired with the CSRF cookie', async () => {
+    const res = await request(app).get('/api/v1/auth/csrf');
+    expect(res.status).toBe(200);
+    expect(typeof res.body.data.csrfToken).toBe('string');
+    expect(String(res.headers['set-cookie'])).toContain('msd_csrf_token=');
   });
 });

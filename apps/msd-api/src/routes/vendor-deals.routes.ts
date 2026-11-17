@@ -17,6 +17,7 @@ import * as dealService from '../services/deal.service';
 import { getMyVendorOrThrow } from '../services/vendor.service';
 import { isSuperAdminUser } from '../services/super-admin-guard.service';
 import { writeAuditLog } from '../services/audit.service';
+import type { AuditAction } from '../lib/audit';
 import { sendData, ApiError } from '../lib/http';
 
 /**
@@ -61,7 +62,7 @@ export function registerDealRoutes(router: Router, surface: Surface) {
 
   /** Resolves the member, runs `work`, writes the audit row for writes and sends the result. */
   const handle =
-    (work: (ctx: Ctx, req: Request) => Promise<unknown>, audit?: { action: string; targetType: string; status?: number }) =>
+    (work: (ctx: Ctx, req: Request) => Promise<unknown>, audit?: { action: AuditAction; targetType: string; status?: number }) =>
     (async (req, res, next) => {
       try {
         const ctx: Ctx = {

@@ -40,6 +40,17 @@ beforeEach(() => {
  * - an active existing user logs in normally (regression)
  */
 describe('loginWithIdentifier — blocked account pre-check', () => {
+  it('rejects a deleted existing account before issuing tokens or recreating it', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ id: USER_ID, status: 'active', deletedAt: new Date() } as never);
+
+    await expect(loginWithIdentifier('deleted@example.com')).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(prismaMock.user.upsert).not.toHaveBeenCalled();
+    expect(prismaMock.refreshSession.create).not.toHaveBeenCalled();
+    expect(prismaMock.loginHistory.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ userId: USER_ID, method: 'otp_email', success: false }),
+    });
+  });
+
   it('rejects an inactive existing user with FORBIDDEN before issuing any token, and never touches lastLoginAt', async () => {
     prismaMock.user.findUnique.mockResolvedValue({ id: USER_ID, status: 'inactive' });
 
@@ -121,8 +132,7 @@ describe('loginWithIdentifier — blocked account pre-check', () => {
     prismaMock.member.findUnique.mockResolvedValue({ status: 'SUSPENDED' });
 
     await expect(loginWithIdentifier('suspended-member@example.com')).rejects.toMatchObject({
-      code: 'FORBIDDEN',
-      message: 'Your member account is suspended. Please contact support.',
+      code: 'MEMBER_SUSPENDED',
     });
     expect(prismaMock.user.upsert).not.toHaveBeenCalled();
     expect(prismaMock.refreshSession.create).not.toHaveBeenCalled();
@@ -174,8 +184,7 @@ describe('loginWithGoogle — blocked account pre-check', () => {
     prismaMock.member.findUnique.mockResolvedValue({ status: 'SUSPENDED' });
 
     await expect(loginWithGoogle('google-sub-3', 'suspended-member@example.com', 'Suspended Member')).rejects.toMatchObject({
-      code: 'FORBIDDEN',
-      message: 'Your member account is suspended. Please contact support.',
+      code: 'MEMBER_SUSPENDED',
     });
     expect(prismaMock.user.update).not.toHaveBeenCalled();
   });

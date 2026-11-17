@@ -19,8 +19,8 @@ definition of done follow `docs/msd/TASKS.md` (including "docs match the code").
 | 8 | Partners | 0 | 3 |
 | 9 | Support and content | 0 | 1 |
 | 10 | Masters | 0 | 1 |
-| 11 | Platform, security and release | 0 | 5 |
-| | **Total** | **0** | **29** |
+| 11 | Platform, security and release | 1 | 6 |
+| | **Total** | **1** | **30** |
 
 ## 1. Administration
 
@@ -105,3 +105,4 @@ definition of done follow `docs/msd/TASKS.md` (including "docs match the code").
 | [ ] | X-03 | BE | Document `auth` and `health` routes in OpenAPI | S | - | 149 of 149 documented |
 | [ ] | X-04 | OPS | Deploy mera-driver-api to Railway and point `environment.prod.ts` at it | M | - | `docs/DEPLOYMENT.md` §9 checks pass |
 | [ ] | X-05 | BIZ | Owner answers the open questions in `PLANNING.md` §12 | S | - | Answers recorded |
+| [x] | X-06 | SEC | Session hygiene in `AuthService` (same rules as msd P10-38): "Login As" preview token in `sessionStorage` only, a refused preview falls back to the real session, sign-out revokes with the access token and clears the preview | S | - | `auth-refresh.spec.ts` "Login As" preview cases; done 2026-10-28 |

@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { UserManagement } from './users';
 
 const navigateMock = vi.fn();
 let searchParamsValue = new URLSearchParams();
@@ -32,7 +33,6 @@ vi.mock('../../../../api/rbac/roles', () => ({
   listRoles: (...args: unknown[]) => listRolesMock(...args),
 }));
 
-import { UserManagement } from './users';
 
 const sampleUser = {
   id: 'user-1',

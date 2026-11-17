@@ -1,6 +1,8 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { MemberSettlementDetail, PurchaseEntitlement } from '../../../../api/rbac/settlements';
+import { EarningsPayouts } from './earnings-payouts';
+import { ApiRequestError } from '../../../../api/rbac/client';
 
 /**
  * Feature: Member "Earnings & Payouts" (`earnings-payouts.tsx`) — reworked to `sky-data-table` +
@@ -43,8 +45,6 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => navigateMock };
 });
 
-import { EarningsPayouts } from './earnings-payouts';
-import { ApiRequestError } from '../../../../api/rbac/client';
 
 function entitlement(overrides: Partial<PurchaseEntitlement> = {}): PurchaseEntitlement {
   return {

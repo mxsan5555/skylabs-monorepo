@@ -17,9 +17,16 @@ vi.mock('bcrypt', () => {
   return { default: impl, ...impl };
 });
 
+const writeMediaFileMock = vi.fn().mockResolvedValue({ storageKey: 'entitlement-evidence/e1/photo.jpg', sizeBytes: 10 });
+vi.mock('../lib/media-storage', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  writeMediaFile: (...args: unknown[]) => writeMediaFileMock(...args),
+}));
+vi.mock('./media-validation.service', () => ({ validateMediaFile: () => ({ extension: '.jpg' }) }));
+
 import { prisma } from '../lib/prisma';
 import { Prisma } from '../generated/prisma-client';
-import { verifyVoucher, startService, requestCompletionOtp, completeVoucher, listMyVoucherQueue } from './voucher.service';
+import { verifyVoucher, startService, requestCompletionOtp, completeVoucher, listMyVoucherQueue, recordDeliveryEvidence } from './voucher.service';
 
 const prismaMock = vi.mocked(prisma, true);
 
@@ -536,5 +543,32 @@ describe('listMyVoucherQueue', () => {
         OR: expect.arrayContaining([{ voucherCode: { contains: 'Priya', mode: 'insensitive' } }]),
       }),
     });
+  });
+});
+
+describe('recordDeliveryEvidence', () => {
+  it('stores the photo privately and saves its key and note on the voucher', async () => {
+    prismaMock.purchaseEntitlement.findUnique.mockResolvedValue({
+      id: ENTITLEMENT_ID,
+      vendorId: VENDOR_ID,
+      fulfilmentKind: 'PRODUCT_SHIPPED',
+      entitlementStatus: 'STARTED',
+    } as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.financeSettings.upsert.mockResolvedValue(financeSettingsFixture as never);
+    prismaMock.purchaseEntitlement.updateMany.mockResolvedValue({ count: 1 } as never);
+    prismaMock.purchaseEntitlement.findUniqueOrThrow.mockResolvedValue({ id: ENTITLEMENT_ID } as never);
+
+    await recordDeliveryEvidence(CALLER_ID, CODE, { buffer: Buffer.from('x') } as never, 'Left with the guard');
+
+    expect(writeMediaFileMock).toHaveBeenCalledWith(`entitlement-evidence/${ENTITLEMENT_ID}`, expect.any(Buffer), '.jpg', 'private');
+    expect(prismaMock.purchaseEntitlement.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          deliveryEvidenceStorageKey: 'entitlement-evidence/e1/photo.jpg',
+          deliveryEvidenceNote: 'Left with the guard',
+        }),
+      }),
+    );
   });
 });

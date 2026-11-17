@@ -30,6 +30,7 @@ import { CATEGORY_PAGE_SIZE, type ListingData } from '../../../prerender-data/lo
 import { Seo } from '../../seo/seo';
 import { breadcrumbJsonLd, itemListJsonLd } from '../../seo/jsonld';
 import { SITE_URL } from '../../seo/site-url';
+import { productPath, therapistPath } from '../../seo/public-urls';
 import content from '../../../content.json';
 
 const t = content.category;
@@ -78,7 +79,7 @@ export function ListingPage({ kind }: { kind: ListingKind }) {
           vendorIds,
           branchIds,
         }
-      : { categoryIds }),
+      : { categoryIds, vendorIds }),
     ...(kind !== 'therapists' ? { tags } : {}),
   };
   const listKey = JSON.stringify([kind, base, sort]);
@@ -135,11 +136,11 @@ export function ListingPage({ kind }: { kind: ListingKind }) {
       ? itemListJsonLd(
           SITE_URL,
           kind === 'products'
-            ? productList.items.map((p) => ({ name: p.name, path: `/products/${p.id}`, price: Number(p.price) }))
+            ? productList.items.map((p) => ({ name: p.name, path: productPath(p), price: Number(p.price) }))
             : kind === 'therapists'
               ? therapistList.items.flatMap((x) => {
                   const price = lowestPackagePrice(x.packages);
-                  return price == null ? [] : [{ name: x.therapistType, path: `/therapist/${x.id}`, price }];
+                  return price == null ? [] : [{ name: x.therapistType, path: therapistPath(x), price }];
                 })
               : deals.map((d) => ({ name: d.title, path: dealHref(d), price: Number(d.salePrice) })),
         )

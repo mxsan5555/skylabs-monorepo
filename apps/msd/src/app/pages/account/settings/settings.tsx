@@ -8,6 +8,8 @@ import { extractFieldErrors } from '../../../../utils/field-errors';
 import content from '../../../../content.json';
 import { validateEmail, validatePhone, } from '../../../../utils/validation';
 
+const t = content.profileSettings;
+
 type ProfileFieldKey = 'name' | 'email' | 'phone';
 export function MyProfileSettings() {
   const { token } = useAuth();
@@ -32,7 +34,7 @@ export function MyProfileSettings() {
         });
       })
       .catch((err) => {
-        setError(err instanceof ApiRequestError ? err.message : 'Could not load your profile.');
+        setError(err instanceof ApiRequestError ? err.message : t.loadFailed);
       })
       .finally(() => { setLoading(false); });
   }, [token]);
@@ -44,12 +46,12 @@ export function MyProfileSettings() {
     const name = form.name.trim();
     const email = form.email.trim();
     const phone = form.phone.trim();
-    if (!name) { errors.name = 'Please enter your name.'; }
+    if (!name) { errors.name = t.nameRequired; }
     if (email && !validateEmail(email)) { errors.email = content.validation.email.invalid; }
     if (phone && !validatePhone(phone)) { errors.phone = content.validation.phone.invalid; }
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      setError('Fix the highlighted fields and try again.');
+      setError(t.fixFields);
       return;
     }
 
@@ -62,14 +64,14 @@ export function MyProfileSettings() {
       });
       setUser(data);
       setForm({ name: data.name ?? '', email: data.email ?? '', phone: data.phone ?? '', });
-      setMessage('Saved');
+      setMessage(t.saved);
     } catch (err) {
       const fields = extractFieldErrors<ProfileFieldKey>(err);
       if (fields) {
         setFieldErrors(fields);
-        setError('Fix the highlighted fields and try again.');
+        setError(t.fixFields);
       } else {
-        setError(err instanceof ApiRequestError ? err.message : 'Could not save your profile.');
+        setError(err instanceof ApiRequestError ? err.message : t.saveFailed);
       }
     } finally { setSaving(false); }
   };

@@ -97,15 +97,9 @@ const trimAll = (form: BecomeVendorForm) =>
 /**
  * Public, unauthenticated "Become a member" application (`POST /vendors/public/register`), the
  * storefront counterpart of the admin "Add member" wizard trimmed to a first pass: business name,
- * owner identity (name/email/mobile) and a basic address. `VendorSelfCreateSchema` has no KYC,
- * bank, branch or category fields, so this form cannot send anything privileged.
- *
- * Registration is closed: staff create every member, so the server answers every submit with 403
- * and a "contact our team" message. The page says so at the top and keeps the submit button off.
- * No token is ever sent with the request.
- *
- * Laid out like Contact: the static page header, then the form beside the partner team's contact
- * details (CMS `GET /catalog/contact-us` over content.json defaults).
+ * owner identity (name/email/mobile) and a basic address. The public route stores an application
+ * record without creating an account, and the page keeps the submit button disabled only while the
+ * request is in flight.
  */
 export function BecomeVendor() {
   const { data } = useCmsContent(getCatalogContactUs);
@@ -306,10 +300,10 @@ export function BecomeVendor() {
                 'md-filled-button',
                 {
                   type: 'submit',
-                  disabled: true,
+                  disabled: submitting,
                   'aria-describedby': noticeId,
                 },
-                t.submit,
+                submitting ? 'Submitting...' : t.submit,
               )}
             </div>
           </form>

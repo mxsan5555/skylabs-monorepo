@@ -8,12 +8,6 @@
 import { getTokenStore } from '@skylabs-monorepo/shared-auth/react';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
-
-// Same singleton `AuthProvider` (app.tsx's `<AuthProvider appPrefix="msd" ...>`) reads/writes —
-// `getTokenStore` memoizes by `appPrefix`, so this resolves to that exact instance. Used here
-// only for the 401-retry-once below: a request whose access token expired between page-load and
-// this call gets one silent cookie-based refresh + replay instead of surfacing a spurious
-// "signed out" error for what is, from the user's perspective, still a perfectly valid session.
 const tokenStore = getTokenStore('msd', API_BASE_URL);
 
 export interface ApiMeta {
@@ -48,17 +42,21 @@ interface EnvelopeShape<T> {
   meta?: ApiMeta;
 }
 
-async function doFetch<T>(path: string, token: string | null, init: RequestInit): Promise<{ res: Response; body: EnvelopeShape<T> | null }> {
+async function doFetch<T>(
+  path: string,
+  token: string | null,
+  init: RequestInit,
+): Promise<{ response: Response; body: EnvelopeShape<T> | null }> {
   // FormData bodies (multipart file uploads) must never get a hardcoded JSON Content-Type — the
   // browser sets its own `multipart/form-data; boundary=...` header, which fetch only does
   // automatically when no Content-Type is set at all.
   const isFormData = init.body instanceof FormData;
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
-    // Needed for the HttpOnly refresh/CSRF cookies (set on `/auth/otp/verify`) to actually be
-    // stored/sent — without it `fetch` defaults to `same-origin`, which drops them since the
-    // API (port 3333) and this app (port 4200 in dev) are different origins.
     credentials: 'include',
+    // This wrapper expects a JSON envelope. A browser-generated 304 has no body and
+    // `Response.ok` is false, so revalidation can incorrectly turn a valid GET into an error.
+    ...(init.method?.toUpperCase() === 'GET' ? { cache: 'no-store' as const } : {}),
     headers: {
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -68,11 +66,11 @@ async function doFetch<T>(path: string, token: string | null, init: RequestInit)
 
   let body: EnvelopeShape<T> | null = null;
   try {
-    body = (await res.json()) as EnvelopeShape<T>;
+    body = (await response.json()) as EnvelopeShape<T>;
   } catch {
     // Empty/non-JSON body (e.g. a proxy error page) — fall through to the generic error below.
   }
-  return { res, body };
+  return { response, body };
 }
 
 async function request<T>(
@@ -80,26 +78,20 @@ async function request<T>(
   token: string | null,
   init: RequestInit = {},
 ): Promise<ApiResult<T>> {
-  let { res, body } = await doFetch<T>(path, token, init);
+  let { response, body } = await doFetch<T>(path, token, init);
 
-  // A request made with a token that expired between page-load and now looks like any other
-  // 401 to the server (`authenticate.ts`'s `UNAUTHORIZED` — distinct from `FORBIDDEN`/
-  // `MEMBER_SUSPENDED`, which are real "this account can't do this" outcomes a retry can't fix
-  // and must surface as-is). One silent refresh + replay of the SAME request, never more than
-  // once — `tokenStore.refresh()` itself de-dupes concurrent callers (see token-store.ts), so
-  // several requests hitting this at once still only burn a single refresh.
-  if (res.status === 401 && body?.error?.code === 'UNAUTHORIZED' && token) {
+  if (response.status === 401 && body?.error?.code === 'UNAUTHORIZED' && token) {
     const refreshed = await tokenStore.refresh().catch(() => null);
     if (refreshed) {
-      ({ res, body } = await doFetch<T>(path, refreshed, init));
+      ({ response, body } = await doFetch<T>(path, refreshed, init));
     }
   }
 
-  if (!res.ok || body?.error) {
+  if (!response.ok || body?.error) {
     throw new ApiRequestError(
       body?.error?.code ?? 'UNKNOWN',
-      body?.error?.message ?? `Request failed with status ${res.status}`,
-      res.status,
+      body?.error?.message ?? `Request failed with status ${response.status}`,
+      response.status,
       body?.error?.details,
     );
   }

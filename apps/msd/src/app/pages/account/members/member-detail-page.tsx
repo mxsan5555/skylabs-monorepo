@@ -6,6 +6,7 @@ import { getMember, changeMemberStatus, deleteMember, sendMemberReminder } from 
 import { updateVendor, type Vendor } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
+import { MEMBERS_TRAIL } from './member-crumbs';
 import { showSnackbar } from '../../../../snackbar/snackbar';
 import { BranchesListPage } from './branches-list-page';
 import { DealsListPage } from './deals-list-page';
@@ -15,6 +16,8 @@ import { VendorProfileForm, extractVendorFieldErrors, type VendorFieldErrors } f
 import { MemberHeaderActions } from './member-header-actions';
 import { MemberDocumentsTab } from './member-documents-tab';
 import { MemberActivityTab } from './member-activity-tab';
+import { VendorCustomers } from './vendor-customers';
+import { MemberSummary } from './member-summary';
 import {
   MEMBER_STATUS_LABEL,
   MEMBER_STATUS_TONE,
@@ -24,7 +27,6 @@ import {
   canBeReminded,
   documentsChipLabel,
   documentsChipTone,
-  dueDateLabel,
   reminderOutcome,
 } from './member-status';
 
@@ -35,6 +37,7 @@ const TABS = [
   { value: 'deals', label: 'Deals' },
   { value: 'therapists', label: 'Therapists' },
   { value: 'products', label: 'Products' },
+  { value: 'customers', label: 'Customers' },
   { value: 'activity', label: 'Activity' },
 ] as const;
 type Tab = (typeof TABS)[number]['value'];
@@ -49,8 +52,9 @@ const STATUS_DONE: Record<'ACTIVE' | 'INACTIVE' | 'SUSPENDED', string> = {
 };
 
 /**
- * One member's page: `/account/members/:memberId[/:section]`. Status actions sit in the header,
- * seven tabs below. The tab strip is `md-tabs`, which supplies the ARIA tabs pattern (tablist and
+ * One member's page: `/account/members/:memberId[/:section]`. Status actions and the customer and
+ * order counts sit in the header, up to eight tabs below (Customers needs `customers:view`).
+ * The tab strip is `md-tabs`, which supplies the ARIA tabs pattern (tablist and
  * tab roles, aria-selected, roving tabindex, Arrow, Home and End keys); this page adds the ids,
  * `aria-controls` and the `tabpanel`. Raw elements so jsdom tests can read the `active` property.
  */
@@ -67,21 +71,9 @@ export function MemberDetailPage() {
   const canStatusChange = can('members', 'status_change');
   const canDelete = can('members', 'delete');
 
-  // Each catalog sub-resource is independently gated by its own matrix key (PLANNING.md §1.2
-  // grants Branches/Deals/Therapists/Products separately from the Member profile itself) — never
-  // the blanket `members:edit`/`members:delete` above, which only governs the Profile and
-  // Documents tabs. A role could hold VCE on Branches without holding `members:edit` at all (or
-  // vice versa), and the Role Permission Matrix UI's own per-resource checkboxes must actually
-  // change what's visible here.
-  const canEditBranches = can('vendors.branches', 'edit');
-  const canEditDeals = can('vendors.deals', 'edit');
-  const canDeleteDeals = can('vendors.deals', 'delete');
-  const canEditTherapists = can('vendors.therapists', 'edit');
-  const canDeleteTherapists = can('vendors.therapists', 'delete');
-  const canEditProducts = can('vendors.products', 'edit');
-  const canDeleteProducts = can('vendors.products', 'delete');
-
-  const tab: Tab = TABS.find((t) => t.value === section)?.value ?? 'profile';
+  // P10-49: the Customers tab lists the member's customers through the staff route.
+  const visibleTabs = TABS.filter((t) => t.value !== 'customers' || can('customers', 'view'));
+  const tab: Tab = visibleTabs.find((t) => t.value === section)?.value ?? 'profile';
 
   const [member, setMember] = useState<Vendor | null>(null);
   const [loading, setLoading] = useState(true);
@@ -113,7 +105,7 @@ export function MemberDetailPage() {
   }, [canView, load]);
 
   const name = member ? member.businessName || member.owner?.name || 'New member' : 'Member';
-  useSetBreadcrumbs([{ label: 'Members' }, { label: 'All members', to: '/account/members' }, { label: name }]);
+  useSetBreadcrumbs([...MEMBERS_TRAIL, { label: name }]);
 
   if (!canView) return <p className="empty-state">You do not have access to Member Management.</p>;
   if (loading) {
@@ -159,8 +151,9 @@ export function MemberDetailPage() {
   };
 
   const onDelete = async (reason: string) => {
-    const { data } = await deleteMember(token, member.id, reason);
-    showSnackbar(data.outcome === 'ARCHIVED' ? 'Member archived. We kept their records.' : 'Member deleted.');
+    // Delete always archives (item 6): nothing is erased and the member can be restored.
+    await deleteMember(token, member.id, reason);
+    showSnackbar('Member archived. Restore them any time from the Archived filter.');
     navigate('/account/members', { replace: true });
   };
 
@@ -180,11 +173,10 @@ export function MemberDetailPage() {
   };
 
   const summary = member.documentsSummary;
-  const due = dueDateLabel(summary);
   const reviewFlagged = Boolean(member.reviewFlaggedAt);
   const tabId = (value: Tab) => `${idBase}-tab-${value}`;
   const panelId = `${idBase}-panel`;
-  const activeLabel = TABS.find((t) => t.value === tab)?.label ?? '';
+  const activeLabel = visibleTabs.find((t) => t.value === tab)?.label ?? '';
 
   return (
     <div className="admin-page admin-page--wide">
@@ -196,7 +188,6 @@ export function MemberDetailPage() {
           <p>
             <sky-badge status={MEMBER_STATUS_TONE[member.status]}>{MEMBER_STATUS_LABEL[member.status]}</sky-badge>{' '}
             <sky-badge status={documentsChipTone(summary)}>{documentsChipLabel(summary)}</sky-badge>
-            {due && <span className="field-hint"> {due}</span>}
           </p>
           {reviewFlagged && member.status !== 'SUSPENDED' && (
             <p>
@@ -233,11 +224,14 @@ export function MemberDetailPage() {
         </p>
       )}
 
+      {/* Item 7: the member's state at a glance before the tabs; counts link to their tab (P10-49). */}
+      <MemberSummary member={member} tabs={visibleTabs.map((t) => t.value)} canOpenOrders={can('orders', 'view')} />
+
       <div className="admin-tabs-wrap">
         {createElement(
           'md-tabs',
           { className: 'admin-tabs', 'aria-label': 'Member sections' },
-          TABS.map((t) =>
+          visibleTabs.map((t) =>
             createElement(
               'md-primary-tab',
               {
@@ -294,7 +288,9 @@ export function MemberDetailPage() {
             canDelete={can('vendors.therapists', 'delete')}
           />
         )}
-        {tab === 'products' && <ProductsListPage token={token} vendorId={member.id} canEdit={canEdit} canDelete={canDelete} />}
+        {tab === 'products' && <ProductsListPage token={token} vendorId={member.id} canEdit={can('vendors.products', 'edit')} canDelete={can('vendors.products', 'delete')} />}
+
+        {tab === 'customers' && <VendorCustomers vendorId={member.id} />}
 
         {tab === 'activity' && <MemberActivityTab token={token} memberId={member.id} refreshKey={activityKey} />}
       </section>

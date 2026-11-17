@@ -3,19 +3,19 @@ import { z } from 'zod';
 import {
   OtpRequestSchema,
   OtpVerifySchema,
+  CsrfTokenResponseSchema,
   AuthTokensResponseSchema,
 } from '../schemas/auth.schema';
 import {
-  RoleCreateSchema,
   RoleUpdateSchema,
   RoleStatusUpdateSchema,
-  RoleCloneSchema,
   RolePermissionsUpdateSchema,
   RolePermissionsResponseSchema,
   RoleWidgetsUpdateSchema,
   DashboardWidgetCreateSchema,
   UserCreateSchema,
   UserUpdateSchema,
+  MyAddressSchema,
   UserStatusUpdateSchema,
   ImpersonateRequestSchema,
 } from '../schemas/rbac.schema';
@@ -24,6 +24,7 @@ import {
   MemberCreateSchema,
   MemberListQuerySchema,
   MemberDocumentReviewSchema,
+  VendorApplicationCreateSchema,
   VendorCreateSchema,
   VendorUpdateSchema,
   VendorSelfUpdateSchema,
@@ -113,9 +114,20 @@ export function buildOpenApiDocument() {
     scheme: 'bearer',
     bearerFormat: 'JWT',
   });
-
+  registry.registerComponent('securitySchemes', 'refreshCookie', {
+    type: 'apiKey',
+    in: 'cookie',
+    name: 'msd_refresh_token',
+  });
+  registry.registerComponent('securitySchemes', 'csrfHeader', {
+    type: 'apiKey',
+    in: 'header',
+    name: 'X-CSRF-Token',
+  });
   const bearer = [{ bearerAuth: [] }];
+  const cookieAuth = [{ refreshCookie: [], csrfHeader: [] }];
   const errorResponse = { description: 'Error', content: { 'application/json': { schema: ErrorObjectSchema } } };
+  const successEnvelope = (schema: z.ZodTypeAny) => z.object({ data: schema, error: z.null() });
 
   // ─── Auth ──────────────────────────────────────────────────────────────────
 
@@ -135,13 +147,13 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'post',
     path: '/auth/otp/verify',
-    summary: 'Verify an OTP and receive a JWT pair',
+    summary: 'Verify an OTP and receive an access token; the refresh token is an HttpOnly cookie',
     tags: ['Auth'],
     request: { body: { content: { 'application/json': { schema: OtpVerifySchema } } } },
     responses: {
       200: {
         description: 'Authenticated',
-        content: { 'application/json': { schema: AuthTokensResponseSchema } },
+        content: { 'application/json': { schema: successEnvelope(AuthTokensResponseSchema) } },
       },
       401: errorResponse,
       429: errorResponse,
@@ -159,29 +171,57 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/auth/google/callback',
-    summary: 'Google OAuth callback — issues a JWT pair',
+    summary: 'Google OAuth callback — issues an access token and HttpOnly refresh cookie',
     tags: ['Auth'],
     responses: {
-      200: { description: 'Authenticated', content: { 'application/json': { schema: AuthTokensResponseSchema } } },
+      200: {
+        description: 'Authenticated',
+        content: { 'application/json': { schema: successEnvelope(AuthTokensResponseSchema) } },
+      },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/auth/csrf',
+    summary: 'Get a CSRF token for cookie-authenticated auth requests',
+    tags: ['Auth'],
+    responses: {
+      200: {
+        description: 'CSRF token',
+        content: { 'application/json': { schema: successEnvelope(CsrfTokenResponseSchema) } },
+      },
     },
   });
 
   registry.registerPath({
     method: 'post',
     path: '/auth/refresh',
-    summary: 'Rotate the refresh session (read from the HttpOnly cookie) and issue a new access token',
-    description: 'Requires the msd_refresh_token cookie (set on login) and a matching X-CSRF-Token header (double-submit of the msd_csrf_token cookie). No request body.',
+    summary: 'Rotate the HttpOnly refresh cookie and issue a new access token',
     tags: ['Auth'],
-    responses: { 200: { description: 'Rotated' }, 401: errorResponse, 403: errorResponse },
+    security: cookieAuth,
+    responses: {
+      200: {
+        description: 'Rotated',
+        content: { 'application/json': { schema: successEnvelope(z.object({ accessToken: z.string() })) } },
+      },
+      401: errorResponse,
+      403: errorResponse,
+    },
   });
 
   registry.registerPath({
     method: 'post',
     path: '/auth/logout',
-    summary: 'Revoke the current refresh session and clear its cookies',
+    summary: 'Revoke the current refresh session and clear auth cookies',
     tags: ['Auth'],
-    security: bearer,
-    responses: { 200: { description: 'Logged out' } },
+    security: cookieAuth,
+    responses: {
+      200: {
+        description: 'Logged out',
+        content: { 'application/json': { schema: successEnvelope(z.object({ message: z.string() })) } },
+      },
+    },
   });
 
   registry.registerPath({
@@ -218,11 +258,10 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'post',
     path: '/rbac/roles',
-    summary: 'Create a role',
+    summary: 'Create a role (locked: the seven roles are fixed, R1)',
     tags: ['RBAC - Roles'],
     security: bearer,
-    request: { body: { content: { 'application/json': { schema: RoleCreateSchema } } } },
-    responses: { 201: { description: 'Created' }, 403: errorResponse, 409: errorResponse },
+    responses: { 403: { description: 'ROLE_MANAGEMENT_LOCKED, or FORBIDDEN without rbac.roles:create' } },
   });
 
   registry.registerPath({
@@ -241,24 +280,21 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'delete',
     path: '/rbac/roles/{id}',
-    summary: 'Delete a role (only if unassigned and non-system)',
+    summary: 'Delete a role (locked: the seven roles are fixed, R1)',
     tags: ['RBAC - Roles'],
     security: bearer,
     request: { params: z.object({ id: z.string().uuid() }) },
-    responses: { 200: { description: 'Deleted' }, 403: errorResponse, 409: errorResponse },
+    responses: { 403: { description: 'ROLE_MANAGEMENT_LOCKED, or FORBIDDEN without rbac.roles:delete' } },
   });
 
   registry.registerPath({
     method: 'post',
     path: '/rbac/roles/{id}/clone',
-    summary: 'Clone a role with its permissions and widgets',
+    summary: 'Clone a role (locked: the seven roles are fixed, R1)',
     tags: ['RBAC - Roles'],
     security: bearer,
-    request: {
-      params: z.object({ id: z.string().uuid() }),
-      body: { content: { 'application/json': { schema: RoleCloneSchema } } },
-    },
-    responses: { 201: { description: 'Cloned' } },
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 403: { description: 'ROLE_MANAGEMENT_LOCKED, or FORBIDDEN without rbac.roles:create' } },
   });
 
   registry.registerPath({
@@ -383,6 +419,16 @@ export function buildOpenApiDocument() {
     security: bearer,
     request: { body: { content: { 'application/json': { schema: UserUpdateSchema } } } },
     responses: { 200: { description: 'Updated' } },
+  });
+
+  registry.registerPath({
+    method: 'put',
+    path: '/rbac/users/me/address',
+    summary: "Save the caller's own delivery address (item 2.2): state and city from the India list; checkout pre-fills it",
+    tags: ['RBAC - Users'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: MyAddressSchema } } } },
+    responses: { 200: { description: 'The caller with the saved address' }, 422: { description: 'Invalid address' } },
   });
 
   registry.registerPath({
@@ -589,7 +635,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/vendors/me/customers',
-    summary: 'Distinct customers who have ordered/booked from the caller\'s own vendor',
+    summary: 'The caller\'s own customers: name, city, order count, last order date; phone and email only with an open (CONFIRMED) order (D19)',
     tags: ['Vendors - Self-service'],
     security: bearer,
     request: { query: PaginationQuerySchema },
@@ -785,6 +831,23 @@ export function buildOpenApiDocument() {
   }
 
   registry.registerPath({
+    method: 'post',
+    path: '/vendors/public/register',
+    summary: 'Submit a public business membership application without creating an account',
+    tags: ['Vendors - Public'],
+    request: { body: { content: { 'application/json': { schema: VendorApplicationCreateSchema } } } },
+    responses: {
+      201: {
+        description: 'Application received',
+        content: { 'application/json': { schema: z.object({ data: z.object({ id: z.string(), status: z.string(), message: z.string(), createdAt: z.string() }) }) } },
+      },
+      422: errorResponse,
+      429: errorResponse,
+      500: errorResponse,
+    },
+  });
+
+  registry.registerPath({
     method: 'get',
     path: '/vendors',
     deprecated: true,
@@ -882,7 +945,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/members/{id}',
-    summary: 'Get a member by id',
+    summary: 'Get a member by id, with liveCounts, customerCount and orderCount (P10-49)',
     tags: ['Members - Admin'],
     security: bearer,
     request: { params: z.object({ id: z.string().uuid() }) },
@@ -1022,7 +1085,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/vendors/{vendorId}/customers',
-    summary: "Distinct customers who have ordered/booked from a vendor (admin, read-only)",
+    summary: "A member's customers with city and full contact details (staff, read-only, D12)",
     tags: ['Vendors - Admin'],
     security: bearer,
     request: { params: z.object({ vendorId: z.string().uuid() }), query: PaginationQuerySchema },
@@ -1479,10 +1542,10 @@ export function buildOpenApiDocument() {
     path: '/catalog/products/facets',
     summary:
       'Filter-panel counts for the product list — same filters as GET /catalog/products minus paging/sort; ' +
-      'category, tag and price each ignore their own selection. Registered before /catalog/products/{id}.',
+      'category, business, tag and price each ignore their own selection. Registered before /catalog/products/{id}.',
     tags: ['Catalogue (public)'],
     request: { query: CatalogProductFacetQuerySchema },
-    responses: { 200: { description: 'Product facets: { categories[], tags[], price | null }' } },
+    responses: { 200: { description: 'Product facets: { categories[], vendors[], tags[], price | null }' } },
   });
 
   registry.registerPath({
@@ -1694,7 +1757,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/catalog/pages/{slug}',
-    summary: 'A single public website page (Privacy Policy/Terms of Service/Accessibility/Cookie Policy) — 404s if not found or not PUBLISHED',
+    summary: 'A single public website page (Privacy Policy/Terms of Service/return-refund-policy/Cookie Policy) — 404s if not found or not PUBLISHED',
     tags: ['Catalogue (public)'],
     request: { params: z.object({ slug: z.string() }) },
     responses: { 200: { description: 'Website page' }, 404: errorResponse },

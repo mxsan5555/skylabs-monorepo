@@ -6,7 +6,7 @@ import { showCartAdded, useAddProductToCart } from '../../../hooks/use-add-produ
 import { useRequireSignIn } from '../../../hooks/use-require-sign-in';
 import { useWishlistToggle } from '../../../hooks/use-wishlist-toggle';
 import { fillTemplate, formatINR } from '../../../utils/format';
-import { dealPath, productPath } from '../../seo/public-urls';
+import {  productPath } from '../../seo/public-urls';
 import { toDealCardDeal, toProductCardDeal } from '../../pages/home/home-data';
 import { DealAddToCartDialog } from '../deal-add-to-cart-dialog';
 import { ProductCardGallery } from '../product-card-gallery';
@@ -35,9 +35,12 @@ const TAG_ROLES: Record<CatalogOfferTag, Omit<OfferTag, 'label'>> = {
   deal: { color: 'primary' },
 };
 
-/** The card tag for an API `tag`, or undefined when the item has none. */
-export function offerTagFor(tag?: CatalogOfferTag | null): OfferTag | undefined {
-  return tag ? { label: t.tags[tag], ...TAG_ROLES[tag] } : undefined;
+/** The card tag for an API `tag`, or undefined when the item has none. When a caller supplies
+ * a label override (for section-driven labels), keep the same shared color/tone mapping while
+ * swapping only the visible copy to match the server's dynamic title. */
+export function offerTagFor(tag?: CatalogOfferTag | null, labelOverride?: string): OfferTag | undefined {
+  if (!tag) return undefined;
+  return { label: labelOverride?.trim() || t.tags[tag], ...TAG_ROLES[tag] };
 }
 
 export interface OfferCardProps {
@@ -97,14 +100,14 @@ export function OfferCard({ item, tag, color, variant = 'plain', layout = 'verti
       {...(shownTag ? { badge: shownTag.label, 'badge-color': shownTag.color, 'badge-tone': shownTag.tone ?? 'filled' } : {})}
       heading={card.title}
       {...(description ? { description } : {})}
-      {...(isDeal && card.providerName ? { eyebrow: card.providerName } : {})}
+      {...(card.providerName ? { eyebrow: card.providerName } : {})}
       {...(place ? { location: place } : {})}
       {...(isDeal && card.distance != null ? { distance: formatDistance(card.distance) } : {})}
       price={formatINR(card.price)}
       {...(card.originalPrice ? { 'original-price': formatINR(card.originalPrice) } : {})}
       {...(card.discount ? { discount: fillTemplate(t.discount, { percent: String(card.discount) }) } : {})}
       {...(rating ? { rating: rating.rating, reviews: rating.reviews } : {})}
-      href={isDeal ? dealHref(item.deal) : `/products/${item.product.slug}`}
+      href={isDeal ? dealHref(item.deal) : productPath(item.product)}
     >
       {gallery && <ProductCardGallery slot="media" images={gallery} alt={card.imageAlt} layout={layout} fill />}
       <ListingToolbar

@@ -28,7 +28,8 @@ import { MediaUploader } from '../../../components/media-uploader';
 import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { showSnackbar } from '../../../../snackbar/snackbar';
 import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
-import { renderCheckbox, renderSelect, renderTextField } from './form-controls';
+import { memberTrail } from './member-crumbs';
+import { renderCheckbox, renderSelect, renderTextField } from '../../../components/form-controls/form-controls';
 import { StringListField } from './string-list-field';
 import { DealPackageCards, packageError, type PackageCard } from './deal-package-cards';
 import { CANCELLATION_OPTIONS, fromDateInput, toDateInput } from './deal-format';
@@ -271,9 +272,7 @@ export function DealFormPage({ token, surface = 'staff' }: DealFormPageProps) {
   useSetBreadcrumbs(
     isStaff
       ? [
-          { label: 'Members' },
-          { label: 'All members', to: '/account/members' },
-          { label: vendorName ?? 'Member', to: `/account/members/${vendorId}` },
+          ...memberTrail(vendorId, vendorName),
           { label: 'Deals', to: listPath },
           { label: isEdit ? title : 'Add deal' },
         ]
@@ -734,21 +733,6 @@ export function DealFormPage({ token, surface = 'staff' }: DealFormPageProps) {
                 Add a question
               </OutlinedButton>
             )}
-          </div>
-        </sky-accordion-item>
-
-        <sky-accordion-item header="Media (Images &amp; Video)" disabled={!branchChosen}>
-          <div className="form-grid">
-            <p className="field-hint">The deal's photos and an optional short video — shown on its public page.</p>
-            <MediaUploader
-              entityType="deal"
-              entityId={deal?.id ?? null}
-              branchId={form.branchId}
-              vendorId={vendorId}
-              existingImages={deal?.mediaImages ?? []}
-              existingVideo={deal?.mediaVideo ?? null}
-              token={token}
-            />
           </div>
         </sky-accordion-item>
 

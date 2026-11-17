@@ -69,7 +69,7 @@ export function ListingBody({
   const activeFilters = [
     located && hasCoords && radius != null,
     minPrice != null || maxPrice != null,
-    (kind === 'deals' || kind === 'therapists') && vendorIds.length > 0,
+    kind !== 'all' && vendorIds.length > 0,
     (kind === 'deals' || kind === 'therapists') && branchIds.length > 0,
     (kind === 'deals' || kind === 'products') && tags.length > 0,
     withCategoryFacet && categoryIds.length > 0,

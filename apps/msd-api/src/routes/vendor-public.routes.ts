@@ -1,22 +1,24 @@
 import { Router } from 'express';
 import { vendorPublicRegisterRateLimiter } from '../middleware/rateLimiter';
-import { ApiError } from '../lib/http';
+import { validateBody } from '../middleware/validate';
+import { VendorApplicationCreateSchema } from '../schemas/vendor.schema';
+import { createVendorApplication } from '../services/vendor-application.service';
+import { sendData } from '../lib/http';
 
-/**
- * Public "Become a Vendor" registration is closed: staff create every member (decision D9).
- * The route stays, unauthenticated and rate limited, so the `/become-vendor` page gets a clear
- * 403 with a "contact our team" message instead of a 404. It never reads the body and never
- * creates a User or a Member.
- */
 const router = Router();
 
-router.post('/register', vendorPublicRegisterRateLimiter, async (_req, _res, next) => {
-  next(
-    new ApiError(
-      'FORBIDDEN',
-      'Member accounts are created by our team. Please contact us and we will set up your account.',
-    ),
-  );
-});
+router.post(
+  '/register',
+  vendorPublicRegisterRateLimiter,
+  validateBody(VendorApplicationCreateSchema),
+  async (req, res, next) => {
+    try {
+      const result = await createVendorApplication(req.body);
+      sendData(res, result, { status: 201 });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 export default router;

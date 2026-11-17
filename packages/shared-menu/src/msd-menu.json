@@ -62,7 +62,7 @@
     "children": [
       {
         "id": "member-list",
-        "title": "All Member",
+        "title": "All members",
         "route": "/account/members",
         "permissionKey": "members",
         "parent": "vendors",
@@ -243,7 +243,7 @@
       },
       {
         "id": "customer-orders",
-        "title": "Order Hitory",
+        "title": "Order History",
         "route": "/account/orders",
         "permissionKey": "orders",
         "parent": "customers",

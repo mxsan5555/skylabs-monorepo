@@ -15,10 +15,8 @@ import {
 } from '@skylabs-monorepo/shared-ui/react';
 
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { useConfirmDialog } from '../../../components/confirm-dialog';
 
 import {
-  deleteRole,
   getPermissionCatalog,
   getRolePermissions,
   getRoleWidgets,
@@ -41,7 +39,6 @@ import { WidgetAssignments } from './widget-assignments';
 
 export function RoleManagement() {
   const { token, can } = useAuth();
-  const { confirm, ConfirmDialog } = useConfirmDialog();
 
   const [roles, setRoles] = useState<Role[]>([]);
   const [rolesLoading, setRolesLoading] = useState(true);
@@ -93,7 +90,6 @@ export function RoleManagement() {
   const [actionError, setActionError] = useState('');
 
   const canEdit = can('rbac.roles', 'edit');
-  const canDelete = can('rbac.roles', 'delete');
   const canChangeStatus = can('rbac.roles', 'status_change');
 
   const selectedRole = useMemo(
@@ -417,50 +413,6 @@ export function RoleManagement() {
     }
   };
 
-  const removeRole = async () => {
-    if (!selectedRole || !canDelete) return;
-
-    if (
-      !(await confirm(
-        `Delete role "${selectedRole.name}"? This cannot be undone.`,
-      ))
-    ) {
-      return;
-    }
-
-    try {
-      await deleteRole(token, selectedRole.id);
-
-      setRoles((previous) =>
-        previous.filter((role) => role.id !== selectedRole.id),
-      );
-
-      setSelectedRoleId(null);
-
-      setPermissionsByRole((previous) => {
-        const next = new Map(previous);
-        next.delete(selectedRole.id);
-        return next;
-      });
-
-      setDirtyRoleIds((previous) => {
-        const next = new Set(previous);
-        next.delete(selectedRole.id);
-        return next;
-      });
-
-      setActionMessage('Role deleted.');
-      setActionError('');
-    } catch (error) {
-      setActionError(
-        error instanceof ApiRequestError
-          ? error.message
-          : 'Could not delete role. It may still be assigned to users.',
-      );
-    }
-  };
-
-  // Save changed roles. Successful roles are marked clean individually.
   const savePermissions = async () => {
     if (!canEdit || savingPermissions) return;
 
@@ -592,9 +544,9 @@ export function RoleManagement() {
       <header className="page-head">
         <div>
           <h1>Role Management</h1>
-          <p>
-            Define roles and control exactly what each one can see and do.
-          </p>
+          <p>Control exactly what each role can see and do.</p>
+          {/* R1 / P2-15: the API refuses role create, clone and delete. */}
+          <p className="field-hint">Roles are fixed. Change what a role can do in the permission matrix.</p>
         </div>
 
       </header>
@@ -640,7 +592,7 @@ export function RoleManagement() {
                   <h2>{selectedRole.name}</h2>
                   <p className="field-hint">
                     {selectedRole.isSystem
-                      ? 'System role — status and delete are locked.'
+                      ? 'System role — status is locked.'
                       : 'Custom role'}
                   </p>
                 </div>
@@ -657,18 +609,6 @@ export function RoleManagement() {
                       />
                       {selectedRole.isActive ? 'Active' : 'Inactive'}
                     </label>
-                  )}
-
-                  {canDelete && (
-                    <OutlinedButton
-                      onClick={removeRole}
-                      disabled={selectedRole.isSystem}
-                    >
-                      <Icon slot="icon" aria-hidden="true">
-                        delete
-                      </Icon>
-                      Delete
-                    </OutlinedButton>
                   )}
                 </div>
               </div>
@@ -805,7 +745,6 @@ export function RoleManagement() {
         </section>
       )}
 
-      {ConfirmDialog}
     </div>
   );
 }

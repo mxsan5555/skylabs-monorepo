@@ -24,9 +24,8 @@ const MAPPING: Record<string, string> = {
 };
 
 async function main() {
-  const rows = await prisma.$queryRawUnsafe<Array<{ status: string; count: string }>>(
-    'SELECT "status"::text AS status, COUNT(*)::text AS count FROM "Vendor" GROUP BY 1 ORDER BY 1',
-  );
+  const rows = await prisma.$queryRaw<Array<{ status: string; count: string }>>`
+    SELECT "status"::text AS status, COUNT(*)::text AS count FROM "Vendor" GROUP BY 1 ORDER BY 1`;
   let hidden = 0;
   console.log('Old status            Rows   Becomes');
   for (const row of rows) {
@@ -37,9 +36,8 @@ async function main() {
   console.log(
     `\nRows that become SUSPENDED and disappear from the website because they were REJECTED: ${hidden}`,
   );
-  const docs = await prisma.$queryRawUnsafe<Array<{ count: string }>>(
-    'SELECT COUNT(*)::text AS count FROM "VendorDocument"',
-  );
+  const docs = await prisma.$queryRaw<Array<{ count: string }>>`
+    SELECT COUNT(*)::text AS count FROM "VendorDocument"`;
   console.log(`Existing KYC files that become SUBMITTED documents: ${docs[0]?.count ?? '0'}`);
 }
 

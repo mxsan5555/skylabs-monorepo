@@ -57,6 +57,23 @@ describe('authenticate: member lifecycle', () => {
     expect(res.body.error.code).toBe('MEMBER_SUSPENDED');
   });
 
+  it('lets a Super Admin preview open a suspended member', async () => {
+    prismaMock.member.findUnique.mockResolvedValue({ status: 'SUSPENDED', statusReason: 'Documents not completed' } as never);
+    const res = await request(app())
+      .get('/api/v1/things')
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['member'], isPreview: true, impersonatedBy: 'super-1' }));
+    expect(res.status).toBe(200);
+  });
+
+  it('keeps an inactive member read-only under a preview token', async () => {
+    prismaMock.member.findUnique.mockResolvedValue({ status: 'INACTIVE', statusReason: 'Business paused' } as never);
+    const res = await request(app())
+      .post('/api/v1/things')
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['member'], isPreview: true, impersonatedBy: 'super-1' }));
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('MEMBER_INACTIVE_READ_ONLY');
+  });
+
   it('lets an inactive member read', async () => {
     prismaMock.member.findUnique.mockResolvedValue({ status: 'INACTIVE', statusReason: 'Business pause' } as never);
     const res = await request(app()).get('/api/v1/things').set('Authorization', bearerFor({ sub: USER_ID, roles: ['member'] }));

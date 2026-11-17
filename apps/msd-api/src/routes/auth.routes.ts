@@ -2,18 +2,30 @@ import { Router } from 'express';
 import { passport } from '../lib/passport';
 import { authenticate } from '../middleware/authenticate';
 import { validateBody } from '../middleware/validate';
-import { otpIdentifierRateLimiter, otpRequestRateLimiter } from '../middleware/rateLimiter';
+import {
+  otpDummyIdentifierVerifyRateLimiter,
+  otpDummyVerifyRateLimiter,
+  otpIdentifierRateLimiter,
+  otpRequestRateLimiter,
+} from '../middleware/rateLimiter';
 import { OtpRequestSchema, OtpVerifySchema } from '../schemas/auth.schema';
 import { requestOtp, verifyOtp } from '../services/otp.service';
 import { loginWithIdentifier } from '../services/auth.service';
 import { normalizeIdentifier } from '../lib/normalizeIdentifier';
 import { rotateRefreshToken, revokeRefreshToken, revokeAllRefreshTokens } from '../services/token.service';
 import { signAccessToken } from '../lib/jwt';
-import { sendData, sendError, ApiError } from '../lib/http';
+import { ApiError, sendData, sendError } from '../lib/http';
+import {
+  clearAuthCookies,
+  ensureCsrfCookie,
+  readCsrfCookie,
+  readRefreshCookie,
+  requireCsrfHeader,
+  setAuthCookies,
+} from '../lib/auth-cookies';
 import { prisma } from '../lib/prisma';
 import { getMemberAccessState } from '../services/member-access.service';
 import { suspendedMessage } from '../lib/member-messages';
-import { setAuthCookies, clearAuthCookies, readRefreshCookie, requireCsrfHeader } from '../lib/auth-cookies';
 
 const router = Router();
 
@@ -48,7 +60,12 @@ router.post('/otp/request', otpRequestRateLimiter, otpIdentifierRateLimiter, val
   }
 });
 
-router.post('/otp/verify', validateBody(OtpVerifySchema), async (req, res, next) => {
+router.post(
+  '/otp/verify',
+  otpDummyVerifyRateLimiter,
+  otpDummyIdentifierVerifyRateLimiter,
+  validateBody(OtpVerifySchema),
+  async (req, res, next) => {
   try {
     const { otp } = req.body as { identifier: string; otp: string };
     const identifier = normalizeIdentifier(req.body.identifier as string);
@@ -59,7 +76,8 @@ router.post('/otp/verify', validateBody(OtpVerifySchema), async (req, res, next)
   } catch (err) {
     next(err);
   }
-});
+  },
+);
 
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'], session: false }));
 
@@ -80,16 +98,19 @@ router.get('/google/failure', (_req, res) => {
   sendData(res, null, { status: 401 });
 });
 
+router.get('/csrf', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  sendData(res, { csrfToken: ensureCsrfCookie(req, res) });
+});
+
 router.post('/refresh', async (req, res, next) => {
   try {
     const refreshToken = readRefreshCookie(req);
     if (!refreshToken) {
+      clearAuthCookies(res);
       sendError(res, 'UNAUTHORIZED', 'No refresh session');
       return;
     }
-    // Checked only after validating the request carries SOME CSRF-cookie-paired header — a
-    // request with no cookies at all (never logged in) gets the plain "no session" 401 above,
-    // not a CSRF rejection, so this stays silent/no-op for a visitor who was never signed in.
     if (!requireCsrfHeader(req)) {
       sendError(res, 'FORBIDDEN', 'Missing or invalid CSRF token');
       return;
@@ -100,20 +121,24 @@ router.post('/refresh', async (req, res, next) => {
     } catch (err) {
       // The session we just rotated to is for a now-blocked account — don't leave it live.
       await revokeAllRefreshTokens(rotated.userId);
-      clearAuthCookies(res);
       throw err;
     }
     const accessToken = signAccessToken({ sub: rotated.userId, roles: rotated.roles, app: 'msd' });
-    setAuthCookies(res, rotated.token);
+    setAuthCookies(res, rotated.token, readCsrfCookie(req));
     sendData(res, { accessToken });
   } catch (err) {
+    if (err instanceof ApiError && err.code === 'UNAUTHORIZED') clearAuthCookies(res);
     next(err);
   }
 });
 
-router.post('/logout', authenticate, async (req, res, next) => {
+router.post('/logout', async (req, res, next) => {
   try {
     const refreshToken = readRefreshCookie(req);
+    if (refreshToken && !requireCsrfHeader(req)) {
+      sendError(res, 'FORBIDDEN', 'Missing or invalid CSRF token');
+      return;
+    }
     if (refreshToken) await revokeRefreshToken(refreshToken);
     clearAuthCookies(res);
     sendData(res, { message: 'Logged out' });

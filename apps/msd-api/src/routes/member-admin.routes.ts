@@ -82,8 +82,11 @@ export function buildMemberAdminRoutes(opts: { deprecated: boolean }): Router {
   router.get('/:id', mark, requirePermission('members', 'view'), validateParams(UuidParamSchema), async (req, res, next) => {
     try {
       const member = await vendorService.getVendorOrThrow(req.params.id);
-      const [withCounts] = await vendorService.attachLiveCounts([member]);
-      sendData(res, withCompletion(withCounts));
+      const [[withCounts], salesCounts] = await Promise.all([
+        vendorService.attachLiveCounts([member]),
+        vendorService.getMemberSalesCounts(member.id),
+      ]);
+      sendData(res, { ...withCompletion(withCounts), ...salesCounts });
     } catch (err) {
       next(err);
     }

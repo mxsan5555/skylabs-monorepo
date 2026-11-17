@@ -24,11 +24,12 @@ export const STATIC_PUBLIC_PATHS = [
   '/about',
   '/how-it-works',
   '/contact',
+  '/help-center',
   '/careers',
-  '/become-vendor',
+  '/become-member',
   '/privacy',
   '/terms',
-  '/accessibility',
+  '/return-refund-policy',
   '/cookies',
 ] as const;
 

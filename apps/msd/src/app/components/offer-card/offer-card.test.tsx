@@ -95,10 +95,11 @@ describe('OfferCard', () => {
     expect(option(card(), 'rating')).toBeFalsy();
   });
 
-  it('shows a product without member or place, and links to the product', () => {
+  it("shows a product with its member's business name but no place, and links to the product (item 4)", () => {
     renderCard(<OfferCard item={{ type: 'product', product }} />);
     expect(option(card(), 'heading')).toBe('Massage Oil');
-    expect(option(card(), 'eyebrow')).toBeFalsy();
+    expect(option(card(), 'eyebrow')).toBe('Calm Spa');
+    expect(card().hasAttribute('divided')).toBe(false);
     expect(option(card(), 'location')).toBeFalsy();
     expect(option(card(), 'href')).toBe('/products/p1');
   });

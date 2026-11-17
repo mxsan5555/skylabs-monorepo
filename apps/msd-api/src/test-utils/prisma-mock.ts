@@ -79,6 +79,7 @@ export function createPrismaMock() {
       updateMany: vi.fn(),
     },
     refreshSession: {
+      findFirst: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
@@ -119,6 +120,13 @@ export function createPrismaMock() {
     memberStatusHistory: {
       create: vi.fn(),
       findMany: vi.fn(),
+    },
+    vendorApplication: {
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      findMany: vi.fn(),
+      update: vi.fn(),
+      count: vi.fn(),
     },
     branch: {
       findUnique: vi.fn(),
@@ -165,6 +173,7 @@ export function createPrismaMock() {
     },
     dealVideo: {
       findUnique: vi.fn(),
+      findMany: vi.fn(),
       upsert: vi.fn(),
       delete: vi.fn(),
     },
@@ -184,6 +193,7 @@ export function createPrismaMock() {
     },
     productVideo: {
       findUnique: vi.fn(),
+      findMany: vi.fn(),
       upsert: vi.fn(),
       delete: vi.fn(),
     },
@@ -198,6 +208,7 @@ export function createPrismaMock() {
     },
     therapistVideo: {
       findUnique: vi.fn(),
+      findMany: vi.fn(),
       upsert: vi.fn(),
       delete: vi.fn(),
     },

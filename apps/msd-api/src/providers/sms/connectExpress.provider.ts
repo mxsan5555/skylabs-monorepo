@@ -13,13 +13,18 @@ const REQUIRED_ENV: Array<[name: string, value: string]> = [
   ['SMS_SENDER', env.smsSender],
 ];
 
+/** Configuration check for authentication to fail clearly before persisting an unusable challenge. */
+export function missingOtpConfiguration(): string[] {
+  return REQUIRED_ENV.filter(([, value]) => !value).map(([name]) => name);
+}
+
 /**
  * Sends an OTP SMS via ConnectExpress. Returns `true` only once the provider's response
  * indicates success; every attempt (success or failure) is logged with the provider's raw
  * response so delivery issues are diagnosable without reproducing the call.
  */
 export async function sendOtp(phone: string, otp: string): Promise<boolean> {
-  const missing = REQUIRED_ENV.filter(([, value]) => !value).map(([name]) => name);
+  const missing = missingOtpConfiguration();
   if (missing.length > 0) {
     console.error(`[sms:connectExpress] cannot send — missing env var(s): ${missing.join(', ')}`);
     return false;

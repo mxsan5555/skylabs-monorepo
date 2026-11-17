@@ -19,4 +19,5 @@ export const RefundCreateSchema = z
     reason: z.string().trim().max(1000).optional(),
     disputeId: z.string().uuid().optional(),
   })
+  .strict()
   .openapi('RefundCreate');

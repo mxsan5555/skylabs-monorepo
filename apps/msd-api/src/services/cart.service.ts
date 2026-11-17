@@ -59,6 +59,7 @@ const CART_INCLUDE = {
       product: {
         select: {
           id: true,
+          slug: true,
           name: true,
           image: true,
           imageAlt: true,

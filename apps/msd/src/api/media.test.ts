@@ -118,7 +118,7 @@ describe('media API client — other entity basePaths still behave unchanged (re
   });
 
   it('deal (admin-on-behalf) nests under /vendors/:vendorId/branches/:branchId/deals/:dealId', async () => {
-    await uploadImage('tok', { entityType: 'deal', entityId: 'deal-1', branchId: 'branch-1', vendorId: 'vendor-9' }, new Blob(['x']), 'p.png');
+    await uploadImage('tok', { entityType: 'deal', entityId: 'deal-1', branchId: 'branch-1', selfService: false, vendorId: 'vendor-9' }, new Blob(['x']), 'p.png');
     expect(calledUrl()).toMatch(/\/vendors\/vendor-9\/branches\/branch-1\/deals\/deal-1\/images$/);
   });
 

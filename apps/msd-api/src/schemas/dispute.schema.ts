@@ -14,6 +14,7 @@ export const DisputeCreateSchema = z
     description: z.string().trim().max(2000).optional(),
     evidenceStorageKey: z.string().max(500).optional(),
   })
+  .strict()
   .openapi('DisputeCreate');
 
 export const DisputeListQuerySchema = PaginationQuerySchema.extend({
@@ -38,4 +39,5 @@ export const DisputeResolveSchema = z
     resolutionType: z.enum(['NO_ACTION', 'REFUNDED', 'OTHER']),
     resolutionNotes: z.string().trim().max(2000).optional(),
   })
+  .strict()
   .openapi('DisputeResolve');

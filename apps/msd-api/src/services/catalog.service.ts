@@ -44,7 +44,11 @@ export async function getHotIds(kind: TagKind, now = new Date()): Promise<string
     by: [key],
     where: {
       [key]: { not: null },
-      order: { status: { in: ['CONFIRMED', 'COMPLETED'] }, createdAt: { gte: daysFrom(now, -TAG_RULES.hotWindowDays) } },
+      order: {
+        status: { in: ['CONFIRMED', 'COMPLETED'] },
+        createdAt: { gte: daysFrom(now, -TAG_RULES.hotWindowDays) },
+        payments: { some: { status: 'PAID' } },
+      },
     },
     _count: { _all: true },
   });
@@ -65,7 +69,7 @@ function withOfferTags<T extends { id: string; createdAt: Date; endDate?: Date |
   now: Date,
 ): (T & { tag: OfferTagKey | null })[] {
   const hotSet = new Set(hot);
-  return rows.map((row) => ({ ...row, tag: offerTag({ id: row.id, createdAt: row.createdAt, endDate: row.endDate, discount: discountOf(row) }, hotSet, now) }));
+  return rows.map((row) => ({ ...row, tag: offerTag({ id: row.id, createdAt: row.createdAt, endDate: row.endDate, discountPercent: discountOf(row) }, hotSet, now) }));
 }
 
 /** Great-circle distance in kilometers between two lat/lng points — the one, reused distance
@@ -693,8 +697,7 @@ export async function listPublicLocations() {
  * deals are a 404.
  */
 export async function getPublicDealOrThrow(idOrSlug: string) {
-  // `previousSlugs` is not present in the generated Prisma Deal model; resolve by UUID or current slug.
-  const match = UUID_RE.test(idOrSlug) ? { id: idOrSlug } : { slug: idOrSlug };
+  const match = UUID_RE.test(idOrSlug) ? { id: idOrSlug } : { OR: [{ slug: idOrSlug }, { previousSlugs: { has: idOrSlug } }] };
   const deal = await prisma.deal.findFirst({ where: { ...match, ...VISIBLE_DEAL_WHERE }, select: PUBLIC_DEAL_DETAIL_SELECT });
   if (!deal) throw new ApiError('NOT_FOUND', 'Deal not found');
 
@@ -722,6 +725,8 @@ export interface ProductWhereOpts {
   categoryIds?: string[];
   subcategoryId?: string;
   vendorId?: string;
+  /** Business ids (`vendorIds=`, item 4); win over `vendorId`. */
+  vendorIds?: string[];
   search?: string;
   minPrice?: number;
   maxPrice?: number;
@@ -734,7 +739,7 @@ export function buildProductWhere(opts: ProductWhereOpts) {
     ...VISIBLE_PRODUCT_WHERE,
     ...(opts.categoryIds?.length ? { categoryId: { in: opts.categoryIds } } : opts.categoryId ? { categoryId: opts.categoryId } : {}),
     ...(opts.subcategoryId ? { subcategoryId: opts.subcategoryId } : {}),
-    ...(opts.vendorId ? { vendorId: opts.vendorId } : {}),
+    ...(opts.vendorIds?.length ? { vendorId: { in: opts.vendorIds } } : opts.vendorId ? { vendorId: opts.vendorId } : {}),
     ...(opts.minPrice !== undefined || opts.maxPrice !== undefined
       ? {
           price: {
@@ -797,27 +802,41 @@ export async function listPublicProducts(
 }
 
 /** Filter-panel counts for the public product list (`GET /catalog/products/facets`): base
- *  filters in SQL, category / tag / price in memory so each ignores its own selection. */
+ *  filters in SQL, category / business / tag / price in memory so each ignores its own selection. */
 export async function getPublicProductFacets(opts: ProductWhereOpts & { tags?: OfferTagKey[] }) {
-  const { categoryId, categoryIds, minPrice, maxPrice, tags = [], ...base } = opts;
+  const { categoryId, categoryIds, vendorIds, minPrice, maxPrice, tags = [], ...base } = opts;
   const now = new Date();
   const [rows, hot] = await Promise.all([
     prisma.product.findMany({
       where: buildProductWhere(base),
-      select: { id: true, price: true, discount: true, createdAt: true, category: { select: PUBLIC_CATEGORY_SELECT } },
+      select: {
+        id: true,
+        price: true,
+        discount: true,
+        createdAt: true,
+        vendorId: true,
+        category: { select: PUBLIC_CATEGORY_SELECT },
+        vendor: { select: { businessName: true } },
+      },
     }),
     getHotIds('product', now),
   ]);
   return computeProductFacets(withOfferTags(rows, (p) => p.discount, hot, now), {
     categoryIds: categoryIds ?? (categoryId ? [categoryId] : []),
+    vendorIds,
     tags,
     minPrice,
     maxPrice,
   });
 }
 
-export async function getPublicProductOrThrow(id: string) {
-  const product = await prisma.product.findFirst({ where: { id, ...VISIBLE_PRODUCT_WHERE }, select: PUBLIC_PRODUCT_SELECT });
+/**
+ * Public product page (`GET /catalog/products/:idOrSlug`): accept either a UUID or the current
+ * product slug, with the response carrying the live `slug` so the page can replace stale URLs.
+ */
+export async function getPublicProductOrThrow(idOrSlug: string) {
+  const match = UUID_RE.test(idOrSlug) ? { id: idOrSlug } : { slug: idOrSlug };
+  const product = await prisma.product.findFirst({ where: { ...match, ...VISIBLE_PRODUCT_WHERE }, select: PUBLIC_PRODUCT_SELECT });
   if (!product) throw new ApiError('NOT_FOUND', 'Product not found');
   const [withTags] = await withProductPopularTags([product]);
   return withTags;
@@ -988,9 +1007,10 @@ export async function getPublicTherapistFacets(
   return { vendors, branches, distance, price };
 }
 
-export async function getPublicTherapistOrThrow(id: string) {
+export async function getPublicTherapistOrThrow(idOrSlug: string) {
+  const match = UUID_RE.test(idOrSlug) ? { id: idOrSlug } : { slug: idOrSlug };
   const therapist = await prisma.therapist.findFirst({
-    where: { OR: [{ id }, { slug: id }], ...VISIBLE_THERAPIST_WHERE },
+    where: { ...match, ...VISIBLE_THERAPIST_WHERE },
     select: PUBLIC_THERAPIST_LISTING_SELECT,
   });
   if (!therapist) throw new ApiError('NOT_FOUND', 'Therapist not found');

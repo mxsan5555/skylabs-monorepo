@@ -34,9 +34,9 @@ const WISHLIST_ITEM_SELECT = {
       slug: true,
       brand: true,
       image: true,
-      imageAlt: true,
       description: true,
       summary: true,
+      imageAlt: true,
       mediaImages: {
         select: {
           storageKey: true,

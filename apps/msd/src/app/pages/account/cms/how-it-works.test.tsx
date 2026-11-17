@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SnackbarHost } from '../../../../snackbar/snackbar';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import type { HowItWorksContent, HowItWorksStep } from '../../../../api/rbac/how-it-works';
+import { HowItWorksPage } from './how-it-works';
 
 let grantedPermissions: Set<string>;
 
@@ -35,7 +36,6 @@ vi.mock('../../../../api/rbac/how-it-works', async () => {
   };
 });
 
-import { HowItWorksPage } from './how-it-works';
 
 const CONTENT: HowItWorksContent = {
   id: 'singleton',

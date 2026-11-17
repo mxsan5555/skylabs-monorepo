@@ -128,7 +128,7 @@ beforeEach(() => {
 
 describe('MemberSettlementDetailPage — loading/error/empty states', () => {
   it('shows a loading state before the data resolves', () => {
-    getMemberSettlementDetailMock.mockReturnValue(new Promise(() => {}));
+    getMemberSettlementDetailMock.mockReturnValue(new Promise(vi.fn()));
     useAuthMock.mockReturnValue({ token: 'tok', can: () => true, bootstrap: { roles: [{ isSuperAdmin: true }] } });
     renderPage();
     expect(screen.getByText(/Loading member settlement/)).toBeTruthy();
@@ -195,7 +195,7 @@ describe('MemberSettlementDetailPage — Record Bank Payment permission gating',
       bootstrap: { roles: [{ isSuperAdmin: true }] },
     });
     renderPage();
-    const button = await screen.findByText('Record Bank Payment', {}, LONG);
+    const [button] = await screen.findAllByText('Record Bank Payment', {}, LONG);
     expect(button.closest('button, [disabled]') ?? button).toBeTruthy();
     expect(screen.getByText(/Bank details are incomplete/)).toBeTruthy();
   });
@@ -211,8 +211,9 @@ describe('MemberSettlementDetailPage — Record Bank Payment permission gating',
     renderPage();
 
     const checkbox = await screen.findByLabelText('Select voucher MSD-DL-ABC123', {}, LONG);
-    fireEvent.click(checkbox);
-    fireEvent.click(screen.getByText('Record Bank Payment'));
+    (checkbox as unknown as { checked: boolean }).checked = true;
+    fireEvent.change(checkbox);
+    fireEvent.click(screen.getAllByText('Record Bank Payment')[0]);
     fireEvent.click(screen.getByText('Record Payment'));
 
     await waitFor(

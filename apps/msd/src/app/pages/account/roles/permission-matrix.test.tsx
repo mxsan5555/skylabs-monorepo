@@ -1,5 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
+import type { PermissionScope } from '@skylabs-monorepo/shared-types';
 import type { PermissionCatalogRow, Role } from '../../../../api/rbac/roles';
 import { PermissionMatrix } from './permission-matrix';
 
@@ -47,6 +48,27 @@ const catalog: PermissionCatalogRow[] = [
   },
 ];
 
+const role = (key: string, name = 'Admin'): Role => ({ id: `role-${key}`, key, name }) as unknown as Role;
+
+function renderMatrix(
+  props: Partial<{ role: Role | null; permissions: ReadonlyMap<string, PermissionScope>; disabled: boolean }> = {},
+) {
+  const onPermissionToggle = vi.fn();
+  render(
+    <PermissionMatrix
+      catalog={catalog}
+      role={props.role === undefined ? role('admin') : props.role}
+      permissions={props.permissions ?? new Map()}
+      onPermissionToggle={onPermissionToggle}
+      disabled={props.disabled}
+    />,
+  );
+  return { onPermissionToggle };
+}
+
+const box = (name: string) => screen.getByRole('checkbox', { name }) as HTMLInputElement;
+
+/** P10-46: the matrix is one checkbox per V/C/E/D action per resource for the selected role. */
 describe('PermissionMatrix', () => {
   it('shows a prompt instead of a table when no role is selected', () => {
     render(
@@ -76,7 +98,7 @@ describe('PermissionMatrix', () => {
     expect(screen.getByRole('rowheader', { name: 'Members' })).toBeTruthy();
     expect(screen.getByRole('rowheader', { name: 'Logs' })).toBeTruthy();
     const headers = screen.getAllByRole('columnheader').map((h) => h.textContent);
-    expect(headers).toEqual(['Resource', 'View', 'Create', 'Edit', 'Delete', 'Scope']);
+    expect(headers).toEqual(['Resource', 'V', 'C', 'E', 'D', 'Scope']);
     expect(document.querySelector('.perm-matrix-wrap table.perm-matrix')).toBeTruthy();
   });
 

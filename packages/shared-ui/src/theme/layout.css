@@ -11,7 +11,6 @@
  *
  * Page-specific styles stay in each app/page.
  */
-
 /* App shell: header / scrollable content / footer. */
 .app-shell {
   min-height: 100vh;
@@ -62,8 +61,6 @@
   font-size: var(--md-sys-typescale-body-medium-size);
 }
 
-/* Auth screens (sign-in, otp). Layout follows the design reference; all colors
-   come from the active M3 theme. */
 .auth-layout {
   min-height: 100vh;
   display: flex;
@@ -125,8 +122,6 @@
   color: var(--md-sys-color-on-surface-variant);
 }
 
-/* Non-interactive pill showing where the code was sent (semantic span, not a
-   chip — it is display-only, so it must not be announced as a button). */
 .auth-destination {
   display: inline-flex;
   align-items: center;
@@ -220,10 +215,6 @@
   align-items: center;
 }
 
-/* ------------------------------------------------------------------ *
- * Admin / account console: sidebar + centered content. Reused for every
- * role (user/admin/marketing/sales). Themed by --md-sys-color-* tokens.
- * ------------------------------------------------------------------ */
 .admin-layout {
   min-height: 100vh;
   height: 100vh;
@@ -239,7 +230,6 @@
   grid-template-columns: 0 1fr;
 }
 
-/* Sidebar */
 .admin-sidebar {
   position: sticky;
   top: 0;
@@ -252,7 +242,6 @@
   overflow: hidden;
   padding: 20px;
   border-right: 1px solid var(--md-sys-color-outline-variant);
-  /* background-color: var(--md-sys-color-surface); */
 }
 
 .admin-sidebar__brand {
@@ -331,7 +320,6 @@
   color: var(--md-sys-color-on-surface-variant);
 }
 
-/* Nav row metrics: one source for items, group rows and the child indent. */
 .admin-sidebar__nav,
 .admin-nav-item {
   --admin-nav-icon-size: 20px;
@@ -483,7 +471,6 @@
 
 .admin-breadcrumb li+li::before {
   content: '\203A';
-  /* › separator, decorative */
   color: var(--md-sys-color-outline);
 }
 
@@ -492,7 +479,6 @@
   font-weight: 600;
 }
 
-/* Ancestor crumbs that link back (e.g. All Member > {business}). */
 .admin-breadcrumb a {
   color: inherit;
   text-decoration: underline;
@@ -514,7 +500,6 @@
   overflow-x: hidden;
 }
 
-/* Centered page with headline + subheadline */
 .admin-page {
   margin: 0 auto;
   display: flex;
@@ -538,7 +523,6 @@
   color: var(--md-sys-color-on-surface-variant);
 }
 
-/* Account / profile content */
 .account-card {
   display: flex;
   flex-direction: column;
@@ -563,14 +547,15 @@
 
 .account-fields {
   display: grid;
-  /* grid-template-columns: repeat(2, minmax(0, 1fr)); */
   gap: 16px;
 }
+
 .address-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
+
 .account-fields--readonly {
   --md-sys-color-on-surface: var(--md-sys-color-on-surface-variant);
   opacity: 0.55;
@@ -667,7 +652,6 @@
   flex: 0 0 var(--admin-nav-icon-size);
 }
 
-/* Group row: one full-width disclosure button (icon, title, chevron). */
 .admin-nav-group__trigger,
 .admin-nav-group__children .admin-nav-item {
   min-height: var(--admin-nav-row-min);
@@ -675,7 +659,6 @@
 
 .admin-nav-group__chevron {
   margin-inline-start: auto;
-  /* Reduced motion is handled by the duration token itself (base.css). */
   transition: transform var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
 }
 
@@ -683,7 +666,6 @@
   transform: rotate(0.5turn);
 }
 
-/* Child list rule sits under the parent icon's centre. */
 .admin-nav-group__children {
   margin-left: calc(var(--admin-nav-pad-inline) + var(--admin-nav-icon-size) / 2);
   padding-left: var(--admin-nav-pad-inline);
@@ -751,7 +733,6 @@
     transform: translateX(0);
   }
 
-  /* Close icon: top-right of sidebar */
   .admin-sidebar__mobile-header {
     position: absolute;
     top: 12px;

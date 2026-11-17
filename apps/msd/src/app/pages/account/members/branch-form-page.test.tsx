@@ -248,7 +248,7 @@ describe('BranchFormPage — Edit', () => {
     expect(getVendorMock).toHaveBeenCalledWith('tok', 'v1');
     await waitFor(() =>
       expect(screen.getByTestId('trail').textContent).toBe(
-        'Members > All Member(/account/members) > Vitality Wellness & Beauty(/account/members/v1) > Branches(/account/members/v1/branches) > Lower Parel Branch',
+        'Members > All members(/account/members) > Vitality Wellness & Beauty(/account/members/v1) > Branches(/account/members/v1/branches) > Lower Parel Branch',
       ),
     );
   });

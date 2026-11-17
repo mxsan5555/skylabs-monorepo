@@ -2,6 +2,7 @@ import { render, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { MemberSettlementRow } from '../../../../api/rbac/settlements';
+import { MemberSettlementsPage } from './member-settlements';
 
 // Full-suite runs under worker-pool load can push jsdom async resolution past testing-library's
 // default 1000ms waitFor/findBy timeout even though every assertion here is otherwise correct —
@@ -28,7 +29,6 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => navigateMock };
 });
 
-import { MemberSettlementsPage } from './member-settlements';
 
 const ROW: MemberSettlementRow = {
   vendorId: 'vendor-1',

@@ -11,6 +11,7 @@ import {
 } from '../../../../api/rbac/members';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import type { SkyStatusTone } from '@skylabs-monorepo/shared-ui';
+import { DOCUMENT_ACCEPT, DOCUMENT_MAX_MB, isDocumentTooLarge } from '@skylabs-monorepo/shared-utils';
 
 const TYPES: { type: VendorDocumentType; label: string; numberLabel: string }[] = [
   { type: 'AADHAAR', label: 'Aadhaar card', numberLabel: 'Aadhaar number' },
@@ -116,6 +117,12 @@ export function MemberDocumentsTab({ token, memberId, canEdit, canApprove, canRe
 
   const upload = (type: VendorDocumentType, file: File | undefined) => {
     if (!file) return;
+    // Saves a wasted upload only; the server enforces the same limit (P10-37).
+    if (isDocumentTooLarge(file)) {
+      setNotice('');
+      setError(`That file is larger than ${DOCUMENT_MAX_MB} MB. Choose a smaller file.`);
+      return;
+    }
     void run('Document uploaded for the member.', () => uploadMemberDocument(token, memberId, type, file, file.name, numbers[type]?.trim() || undefined));
   };
 
@@ -167,9 +174,16 @@ export function MemberDocumentsTab({ token, memberId, canEdit, canApprove, canRe
                 <h3>{label}</h3>
                 <sky-badge status={STATUS_TONE[state]}>{STATUS_LABEL[state]}</sky-badge>
                 {row?.numberMasked && <p>{row.numberMasked}</p>}
-                {row?.uploadedOnBehalf && <p className="field-hint">Uploaded by staff for the member</p>}
+                {row?.uploadedOnBehalf && <p className="field-hint">{`Uploaded by ${row.uploadedByName || 'staff'} for the member`}</p>}
                 {row?.status === 'REJECTED' && row.rejectionReason && <p className="error-state">Rejected: {row.rejectionReason}</p>}
                 {row?.originalFilename && <p className="field-hint">{row.originalFilename}</p>}
+                {/* Signed link (P5-14), new tab without opener or referrer (P10-37). */}
+                {row?.fileUrl && (
+                  <a className="text-link" href={row.fileUrl} target="_blank" rel="noopener noreferrer">
+                    {`View ${label} file`}
+                    <span className="sr-only"> (opens in a new tab)</span>
+                  </a>
+                )}
               </div>
 
               {canEdit && (
@@ -188,7 +202,7 @@ export function MemberDocumentsTab({ token, memberId, canEdit, canApprove, canRe
                     {`${row ? 'Replace' : 'Upload'} ${label} file`}
                     <input
                       type="file"
-                      accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                      accept={DOCUMENT_ACCEPT}
                       disabled={busy}
                       onChange={(e) => {
                         upload(type, e.target.files?.[0]);

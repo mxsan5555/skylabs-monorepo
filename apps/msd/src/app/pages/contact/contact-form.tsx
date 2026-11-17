@@ -6,6 +6,8 @@ import {
 } from '@skylabs-monorepo/shared-ui/react';
 import { showSnackbar } from '../../../snackbar/snackbar';
 import { EMAIL_REGEX, MOBILE_REGEX, fillTemplate, inputValue } from '../../../utils/format';
+import { submitContactMessage } from '../../../api/contact';
+import { ApiRequestError } from '../../../api/rbac/client';
 import content from '../../../content.json';
 
 const t = content.contact.form;
@@ -19,19 +21,21 @@ const EMPTY: Record<Field, string> = {
   message: '',
 };
 
-/** Public contact form. msd-api has no public message endpoint yet, so Send validates and opens
- *  the visitor's email app with a message addressed to `to`, every field filled in. */
 export function ContactForm({ to }: { to: string }) {
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
   const set = (key: Field) => (e: Event) =>
     setForm((f) => ({ ...f, [key]: inputValue(e) }));
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
     const v = Object.fromEntries(
       Object.entries(form).map(([k, x]) => [k, x.trim()]),
     ) as Record<Field, string>;
+
     const problem =
       !v.name || !v.email || !v.subject || !v.message
         ? t.required
@@ -40,11 +44,38 @@ export function ContactForm({ to }: { to: string }) {
           : v.phone && !MOBILE_REGEX.test(v.phone)
             ? t.invalidPhone
             : '';
+
     setError(problem);
     if (problem) return;
-    const body = fillTemplate(t.mailBody, v).trim();
-    window.location.href = `mailto:${to}?subject=${encodeURIComponent(v.subject)}&body=${encodeURIComponent(body)}`;
-    showSnackbar(t.opened, { variant: 'success' });
+
+    try {
+      setSubmitting(true);
+
+      // 1. Pehle DB mein save (proper API client se)
+      await submitContactMessage({
+        name: v.name,
+        email: v.email,
+        phone: v.phone || undefined,
+        subject: v.subject,
+        message: v.message,
+      });
+
+      // 2. Phir Outlook / Gmail open karo
+      const body = fillTemplate(t.mailBody, v).trim();
+      window.location.href = `mailto:${to}?subject=${encodeURIComponent(
+        v.subject,
+      )}&body=${encodeURIComponent(body)}`;
+
+      showSnackbar(t.opened, { variant: 'success' });
+    } catch (err) {
+      const message =
+        err instanceof ApiRequestError
+          ? err.message
+          : 'Something went wrong. Please try again.';
+      showSnackbar(message, { variant: 'error' });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -57,6 +88,7 @@ export function ContactForm({ to }: { to: string }) {
       <h2 id="contact-form-heading" className="form-grid__full headline-small">
         {t.heading}
       </h2>
+
       <OutlinedTextField
         label={t.name}
         value={form.name}
@@ -94,14 +126,17 @@ export function ContactForm({ to }: { to: string }) {
         required
         onInput={set('message')}
       />
+
       {error && (
         <p className="error-state" role="alert">
           {error}
         </p>
       )}
+
       <p className="form-grid__full body-medium text-muted">{t.hint}</p>
+
       <div className="form-actions">
-        <FilledButton type="submit">
+        <FilledButton type="submit" disabled={submitting}>
           <Icon slot="icon" aria-hidden="true">
             send
           </Icon>

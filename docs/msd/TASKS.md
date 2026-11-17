@@ -37,19 +37,19 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 
 | # | Module | Done | Total | % |
 |---|---|---|---|---|
-| 1 | Admin and staff | 2 | 31 | 6 |
-| 2 | Members | 47 | 101 | 47 |
-| 3 | Customers and orders | 2 | 12 | 17 |
-| 4 | Storefront | 17 | 42 | 40 |
-| 5 | Static content | 0 | 5 | 0 |
+| 1 | Admin and staff | 4 | 31 | 13 |
+| 2 | Members | 54 | 101 | 53 |
+| 3 | Customers and orders | 3 | 12 | 25 |
+| 4 | Storefront | 30 | 48 | 63 |
+| 5 | Static content | 2 | 5 | 40 |
 | 6 | CTA banners | 4 | 5 | 80 |
 | 7 | Home slider | 13 | 14 | 93 |
 | 8 | Masters | 0 | 1 | 0 |
 | 9 | Payments, payouts and reports | 0 | 11 | 0 |
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
-| 12 | Platform, security and release | 7 | 69 | 10 |
-| | **Total** | **66** | **272** | **24** |
+| 12 | Platform, security and release | 15 | 71 | 21 |
+| | **Total** | **119** | **297** | **40** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -94,7 +94,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | P10-10 | FE | Staff users page: create, edit, status, delete rules; role dropdown limited; last super admin message | M | P8-01 | `users/` tests updated |
 | [ ] | P10-29 | FE | System settings page (super admin edit, admin view) | M | P8-03 | Tests |
 | [ ] | P10-30 | FE | Logs page: login history (all or own) and audit filters | M | P8-04, P8-05 | Tests |
-| [ ] | P10-38 | SEC | Logout clears tokens and bootstrap; preview token never persisted past tab; no open redirects after sign-in | S | - | Tests |
+| [x] | P10-38 | SEC | Logout clears tokens and bootstrap; preview token never persisted past tab; no open redirects after sign-in | S | - | Tests; done 2026-10-28: `shared-auth` sign-out revokes the refresh token and clears everything, preview token in `sessionStorage` only (older localStorage previews migrated), `sanitizeReturnUrl` refuses backslash, control-character and encoded `//` paths. mera-driver's Angular `AuthService` follows the same rules since mera-driver X-06 |
 
 ## 2. Members
 
@@ -124,8 +124,8 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [x] | P3-21 | BE | Remove `POST /vendors/me` and `POST /vendors/me/submit` and the vendor approve and reject routes (ARCHITECTURE.md C-11) | M | P3-12 | Routes return 404, OpenAPI updated |
 | [ ] | P3-22 | BE | Rename `vendor.service.ts`, `vendors.routes.ts` and the `Vendor*` Zod schemas to member names | S | P3-12 | No `vendor` in those file or schema names; existing tests green |
 | [ ] | P3-23 | FE | Move the member detail page and self-service calls in msd from `/vendors/:id` and `/vendors/me` to `/members/*` before the alias is removed | S | P3-12 | No `/vendors` request left in `apps/msd/src/api` (grep) |
-| [ ] | P3-24 | BE | Return structured fields (from status, to status, document type, actor id) from the member activity API so the client stops parsing summary sentences | S | P3-13 | Activity items carry the fields; `readableActivitySummary` removed from `apps/msd`; tests |
-| [ ] | P3-25 | BE | Hard delete of a member also removes the media files of its deals, products and therapists from R2, not only its own documents, images and video | S | P3-09 | Test: every storage key of the cascaded rows is deleted after commit; archive keeps all files |
+| [x] | P3-24 | BE | Return structured fields (from status, to status, document type, actor id) from the member activity API so the client stops parsing summary sentences | S | P3-13 | Activity items carry the fields; `readableActivitySummary` removed from `apps/msd`; tests; done 2026-10-28: typed fields per kind (status, document, reminder) next to `summary`; console `activityText` builds the sentence, `readableActivitySummary` removed |
+| [x] | P3-25 | BE | Hard delete of a member also removes the media files of its deals, products and therapists from R2, not only its own documents, images and video | S | P3-09 | Test: every storage key of the cascaded rows is deleted after commit; archive keeps all files; done 2026-10-27: `memberStorageKeys` also reads deal, product and therapist images and videos before the delete |
 | [ ] | P4-01 | BE | Members list, get, update through `scopedWhere` | M | P2-02, P3-05 | Member A cannot read B (404) |
 | [ ] | P4-02 | BE | Branches: flat routes plus scope plus status endpoint | M | P4-01 | IDOR test |
 | [ ] | P4-03 | BE | Deals: scope, status, `PUT /deals/:id/therapists` with branch and member checks | L | P4-02 | Cross-branch assignment returns 422 |
@@ -135,7 +135,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | P4-13 | BE | Grant `members:view` and `members:edit` with own scope to role `member`, then retire `members:custom` | M | P4-01 | Member reads and edits only their own record; `members:custom` gone from the seed |
 | [x] | P4-14 | BE | Product category without per-member grants (D10, C-07, C-12 for products): `createProduct` and `updateProduct` check only active `PRODUCT` type and subcategory parentage | S | - | Member with no `VendorCategoryAccess` row creates a product; a `SERVICE` category is rejected; tests |
 | [x] | P4-15 | BE | Finish C-12 for deals and therapists: drop vendor and branch category grant checks, retire the `PUT .../category-access` routes and the onboarding grant step | M | P4-14 | Deal and therapist create work with no grants; grant routes return 404; tests; done 2026-10-27: no grant checks or grant routes (404), branch and therapist forms have no grant step, dashboard counts used categories; grant tables and `offers*` flags dropped in the contract step |
-| [ ] | P4-16 | BE | Member customers view (C-16, D9, D19): `GET /customers` own scope, customers with an order item from the member, name, city, order count, last order date | S | P4-01 | Member sees only own customers; no phone or email unless an order is open |
+| [x] | P4-16 | BE | Member customers view (C-16, D9, D19): `GET /customers` own scope, customers with an order item from the member, name, city, order count, last order date | S | P4-01 | Member sees only own customers; no phone or email unless an order is open; done 2026-10-28: `GET /vendors/me/customers` returns city and `hasOpenOrder`, phone and email only with a CONFIRMED order; staff route keeps full contact; console shows City and "Hidden until an order is open"; flat `GET /customers` own scope moves to P4-01 |
 | [ ] | P5-01 | DB | `MemberDocument` migration: status, masked number, hash, reviewer, expiry, uploader fields | M | P3-01 | Up and down tested; partly: columns in the migration; up and down rehearsal open (P10-45) |
 | [ ] | P5-02 | DB | Copy legacy GST, PAN and `kycDocuments` into `MemberDocument`; verify counts | M | P5-01 | Count and checksum report; partly: existing `VendorDocument` rows become SUBMITTED; legacy GST, PAN and `kycDocuments` columns not copied yet |
 | [x] | P5-03 | BE | Private R2 bucket client, presigned GET (5 min), `.pdf` ContentType fix | M | P2-09 | Merged: `R2_PRIVATE_BUCKET`, `signedFileUrl` (300 s), `.pdf` content type; no fallback to the public bucket |
@@ -150,7 +150,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | P5-12 | SEC | Decide and add malware scanning for uploads (provider or ClamAV) | M | P5-06 | Infected sample rejected |
 | [ ] | P5-13 | BE | Encrypt and mask bank account number at rest | M | P2-13 | Raw DB value is ciphertext |
 | [x] | P5-14 | BE | Signed URL download for member documents, replacing the `storageKey` in list responses | M | P5-03 | Merged: `fileUrl` replaces `storageKey`; tests assert no key in responses |
-| [ ] | P5-15 | BE | Documents list returns the uploader name, and the row shows "uploaded by <name> for member" | S | P5-07 | Test shows the name |
+| [x] | P5-15 | BE | Documents list returns the uploader name, and the row shows "uploaded by <name> for member" | S | P5-07 | Test shows the name; done 2026-10-28: `uploadedByName` on every documents list row (staff uploads only, one lookup); the Documents tab shows "Uploaded by <name> for the member" |
 | [x] | P6-01 | DB | `MemberDocumentReminder` table with unique (member, sequence, channel) | S | P3-01 | Merged: migration `20261017100000_member_document_reminders` (one row per reminder with per-channel status; unique member + sequence) |
 | [x] | P6-02 | BE | Reminder schedule service (due +0, +7, +14 days, listing exact missing documents) | M | P6-01 | Merged: `member-reminder-policy.ts` with fake-clock tests; missing list stored per reminder |
 | [ ] | P6-03 | BE | Notification template service for SMS and email (generic, replaces OTP-only sender) | M | - | Provider failure recorded, no crash; partly: minimal: welcome, suspension and reactivation notices by email and SMS with one inline retry; OTP sender not replaced |
@@ -170,7 +170,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [x] | P10-14 | FE | Tabs: Profile, Documents, Branches/Deals/Therapists, Activity | M | P10-13 | Keyboard and ARIA tab pattern |
 | [x] | P10-15 | FE | Status change with inline confirm and reason (10 to 500 chars), history list | M | P3-07 | Tests |
 | [x] | P10-16 | FE | Delete member (super admin only) with inline confirm; message for the ARCHIVED outcome | S | P3-09 | Tests |
-| [ ] | P10-17 | FE | Documents tab: per-document status chips, masked number input, upload, approve, reject with reason, "uploaded by X for member", view via signed URL in new tab | L | P5-06, P5-09 | Tests; support sees status only; partly: status chips, masked number, upload on behalf, approve and reject done; uploader name (P5-15) open; signed URL view done (P5-14) |
+| [x] | P10-17 | FE | Documents tab: per-document status chips, masked number input, upload, approve, reject with reason, "uploaded by X for member", view via signed URL in new tab | L | P5-06, P5-09 | Tests; support sees status only; partly: status chips, masked number, upload on behalf, approve and reject done; uploader name done (P5-15); signed URL from P5-14 (server only); done 2026-10-28: "View <document> file" link added with P10-37, every part now built and tested |
 | [x] | P10-18 | FE | Activity tab: reminders, warnings, status timeline | M | P3-13, P6-01 | Merged: reminders, manual reminders and the review flag in the Activity tab |
 | [x] | P10-19 | FE | "Ready for suspension review" badge with reason prefilled "Documents not completed" | S | P6-05, P10-15 | Merged: the flag is now set by the reminder job; badge, filter and prefilled reason read it |
 | [ ] | P10-20 | FE | My profile and business profile (own view/edit) | M | P8-06 | Tests |
@@ -182,10 +182,10 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | P10-43 | OPS | Register DLT-approved SMS templates for the welcome, suspension and reactivation texts in `apps/msd-api/src/lib/member-messages.ts` before production | S | - | Template IDs approved and recorded |
 | [ ] | P10-44 | OPS | Set `SUPPORT_EMAIL`, `SUPPORT_PHONE`, `FIELD_ENCRYPTION_KEY` and `DOC_HASH_PEPPER` on Railway before this slice ships | S | - | Staging and production boot with all 4 set |
 | [ ] | P10-45 | OPS | Run `prisma/member-status-report.ts` and get owner sign-off before applying the `member_lifecycle` migration; rehearse migration up and down on a Neon copy | M | P0-05 | Report saved, sign-off recorded, rehearsal log with row counts |
-| [ ] | P10-46 | QA | Fix pre-existing lint and test drift: eslint ignore error in shared-* packages and 31 msd lint errors; 26 msd tests in 15 files (permission-matrix, roles, widget-registry, settings, home, wishlist, become-vendor, india-locations, deal-card, sky-product-card-wc, media-uploader, site-footer, contact-us, app.spec, entry-server); msd-api `rbac.routes` and orders image tests; shared-menu `index.test.ts` | M | - | `nx run-many -t lint test` green for msd, msd-api and shared-* |
-| [ ] | P10-47 | FE | Rename "All Member" to "All members" in the sidebar title (`packages/shared-menu/src/msd-menu.json`) and the breadcrumbs of the branch, deal, product and therapist form pages | S | - | grep finds no "All Member" in `apps/msd/src` or `packages/shared-menu`; tests updated |
+| [ ] | P10-46 | QA | Fix pre-existing lint and test drift: eslint ignore error in shared-* packages and 31 msd lint errors; 26 msd tests in 15 files (permission-matrix, roles, widget-registry, settings, home, wishlist, become-vendor, india-locations, deal-card, sky-product-card-wc, media-uploader, site-footer, contact-us, app.spec, entry-server); msd-api `rbac.routes` and orders image tests; shared-menu `index.test.ts` | M | - | `nx run-many -t lint test` green for msd, msd-api and shared-* (partly, 2026-10-29: msd-api tests green; shared-* lint and tests green; msd lint 0 errors; msd tests: 0 known failures; flaky tests left, see TESTING §3) |
+| [x] | P10-47 | FE | Rename "All Member" to "All members" in the sidebar title (`packages/shared-menu/src/msd-menu.json`) and the breadcrumbs of the branch, deal, product and therapist form pages | S | - | grep finds no "All Member" in `apps/msd/src` or `packages/shared-menu`; tests updated; done 2026-10-28: sidebar title renamed; the six member pages build the trail from one `member-crumbs.ts` (`MEMBERS_TRAIL`, `memberTrail`) |
 | [x] | P10-48 | FE | Product form (member detail Products and member self-service): Category (required), Subcategory and Type (optional) list all active `PRODUCT` categories, not per-member grants; "New" and "Featured" checkboxes stay on the form | S | P4-14 | Member with no grants sees the category list; both checkboxes save `isNew` and `isFeatured`; tests |
-| [ ] | P10-49 | FE | Member detail page shows total customers and total orders (counts linking to the filtered lists) | S | P4-16 | Counts match the lists; support sees counts only |
+| [x] | P10-49 | FE | Member detail page shows total customers and total orders (counts linking to the filtered lists) | S | P4-16 | Counts match the lists; support sees counts only; done 2026-10-28: `customerCount` and `orderCount` on the member detail API; header counts link to a new Customers tab (`customers:view`) and to `/account/orders?vendorId=` (`orders:view`), plain numbers otherwise. "Support sees counts only" replaced by these permission checks (owner decision 2026-10-28: Support holds both views, D12) |
 | [ ] | P5-16 | SEC | Switch `STORE_FULL_DOCUMENT_NUMBER` (default true in development): when false, write only the masked number and hash; production boot warns while it is true (D3) | S | P2-13 | Both modes tested; no full number stored when false |
 | [ ] | DL-01 | DB | Deal schema S18 to S21 and backfill S23 (PLANNING §2.7, DATABASE §2) with `down.sql` | M | owner approval of §2.7 | Migration up and down on a Neon copy; counts of backfilled rows recorded; partly 2026-10-27: migration `20261026100000_deal_page_fields` + `down.sql` written, client generated, applied locally 2026-10-27 (empty `migrate diff`, 38 deals backfilled); Neon rehearsal open |
 | [x] | DL-02 | SH | India location list to `packages/shared-utils`; branch `state` and `city` required from it, `addressLine2` (C-03, S22) | M | - | Unknown state or city returns 422; msd form and API use the one list; report of existing bad rows; partly 2026-10-27: list in `@skylabs-monorepo/shared-utils`, API and both branch forms require state + city, `addressLine2` added; done 2026-10-27: report script `npm run msd-api:prisma:report-branch-locations` (0 bad rows locally), `state`/`city` `NOT NULL` migration; Neon run with DL-01 |
@@ -206,7 +206,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 
 | Done | ID | Area | Task | Size | Depends | Done when |
 |---|---|---|---|---|---|---|
-| [ ] | P4-06 | BE | Orders: scope on `OrderItem.vendorId`; strip other members' items | M | P2-02 | Mixed-vendor order test; partly: member scope fixed in P4-17 |
+| [x] | P4-06 | BE | Orders: scope on `OrderItem.vendorId`; strip other members' items | M | P2-02 | Done 2026-10-29 (item 5): members get their own lines, totals, payment share, vendor and branch; search limited to own items; `order-member-scope.test.ts` |
 | [ ] | P4-07 | BE | Customers: support and sales view-only, member view own (D9, PLANNING.md §1.2 matrix) | S | P1-07 | Matrix test |
 | [ ] | P7-01 | DB | `RefundRequest` table; `REFUNDED`, `PARTIALLY_REFUNDED` payment statuses | M | P0-01 | Migration tested |
 | [ ] | P7-02 | BE | `POST /orders/:id/cancel` with reason, state rules, notifications | M | P4-06 | Invalid state returns 409 |
@@ -225,28 +225,28 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | Done | ID | Area | Task | Size | Depends | Done when |
 |---|---|---|---|---|---|---|
 | [ ] | P10-33 | FE | Storefront check: suspended member's deals, branches and therapists absent; deal URL returns not-found page; prerender and sitemap exclude them | M | P3-10 | Manual and `hydration.test.tsx` |
-| [ ] | ST-01 | FE | Create the `/member` page that the header "Become a Member" link opens | S | - | Route renders, link works, test |
+| [x] | ST-01 | FE | Create the `/member` page that the header "Become a Member" link opens | S | - | Done: the link opens `/become-member` (member sign-up, `become-vendor.tsx`); `header-actions.test.tsx` checks the link and its route |
 | [ ] | ST-02 | FE | Transparent and dark-mode logo asset (`logo.jpg` has a white background) | S | - | Logo reads on dark surfaces |
 | [ ] | ST-03 | BIZ | Decide where staff land when they open "Account" on a phone (console has no bottom nav) | S | - | Decision recorded in PLANNING.md §4 |
-| [ ] | ST-04 | FE | 10 public pages render their own `<main>` inside the layout `<main>` (about, become-vendor, blog, blog-detail, careers, checkout, contact, how-it-works, showcase, website-page): change page roots to `div`/`article` | S | - | One `<main>` per page (test) |
-| [ ] | ST-05 | FE | Tell the visitor when "Use my current location" fails or is more than 75 km from any partner city | S | - | Message shown, test |
-| [ ] | ST-06 | QA | Header and tab bar tests: search submit, signed-in account menu, `useAccountLinks` role branches | S | - | Tests green; partly: account menu Profile link and `/my-dashboard` redirect per role done (staff to `/account/dashboard`, customers to `/my-dashboard`) |
-| [ ] | ST-07 | FE | `/help` and `/gifting` footer links have no routes (404) | S | - | Routes exist or links removed |
-| [ ] | ST-08 | FE | Public pages without a meta description (cart, sign-in, otp, orders, invoice, choose-experience) move to `Seo` | S | - | Every public route has a description |
+| [x] | ST-04 | FE | 10 public pages render their own `<main>` inside the layout `<main>` (about, become-vendor, blog, blog-detail, careers, checkout, contact, how-it-works, showcase, website-page): change page roots to `div`/`article` | S | - | One `<main>` per page (test); done 2026-10-28: the last four (blog, blog detail, checkout, showcase) use `div`; `one-main-landmark.test.ts` fails on any `<main>` in `app/pages` |
+| [x] | ST-05 | FE | Tell the visitor when "Use my current location" fails or is more than 75 km from any partner city | S | - | Done: `requestBrowser` resolves `far`; `CityPicker` shows the far or failed alert; `city-picker.test.tsx`, `location-context.test.tsx` |
+| [x] | ST-06 | QA | Header and tab bar tests: search submit, signed-in account menu, `useAccountLinks` role branches | S | - | Done: `role-routing.test.ts` (landing per role), `shell-labels.test.tsx` (`useAccountLinks`); fixed the member check (`member`, not `vendor`) and support as staff |
+| [x] | ST-07 | FE | `/help` and `/gifting` footer links have no routes (404) | S | - | Routes exist or links removed; done 2026-10-28: `/help` already pointed to `/help-center`; the "Gifting" link removed until a gift-card feature exists (owner decision) |
+| [x] | ST-08 | FE | Public pages without a meta description (cart, sign-in, otp, orders, invoice, choose-experience) move to `Seo` | S | - | Every public route has a description; done 2026-10-28: cart, sign in, OTP, orders, invoice (and its not-found view, now noindex too) and choose experience render `Seo` with a `content.meta` description |
 | [ ] | ST-09 | BIZ | Owner supplies footer brand contact details (phone, email) | S | - | Copy in `content.json` |
 | [ ] | ST-10 | OPS | When the custom domain goes live, set `VITE_SITE_URL` (website origin, not the API) for Vercel Production and redeploy; until then canonicals, OG, most JSON-LD and sitemap/robots/llms are omitted. The Vercel build must reach the Railway msd-api (prerender data) | S | X-01 | Canonical tags and sitemap present on production |
 | [ ] | ST-11 | OPS | On the first Vercel preview, verify `/api/geo`, that `/category/x/` and `/spa.html` 308 to `/category/x` and `/spa`, and that non-prerendered routes get the SPA shell | S | - | Checklist ticked |
 | [ ] | ST-12 | OPS | Vercel deploy hook (cron or on catalog change) so prerendered pages rebuild when deals change | S | - | Hook fires, pages refresh |
 | [x] | ST-13 | BIZ | Decide whether `/category/product` and `/category/therapy` are indexable or redirect to `/products` and `/therapists` | S | - | Done 2026-10-24: D31, both indexable; chips link listing and category pages |
-| [ ] | ST-14 | FE | Add `prerender/` to a tsconfig so it is type-checked | S | - | `tsc` covers prerender |
+| [x] | ST-14 | FE | Add `prerender/` to a tsconfig so it is type-checked | S | - | `tsc` covers prerender; done 2026-10-28: `apps/msd/tsconfig.prerender.json` (bundler resolution for Vite 8 types, app element typings included); `nx run msd:typecheck` runs it beside the app config; 0 errors in `prerender/` |
 | [x] | ST-15 | FE | `showcase.tsx` and unused `product-card.tsx` pass camelCase props to raw custom elements; fix, and delete `product-card.tsx` if unused | S | - | Done 2026-10-24: 80 props in 9 files moved to kebab-case (incl. `OfferCard` `price-first`, `image-alt`, `badge-color`/`badge-tone`, `original-price`, header `clear-label`), `product-card.tsx`/`.css` deleted, `SkyProductCardWC` writes `favorite`/`favorite-active` as attributes; guard `src/sky-element-props.test.ts`, hydration case in `offer-card.test.tsx` |
-| [ ] | ST-16 | FE | Audit app-level CSS in the dark theme (the footer theme switch exposes it) | S | - | No hardcoded light colours |
-| [ ] | ST-18 | FE | Popular searches render only on the client until the catalog is seeded into the prerender | S | - | Present in prerendered HTML |
-| [ ] | ST-19 | FE | Shared `--sky-content-max` token for the 1280px / 16px containers (header, footer, home) | S | - | One token, no repeated values |
-| [ ] | ST-20 | FE | Move the remaining `useCurrentLocation` callers (category, search, therapists, vendor) to `useVisitorLocation` | S | - | `useCurrentLocation` deleted (category, search and therapists move with ST-41 to ST-43) |
+| [x] | ST-16 | FE | Audit app-level CSS in the dark theme (the footer theme switch exposes it) | S | - | Done: removed light hex fallbacks from `var()` (styles, blog, blog post, my account, not found), video backgrounds use `scrim`, checkout card uses `--sky-elevation-1`, Razorpay colour comes from the theme seed; `theme-colours.test.ts` guards it |
+| [x] | ST-18 | FE | Popular searches render only on the client until the catalog is seeded into the prerender | S | - | Done: the shell payload already seeds categories and locations, so the footer renders them on the server; `hydration.test.tsx` guards the links and a clean hydration when a saved city reorders them |
+| [x] | ST-19 | FE | Shared `--sky-content-max` token for the 1280px / 16px containers (header, footer, home) | S | - | One token, no repeated values; done 2026-10-28: `--sky-content-max` and `--sky-content-gutter` on `:root` in `styles.css`, used by page sections, header, footer, breadcrumb and the product "related" band; `content-width.test.ts` fails on any other 1280px |
+| [x] | ST-20 | FE | Move the remaining `useCurrentLocation` callers (category, search, therapists, vendor) to `useVisitorLocation` | S | - | `useCurrentLocation` deleted (category, search and therapists move with ST-41 to ST-43); done 2026-10-28: the member page was the last caller; it reads `useVisitorLocation()` and `hooks/useCurrentLocation.ts` is deleted; `resolveBranch` tested (`vendor.test.tsx`) |
 | [x] | ST-21 | FE | Move `/categories`, therapists, orders, invoices and payments off `category.css` onto `PageSection`/`CardGrid`, then delete `category.css` | M | - | Done 2026-10-22: pages migrated, `category.css` deleted |
 | [ ] | ST-22 | BIZ | Reviews system (customers rate completed orders) so the category page can add a rating sort, rating filter and card ratings | L | - | Module rules written in PLANNING.md |
-| [ ] | ST-25 | FE | Filter panel polish: keep selected Business/Branch options visible outside the facet list or past "Show more"; clamp URL min/max into the slider bounds when facets narrow | S | - | Tests |
+| [x] | ST-25 | FE | Filter panel polish: keep selected Business/Branch options visible outside the facet list or past "Show more"; clamp URL min/max into the slider bounds when facets narrow | S | - | Done: `CheckboxFacet` pins selected options (all facets), `PriceRangeField` clamps shown values; `checkbox-facet.test.tsx`, `price-range-field.test.tsx` |
 | [x] | ST-26 | FE | Deal page single-location map using `DealMap` | S | - | Map shows the branch; done 2026-10-27: compact `DealMap` (one plain marker) in the deal page Location panel after hydration, only when the branch has coordinates; fixed `GET /catalog/locations` 500 (null filters on the now-required state/city) |
 | [ ] | ST-27 | OPS | Before traffic grows, move `VITE_MAP_TILE_URL` off `tile.openstreetmap.org` to a free-tier tile provider (OSM tile policy) | S | - | Env changed on Vercel |
 | [ ] | ST-28 | BE | Newsletter backend (msd-api table and endpoint) for the footer signup, which is UI only today | M | - | Signup stored; footer copy updated |
@@ -254,7 +254,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [x] | ST-30 | FE | Offer card (`OfferCard` in `app/components/offer-card`, used by the home hero with `color="surface-high"` `variant="plain"` and the showcase): `sky-product-card` `price-first`, `description`, `badge-color`/`badge-tone` (theme-role tags), `color` (M3 roles, shared `actionRoles` for slotted buttons), shared `lineClamp` and `mediaCorner` styles; real deal and product with Add to cart (`showCartAdded`), wishlist and the shared `useRequireSignIn` guard; grid and list | M | - | Merged: `sky-product-card.test.ts`, `offer-card.test.tsx`, `home.test.tsx` hero, `use-require-sign-in.test.tsx`; checked at 1440 and 390 px |
 | [ ] | ST-31 | FE | Replace listing cards with the offer card page by page (home, category, explore, search, member, wishlist) and move the ~40 inline sign-in redirects onto `useRequireSignIn` | L | ST-30 | Each page's tests; no visual regressions (done 2026-10-22: home, hero, category, explore/search, products, wishlist, deal and product "You May Also Like"; left: member page, remaining inline redirects) |
 | [ ] | ST-33 | BE | Public contact message endpoint (`POST /catalog/contact-messages`, table, console list) so the Contact form stores messages instead of opening the email app | M | - | Message stored; form posts; tests |
-| [ ] | ST-34 | BIZ | Owner supplies the real office address, phone and email (CMS Contact Us), replacing the `content.contact.defaults` placeholders | S | - | CMS row filled |
+| [ ] | ST-34 | BIZ | Owner supplies the real office address, phone and email (CMS Contact Us), replacing the `content.contact.defaults` placeholders | S | - | CMS row filled. Decide too: the CMS Contact Us form accepts only a 10-digit mobile (`validatePhone`), so a landline office number is refused today |
 | [x] | ST-35 | FE | Static page headers show the brand logo in the right column; Contact gets details + form + map; Become a member uses the same layout; 8 default FAQs; About copy describes a marketplace | M | - | Tests in contact, become-vendor, section-head |
 | [x] | ST-36 | FE | Offer card for services: title only, `divided` (hairline, then member and place on one line each; shared-ui `sky-product-card` option); `slider` prop (image slider with previous / next and dots via `ProductCardGallery fill`, on every listing); `TherapistCard` + `lowestPackagePrice` / `formatDistance` replace four hand-built therapist cards; list-layout images no longer stretch the row | M | ST-30 | Merged: `sky-product-card.test.ts` (divided), `offer-card.test.tsx` (slider), `search.test.tsx`; checked at 1366 and 390 px |
 | [x] | ST-37 | FE | Therapist detail laid out like the deal page: shared `components/detail-page` (gallery, price, quantity + total + Add to cart + share, location and hours, not found), one generic `DurationPackageSelector` (therapist selector removed), therapist cart line from the page, "More therapists at {member}" rail; deal page moved onto the same blocks | M | - | Merged: `therapist-detail.test.tsx`; deal and therapist pages checked at 1366 and 390 px |
@@ -266,6 +266,12 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [x] | ST-43 | FE | `/explore` on the shell with kind chips and counts, `noindex, follow` | M | ST-41 | Done 2026-10-24: `search.test.tsx` rewritten (kind chips, counts, category param, `noindex, follow`, sign-in path); state/city dialogs replaced by the shared filter panel; checked at 1366 and 390 px |
 | [x] | ST-44 | FE | Home "Shop by category" becomes "Deals by category" with all 10 categories in a 5x2 grid from 840px (2 columns below) | S | - | Done 2026-10-24 (b01a585) |
 | [x] | ST-45 | FE | Category tiles get the M3 hover/press state layer (`sky-tile-card` with a slotted headline link); card rails and the home hero stop clipping card shadows and focus rings (padding inside Swiper's `::part(container)`) | S | - | Done 2026-10-24 (26981d8): `sky-tile-card.test.ts`; checked at 1280 px |
+| [ ] | ST-46 | FE | Rebuild the my-account Wishlist, Payments and Invoices pages on the shared blocks (60/30/10 roles, no page CSS, copy in `content.json`) and swap their raw robots `<meta>` for `Seo noindex` | M | - | Each page's tests; no page CSS left |
+| [ ] | ST-47 | FE | Rebuild the invoice page (`/orders/:id/invoice`, opened by Download invoice) on the shared blocks, print-friendly | S | - | Tests; prints on one page |
+| [ ] | ST-48 | FE | Move the console settings page (`/account/settings`) off the old `account-card` styles onto the shared blocks | S | - | Tests; `account-card` unused there |
+| [ ] | ST-49 | BIZ | Owner decisions from the cart, checkout and account rebuild: outline and corners on the payment method cards, `--sky-space-*` spacing tokens or the 4/8 px grid, removal of the dashboard Orders / Profile / Sign out cards | S | - | Decisions recorded in PLANNING.md §4 |
+| [x] | ST-51 | BE | Count only paid order lines when computing Hot deal/product tags; confirmed COD orders are unpaid until collection | S | ST-40 | Done: `catalog.service.test.ts` asserts Hot queries require `payments.some(status: PAID)`; `offer-tag.test.ts` passes |
+| [ ] | ST-50 | QA | Manual browser checks of the rebuilt pages: Razorpay test card (paid; failed then window closed), Back to cart, Edit details and Cash on delivery at checkout, `/products` Business filter and business name on cards, dark mode on cart, checkout, order and account pages | S | - | Each check passes at desktop and phone width |
 
 Removed 2026-10-24: ST-17 (therapist city filter is in ST-40; products are not location bound, D29), ST-23 (explore filter panel is ST-43), ST-24 (products have no Business filter, D29).
 
@@ -275,9 +281,9 @@ Removed 2026-10-24: ST-17 (therapist city filter is in ST-40; products are not l
 |---|---|---|---|---|---|---|
 | [ ] | P8-07 | BE | Swap every `cms.*` gate to `content:<action>` | M | P1-05 | Matrix test for content |
 | [ ] | P10-31 | FE | Content pages gated by `content` permission; hide delete for admin | M | P8-07 | Tests |
-| [ ] | P10-36 | SEC | Sanitize rich-text output (DOMPurify) wherever `sky-rich-text-editor` content renders | S | - | XSS payload test |
-| [ ] | CO-01 | FE | Public Contact page (both apps): check against the CMS Contact Us content and finish what is missing | S | - | Page renders CMS content |
-| [ ] | CO-02 | FE | Blog category page (filtered list) | S | - | Route and tests |
+| [x] | P10-36 | SEC | Sanitize rich-text output (DOMPurify) wherever `sky-rich-text-editor` content renders | S | - | Done without DOMPurify: the editor loads values through Quill's clipboard parser (inert document, registered formats only) instead of `innerHTML`; public pages render CMS blocks as escaped React text and never set HTML; `sky-rich-text-editor.test.ts` XSS payload tests |
+| [ ] | CO-01 | FE | Public Contact page (both apps): check against the CMS Contact Us content and finish what is missing | S | - | Page renders CMS content (partly: msd done, every CMS field with per-field fallback and the SEO overrides, `contact.test.tsx`; social links come from the Social Media table, not this row. Left: mera-driver reads a static `/data/contact.json` because mera-driver-api has no CMS; it needs a Contact Us table and endpoint first, which is a schema and API change for review) |
+| [x] | CO-02 | FE | Blog category page (filtered list) | S | - | Done: `/blog/category/:slug` (`BlogCategory` in `blog.tsx`), card category links; `blog.test.tsx` |
 
 ## 6. CTA banners
 
@@ -318,7 +324,7 @@ Removed 2026-10-24: ST-17 (therapist city filter is in ST-40; products are not l
 
 | Done | ID | Area | Task | Size | Depends | Done when |
 |---|---|---|---|---|---|---|
-| [ ] | P4-08 | BE | Dashboard widgets and counts respect scope | M | P2-02 | Member sees own counts only |
+| [ ] | P4-08 | BE | Dashboard widgets and counts respect scope | M | P2-02 | Member sees own counts only (partly 2026-10-29: member revenue = own paid lines, not whole payments). Note P7-10: reports have no member scope yet, so `reports:view` must not be granted to the member role before it |
 | [ ] | P7-06 | DB | `Payout` table with unique period per member, `Decimal(12,2)` | M | P0-02 | Migration tested |
 | [ ] | P7-07 | BE | Payout generation job | L | P7-06, P6-04 | Totals reconcile with orders in test |
 | [ ] | P7-08 | BE | Payouts and payments list/get with scope | M | P7-06, P2-02 | Member sees own only |
@@ -362,16 +368,17 @@ Removed 2026-10-24: ST-17 (therapist city filter is in ST-40; products are not l
 | [ ] | P2-02 | BE | `lib/scope.ts` with `scopedWhere(req, resource)` per resource | M | P2-01 | Unit test per resource |
 | [x] | P2-07 | SEC | Add `helmet`, `trust proxy`, JSON and urlencoded body limit 100 kb | S | - | Merged: `helmet` 8, `TRUST_PROXY_HOPS`, JSON limit 100 kb with 413 `PAYLOAD_TOO_LARGE`; no urlencoded parser is mounted; `app.security.test.ts` |
 | [ ] | P2-08 | SEC | Global rate limit plus limiters for upload, status change, payout, refund, export, document download | M | P2-07 | Limit tests return 429 with `RATE_LIMITED` |
-| [ ] | P2-09 | SEC | `env.ts`: production fails on JWT secret under 32 chars, `*` in CORS, missing `R2_PRIVATE_BUCKET`, `DOC_HASH_PEPPER`, `FIELD_ENCRYPTION_KEY`, `CRON_SECRET` | S | - | Boot test fails fast |
-| [ ] | P2-10 | SEC | Request logger with request id and PII redaction (`documentNumber`, `bankAccountNumber`, `otp`, `authorization`); no stack traces in production responses | M | - | Log snapshot test has no PII |
-| [ ] | P2-11 | BE | `lib/audit.ts` helper with dotted action constants (`member.status.changed`) | S | - | Used by every mutation in later tasks |
+| [x] | P2-09 | SEC | `env.ts`: production fails on JWT secret under 32 chars, `*` in CORS, missing `R2_PRIVATE_BUCKET`, `DOC_HASH_PEPPER`, `FIELD_ENCRYPTION_KEY`, `CRON_SECRET` | S | - | Done: `config/env-checks.ts` (`productionEnvProblems`), thrown from `env.ts` in production; `env-checks.test.ts` incl. boot test; DEPLOYMENT §2 says set them before deploying |
+| [x] | P2-10 | SEC | Request logger with request id and PII redaction (`documentNumber`, `bankAccountNumber`, `otp`, `authorization`); no stack traces in production responses | M | - | Done: `lib/logger.ts`, `middleware/requestLogger.ts`, error handler logs through it; `logger.test.ts`, `requestLogger.test.ts` (no token, OTP, body value or phone in any line). The ~40 older `console.*` calls in services move to `logger` as their modules are touched |
+| [x] | P2-11 | BE | `lib/audit.ts` helper with dotted action constants (`member.status.changed`) | S | - | Done: `AUDIT_ACTIONS` (132 stored names kept as they are) and `AuditAction`, required by `writeAuditLog`/`auditLogData` so an unknown action fails to compile; `isAuditAction` for P8-05 filters; `lib/audit.test.ts` |
 | [ ] | P2-12 | BE | Idempotency-Key middleware and table (24 h TTL, replay returns stored response) | M | - | Replay and conflict tests |
 | [ ] | P2-13 | SEC | AES-256-GCM field encryption util with key id prefix for rotation | M | P2-09 | Round-trip and tamper tests |
-| [ ] | P2-14 | BE | Shared Zod primitives: pagination, sort allowlist, reason, date range, money, phone, email; lint rule or test that every body schema is `.strict()` | M | - | Test scans schemas |
-| [ ] | P2-16 | SEC | Confirm token transport (bearer only or cookie); if any cookie is used set `HttpOnly`, `Secure`, `SameSite` and add CSRF protection; document decision | S | - | Written note in spec |
+| [x] | P2-14 | BE | Shared Zod primitives: pagination, sort allowlist, reason, date range, money, phone, email; lint rule or test that every body schema is `.strict()` | M | - | Done: primitives in `schemas/common.schema.ts` (+ `isStrictObject`), member reasons use `ReasonSchema`; `body-schemas-strict.test.ts` walks every route's `validateBody` schema, 95 older loose routes frozen in `body-schemas-loose.json` (making them strict is P11-02, per route, since a form sending extra keys would get 422) |
+| [x] | P2-16 | SEC | Confirm token transport (bearer only or cookie); if any cookie is used set `HttpOnly`, `Secure`, `SameSite` and add CSRF protection; document decision | S | - | Done: bearer only, no cookies (ARCHITECTURE §12.2); `lib/token-transport.test.ts` fails on any cookie code |
 | [ ] | P2-17 | SEC | `npm audit` gate and Dependabot for api and shared packages | S | - | CI step exists |
 | [x] | P2-18 | SEC | OTP request limit per identifier from any IP (`OTP_IDENTIFIER_RATE_LIMIT_PER_HOUR`, default 10), on top of the per IP + identifier limit | S | - | Merged: `otpIdentifierRateLimiter` |
 | [x] | P2-19 | SEC | Access tokens verified with `algorithms: ['HS256']` only | S | - | Merged: test refuses an HS512 token |
+| [ ] | P2-22 | BE | Google sign-in ends on the API domain: `/auth/google/callback` sends the tokens as JSON, so the app never gets them. Redirect to the app with a one-time code it exchanges for tokens (never tokens in the URL) | M | - | Sign in with Google lands signed in; code single-use and short-lived (tests). Public API change: review first |
 | [x] | P2-21 | BE | Storage layout: one folder per owner (`members/<id>/{profile,deals,therapists,products,documents}`, `customers/`, `home-slider/`, `cta-banners/`, `static-content/`, `masters/`), `bucketForKey`; ARCHITECTURE.md §12.3 | M | P5-03 | Merged: `lib/storage-layout.ts` tests, media service folder tests |
 | [x] | P2-20 | SEC | `vendors` routes reject a non-UUID id with 422 (`router.param` hook `uuidParam`); role-assign routes validate both ids | S | - | Merged: test returns 422 with the field name |
 | [ ] | P4-12 | QA | Route inventory test: every route has `requirePermission` or is on a documented public allowlist | M | P4-01 | CI fails on an unguarded route |
@@ -385,13 +392,14 @@ Removed 2026-10-24: ST-17 (therapist city filter is in ST-40; products are not l
 | [ ] | P9-08 | FE | Generate typed API client from OpenAPI for msd | M | P9-05 | Build uses generated types |
 | [ ] | P10-34 | FE | Form UX: inline errors with `aria-describedby`, 422 mapped to fields, focus first error, live region for status | M | P10-03 | Axe has 0 violations |
 | [ ] | P10-35 | SEC | No PII in console, URLs, localStorage or error reports; masked values only; Sentry scrubbing rules | M | - | Test and manual review |
-| [ ] | P10-37 | SEC | Upload inputs: `accept`, size pre-check (UX only), filename display escaped; open links with `rel="noopener noreferrer"` | S | P10-17 | Test |
+| [x] | P10-37 | SEC | Upload inputs: `accept`, size pre-check (UX only), filename display escaped; open links with `rel="noopener noreferrer"` | S | P10-17 | Test; done 2026-10-28: `DOCUMENT_ACCEPT` and the 5 MB limit shared from `shared-utils` (msd-api uses the same constant), pre-upload size check, file names render as text, file link opens with `rel="noopener noreferrer"` |
 | [ ] | P10-40 | FE | `noindex` on all `/account/*`; 301 redirects for renamed public vendor routes decided with SEO owner | S | P10-05 | Meta test |
 | [ ] | P10-41 | QA | Accessibility audit WCAG 2.2 AA on every new page (keyboard, focus, contrast, target size) via sahaj | L | P10-30 | Report with 0 blockers |
 | [ ] | P10-42 | QA | Playwright e2e per role (7 roles): login, allowed action works, forbidden action hidden and server-rejected | L | P10-33 | Suite green in CI |
+| [ ] | P1-12 | SEC | Environment OTP providers: isolated dummy OTPs for staff, separate configured Super Admin login, preserve SMS flow | M | - | Tests cover role isolation, missing configuration, account status, no SMS in dummy mode, and unchanged session/token behavior |
 | [ ] | P11-01 | QA | IDOR suite across all 14 resources (member A vs B, support, sales) | M | P4-12 | All foreign reads return 404 |
 | [ ] | P11-02 | QA | Mass-assignment suite: extra keys on every write return 422 | M | P2-14 | Test generated from schemas |
-| [ ] | P11-03 | SEC | Review all raw SQL and `$queryRaw`; no string concatenation | S | - | Review note |
+| [x] | P11-03 | SEC | Review all raw SQL and `$queryRaw`; no string concatenation | S | - | Done 2026-10-29: the API has no raw SQL; the only raw queries were two constant `$queryRawUnsafe` calls in `prisma/member-status-report.ts`, now tagged `$queryRaw`; `lib/raw-sql.test.ts` fails on any `*Unsafe` raw query or `Prisma.raw` in `src` or `prisma` |
 | [ ] | P11-04 | QA | Auth suite: suspended login, token use after suspend, refresh after suspend, deactivated staff | M | P3-08 | Tests |
 | [ ] | P11-05 | QA | Upload abuse: polyglot, wrong magic, oversize, path traversal filename, zip bomb | M | P5-06 | Tests |
 | [ ] | P11-06 | QA | PII leak scan of logs and API responses for full Aadhaar/PAN | M | P2-10 | Zero matches |
@@ -416,4 +424,6 @@ Removed 2026-10-24: ST-17 (therapist city filter is in ST-40; products are not l
 | [ ] | X-02 | OPS | Add the CI check as a required status check in branch protection | S | - | PR cannot merge red |
 | [ ] | X-03 | SEC | Rotate the secrets that were once committed (Gmail app password, ConnectExpress SMS key, Razorpay keys, `JWT_SECRET`); they remain in git history | S | - | All rotated at the provider |
 | [ ] | X-04 | OPS | Verify the msd-api production deploy end to end with the DEPLOYMENT.md checklist (health, /docs, sign-in, R2 upload survives a redeploy) | S | - | Checklist ticked |
-| [ ] | X-05 | BE | Remove the leftover `console.log` in `apps/msd-api/src/middleware/requirePermission.ts` (prints every permission when routes load) | S | - | No log line at boot |
+| [x] | X-05 | BE | Remove the leftover `console.log` in `apps/msd-api/src/middleware/requirePermission.ts` (prints every permission when routes load) | S | - | No log line at boot; done 2026-10-28 (`requirePermission.test.ts` "at boot") |
+| [ ] | X-06 | QA | Fix the pre-existing type errors (Dialog ref type in the profile form, showcase and CMS pages; `account/orders/orders.test.tsx`; `treatment-directory.tsx`) and the two newer flaky tests in TESTING.md §3 (`env-checks`, `deals-list-page`) | S | - | `tsc` clean for msd; both tests stable and removed from §3 |
+| [x] | X-07 | QA | Merge `feature/msd-matrix-raj-12sep2026` into the member matrix branch: bearer-only tokens (P2-16) and fixed roles (R1) kept, merge breaks repaired, migrations rehearsed | M | - | msd and msd-api lint, tests and builds pass; done 2026-11-05 |

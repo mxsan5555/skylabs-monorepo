@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SnackbarHost } from '../../../../snackbar/snackbar';
 import type { SocialMediaLink } from '../../../../api/rbac/social-media';
+import { SocialMediaList } from './social-media-list';
 
 let grantedPermissions: Set<string>;
 
@@ -28,7 +29,6 @@ vi.mock('../../../../api/rbac/social-media', async () => {
   };
 });
 
-import { SocialMediaList } from './social-media-list';
 
 const LINK: SocialMediaLink = {
   id: 'link-1',

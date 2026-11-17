@@ -17,7 +17,10 @@ import {
   isJwtExpired,
   isPreviewToken,
   msUntilJwtExpiry,
+  readSessionValue,
   readStorageValue,
+  resolveInitialToken,
+  writeSessionValue,
   writeStorageValue,
 } from '../index';
 import { getTokenStore } from './token-store';
@@ -29,9 +32,6 @@ export interface AuthContextValue {
   loading: boolean;
   isPreviewing: boolean;
   can: (menuKey: string, action?: PermissionAction) => boolean;
-  /** `refreshToken` is accepted for source compatibility with existing call sites but ignored —
-   *  the server sets the refresh token as an HttpOnly cookie directly (see
-   *  apps/msd-api/src/lib/auth-cookies.ts), it never reaches page JS at all. */
   signIn: (token: string, refreshToken?: string) => Promise<void>;
   signOut: () => void;
   refreshBootstrap: () => Promise<void>;
@@ -51,35 +51,47 @@ export function AuthProvider({
   children: ReactNode;
 }) {
   const keys = useMemo(() => authStorageKeys(appPrefix), [appPrefix]);
+  const initialToken = useMemo(() => resolveInitialToken(keys), [keys]);
   const tokenStore = useMemo(() => getTokenStore(appPrefix, apiBaseUrl), [appPrefix, apiBaseUrl]);
-  const [token, setTokenState] = useState<string | null>(() => tokenStore.getToken());
+  const [token, setTokenState] = useState<string | null>(() => initialToken ?? tokenStore.getToken());
   const [bootstrap, setBootstrap] = useState<BootstrapResponse | null>(null);
-  // Always starts true: even with no (or an expired) access token in localStorage, a valid
-  // persistent session may still exist as the HttpOnly refresh cookie — the mount effect below
-  // must get a chance to try it (silent refresh) before anything decides the visitor is signed
-  // out. This is what makes "signed in across a browser restart" work, not just "across a
-  // refresh while the 15-minute access token is still fresh."
   const [loading, setLoading] = useState(true);
 
   const setToken = useCallback(
-    (next: string | null) => {
-      tokenStore.setToken(next);
-      setTokenState(next);
+    (nextToken: string | null) => {
+      if (nextToken && isPreviewToken(nextToken)) {
+        writeSessionValue(keys.previewToken, nextToken);
+        setTokenState(nextToken);
+        return;
+      }
+      writeSessionValue(keys.previewToken, null);
+      tokenStore.setToken(nextToken);
+      setTokenState(nextToken);
     },
-    [tokenStore],
+    [keys.previewToken, tokenStore],
   );
 
+  const loadBootstrapRef = useRef<(nextToken: string) => Promise<void>>(async () => undefined);
   const loadBootstrap = useCallback(
     async (nextToken: string, opts: { silent?: boolean } = {}) => {
-      // `silent` skips the `loading` flip — `RequireAuth` renders a full-page placeholder
-      // instead of `children` for as long as `loading` is true (see its own doc comment), which
-      // is correct for the *initial* session restore but would otherwise replace whatever the
-      // user is looking at with a spinner on every background refresh too (see the proactive
-      // token-refresh effect below, which calls this silently every ~15 minutes so an active
-      // session's permissions don't go stale for its entire duration).
       if (!opts.silent) setLoading(true);
       try {
-        const data = await fetchBootstrap(apiBaseUrl, nextToken);
+        let data: BootstrapResponse;
+        try {
+          data = await fetchBootstrap(apiBaseUrl, nextToken);
+        } catch (err) {
+          const status = err instanceof AuthRequestError ? err.status : undefined;
+          if (status !== 401 || isPreviewToken(nextToken)) throw err;
+
+          const refreshed = await tokenStore.refresh();
+          if (!refreshed) {
+            setBootstrap(null);
+            setToken(null);
+            return;
+          }
+          setTokenState(refreshed);
+          data = await fetchBootstrap(apiBaseUrl, refreshed);
+        }
         setBootstrap(data);
       } catch (err) {
         // Only a genuine auth failure (401/403 — the token is actually invalid, expired
@@ -89,7 +101,17 @@ export function AuthProvider({
         // successful login whenever the bootstrap fetch hit any transient error (see the mount
         // effect below, which used to fire this same call twice under React StrictMode).
         const status = err instanceof AuthRequestError ? err.status : undefined;
-        if (status === 401 || status === 403) {
+        if ((status === 401 || status === 403) && isPreviewToken(nextToken)) {
+          writeSessionValue(keys.previewToken, null);
+          const realToken = tokenStore.getToken() ?? readStorageValue(keys.token);
+          if (realToken) {
+            setTokenState(realToken);
+            await loadBootstrapRef.current(realToken);
+          } else {
+            setToken(null);
+            setBootstrap(null);
+          }
+        } else if (status === 401 || status === 403) {
           setBootstrap(null);
           setToken(null);
         }
@@ -97,8 +119,9 @@ export function AuthProvider({
         if (!opts.silent) setLoading(false);
       }
     },
-    [apiBaseUrl, setToken],
+    [apiBaseUrl, keys.previewToken, keys.token, setToken, tokenStore],
   );
+  loadBootstrapRef.current = loadBootstrap;
 
   // Guards against React StrictMode's dev-only double-invoke of this effect, which previously
   // fired two concurrent /rbac/bootstrap requests on every mount/reload — a real race where
@@ -108,50 +131,35 @@ export function AuthProvider({
   useEffect(() => {
     if (initRef.current) return;
     initRef.current = true;
-
-    const current = tokenStore.getToken();
-    if (current && !isJwtExpired(current)) {
-      loadBootstrap(current);
-      return;
-    }
-    // No usable access token locally (missing, or expired — including a page loaded after a
-    // browser/computer restart days later). Never attempted for a "Login As" preview token:
-    // those are fixed-lifetime by design (see CLAUDE.md's Login As section) and the refresh
-    // cookie underneath still belongs to the real SuperAdmin session, not the preview — ending
-    // a preview must just end it, not silently fall back to the real account.
-    if (current && isPreviewToken(current)) {
+    if (token && !isJwtExpired(token)) {
+      loadBootstrap(token);
+    } else if (token && isPreviewToken(token)) {
       setToken(null);
       setLoading(false);
-      return;
+    } else {
+      tokenStore
+        .refresh()
+        .then((refreshed) => {
+          if (refreshed) {
+            setTokenState(refreshed);
+            return loadBootstrap(refreshed);
+          }
+          setLoading(false);
+        })
+        .catch(() => setLoading(false));
     }
-    tokenStore
-      .refresh()
-      .then((refreshed) => {
-        if (refreshed) {
-          setTokenState(refreshed);
-          return loadBootstrap(refreshed);
-        }
-        setLoading(false);
-      })
-      .catch(() => {
-        // Transient (network/5xx) failure on the very first silent refresh attempt — nothing
-        // local to preserve (there was no valid token to begin with), so this just falls through
-        // to "not authenticated for now"; RequireAuth sends them to sign-in same as any other
-        // signed-out visit, and a real connectivity blip won't have burned the refresh cookie
-        // (it's still sitting there for the next attempt, e.g. a manual reload).
-        setLoading(false);
-      });
     // Only re-run when the provider mounts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Cross-tab sync: another tab's refresh/sign-in/sign-out writes the shared localStorage key,
-  // and the token store's own `storage` listener picks it up and notifies every subscriber in
-  // this tab — mirror that straight into this tab's React state instead of each tab refreshing
-  // independently (which would race the single-use refresh cookie — see token-store.ts).
-  useEffect(() => {
-    return tokenStore.subscribe((next) => setTokenState(next));
-  }, [tokenStore]);
+  useEffect(
+    () =>
+      tokenStore.subscribe((nextToken) => {
+        if (readSessionValue(keys.previewToken)) return;
+        setTokenState(nextToken);
+      }),
+    [keys.previewToken, tokenStore],
+  );
 
   const signIn = useCallback(
     async (nextToken: string) => {
@@ -161,32 +169,27 @@ export function AuthProvider({
     [setToken, loadBootstrap],
   );
 
+  /** Revokes the refresh token on the server (best effort), then clears every token, any
+   *  preview and the bootstrap, whatever the server answered (P10-38). */
   const signOut = useCallback(() => {
     writeStorageValue(keys.realToken, null);
-    setBootstrap(null);
+    writeSessionValue(keys.previewToken, null);
     setTokenState(null);
+    setBootstrap(null);
     void tokenStore.logout();
-  }, [keys.realToken, tokenStore]);
+  }, [keys.realToken, keys.previewToken, tokenStore]);
 
   const refreshBootstrap = useCallback(async () => {
     if (token) await loadBootstrap(token);
   }, [token, loadBootstrap]);
 
-  // Proactively renews the access token ~60s before it expires via the HttpOnly refresh cookie,
-  // so a session outlives the 15-minute access-token TTL instead of the app silently going
-  // "logged in but broken" (or getting force-logged-out) once it lapses. Never armed for a
-  // preview ("Login As") token — see the mount effect's own note on why.
-  //
-  // Also the one place a long-lived, already-open session picks up a role-permission change:
-  // without the silent `loadBootstrap` below, `bootstrap` (and therefore the sidebar and every
-  // `can()` check) stayed frozen at whatever it was at the last sign-in for as long as the tab
-  // stayed open — a Role Permission Matrix save could never reach an already-signed-in holder of
-  // that role until they manually signed out and back in. `silent: true` so this doesn't flip
-  // the shared `loading` flag `RequireAuth` uses to show a full-page placeholder (see
-  // `loadBootstrap`'s own doc comment) — this is a background refresh, never the initial restore.
+  // Proactively renews the access token ~60s before it expires using the HttpOnly refresh cookie,
+  // so a session outlives the access-token TTL instead of the app
+  // silently going "logged in but broken" (or getting force-logged-out) once it lapses. Never
+  // armed for a preview ("Login As") token — those are fixed-lifetime by design (see
+  // CLAUDE.md's Login As section) and have no refresh session of their own.
   useEffect(() => {
     if (!token || isPreviewToken(token)) return;
-
     const delay = msUntilJwtExpiry(token);
     const timer = setTimeout(async () => {
       try {
@@ -195,15 +198,11 @@ export function AuthProvider({
           setTokenState(refreshed);
           await loadBootstrap(refreshed, { silent: true });
         } else {
-          // The refresh cookie itself is invalid/expired/revoked — nothing left to recover,
-          // this is a genuine end of session.
           setBootstrap(null);
           setTokenState(null);
         }
       } catch {
-        // Transient (network/5xx) failure — leave the still-unexpired-for-a-few-more-seconds
-        // token in place rather than forcing a sign-out; the next proactive attempt (or a
-        // 401-triggered retry at the API call layer) gets another chance.
+        // A transient failure leaves the current token in place for the next API request to retry.
       }
     }, delay);
 
@@ -220,20 +219,31 @@ export function AuthProvider({
       });
       if (!res.ok) throw new Error(`Failed to start preview: ${res.status}`);
       const body = (await res.json()) as { data: { previewToken: string } };
-      writeStorageValue(keys.realToken, token);
       setToken(body.data.previewToken);
       await loadBootstrap(body.data.previewToken);
     },
-    [apiBaseUrl, token, keys.realToken, setToken, loadBootstrap],
+    [apiBaseUrl, token, setToken, loadBootstrap],
   );
 
   const returnToSuperAdmin = useCallback(async () => {
-    const realToken = readStorageValue(keys.realToken);
-    if (!realToken) return;
-    writeStorageValue(keys.realToken, null);
-    setToken(realToken);
+    writeSessionValue(keys.previewToken, null);
+    const realToken = tokenStore.getToken() ?? readStorageValue(keys.token);
+    if (!realToken) {
+      setToken(null);
+      setBootstrap(null);
+      return;
+    }
+    setTokenState(realToken);
+    if (isJwtExpired(realToken)) {
+      const refreshed = await tokenStore.refresh();
+      if (refreshed) {
+        setTokenState(refreshed);
+        await loadBootstrap(refreshed);
+      }
+      return;
+    }
     await loadBootstrap(realToken);
-  }, [keys.realToken, setToken, loadBootstrap]);
+  }, [keys.previewToken, keys.token, tokenStore, setToken, loadBootstrap]);
 
   const can = useCallback(
     (menuKey: string, action: PermissionAction = 'view') =>

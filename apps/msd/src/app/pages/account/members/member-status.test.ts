@@ -38,14 +38,27 @@ describe('member status helpers', () => {
     expect(dueDateLabel({ ...summary, complete: true })).toBe('');
   });
 
-  it('actions follow the lifecycle and the viewer permissions', () => {
+  /** Item 6: Active, Inactive, Suspended, Delete; the next blocked step shows with its reason. */
+  it('actions follow the journey and the viewer permissions', () => {
     const all = { canStatusChange: true, canDelete: true };
-    expect(availableStatusActions('ACTIVE', all)).toEqual(['deactivate', 'suspend']);
-    expect(availableStatusActions('INACTIVE', all)).toEqual(['reactivate', 'suspend']);
-    expect(availableStatusActions('SUSPENDED', all)).toEqual(['reactivate', 'delete']);
-    expect(availableStatusActions('ARCHIVED', all)).toEqual([]);
-    expect(availableStatusActions('SUSPENDED', { canStatusChange: true, canDelete: false })).toEqual(['reactivate']);
+    expect(availableStatusActions('ACTIVE', all)).toEqual([
+      { action: 'deactivate' },
+      { action: 'suspend', blockedBy: 'Make the member inactive first.' },
+    ]);
+    expect(availableStatusActions('INACTIVE', all)).toEqual([
+      { action: 'reactivate' },
+      { action: 'suspend' },
+      { action: 'delete', blockedBy: 'Suspend the member first.' },
+    ]);
+    expect(availableStatusActions('SUSPENDED', all)).toEqual([{ action: 'reactivate' }, { action: 'delete' }]);
+    expect(availableStatusActions('ARCHIVED', all)).toEqual([{ action: 'restore' }]);
+    expect(availableStatusActions('SUSPENDED', { canStatusChange: true, canDelete: false })).toEqual([{ action: 'reactivate' }]);
+    expect(availableStatusActions('INACTIVE', { canStatusChange: true, canDelete: false })).toEqual([
+      { action: 'reactivate' },
+      { action: 'suspend' },
+    ]);
     expect(availableStatusActions('ACTIVE', { canStatusChange: false, canDelete: false })).toEqual([]);
+    expect(availableStatusActions('ARCHIVED', { canStatusChange: false, canDelete: true })).toEqual([]);
   });
 });
 

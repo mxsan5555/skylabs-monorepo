@@ -30,6 +30,7 @@ export interface OrderItem {
   therapistId: string | null;
   therapistPackageId: string | null;
   productId: string | null;
+  product?: { slug: string } | null;
   vendorId: string;
   branchId: string | null;
   vendorNameSnapshot: string;

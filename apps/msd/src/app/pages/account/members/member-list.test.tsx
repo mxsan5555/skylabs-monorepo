@@ -80,6 +80,7 @@ describe('MemberList', () => {
       'Status: Active',
       'Status: Inactive',
       'Status: Suspended',
+      'Status: Archived',
       'Documents: Documents incomplete',
       'Review: Ready for suspension review',
     ]);

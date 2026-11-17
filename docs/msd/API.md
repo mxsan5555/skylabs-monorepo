@@ -33,7 +33,11 @@
   OTP request also per identifier alone, `OTP_IDENTIFIER_RATE_LIMIT_PER_HOUR` per hour (default 10).
   Global and per-action limiters are planned (P2-08).
 - **Schemas:** `<Entity><Action>Schema` (for example `MemberCreateSchema`,
-  `MemberListQuerySchema`); new and changed bodies are `.strict()` (R3).
+  `MemberListQuerySchema`); new and changed bodies are `.strict()` (R3). Common fields come from
+  `schemas/common.schema.ts` (P2-14): `pagination()`, `sortQuery()`, `ReasonSchema` (10 to 500),
+  `dateRangeQuery(maxDays)`, `MoneySchema`, `PhoneSchema` (stored `+91XXXXXXXXXX`), `EmailSchema`.
+  `body-schemas-strict.test.ts` fails on any new route with a loose body schema; the 95 older ones
+  are frozen in `body-schemas-loose.json` and leave it one review at a time (P11-02).
 - **Money:** decimal strings with 2 places (`"1299.00"`), INR.
 - **Dates:** ISO 8601 UTC; ranges `from <= to`, at most 366 days.
 
@@ -79,6 +83,12 @@ Closing the gap and a CI coverage check are P9-05 and P9-06.
 | POST | `/api/v1/auth/refresh` | public |
 | GET | `/api/v1/dashboard/stats` | `dashboard:view` |
 | GET | `/api/v1/health` | public |
+
+`POST /auth/otp/request` accepts only `{ identifier, purpose? }`; `POST /auth/otp/verify` accepts
+only `{ identifier, otp }`. Unknown keys (including a client-supplied role) are rejected. OTP
+delivery is selected by backend `OTP_PROVIDER`; fixed test credentials are never returned. Role
+and permissions in tokens continue to come from database relations, not request fields. See
+`DEPLOYMENT.md` for backend-only environment configuration.
 | GET | `/api/v1/notifications` | signed in (own records, or checked in the handler) |
 | PATCH | `/api/v1/notifications/:id/read` | signed in (own records, or checked in the handler) |
 | PATCH | `/api/v1/notifications/read-all` | signed in (own records, or checked in the handler) |
@@ -89,10 +99,10 @@ Closing the gap and a CI coverage check are P9-05 and P9-06.
 | POST | `/api/v1/rbac/impersonate` | `rbac.users:custom` |
 | GET | `/api/v1/rbac/permissions/catalog` | `rbac.roles:view` |
 | GET | `/api/v1/rbac/roles` | `rbac.roles:view` |
-| POST | `/api/v1/rbac/roles` | `rbac.roles:create` |
+| POST | `/api/v1/rbac/roles` | `rbac.roles:create`, then 403 `ROLE_MANAGEMENT_LOCKED` (R1) |
 | PATCH | `/api/v1/rbac/roles/:id` | `rbac.roles:edit` |
-| DELETE | `/api/v1/rbac/roles/:id` | `rbac.roles:delete` |
-| POST | `/api/v1/rbac/roles/:id/clone` | `rbac.roles:create` |
+| DELETE | `/api/v1/rbac/roles/:id` | `rbac.roles:delete`, then 403 `ROLE_MANAGEMENT_LOCKED` (R1) |
+| POST | `/api/v1/rbac/roles/:id/clone` | `rbac.roles:create`, then 403 `ROLE_MANAGEMENT_LOCKED` (R1) |
 | GET | `/api/v1/rbac/roles/:id/permissions` | `rbac.roles:view` |
 | PUT | `/api/v1/rbac/roles/:id/permissions` | `rbac.roles:edit` |
 | PATCH | `/api/v1/rbac/roles/:id/status` | `rbac.roles:status_change` |
@@ -104,14 +114,18 @@ Closing the gap and a CI coverage check are P9-05 and P9-06.
 | DELETE | `/api/v1/rbac/users/:id` | `rbac.users:delete` |
 | GET | `/api/v1/rbac/users/:id/login-history` | `rbac.users:view` |
 | POST | `/api/v1/rbac/users/:id/otp/reset` | `rbac.users:edit` |
-| POST | `/api/v1/rbac/users/:id/roles/:roleId` | `rbac.users:assign` |
-| DELETE | `/api/v1/rbac/users/:id/roles/:roleId` | `rbac.users:assign` |
+| PUT | `/api/v1/rbac/users/:id/role` | `rbac.users:assign`; only a Super Admin gives the Super Admin role, and the last active Super Admin keeps it (409) |
+| GET | `/api/v1/rbac/role-conflicts` | `rbac.users:assign` |
+| PUT | `/api/v1/rbac/role-conflicts/:id` | `rbac.users:assign` |
 | GET | `/api/v1/rbac/users/:id/sessions` | `rbac.users:view` |
 | POST | `/api/v1/rbac/users/:id/sessions/revoke-all` | `rbac.users:edit` |
 | PATCH | `/api/v1/rbac/users/:id/status` | `rbac.users:status_change` |
 | GET | `/api/v1/rbac/users/me` | signed in (own records, or checked in the handler) |
 | PATCH | `/api/v1/rbac/users/me` | signed in (own records, or checked in the handler) |
 
+Role create, clone and delete return 403 `ROLE_MANAGEMENT_LOCKED` to anyone holding the permission
+(R1, P2-15, done 2026-10-28; nothing is written); a role's name, status, grants and widgets stay
+editable. Planned: `GET /rbac/bootstrap` adds `scopes`; grant edits refuse super-admin-only actions (`ROLE_GRANT_FORBIDDEN`);
 Done since 2026-10-23 (not yet reflected in the generated table above, which is otherwise
 unchanged — no route path added, removed or moved):
 
@@ -143,14 +157,14 @@ Still planned: grant edits refuse super-admin-only actions (`ROLE_GRANT_FORBIDDE
 | POST | `/api/v1/members` | `members:create` |
 | GET | `/api/v1/members/:id` | `members:view` |
 | PATCH | `/api/v1/members/:id` | `members:edit` |
-| DELETE | `/api/v1/members/:id` | `members:delete` |
+| DELETE | `/api/v1/members/:id` | `members:delete` (always archives, `{ outcome: 'ARCHIVED' }`, D36; the list hides Archived unless `status=ARCHIVED`) |
 | GET | `/api/v1/members/:id/activity` | `members:view` |
 | GET | `/api/v1/members/:id/documents` | `members:view` |
 | POST | `/api/v1/members/:id/documents/:documentType` | `members:edit` |
 | DELETE | `/api/v1/members/:id/documents/:documentType` | `members:edit` |
 | PATCH | `/api/v1/members/:id/documents/:documentType/review` | `members:approve|reject` |
 | POST | `/api/v1/members/:id/documents/reminders` | `members:status_change` |
-| PATCH | `/api/v1/members/:id/status` | `members:status_change` |
+| PATCH | `/api/v1/members/:id/status` | `members:status_change` (item 6: one step at a time, Active → Inactive → Suspended; Archived restores to Inactive; 409 names the step to take first) |
 | GET | `/api/v1/members/:id/status-history` | `members:view` |
 | GET | `/api/v1/products` | `products:view` |
 | GET | `/api/v1/products/:id` | `products:view` |
@@ -283,6 +297,29 @@ return 404; the branch list no longer carries `categoryTypes`; `GET /vendors/cat
 same active categories for every member and ignores `vendorId`. Member dashboard `categories` and
 `subCategories` count the categories the member uses on its deals, products and therapists.
 
+Member documents (P5-15): each row of `GET /members/:id/documents` (and the `/vendors` and
+`/vendors/me` variants) carries `uploadedByName`: the staff member's name when
+`uploadedOnBehalf` is true, `null` for the member's own upload or when that account is gone.
+Visible to every viewer of the list; one name lookup per list.
+
+Member detail counts (P10-49): `GET /members/:id` (and `/vendors/:id`) also returns
+`customerCount` and `orderCount`: distinct customers and distinct orders with at least one order
+line from the member (any status), the same rows as the Customers list. List routes do not carry
+them. `GET /orders?vendorId=` (existing filter) backs the "N orders" link.
+
+Member activity (P3-24): `GET /members/:id/activity` (and the `/vendors/:id/activity` alias,
+`members:view`) returns items newest first with `kind`, `at`, `summary` (plain sentence, kept for
+older clients) and `detail`, plus typed fields per kind: `status` → `fromStatus`, `toStatus`,
+`actorId`, `actorName`; `document` → `documentType`, `event` (`uploaded | approved | rejected`),
+`byStaff`; `reminder` → `sequence` (null for a manual reminder), `channels` (`email`, `sms` that
+delivered), `actorId`, `actorName`; `review` → none. Clients build their text from these fields.
+
+Member customers (D19, P4-16): `GET /vendors/me/customers` (`members:custom`) returns per
+customer `id`, `name`, `city`, `orderCount`, `lastActivityAt` (latest order date), `hasOpenOrder`,
+and `phone` / `email` only when `hasOpenOrder` is true (else `null`). The staff route
+`GET /vendors/:vendorId/customers` (`members:view`) returns the same rows with contact details
+always filled. The flat `GET /customers` with own scope (C-16) waits for P4-01.
+
 `/vendors/...` paths that mirror `/members/...` are deprecated aliases (`Deprecation` and `Link`
 headers) kept for one release (R7, D16). `/vendors/me/*` is member self-service and
 `/vendors/:vendorId/*` is staff working on a member's catalog until the flat routes exist.
@@ -392,6 +429,21 @@ never returned. Upload without `R2_PRIVATE_BUCKET` configured returns 503.
 | POST | `/api/v1/orders/pay-batch/cod` | signed in (own records, or checked in the handler) |
 | POST | `/api/v1/orders/pay-batch/verify` | signed in (own records, or checked in the handler) |
 | POST | `/api/v1/payments/webhook/razorpay` | public |
+
+**Saved delivery address (item 2.2, D37):** `GET /rbac/users/me` also returns `address`, `city`,
+`state`, `pincode` (staff user lists never do). `PUT /rbac/users/me/address` (signed in, own row)
+saves `{ address, state, city, pincode }`: strict body, state and city from the India list, 6-digit
+PIN, 422 otherwise. `POST /orders/checkout` refuses a `shippingState`/`shippingCity` pair outside
+the India list (422) and, when all four `shipping*` fields are given, saves them as the customer's
+address (also on a repeat checkout of the same pending order).
+
+**Member view of an order** (`GET /orders`, `GET /orders/:id` for a caller who owns a member,
+item 5, `services/order.service.ts` `scopeOrderForMember`): `items` holds only their own lines;
+`subtotal`, `total` and each `payments[].amount` are the sum of those lines; `vendorId`,
+`vendorNameSnapshot`, `vendor` and `branchId`, `branchNameSnapshot` are their own (the order's
+primary vendor and branch can be another member's), and `branch` is null unless it is their own.
+An order with none of their lines is 404. `search` matches the customer name and their own item
+names only. Staff and the ordering customer see the whole order.
 | GET | `/api/v1/wishlist` | signed in (own records, or checked in the handler) |
 | POST | `/api/v1/wishlist` | signed in (own records, or checked in the handler) |
 | DELETE | `/api/v1/wishlist/:dealId` | signed in (own records, or checked in the handler) |
@@ -437,8 +489,10 @@ returns today's response plus the new `tag` field.
   `tags=expire_soon,hot,new,deal` (any of the four, comma list; anything else → 422).
 - `GET /catalog/deals`: `categoryId` stays optional, so `/deals` lists every category.
 - `GET /catalog/products`: adds `categoryIds` (comma list, max 50, wins over `categoryId`),
-  `tags`. `GET /catalog/products/facets` takes the same filters minus paging and sort and
-  returns `{ categories: [{ id, name, slug, count }], tags: [{ tag, count }], price: { min, max } }`.
+  `vendorIds` (comma list, max 50, wins over `vendorId`; item 4, D39) and `tags`.
+  `GET /catalog/products/facets` takes the same filters minus paging and sort and returns
+  `{ categories: [{ id, name, slug, count }], vendors: [{ id, name, count }], tags: [{ tag, count }], price: { min, max } }`;
+  category, business, tag and price counts each ignore their own selection.
 - `GET /catalog/therapists`: adds `sort=relevance|price_asc|price_desc|distance` (price = lowest
   active package; `distance` needs coordinates, else behaves like `relevance`), `minPrice` /
   `maxPrice` (lowest package), `radiusKm`, `city` / `state`, `vendorIds` / `branchIds`, and

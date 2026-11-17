@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SnackbarHost } from '../../../../snackbar/snackbar';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import type { CareersJobListing, CareersPageContent } from '../../../../api/rbac/careers';
+import { CareersPage } from './careers';
 
 let grantedPermissions: Set<string>;
 
@@ -35,7 +36,6 @@ vi.mock('../../../../api/rbac/careers', async () => {
   };
 });
 
-import { CareersPage } from './careers';
 
 const CONTENT: CareersPageContent = {
   id: 'singleton',

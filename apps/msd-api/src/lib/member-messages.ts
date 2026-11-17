@@ -2,7 +2,8 @@ import { env } from '../config/env';
 import { documentTypeList, type DocumentTypeKey } from './document-number';
 import { BUSINESS_TIME_ZONE, REMINDER_COUNT } from '../services/member-reminder-policy';
 
-function contactLine(): string {
+/** "Please email … or call …", from the support settings; shared by member and order notices. */
+export function contactLine(): string {
   const parts: string[] = [];
   if (env.supportEmail) parts.push(`email ${env.supportEmail}`);
   if (env.supportPhone) parts.push(`call ${env.supportPhone}`);
@@ -19,6 +20,30 @@ export function suspendedMessage(reason: string | null): string {
 
 export function reactivatedMessage(): string {
   return 'Your member account is active again. You can log in and manage your branches, deals, therapists and products.';
+}
+
+/** Notice when an admin makes a member inactive (item 6). */
+export function inactiveMessage(reason: string | null): string {
+  return (
+    `Your member account is now inactive. Reason: ${reason?.trim() || 'not recorded'}. ` +
+    `You can still log in and view everything, but you cannot make changes and your listings are hidden from the website. ${contactLine()} to reactivate it.`
+  );
+}
+
+/** Notice when a suspended member is deleted: archived, never erased (item 6, Q2). */
+export function archivedMessage(reason: string | null): string {
+  return (
+    `Your member account has been closed and archived. Reason: ${reason?.trim() || 'not recorded'}. ` +
+    `Your records are kept. ${contactLine()} if you want to come back.`
+  );
+}
+
+/** Notice when an archived member is restored to inactive (item 6). */
+export function restoredMessage(): string {
+  return (
+    'Your member account has been restored. It is inactive for now: you can log in and view everything, ' +
+    'and our team will reactivate it once your details are confirmed.'
+  );
 }
 
 export function inactiveReadOnlyMessage(): string {

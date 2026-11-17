@@ -14,6 +14,23 @@ npx vitest run <path> --config apps/msd/vite.config.mts     # one folder or file
 npx vitest run <path> --config apps/msd-api/vite.config.ts  # one folder or file (msd-api)
 ```
 
+### Local test accounts
+
+`npm run msd-api:prisma:seed-dev-users` creates (or updates) these accounts in the local database.
+Their phones and emails are made up. For login testing, `OTP_PROVIDER=dummy` uses the role-wise
+OTP environment variables documented in `apps/msd-api/.env.example`; customer phone login uses
+the fixed OTP `111111`. No dummy OTP is logged and no SMS is sent. Super Admin uses
+its separate `SUPERADMIN_LOGIN_MOBILE` and
+`SUPERADMIN_LOGIN_OTP` environment values. With `OTP_PROVIDER=sms`, the normal random OTP flow
+uses the configured SMS/email providers. Do not put credentials in frontend variables or source.
+
+| Role | Name | Phone (sign in with) | Email | Business / city |
+|---|---|---|---|---|
+| Member | Alok Kumar | 9112312391 | test@test.com | Alok Kumar Wellness, New Delhi |
+| Member | Ravi Singh | 9122558891 | hello@hello.com | Ravi Singh Spa, Mumbai |
+| Customer | Neeraj Singh | 9177889991 | neeraj@test.com | New Delhi |
+| Customer | Sudhir Vishwa | 9144556610 | suddhir@test.com | Bengaluru |
+
 Needs Postgres (local, never Neon production): `prisma migrate dev`, seed twice, the role × resource
 × action × own/other matrix test, IDOR tests, migration row-count rehearsal.
 
@@ -44,15 +61,22 @@ Known failures at 2026-10-18 (msd recounted 2026-10-27: `india-locations` moved 
 
 | Project | Failing | Where |
 |---|---|---|
-| msd | 16 tests in 54 files, found 2026-10-27 (was 27 tests in 58 files on 2026-10-23, itself documented as 23 tests in 13 files on 2026-10-18 — massively understated even before the 2026-10-23 permission-engine change, root-caused below; none of the extra scope traces to that change) | **Dominant cause, ~53 of the 54 files**: every one crashes at import with `[vitest] No "getTokenStore" export is defined on the "@skylabs-monorepo/shared-auth/react" mock` — `api/rbac/client.ts` calls `getTokenStore()` at module scope (added after 2026-10-18), and dozens of page/component test files mock `shared-auth/react` minimally (just `useAuth`) without it, so merely importing the page under test throws before any test body runs. Confirmed pre-existing and unrelated to RBAC: reproduces identically for files never touched this session (`category.test.tsx`, `settings.test.tsx`, every `account/cms/*`, `account/masters/*`, `account/vendor-portal/*`, `account/orders/*`, etc.) — not attempted here, a one-line-per-file fix (add a `getTokenStore` stub to each file's mock factory, same shape used in `roles.test.tsx`) but far outside this pass's scope. The remaining, individually-named failures: `india-locations` 3, `contact-us` 2, and 1 each in `app.spec`, `widget-registry`, `deal-card`, `media-uploader`, `sky-product-card-wc`, `site-footer`, `wishlist`; regressions since commit e756759 (NewOfferCard), not yet fixed: `home` 4 (FAQ section no longer rendered, deal favourite), `category` 1 (product wishlist heart — on top of that file's `getTokenStore` crash above). **Fixed 2026-10-27**: `permission-matrix.test.tsx`'s 9 failures (targeted a per-cell-select Permission Matrix redesign — one `<select>` per action, `onScopeChange(permissionId, scope)` — that was never built) and `roles.test.tsx`'s 7th case (same unbuilt design) are gone; both files rewritten against the real checkbox-plus-one-scope-control component, now 10/10 and 7/7 (see §4.1 and ARCHITECTURE.md §1) |
-| msd-api | 39 tests in 10 files, found 2026-10-27 (was 40 in 10 files on 2026-10-23, itself documented as 5 on 2026-10-18 — the baseline was already stale before that date; none of the 40 was caused by the 2026-10-23 permission-engine change, and none was cross-test pollution from it either — every one reproduces identically running its file alone, confirmed file-by-file with `nx run msd-api:test -- <file>`, and the full-suite run is deterministic across repeats) | `rbac.routes` 15 (see below), `vendors.routes` 6, `order.service` 4, `promotion.service` 4, `auth.member` 2, `auth.routes` 2, `orders.routes` 2, `payment.routes` 2, `vendor.service` 2, `permission-resolver.service` 1 (asserts a SuperAdmin's resolved keys contain `vendors:delete`, a key the live menu no longer has — `msd-menu.json`'s top-level list node is already `members`, per the partly-done P1-05 rename). Of the 15 in `rbac.routes`: 4 use `POST`/`DELETE /rbac/users/:id/roles/:roleId`, a route pair that no longer exists (replaced by the atomic `PUT /rbac/users/:id/role`, which is itself also broken — see the build-failure note below); 2 assert the old suspended-member bootstrap message text against the current, longer one; 1 validates `PUT /rbac/users/:id/role` params that don't match the route's actual `:id`-only param shape; 1 is the matching "atomic replace" test hitting the same param mismatch; 1 is a stale role-conflicts fixture; 2 are `GET /roles/:id/permissions` asserting the old `{permissionIds}` response shape instead of `{permissionId, scope}`; the remaining 4 (bootstrap/impersonate "404" cases, 2 Super-Admin-role-grant cases) weren't traced past "fails the same alone" — not investigated further, out of scope for the permission-engine pass. The other ~9 files were not individually root-caused beyond "pre-existing, confirmed via isolation". **Fixed 2026-10-27**: `rbac.routes.test.ts`'s "/permissions/catalog" test (not in the above list — found 500ing when touching `getPermissionCatalog()` for P10-08; `test-utils/prisma-mock.ts`'s `permission` mock never had an `upsert`, so the route 500'd under test regardless of catalog content) — added the missing mock method and fixed the test's stale `menuKey === 'rbac.roles'` assertion (never a real catalog row, old or new) to a real one |
-| shared-menu | 5 | `index.test.ts` |
+| msd | 0 (2026-11-05, X-07: 1,374 pass; `products-list-page` delete test failed once in a full run and passed 3 of 3 alone) | P10-46 fixed every known failure: `permission-matrix`, `roles`, `contact-us`, `settings`, `widget-registry`, `app.spec`, `deal-card`, `media-uploader`, `site-footer`, `wishlist`, `entry-server`, and the OfferCard regressions in `home` (FAQ section restored, hearts are the card's icon button) and `category`. Only the flaky tests below can fail, and they pass alone |
+| msd-api | 0 | 2026-11-05 (X-07): 1,715 pass. Fixed 2026-10-29 (P10-46): 1,299 pass. `rbac.routes` tests moved to the scoped permission contract, `GET /roles/:id/permissions` validates its id again, order item images keep the bare key when `R2_PUBLIC_URL` is unset |
+| shared-* | 0 | Fixed 2026-10-29 (P10-46): `shared-menu` tests follow the `/account/*` menu; every shared package has an `.eslintrc.json` (the root config ignores all files until a project opts in), so `nx run-many -t lint test` passes for all six |
 
-Lint and type drift: 30 msd lint errors (`import/first` and `no-empty-function` in older tests), an ESLint ignore error in the shared packages, and
+Type check: `npx nx run msd:typecheck` runs `tsconfig.app.json` and `tsconfig.prerender.json` (ST-14,
+`prerender/` has 0 errors; both report the same known `src/` errors until P10-46).
+
+Lint and type drift: msd lint has 0 errors since 2026-10-29 (P10-46: late imports moved to the top,
+the reports filter loaders set empty options on failure); still open:
 `apps/msd-api/src/routes/members.routes.test.ts` type errors in its setup code (P10-46). ESLint
 ignores every file under `apps/msd-api/src` today. Flaky under load: `deals-list-page.test.tsx`
 "toggle-status flips a non-ACTIVE deal" and `popular-tags.test.tsx` "mapping a category calls
-mapPopularTag" (both pass alone).
+mapPopularTag" (both pass alone); also `branches-list-page.test.tsx` and
+`products-list-page.test.tsx` "delete asks for confirmation" (seen 2026-10-28, pass alone), and
+`home-hero.test.tsx` (one test, seen 2026-10-28, passes alone); msd-api `config/env-checks.test.ts` "boots with a
+complete production environment" (seen 2026-10-29 in `nx run-many`, passes alone); `deals-list-page.test.tsx` "shows the DEAL_NOT_READY message" (seen 2026-10-29, passes alone).
 
 **`npx nx run msd-api:build` is already red**, found 2026-10-23: 15 pre-existing TypeScript
 errors, none in a file touched by that date's permission-engine change (confirmed file-by-file).
@@ -67,6 +91,15 @@ transform doesn't type-check, which is why these don't block `msd-api:test`.
 ## 4. Acceptance per module
 
 ### 4.1 Admin and staff
+
+- OTP provider tests: dummy mode uses backend environment values for Admin, Member, Sales,
+  Marketing and Support; each rejects other roles' OTPs and never calls SMS. Customers can use
+  their registered phone with fixed OTP `111111`. Super Admin uses only its
+  separate configured mobile/OTP and must already be an active Super Admin account.
+- Missing/invalid OTP configuration fails safely without returning or logging credential values;
+  unknown, inactive, suspended, deleted and wrong-role accounts cannot obtain staff tokens.
+- `OTP_PROVIDER=sms` preserves random OTP expiry/attempt behavior and the ConnectExpress sender;
+  provider failure never falls back to dummy. Refresh, logout, JWT roles and RBAC remain unchanged.
 
 - Matrix snapshot test: 7 roles × 14 resources × actions × scope equals `PLANNING.md` §1.2 (P1-08,
   still open for the full 14-resource spec — `prisma/permission-matrix.test.ts` covers the
@@ -159,6 +192,28 @@ transform doesn't type-check, which is why these don't block `msd-api:test`.
 
 ### 4.2 Members
 
+- Member page overview (item 7, `member-summary.test.tsx`, `stat-tile.test.tsx`,
+  `member-detail-page.test.tsx`): eight cards in order (status, documents with due date, branches,
+  deals, therapists, products with "N live", customer and order counts); each links to its tab or
+  the filtered orders list only when the viewer may open it; the page outline is h1, h2 Overview,
+  h2 tab, h3. The admin dashboard renders the same `StatTile`.
+- Member profile form (item 8, `vendor-profile-form.test.tsx`): Save ("Save changes") is enabled
+  whenever the viewer can edit; a click with missing or invalid fields saves nothing, marks each
+  field and lists them in one "Fix these fields to save" alert (focus moves to the first); State
+  and City are lists from the India location list, City unlocks after State and resets when State
+  changes; "You have unsaved changes." with Discard appears after an edit; sections are titled
+  regions, never bordered cards.
+
+- Status journey (item 6, `member-status-machine.test.ts`, `member-status.service.test.ts`,
+  `member-header-actions.test.tsx`, `member-status.test.ts`): Active → Suspended is 409 "Make the
+  member inactive first"; Active → Inactive → Suspended works; Suspended and Inactive reactivate;
+  Delete from Suspended always archives (no row or file removed, outcome `ARCHIVED`), even with no
+  orders; Archived restores to Inactive (clears `archivedAt`), never straight to Active; each change
+  sends the member notice (INACTIVE, SUSPENDED, REACTIVATED, ARCHIVED, RESTORED) and the staff
+  email; a failed notice never fails the change. Console: Suspend shows disabled with its reason
+  for an Active member, Delete disabled for an Inactive one; only the open action is filled;
+  Archived shows Restore; the members list hides Archived unless that filter is chosen.
+
 - Status machine: every allowed transition, every refused one returns 409; reason 10 to 500.
 - Suspend: refresh sessions revoked; login and OTP request return 403 `MEMBER_SUSPENDED` with
   reason and steps, no OTP row; storefront hides everything; reactivation restores it and sends
@@ -166,9 +221,31 @@ transform doesn't type-check, which is why these don't block `msd-api:test`.
 - Inactive: any non-GET returns 403 `MEMBER_INACTIVE_READ_ONLY` (logout and refresh excepted);
   GET orders, customers and catalog return 200; banner on every console screen.
 - Delete: only from Suspended and only for Super Admin; zero orders deletes, otherwise archives;
-  media files removed after commit (P3-25 for cascaded rows).
+  every media file removed after commit: the member's documents, images and video plus the
+  images and videos of its deals, products and therapists (P3-25); archive keeps every file.
 - Documents: Support sees type and status only (no file key); masked numbers only; duplicate
-  number 409; approve, reject with reason; deleting an Approved document 409.
+  number 409; approve, reject with reason; deleting an Approved document 409. Uploader (P5-15;
+  `member-document.service.test.ts`, `member-documents-tab.test.tsx`): an on-behalf upload names the
+  staff member ("Uploaded by Priya for the member"), a missing account reads "staff", the member's
+  own upload has no name, and the list makes one name lookup (none without on-behalf rows).
+  Upload safety (P10-37; `member-documents-tab.test.tsx`, `shared-utils` `document-upload.test.ts`):
+  the file input accepts PDF, JPEG and PNG only; a file over 5 MB is refused before upload with a
+  message (the server limit is the same shared constant); a file name renders as text, never
+  markup; "View <document> file" opens the signed URL in a new tab with `rel="noopener noreferrer"`
+  and says so to screen readers; viewers without a file URL get no link.
+- Counts (P10-49; `vendors.routes.test.ts` "customer and order counts", `member-detail-page.test.tsx`,
+  `vendor-customers.test.tsx`, `orders.test.tsx`): the detail response counts distinct orders and
+  distinct customers (two lines of one order count once; two orders of one customer, one
+  customer); a member with no orders shows 0; "N customers" links to the Customers tab with
+  `customers:view`, "N orders" to `/account/orders?vendorId=` with `orders:view`, plain text
+  otherwise; the Customers tab is hidden without `customers:view` and its URL falls back to
+  Profile; the tab uses the staff route with contact details; the Orders page sends `vendorId`,
+  says "Showing one member's orders." and links back to every order.
+- Activity (P3-24; `member-activity.service.test.ts`, `member-activity-tab.test.tsx`): status items
+  carry from, to and the actor; document items the type, the event and `byStaff`; reminder items
+  the sequence (null when manual), the delivered channels and the sender; the console writes
+  "Status changed from Active to Suspended by Priya" and "Aadhaar card uploaded by staff for the
+  member" from those fields and falls back to `summary` for unknown values or rows without fields.
 - Reminders (all covered by unit tests): nothing before day 14; reminder 1 on the due date; 7-day
   spacing; after missed runs only the next reminder; final reminder carries the suspension
   sentence; documents asked for = missing + rejected; a second run sends nothing; a run that loses
@@ -179,6 +256,15 @@ transform doesn't type-check, which is why these don't block `msd-api:test`.
   summary; not in `/docs`.
 - Remind now: 403 without `members:status_change`; 201 with per-channel result and audit row; 429
   within 24 hours; 409 for suspended, complete, or no contact; button hidden in those cases.
+- Member customers (D19, P4-16; `vendor.service.test.ts` "listMyCustomers", `vendors.routes.test.ts`,
+  `vendor-customers.test.tsx`): a member sees only customers with an order item from them; phone
+  and email are `null` unless the customer has a `CONFIRMED` order with this member
+  (`PENDING_PAYMENT`, `COMPLETED`, `CANCELLED` keep them hidden); city is the shipping city of the
+  latest order that has one; order count counts distinct orders; the staff route always returns
+  contact details; the console shows City and "Hidden until an order is open".
+- Breadcrumbs (P10-47; `member-crumbs.test.ts`, `branch-form-page.test.tsx`): every member page starts
+  with Members > All members (linked to the list), then the member ("Member" until the name loads);
+  the sidebar title reads "All members".
 - Members list: the Filter menu sends exactly one filter per option; status and documents columns
   use their tonal colours.
 - Own scope (after P4): member A reading member B's branch, deal, therapist or product gets 404.
@@ -223,6 +309,75 @@ transform doesn't type-check, which is why these don't block `msd-api:test`.
 
 ### 4.3 Customers and orders
 
+- Checkout details (item 2.2, `checkout.test.tsx`): the form fills from `GET /users/me` (name,
+  phone without +91, email, address, state, city, PIN) and Continue sends them; State lists the
+  India states and City only the chosen state's cities; with nothing saved City is locked and
+  Continue names the missing fields (the `content.json` validation copy) without calling
+  checkout; Back to cart opens `/cart`; the form still fills under `StrictMode` (dev runs each effect twice); the summary
+  region lists every line and the total (`step-indicator.test.tsx`: named list, current step,
+  done steps read "completed"; `radio-card-group.test.tsx`: fieldset and legend, one radio per
+  option, the chosen one checked, change reported; `form-field.test.tsx`: error as an alert,
+  wide span; `form-panel.test.tsx`: region named by its h2, sections with an h3 and action,
+  footer with actions and note, nothing empty rendered).
+- Profile delivery address (item 2.2, `profile-form.test.tsx`, under `StrictMode`): fills from
+  the saved account address, never from an order; City lists only the chosen state's cities and a
+  new state clears it; Save address sends `{ address, state, city, pincode }` to
+  `PUT /users/me/address` and confirms only after it resolves; an API refusal shows as an alert
+  with no success message; an incomplete address names the missing fields without a request.
+- Saved delivery address (item 2.2, `rbac.routes.test.ts`, `orders.routes.test.ts`): `GET
+  /users/me` returns it; `PUT /users/me/address` saves a valid India address for the caller only
+  and refuses a city outside the state, a bad PIN, an unknown key and no token; checkout with all
+  four delivery fields saves them on the customer, with partial fields leaves the saved one alone,
+  refuses a state/city off the list, and needs a signed-in customer (401).
+- Line cards (item 2.3, `purchase-line-card.test.tsx`, `checkout.test.tsx`): one card per line
+  with type, title, member, branch, duration, quantity and price; title and image link to the
+  detail page with `target="_blank"`, `rel="noopener noreferrer"` and "(opens in a new tab)"; no
+  link or image when the line has none; the cart slots (select, quantity, actions) render and hide
+  "× qty"; the checkout summary lists every cart line as a card with the total.
+- Cart page (item 2.1, `cart.test.tsx`): cards carry the member and a new-tab detail link, no
+  vendor group headings; Move to wishlist shows for deals and products only, adds the product
+  then removes the line, and keeps the line with an alert when the add fails; Remove selected is
+  disabled with nothing selected and removes only the chosen lines; Select all (n) selects every
+  line and clears the cart in one call; one h1 with the item count; the summary region shows the
+  subtotal with the count and the total; the stepper updates a line's quantity; an empty cart
+  shows the empty heading and copy and no summary (`quantity-stepper.test.tsx`: named group,
+  polite value, steps, stops at min and max; `summary-panel.test.tsx`: region, rows, total).
+- Order notices (item 3, `order-notice.service.test.ts`, `payment.routes.test.ts`): confirmation
+  email to the checkout contact (account email as fallback) with every line, member, total and
+  order link; payment-failed email with the pay-again link; SMS only with the DLT template id
+  set; test accounts print to the console; a combined checkout sends one email; provider or
+  database errors never throw. Sent after COD, verified payment and webhook capture; failure
+  notice after a bad signature and `payment.failed`; nothing on a refused COD or a duplicate
+  webhook.
+- Order result page (item 3, `order-result.test.tsx`, `section-head.test.tsx`): the result comes
+  from the order state, not the URL (`outcomeOf`: confirmed/completed, cancelled, waiting, failed
+  by latest payment or by `?payment=failed`, error); the thank-you page names the email, the
+  order number, each line with its member and the total, and focuses the h1; Pay now reopens
+  checkout; a load error shows Try again and the Contact link, no facts and no summary, and
+  recovers; the page is `noindex`; facts list the order number and date; the summary region
+  counts items and shows the total (`status-panel.test.tsx`, `purchase-line-card.test.tsx`).
+- Checkout payment result (item 3, `checkout.test.tsx`): a verified payment and a failed
+  verification both open `/orders/:id/confirmation`; closing Razorpay after `payment.failed`
+  opens it with `?payment=failed`; closing it with no failed attempt stays on checkout.
+
+- Customer account pages (`customer-order-card.test.tsx`, `orders.test.tsx`,
+  `customer-dashboard.test.tsx`, `support.test.tsx`, `profile-form.test.tsx`): an order with
+  lines from three members lists all three with their own image, member, branch and a new-tab
+  detail link, is named `Order ORD-XXXXXXXX` (never the full id), shows the date, item count,
+  tonal status (cancelled = error) and total, and View details opens it; Orders hides orders
+  awaiting payment, the Cancelled chip shows only cancelled ones, and no orders shows the empty
+  state; the dashboard has one h1, four count links (cart and wishlist to their account pages),
+  the latest three orders and a load error as an alert; Support asks for both fields, sends
+  them trimmed and confirms; Profile shows Contact details as a region with a read-only phone and
+  asks for a name.
+- Order page (`order-detail.test.tsx`): h1 is the short number with the date and status badge,
+  the full id never shows, the breadcrumb links My orders, `noindex`; one progress list with the
+  current step marked (Delivered when the order holds a product); every line with its member and
+  a new-tab detail link; the summary lists payment, method, date and total and the delivery
+  address shows; Cancel calls the API only after the dialog confirms and the badge turns to
+  cancelled; a cancelled paid order ends on Cancelled with the refund notice and no Cancel action;
+  a failed payment shows its notice and Pay opens checkout for the order; a load error shows not
+  found.
 - A customer never reads or changes another customer's cart, wishlist or order by changing an id.
 - A member never changes an order's status (403), for a deal or a product order (D27).
 - A member with no business record gets empty Orders and Customers lists and 404 on any order;
@@ -279,6 +434,57 @@ transform doesn't type-check, which is why these don't block `msd-api:test`.
 - Therapist detail (`therapist-detail.test.tsx`): type as h1, person and experience, Details and
   the location aside, the rail leaves out the current therapist; the price follows the chosen
   package; signed-out Add to cart goes to sign in; a 404 shows the not-found state.
+- Meta descriptions (ST-08; `seo/private-page-meta.test.ts`, `otp.test.tsx`): cart, sign in, OTP,
+  orders, invoice and choose experience each have a 50 to 160 character description and stay
+  noindex (sign in, OTP and choose experience also nofollow); the invoice not-found view is noindex.
+- Branch address line (`utils/format.test.ts` "formatStreetAddress", `deal-detail.test.tsx`): the deal
+  and member pages print the city once when the stored address already ends with it, and keep a
+  state that only shares its last word ("Vasant Kunj, New Delhi, Delhi").
+- Member page branch (ST-20, `vendor.test.tsx`): the page shows the branch nearest the visitor's
+  location from `useVisitorLocation()`, the first branch without a location or mapped branches,
+  and nothing for a member with no branches; `useCurrentLocation` no longer exists.
+- Content width (ST-19, `content-width.test.ts`): `--sky-content-max` (1280px) and
+  `--sky-content-gutter` (16px) are defined once on `:root`; no stylesheet repeats 1280px; header,
+  footer and sections resolve to 1280px with 16px gutters and no sideways scroll at phone width.
+- Footer (ST-07, `site-footer.test.tsx`): every footer link has a page; Help & Info lists Help Center
+  (`/help-center`) and Wishlist, and no Gifting link until a gift-card feature exists.
+- One `<main>` per page (ST-04, `one-main-landmark.test.ts`): only the layouts render `<main>`; no
+  file under `app/pages` does, so the skip link keeps a single target.
+- Rich text safety (P10-36, shared-ui `sky-rich-text-editor.test.ts`): an initial or later value
+  with `onclick`, `onerror`, `<script>` and a `javascript:` link loads with the text and bold kept
+  and none of those left, and a later value never fires `sky-change`.
+- Blog category page (CO-02, `blog.test.tsx`): `/blog/category/massage` queries only that
+  category, shows "Massage articles" as h1, title and description, links back to `/blog` and
+  hides the Category facet; an unknown slug shows the not-found page; a failed category list still
+  lists the posts; index cards link their category to `/blog/category/<slug>`.
+- Contact page (CO-01, `contact.test.tsx`): defaults without a CMS row; CMS address, phone, email
+  and map embed win; an empty CMS field falls back on its own (no phone row while neither has a
+  phone); the CMS meta title and description override the page defaults; required fields first.
+- Become a Member (ST-01, `header-actions.test.tsx`): the header link opens `/become-member`, and
+  the route table serves the member sign-up page there. The sitemap paths (`prerender/routes.test.ts`)
+  and `llms.txt` list `/become-member` and `/help-center`, and every sitemap path must be a route
+  in `routes.tsx`, so the sitemap never points at a 404.
+- Popular searches in the prerender (ST-18, `hydration.test.tsx`): the server-rendered home page
+  lists every "{Category} in {City}" footer link in catalog order; with a saved city the client
+  moves that city first after hydration, with no hydration error.
+- Facet selections and price bounds (ST-25, `checkbox-facet.test.tsx`, `price-range-field.test.tsx`):
+  a checked option past the limit shows while collapsed after the first rows, and Show more
+  hides when only checked options are left past the limit; checked options stay during a
+  search that does not match them; a checked option the facet stops listing stays with its last
+  label, a 0 count and an enabled checkbox that clears it; URL prices outside the bounds show
+  clamped in both fields and the slider, with min never above max.
+- Use my current location (ST-05, `city-picker.test.tsx`, `location-context.test.tsx`): located
+  near a partner city closes the picker; a refused or failed lookup and a location more than
+  75 km from every partner city each keep it open with their own alert (the button points at it
+  with `aria-describedby`); a far location still keeps the coordinates for distance sorting.
+- Theme colours only (ST-16, `theme-colours.test.ts`): no CSS file outside `assets/theme` holds a
+  hex, `rgb()`/`hsl()` or `white`/`black` value (no light fallback inside `var()` either), and no
+  TypeScript file holds a hex colour string, so the dark and contrast themes reach every screen.
+- Sign-in landing and account links (ST-06, `role-routing.test.ts`, `shell-labels.test.tsx`):
+  staff (super admin, admin, sales, marketing, support) and members land on `/account/dashboard`;
+  a customer who is also a member lands on `/choose-experience`; a customer on `/`. The account
+  link goes to `/my-dashboard` for customers (with or without the member role) and to
+  `/account/dashboard` for members and staff; signed out it goes to `/sign-in`.
 - One `<h1>` per page; prerendered `/` contains the hero `<h1>`, category links and JSON-LD; no
   hydration warnings; `sitemap.xml`, `robots.txt`, `llms.txt` written when `VITE_SITE_URL` is set.
 - Category page (`category.test.tsx`): pills set `?sub=`; sort and filters send the right API
@@ -286,10 +492,11 @@ transform doesn't type-check, which is why these don't block `msd-api:test`.
   map hidden for products and therapists; a prerendered 404 renders not found on the first
   render; not-found keeps one h1; filter counts reload when the city resolves; a therapy category
   under a city URL does not filter by city; empty copy names the kind.
-- Card tags (ST-40, `offer-tag.test.ts`, `catalog.routes.test.ts`): a deal ending in 7 days or
+- Card tags (ST-40/ST-51, `offer-tag.test.ts`, `catalog.service.test.ts`, `catalog.routes.test.ts`): a deal ending in 7 days or
   less is Expire soon even when it is also hot, new or 30% off; ended deals get no Expire soon;
-  Hot needs the top 10% of paid lines in 30 days and at least 5 (4 lines → not hot; pending and
-  cancelled orders ignored); New is created within 14 days; Deal is 30% off or more (29% → none);
+  Hot needs the top 10% of paid lines in 30 days and at least 5 (4 lines → not hot; pending,
+  cancelled and confirmed-but-unpaid COD orders ignored); New is created within 14 days; Deal is
+  30% off or more (29% → none);
   products never get Expire soon; `tags=hot,new` returns only items whose shown tag is one of
   them; tag facet counts equal the filtered list totals; `tags=foo` → 422.
 - Catalog API for listings (ST-40, `catalog.routes.test.ts`): no new params → same items and
@@ -299,8 +506,8 @@ transform doesn't type-check, which is why these don't block `msd-api:test`.
   coordinates behaves like `relevance`; `radiusKm`, `city`, `vendorIds`, `branchIds`,
   `minPrice` / `maxPrice` narrow and `meta.total` matches; therapist facets match the list.
 - Listing shell (ST-41, `filter-panel.test.tsx`, `chip-nav.test.tsx`, `category.test.tsx`): deals show Your location,
-  Distance, Price, Tags, Business, Branches; products show Category (on `/products`), Price and
-  Tags with no location or distance; therapists show Your location, Distance, Price, Business,
+  Distance, Price, Tags, Business, Branches; products show Category (on `/products`), Price,
+  Tags and Business with no location, distance or branches (item 4); therapists show Your location, Distance, Price, Business,
   Branches; Clear all empties every filter param; a tag checkbox writes `?tag=` and the card
   image shows the API tag with its theme role; no Reviews section.
 - Listing pages (ST-42, `listing-page.test.tsx`, `prerender/routes.test.ts`): `/deals`, `/deals/:city`, `/products`,
@@ -309,6 +516,13 @@ transform doesn't type-check, which is why these don't block `msd-api:test`.
   → not found and `noindex`; prerendered HTML holds the cards, ItemList and BreadcrumbList
   JSON-LD and hydrates without warnings; `sitemap.xml` lists the new routes and only cities
   with results. Checked at 1366 and 390 px, light and dark, no horizontal scroll at 320 px.
+- Product business (item 4, D39; `product-facets.test.ts`, `catalog.routes.test.ts`,
+  `offer-card.test.tsx`, `listing-page.test.tsx`): business counts ignore the business
+  selection and apply the others, sorted by count with zero-count businesses kept;
+  `vendorIds=` narrows `GET /catalog/products` and stays out of the facets SQL; a bad id → 422;
+  `/products?vendor=` sends `vendorIds` to the list and the facets, and explore with
+  `kind=products` to the list (`search.test.tsx`); a product card shows the
+  member's business name without the `divided` service layout.
 - Explore (ST-43, `search.test.tsx`): kind chips All, Deals, Products, Therapists with counts set
   `?kind=`; the filter panel follows the kind; list and grid render offer and therapist cards;
   signed-out Add to cart goes to sign in with the query kept; one (visually hidden) h1;
@@ -381,6 +595,9 @@ rollback rehearsal (P11).
 
 - [ ] Public vs signed-in access matches `API.md` for every route.
 - [ ] Ownership tested with another user's id (member, customer, order, branch): IDOR / BOLA.
+- [ ] A member never sees another member's part of a shared order: lines, totals, payment amount,
+      business or branch name, or a search hit (item 5, `services/order-member-scope.test.ts`);
+      member dashboard revenue counts only their own paid lines.
 - [ ] A normal user calling an admin endpoint directly gets 403.
 - [ ] `/rbac/impersonate` restricted, short-lived, audited.
 - [ ] OTP request and verify rate-limited, per IP + identifier and per identifier alone.
@@ -392,6 +609,16 @@ rollback rehearsal (P11).
 - [ ] No OTP, secret, token or unneeded private field in any response.
 - [ ] Public catalog: only intended records and fields; maximum page size enforced; validated input.
 - [ ] Errors expose no stack traces or database details.
+- [ ] Logs carry a request id and no token, OTP, password, document or bank number (P2-10,
+      `lib/logger.test.ts`, `middleware/requestLogger.test.ts`).
+- [ ] No new loose body schema (P2-14, `body-schemas-strict.test.ts`; the frozen list only shrinks);
+      shared field rules tested in `schemas/common.schema.test.ts`.
+- [ ] Tokens only as bearer headers; the API sets no cookie (P2-16, `lib/token-transport.test.ts`).
+- [ ] Raw SQL only as tagged `$queryRaw` / `$executeRaw` (P11-03, `lib/raw-sql.test.ts`).
+- [ ] Every audit row uses an action from `lib/audit.ts` (P2-11: enforced by the type,
+      `lib/audit.test.ts` checks the list is unique and dotted).
+- [ ] Production boots only with a strong `JWT_SECRET`, exact `CORS_ORIGIN` origins and the four
+      document and job secrets (P2-09, `config/env-checks.test.ts`, including a boot test).
 - [ ] Sensitive admin actions are audited.
 
 API docs prove that a route is registered, not that its runtime checks are right; this checklist

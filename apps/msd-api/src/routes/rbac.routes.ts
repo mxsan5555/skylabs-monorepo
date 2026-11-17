@@ -1,21 +1,20 @@
 import { Router } from 'express';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { authenticate } from '../middleware/authenticate';
 import { requirePermission } from '../middleware/requirePermission';
 import { validateBody, validateParams, validateQuery } from '../middleware/validate';
 import { z } from 'zod';
 import { UuidParamSchema, PaginationQuerySchema } from '../schemas/common.schema';
 import {
-  RoleCreateSchema,
   RoleUpdateSchema,
   RoleStatusUpdateSchema,
-  RoleCloneSchema,
   RolePermissionsUpdateSchema,
   RoleWidgetsUpdateSchema,
   DashboardWidgetCreateSchema,
   UserListQuerySchema,
   UserCreateSchema,
   UserUpdateSchema,
+  MyAddressSchema,
   UserStatusUpdateSchema,
   UserRoleSetSchema,
   RoleConflictResolveSchema,
@@ -34,11 +33,11 @@ import { startImpersonation } from '../services/impersonation.service';
 import { getBootstrap } from '../services/bootstrap.service';
 import { writeAuditLog } from '../services/audit.service';
 import { prisma } from '../lib/prisma';
-import { sendData, ApiError } from '../lib/http';
+import { sendData, sendError, ApiError } from '../lib/http';
 import { invalidatePermissionCache, isSuperAdminRoleSet, resolveGrantedPermissions } from '../services/permission-resolver.service';
 import { scopeFor } from '@skylabs-monorepo/shared-permissions';
 
-const UserRoleParamsSchema = z.object({ id: z.string().uuid(), roleId: z.string().uuid() });
+const UserRoleParamsSchema = UuidParamSchema;
 
 const router = Router();
 router.use(authenticate);
@@ -68,20 +67,16 @@ router.get('/roles', requirePermission('rbac.roles', 'view'), async (_req, res, 
   }
 });
 
-router.post(
-  '/roles',
-  requirePermission('rbac.roles', 'create'),
-  validateBody(RoleCreateSchema),
-  async (_req, _res, next) => {
-    // `createRole` always throws `ROLE_MANAGEMENT_LOCKED` (PLANNING.md §1.1/R1) — no role is
-    // ever actually created, so there is nothing left here to audit-log or respond with.
-    try {
-      await roleService.createRole(_req.body);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
+/**
+ * R1 (PLANNING §1, P2-15): the seven roles are fixed. Creating, cloning and deleting a role are
+ * refused for everyone who passes the permission check; a role's name, status and grants stay
+ * editable below.
+ */
+function roleManagementLocked(_req: Request, res: Response) {
+  sendError(res, 'ROLE_MANAGEMENT_LOCKED', 'Roles are fixed. Change what a role can do in its permissions instead.');
+}
+
+router.post('/roles', requirePermission('rbac.roles', 'create'), roleManagementLocked);
 
 router.patch(
   '/roles/:id',
@@ -109,48 +104,9 @@ router.patch(
   },
 );
 
-router.delete(
-  '/roles/:id',
-  requirePermission('rbac.roles', 'delete'),
-  validateParams(UuidParamSchema),
-  async (req, res, next) => {
-    try {
-      const before = await roleService.getRole(req.params.id);
-      await roleService.deleteRole(req.params.id);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'role.delete',
-        targetType: 'Role',
-        targetId: req.params.id,
-        before,
-        ...requestMeta(req),
-      });
-      // A deleted role can no longer contribute any grant to whatever role-key combination it
-      // used to be part of — without this, anyone else sharing that combination would keep
-      // resolving the now-deleted role's permissions from the cache for up to CACHE_TTL_MS.
-      invalidatePermissionCache();
-      sendData(res, null);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
+router.delete('/roles/:id', requirePermission('rbac.roles', 'delete'), roleManagementLocked);
 
-router.post(
-  '/roles/:id/clone',
-  requirePermission('rbac.roles', 'create'),
-  validateParams(UuidParamSchema),
-  validateBody(RoleCloneSchema),
-  async (req, _res, next) => {
-    // `cloneRole` always throws `ROLE_MANAGEMENT_LOCKED` (PLANNING.md §1.1/R1) — no role is
-    // ever actually cloned, so there is nothing left here to audit-log or respond with.
-    try {
-      await roleService.cloneRole(req.params.id, req.body.key, req.body.name);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
+router.post('/roles/:id/clone', requirePermission('rbac.roles', 'create'), roleManagementLocked);
 
 router.patch(
   '/roles/:id/status',
@@ -190,6 +146,7 @@ router.get('/permissions/catalog', requirePermission('rbac.roles', 'view'), asyn
 router.get(
   '/roles/:id/permissions',
   requirePermission('rbac.roles', 'view'),
+  validateParams(UuidParamSchema),
   async (req, res, next) => {
     try {
       const data =
@@ -352,7 +309,24 @@ router.post(
 router.get('/users/me', async (req, res, next) => {
   try {
     const user = await userService.getUserOrThrow(req.user!.sub);
-    sendData(res, userService.serializeUser(user));
+    sendData(res, userService.serializeMe(user));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Item 2.2 (D37): the caller's own saved delivery address, pre-filled at checkout.
+router.put('/users/me/address', validateBody(MyAddressSchema), async (req, res, next) => {
+  try {
+    const user = await userService.saveMyAddress(req.user!.sub, req.body);
+    await writeAuditLog({
+      actorUserId: req.user!.sub,
+      action: 'user.address.update',
+      targetType: 'User',
+      targetId: user.id,
+      ...requestMeta(req),
+    });
+    sendData(res, user);
   } catch (err) {
     next(err);
   }
@@ -472,20 +446,24 @@ router.put(
   '/users/:id/role',
   requirePermission('rbac.users', 'assign'),
   validateParams(UserRoleParamsSchema),
+  validateBody(UserRoleSetSchema),
   async (req, res, next) => {
     try {
       await assertCanManageUser(req.user!.sub, req.params.id);
-      await assertCanAssignRole(req.user!.sub, req.params.roleId);
-      await userService.assignRole(req.params.id, req.params.roleId);
+      const givesSuperAdmin = await assertCanAssignRole(req.user!.sub, req.body.roleId);
+      if (!givesSuperAdmin) await assertNotLastSuperAdmin(req.params.id);
+      const before = await userService.getUserOrThrow(req.params.id);
+      const user = await userService.setStaffUserRole(req.params.id, req.body.roleId);
       await writeAuditLog({
         actorUserId: req.user!.sub,
         action: 'user.role.set',
         targetType: 'User',
         targetId: req.params.id,
-        before: { roleIds: before.roles.map((r) => r.role.id) },
+        before: { roleIds: before.roles.map((r: { role: { id: string } }) => r.role.id) },
         after: { roleId: req.body.roleId },
         ...requestMeta(req),
       });
+      invalidatePermissionCache();
       sendData(res, user);
     } catch (err) {
       next(err);
@@ -510,20 +488,24 @@ router.put(
   '/role-conflicts/:id',
   requirePermission('rbac.users', 'assign'),
   validateParams(UserRoleParamsSchema),
+  validateBody(RoleConflictResolveSchema),
   async (req, res, next) => {
     try {
       await assertCanManageUser(req.user!.sub, req.params.id);
-      if (await assertCanAssignRole(req.user!.sub, req.params.roleId)) await assertNotLastSuperAdmin(req.params.id);
-      await userService.unassignRole(req.params.id, req.params.roleId);
+      await assertCanAssignRole(req.user!.sub, req.body.roleId);
+      await assertNotLastSuperAdmin(req.params.id);
+      const before = await userService.getUserOrThrow(req.params.id);
+      const user = await userService.resolveAccountRoleConflict(req.params.id, req.body.roleId);
       await writeAuditLog({
         actorUserId: req.user!.sub,
         action: 'user.role_conflict.resolve',
         targetType: 'User',
         targetId: req.params.id,
-        before: { roleIds: before.roles.map((r) => r.role.id) },
+        before: { roleIds: before.roles.map((r: { role: { id: string } }) => r.role.id) },
         after: { roleId: req.body.roleId },
         ...requestMeta(req),
       });
+      invalidatePermissionCache();
       sendData(res, user);
     } catch (err) {
       next(err);

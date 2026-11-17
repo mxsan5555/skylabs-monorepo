@@ -15,31 +15,25 @@ export const MEMBER_DOCUMENT_LABEL: Record<VendorDocumentType, string> = {
   GST: 'GST number',
 };
 
-const STATUS_SUMMARY = /^Status changed from ([A-Z_]+) to ([A-Z_]+)(.*)$/;
-const DOCUMENT_SUMMARY = /^([A-Z_]+) document (.*)$/;
-
-const isStatus = (value: string): value is MemberStatus => value in MEMBER_STATUS_LABEL;
-const isDocumentType = (value: string): value is VendorDocumentType => value in MEMBER_DOCUMENT_LABEL;
+const isStatus = (value: string | undefined): value is MemberStatus => !!value && value in MEMBER_STATUS_LABEL;
+const isDocumentType = (value: string | undefined): value is VendorDocumentType => !!value && value in MEMBER_DOCUMENT_LABEL;
 
 /**
- * Makes an activity summary readable. msd-api (`member-activity.service.ts`) writes two fixed
- * templates with raw enums: "Status changed from ACTIVE to SUSPENDED[ by Name]" and
- * "AADHAAR document uploaded[ by staff for the member]" / "... approved" / "... rejected". Only a
- * known enum at the start of one of those templates is swapped for its label; anything else,
- * including the rest of the sentence, stays exactly as the server sent it.
+ * The sentence for one activity row, built from its structured fields (P3-24) with the console's
+ * own labels: "Status changed from Active to Suspended by Priya", "Aadhaar card uploaded by staff
+ * for the member", "PAN card approved". Reminder and review rows, rows without fields and any
+ * value this map does not know use the server's `summary` as sent.
  */
-export function readableActivitySummary(summary: string): string {
-  const status = STATUS_SUMMARY.exec(summary);
-  if (status) {
-    const [, from, to, rest] = status;
-    return isStatus(from) && isStatus(to) ? `Status changed from ${MEMBER_STATUS_LABEL[from]} to ${MEMBER_STATUS_LABEL[to]}${rest}` : summary;
+export function activityText(item: ActivityItem): string {
+  if (item.kind === 'status' && isStatus(item.fromStatus) && isStatus(item.toStatus)) {
+    const by = item.actorName ? ` by ${item.actorName}` : '';
+    return `Status changed from ${MEMBER_STATUS_LABEL[item.fromStatus]} to ${MEMBER_STATUS_LABEL[item.toStatus]}${by}`;
   }
-  const document = DOCUMENT_SUMMARY.exec(summary);
-  if (document) {
-    const [, type, rest] = document;
-    return isDocumentType(type) ? `${MEMBER_DOCUMENT_LABEL[type]} ${rest}` : summary;
+  if (item.kind === 'document' && isDocumentType(item.documentType) && item.event) {
+    const byStaff = item.event === 'uploaded' && item.byStaff ? ' by staff for the member' : '';
+    return `${MEMBER_DOCUMENT_LABEL[item.documentType]} ${item.event}${byStaff}`;
   }
-  return summary;
+  return item.summary;
 }
 
 /** Colour meaning of each lifecycle state (`sky-badge status`): live, paused, blocked, gone. */
@@ -94,7 +88,7 @@ export const ACTIVITY_DETAIL_LABEL: Record<ActivityItem['kind'], string> = {
   review: 'Reason',
 };
 
-const documentsState = (summary: Summary | undefined) => (summary?.complete ? 'complete' : 'incomplete');
+export const documentsState = (summary: Summary | undefined) => (summary?.complete ? 'complete' : 'incomplete');
 
 export function documentsChipLabel(summary: Summary | undefined): string {
   return DOCUMENTS_LABEL[documentsState(summary)];
@@ -113,18 +107,35 @@ export function dueDateLabel(summary: Summary | undefined): string {
   return `${summary.overdue ? 'Overdue since' : 'Due'} ${formatDate(summary.dueAt)}`;
 }
 
-export type StatusAction = 'deactivate' | 'suspend' | 'reactivate' | 'delete';
+export type StatusAction = 'deactivate' | 'suspend' | 'reactivate' | 'delete' | 'restore';
 
+/** One header action; `blockedBy` marks the next step that is not allowed yet and why. */
+export interface StatusActionOption {
+  action: StatusAction;
+  blockedBy?: string;
+}
+
+/** Why the next step is not available yet (item 6). Mirrors the msd-api status machine. */
+export const MAKE_INACTIVE_FIRST = 'Make the member inactive first.';
+export const SUSPEND_FIRST = 'Suspend the member first.';
+
+/**
+ * Header actions for a member's status (item 6): Active, then Inactive, then Suspended, then
+ * Delete, which archives; every step can come back (Reactivate, Restore). The next step that is
+ * not allowed yet is listed with `blockedBy`, so staff see the journey instead of a missing button.
+ */
 export function availableStatusActions(
   status: MemberStatus,
   can: { canStatusChange: boolean; canDelete: boolean },
-): StatusAction[] {
-  const actions: StatusAction[] = [];
+): StatusActionOption[] {
+  const actions: StatusActionOption[] = [];
   if (can.canStatusChange) {
-    if (status === 'ACTIVE') actions.push('deactivate', 'suspend');
-    if (status === 'INACTIVE') actions.push('reactivate', 'suspend');
-    if (status === 'SUSPENDED') actions.push('reactivate');
+    if (status === 'ACTIVE') actions.push({ action: 'deactivate' }, { action: 'suspend', blockedBy: MAKE_INACTIVE_FIRST });
+    if (status === 'INACTIVE') actions.push({ action: 'reactivate' }, { action: 'suspend' });
+    if (status === 'SUSPENDED') actions.push({ action: 'reactivate' });
+    if (status === 'ARCHIVED') actions.push({ action: 'restore' });
   }
-  if (can.canDelete && status === 'SUSPENDED') actions.push('delete');
+  if (can.canDelete && can.canStatusChange && status === 'INACTIVE') actions.push({ action: 'delete', blockedBy: SUSPEND_FIRST });
+  if (can.canDelete && status === 'SUSPENDED') actions.push({ action: 'delete' });
   return actions;
 }

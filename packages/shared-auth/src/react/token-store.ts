@@ -1,52 +1,23 @@
-import { authStorageKeys, readStorageValue, writeStorageValue, AuthRequestError } from '../index';
-
-/**
- * Plain (non-React) singleton holding the live access token + the cookie-based refresh
- * coordination for the persistent-login flow. Lives outside React so both `AuthProvider`
- * (mirrors it into context state) and a plain fetch wrapper like msd's `api/rbac/client.ts`
- * (401-retry-once) can share exactly one in-flight refresh instead of each racing the server's
- * single-use refresh cookie independently — a second concurrent rotation of the same cookie
- * reads as a replay server-side and revokes the whole session (see
- * apps/msd-api/src/services/token.service.ts#rotateRefreshToken).
- *
- * The refresh token itself is never seen here — it's an HttpOnly cookie the browser attaches
- * automatically; this module only ever holds the short-lived access token (same as before,
- * still in localStorage — only the long-lived refresh credential moved out of it) plus the
- * paired CSRF cookie's value (JS-readable by design, see apps/msd-api/src/lib/auth-cookies.ts).
- */
+import {
+  authStorageKeys,
+  AuthRequestError,
+  isJwtExpired,
+  readStorageValue,
+  resolveInitialToken,
+  writeStorageValue,
+} from '../index';
 
 export interface TokenStore {
   getToken(): string | null;
   setToken(token: string | null): void;
   subscribe(listener: (token: string | null) => void): () => void;
-  /** Cookie-based refresh, de-duplicated within this tab and coordinated across tabs (Web Locks
-   *  API where available). Resolves the new access token on success, `null` on a definitive
-   *  "no session"/"session invalid" response, and throws `AuthRequestError` on a transient
-   *  (network/5xx) failure so callers can tell the two apart. */
   refresh(): Promise<string | null>;
-  /** Best-effort server-side revoke + cookie clear, then clears local state regardless of
-   *  whether the network call succeeds (a flaky network must not block signing out locally). */
   logout(): Promise<void>;
 }
 
-const CSRF_COOKIE_NAME = 'msd_csrf_token';
-
-function readCsrfCookie(): string | null {
-  if (typeof document === 'undefined') return null;
-  const match = document.cookie.match(new RegExp(`(?:^|; )${CSRF_COOKIE_NAME}=([^;]+)`));
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
-function withLock<T>(name: string, fn: () => Promise<T>): Promise<T> {
-  const nav = typeof navigator !== 'undefined' ? (navigator as Navigator & { locks?: LockManager }) : undefined;
-  if (nav?.locks) {
-    // lib.dom.d.ts's `LockGrantedCallback<T>` types the callback as returning `T`, not
-    // `T | PromiseLike<T>` — the real Web Locks spec flattens a returned promise same as any
-    // other promise-returning callback (and every browser's actual implementation does), so
-    // this is a stale ambient type, not a real double-Promise at runtime.
-    return nav.locks.request(name, () => fn()) as unknown as Promise<T>;
-  }
-  return fn();
+function withLock<T>(name: string, operation: () => Promise<T>): Promise<T> {
+  const nav = typeof navigator === 'undefined' ? undefined : navigator as Navigator & { locks?: LockManager };
+  return nav?.locks ? nav.locks.request(name, () => operation()) as unknown as Promise<T> : operation();
 }
 
 const stores = new Map<string, TokenStore>();
@@ -56,54 +27,105 @@ export function getTokenStore(appPrefix: string, apiBaseUrl: string): TokenStore
   if (existing) return existing;
 
   const keys = authStorageKeys(appPrefix);
+  resolveInitialToken(keys);
+  writeStorageValue(keys.refreshToken, null);
   const listeners = new Set<(token: string | null) => void>();
-  let current: string | null = readStorageValue(keys.token);
+  let current = readStorageValue(keys.token);
+  let csrfToken: string | null = null;
+  let generation = 0;
   let inFlight: Promise<string | null> | null = null;
 
-  function setToken(token: string | null): void {
-    current = token;
-    writeStorageValue(keys.token, token);
+  function notify(token: string | null): void {
     listeners.forEach((listener) => listener(token));
   }
 
+  function setToken(token: string | null): void {
+    current = token;
+    generation += 1;
+    if (!token) csrfToken = null;
+    writeStorageValue(keys.token, token);
+    notify(token);
+  }
+
   if (typeof window !== 'undefined') {
-    // Fires only in OTHER tabs than the one that wrote the value — exactly what we want: the
-    // writing tab already updated its own React state directly, this is purely for siblings.
     window.addEventListener('storage', (event) => {
       if (event.key === keys.token) {
         current = event.newValue;
-        listeners.forEach((listener) => listener(current));
+        generation += 1;
+        if (!current) csrfToken = null;
+        notify(current);
       }
     });
   }
 
-  async function doRefresh(): Promise<string | null> {
-    const csrf = readCsrfCookie();
-    let res: Response;
+  async function getCsrfToken(): Promise<string> {
+    if (csrfToken) return csrfToken;
+
+    let response: Response;
     try {
-      res = await fetch(`${apiBaseUrl}/auth/refresh`, {
+      response = await fetch(`${apiBaseUrl}/auth/csrf`, {
+        credentials: 'include',
+        cache: 'no-store',
+      });
+    } catch (error) {
+      throw new AuthRequestError(error instanceof Error ? error.message : 'Network error loading CSRF token');
+    }
+
+    if (!response.ok) {
+      throw new AuthRequestError(`Failed to load CSRF token: ${response.status}`, response.status);
+    }
+
+    const body = (await response.json()) as { data: { csrfToken: string } };
+    csrfToken = body.data.csrfToken;
+    return csrfToken;
+  }
+
+  async function doRefresh(): Promise<string | null> {
+    const csrf = await getCsrfToken();
+    let response: Response;
+    try {
+      response = await fetch(`${apiBaseUrl}/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
-        headers: csrf ? { 'X-CSRF-Token': csrf } : {},
+        headers: { 'X-CSRF-Token': csrf },
       });
-    } catch (err) {
-      throw new AuthRequestError(err instanceof Error ? err.message : 'Network error refreshing token');
+    } catch (error) {
+      throw new AuthRequestError(error instanceof Error ? error.message : 'Network error refreshing token');
     }
-    if (!res.ok) {
-      if (res.status === 401 || res.status === 403) {
-        setToken(null);
-        return null;
-      }
-      throw new AuthRequestError(`Failed to refresh token: ${res.status}`, res.status);
+
+    if (response.status === 401 || response.status === 403) {
+      setToken(null);
+      csrfToken = null;
+      return null;
     }
-    const body = (await res.json()) as { data: { accessToken: string } };
+    if (!response.ok) {
+      throw new AuthRequestError(`Failed to refresh token: ${response.status}`, response.status);
+    }
+
+    const body = (await response.json()) as { data: { accessToken: string } };
     setToken(body.data.accessToken);
     return body.data.accessToken;
   }
 
   function refresh(): Promise<string | null> {
     if (!inFlight) {
-      inFlight = withLock(`${appPrefix}-auth-refresh`, doRefresh).finally(() => {
+      const tokenAtRequest = current;
+      const generationAtRequest = generation;
+      inFlight = withLock(`${appPrefix}-auth-refresh`, async () => {
+        // Another tab may have completed the one-time refresh while this tab waited for the lock.
+        // Re-read shared storage inside the lock to avoid replaying the old refresh cookie.
+        const latest = readStorageValue(keys.token);
+        if (generation !== generationAtRequest) {
+          return current && !isJwtExpired(current) ? current : null;
+        }
+        if (latest !== tokenAtRequest) {
+          current = latest;
+          generation += 1;
+          notify(latest);
+          return latest && !isJwtExpired(latest) ? latest : null;
+        }
+        return doRefresh();
+      }).finally(() => {
         inFlight = null;
       });
     }
@@ -111,20 +133,19 @@ export function getTokenStore(appPrefix: string, apiBaseUrl: string): TokenStore
   }
 
   async function logout(): Promise<void> {
-    const csrf = readCsrfCookie();
-    const tokenAtLogout = current;
     setToken(null);
+    writeStorageValue(keys.refreshToken, null);
     try {
+      const csrf = await getCsrfToken();
       await fetch(`${apiBaseUrl}/auth/logout`, {
         method: 'POST',
         credentials: 'include',
-        headers: {
-          ...(tokenAtLogout ? { Authorization: `Bearer ${tokenAtLogout}` } : {}),
-          ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
-        },
+        headers: { 'X-CSRF-Token': csrf },
       });
     } catch {
-      // Local state is already cleared above — a flaky network here must not block sign-out.
+      // Local sign-out must still complete if the API is unavailable.
+    } finally {
+      csrfToken = null;
     }
   }
 

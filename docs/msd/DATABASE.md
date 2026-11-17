@@ -48,6 +48,10 @@ PostgreSQL database `msd`, schema `apps/msd-api/prisma/schema.prisma` (68 models
 | LoginHistory | 8 | user -> User | index(userId) |
 | ImpersonationSession | 7 | superAdmin -> User; target -> User | index(superAdminUserId); index(targetUserId) |
 
+OTP credentials/provider selection are environment-only. `OtpChallenge` remains for generated,
+hashed, expiring SMS/email challenges; dummy fixed role credentials and the Super Admin login
+credential are not written to any model. This change makes no schema or migration changes.
+
 - `RolePermission.scope` (`ALL` | `OWN`, default `ALL`) is resolved end to end since 2026-10-23
   (`permission-resolver.service.ts`, `GET /rbac/bootstrap`) but only actually enforced by a route
   for one key so far, `rbac.audit-logs:view` (F2); `setRolePermissions` rejects `scope: 'OWN'`
@@ -97,6 +101,9 @@ PostgreSQL database `msd`, schema `apps/msd-api/prisma/schema.prisma` (68 models
   P4-09 renames it to `ADMIN | MEMBER`.
 - `AuditLog.actorUserId` is a required foreign key to `User`, so only actions by a person are
   audited.
+- `RefreshSession` stores only the refresh-token hash plus user, creation, expiry and revocation
+  metadata. Rotation carries the original `createdAt` forward to enforce the 90-day absolute
+  lifetime; no schema migration is required.
 
 ## 2. Members
 
@@ -195,6 +202,9 @@ value and hash) is not built yet (task P5-16).
 - `OrderItem.vendorId` (not `Order`'s own vendor column) says which member sold each line; own
   scope on orders and payments filters by it.
 - `SupportRequest` is a customer contact message, unrelated to the `support` role (F14).
+- `User.address`, `city`, `state`, `pincode` (nullable, S25): the customer's saved delivery address
+  (D37). Checkout pre-fills it and a placed order with a complete address replaces it; orders keep
+  their own copy in `shipping*`, so history never changes.
 
 ## 4. Storefront
 
@@ -335,7 +345,7 @@ No tables (GA4 holds the data).
 | `PaymentProvider` | RAZORPAY, COD |
 | `PaymentStatus` | CREATED, PAID, FAILED, CANCELLED |
 | `NotificationRecipientType` | SUPERADMIN, VENDOR |
-| `NotificationType` | DEAL_PENDING_APPROVAL, ORDER_RECEIVED, VENDOR_PENDING_APPROVAL, MEMBER_SUSPENDED, DOCUMENT_APPROVED, DOCUMENT_REJECTED, MEMBER_REVIEW_FLAGGED |
+| `NotificationType` | DEAL_PENDING_APPROVAL, ORDER_RECEIVED, VENDOR_PENDING_APPROVAL, MEMBER_SUSPENDED, DOCUMENT_APPROVED, DOCUMENT_REJECTED, MEMBER_REVIEW_FLAGGED, DISPUTE_RAISED, PAYOUT_RECORDED |
 | `ReminderDelivery` | PENDING, SENT, FAILED |
 | `VendorDocumentType` | GST, PAN, AADHAAR |
 
@@ -360,12 +370,14 @@ No tables (GA4 holds the data).
 | S16 | Notification enums (`ADMIN`, `MEMBER` recipients; `REFUND_REQUESTED`, `PAYOUT_RELEASED`) | open (P4-09) |
 | S17 | Encrypt and mask `bankAccountNumber` | open (P5-13) |
 | S18 | Deal: highlights, eligibility, booking required, booking instructions (rename of `notes`), validity days, limit per customer, cancellation policy and note, previous slugs, published at; enum `DealCancellationPolicy` | written (`20261026100000_deal_page_fields`); apply and rehearse on a Neon copy open (DL-01) |
+| S19 | `NotificationType.DISPUTE_RAISED`, `PAYOUT_RECORDED` restored: `20261029073832` dropped them while disputes and payouts still send them | done (`20261105100000_restore_dispute_payout_notifications`) |
 | S19 | DealPackage: name, persons, inclusions; unique `(dealId, durationMinutes, persons)` | written (same migration) |
 | S20 | DealImage: `altText` | written (same migration) |
 | S21 | `DealFaq` table | written (same migration) |
 | S22 | Branch: `addressLine2`; report and fix rows whose `state` or `city` is not in the India list, then `NOT NULL` | done 2026-10-27 (DL-02): column in `20261026100000_deal_page_fields`; report script `prisma/report-branch-locations.ts` (0 bad rows locally); `NOT NULL` in `20261027100000_branch_location_required` (stops with a clear message if a row lacks state or city); Neon run with DL-01 |
 | S23 | Backfill: `policy` → `cancellationNote`; `publishedAt` = `updatedAt` for ACTIVE deals; every deal `approvalStatus = APPROVED` (D6). Existing slugs are kept; new deals get `{title}-{member}-{city}` | written (same migration) |
 | S24 | `pg_trgm` + GIN trigram indexes on `Deal.title` and `Vendor.businessName` | written (same migration; indexes declared in `schema.prisma`, extension in SQL) |
+| S25 | User: `address`, `city`, `state`, `pincode` (nullable), the saved delivery address (D37, item 2.2) | written 2026-10-29 (`20261029130000_user_saved_address`, `down.sql` drops them); apply locally, then Neon with DL-01 |
 | - | Contract: drop `kycStatus`, `kycRejectionReason`, legacy GST/PAN/`kycDocuments`, `approvalStatus`, `approvalRejectionReason`, `Deal.images`, `Deal.policy`, category-grant tables, `Member.offersService`/`offersProduct`/`offersTherapy` | after one release without readers (P3-16) |
 
 `PaymentStatus` gains `REFUNDED`, `PARTIALLY_REFUNDED` with S8.

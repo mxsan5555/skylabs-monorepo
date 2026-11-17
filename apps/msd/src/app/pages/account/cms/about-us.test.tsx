@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SnackbarHost } from '../../../../snackbar/snackbar';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import type { AboutUsContent } from '../../../../api/rbac/site-content';
+import { AboutUsPage } from './about-us';
 
 let canEditAboutUs = true;
 
@@ -38,7 +39,6 @@ vi.mock('../../../../api/media', async () => {
   };
 });
 
-import { AboutUsPage } from './about-us';
 
 const SAVED: AboutUsContent = {
   id: 'singleton',

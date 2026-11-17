@@ -1,217 +1,146 @@
-import { render, screen, fireEvent } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SnackbarHost } from '../../../snackbar/snackbar';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Order } from '../../../api/orders';
-
-vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
-  useAuth: () => ({ token: 'test-token' }),
-}));
-
-const getMyOrderMock = vi.fn();
-const cancelMyOrderMock = vi.fn();
-vi.mock('../../../api/orders', async () => {
-  const actual = await vi.importActual<typeof import('../../../api/orders')>('../../../api/orders');
-  return {
-    ...actual,
-    getMyOrder: (...args: unknown[]) => getMyOrderMock(...args),
-    cancelMyOrder: (...args: unknown[]) => cancelMyOrderMock(...args),
-  };
-});
-
-const raiseDisputeMock = vi.fn();
-vi.mock('../../../api/rbac/disputes', async () => {
-  const actual = await vi.importActual<typeof import('../../../api/rbac/disputes')>('../../../api/rbac/disputes');
-  return {
-    ...actual,
-    raiseDispute: (...args: unknown[]) => raiseDisputeMock(...args),
-  };
-});
-
+import content from '../../../content.json';
 import { OrderDetail } from './order-detail';
 
-const MASSAGE_ENTITLEMENT_ID = 'entitlement-1';
-const PRODUCT_ENTITLEMENT_ID = 'entitlement-2';
+const t = content.orderDetail;
+const m = vi.hoisted(() => ({ getMyOrder: vi.fn(), cancelMyOrder: vi.fn() }));
+vi.mock('@skylabs-monorepo/shared-auth/react', () => ({ useAuth: () => ({ token: 'test-token', isAuthenticated: true }) }));
+vi.mock('../../../api/orders', () => ({
+  getMyOrder: (...a: unknown[]) => m.getMyOrder(...a),
+  cancelMyOrder: (...a: unknown[]) => m.cancelMyOrder(...a),
+}));
 
-function baseOrder(overrides: Partial<Order> = {}): Order {
-  return {
-    id: 'order-1',
-    type: 'SERVICE',
-    status: 'CONFIRMED',
-    vendorNameSnapshot: 'ABC Spa',
-    branchNameSnapshot: 'Downtown',
-    subtotal: '1000.00',
-    total: '1000.00',
-    cancellationReason: null,
-    createdAt: '2026-01-01T00:00:00Z',
-    branch: null,
-    payments: [{ id: 'pay-1', status: 'PAID', provider: 'RAZORPAY', amount: '1000.00', currency: 'INR', failureReason: null, createdAt: '2026-01-01T00:00:00Z' }],
-    items: [
-      {
-        id: 'item-1',
-        dealId: 'deal-1',
-        dealPackageId: null,
-        therapistId: null,
-        therapistPackageId: null,
-        productId: null,
-        vendorId: 'vendor-1',
-        branchId: 'branch-1',
-        vendorNameSnapshot: 'ABC Spa',
-        branchNameSnapshot: 'Downtown',
-        itemName: '60-min Massage',
-        itemType: 'SERVICE',
-        unitPrice: '1000.00',
-        quantity: 1,
-        lineTotal: '1000.00',
-        durationMinutes: 60,
-        entitlements: [
-          { id: MASSAGE_ENTITLEMENT_ID, voucherCode: 'MSD-DL-ABC123', fulfilmentKind: 'SERVICE_SESSION', entitlementStatus: 'ACTIVE', dispute: null },
-        ],
-      },
-    ],
-    ...overrides,
-  } as Order;
-}
+const ID = '79f93d36-8e4f-4674-8a05-2334118dfcbd';
+const line = (id: string, name: string, member: string, extra: Record<string, unknown>) => ({
+  id, dealId: null, dealPackageId: null, therapistId: null, therapistPackageId: null, productId: null, vendorId: `m-${id}`, branchId: null,
+  vendorNameSnapshot: member, branchNameSnapshot: null, itemName: name, itemType: 'SERVICE', unitPrice: '100.00', quantity: 1, lineTotal: '100.00',
+  durationMinutes: null, image: null, ...extra,
+});
+const ORDER = {
+  id: ID,
+  type: 'MIXED',
+  status: 'CONFIRMED',
+  total: '2679.00',
+  createdAt: '2026-10-29T10:00:00.000Z',
+  updatedAt: '2026-10-29T10:00:00.000Z',
+  shippingAddress: '1457, D Block, Pacchim Vihar',
+  shippingCity: 'New Delhi',
+  shippingState: 'Delhi',
+  shippingPincode: '110063',
+  payments: [{ id: 'p1', status: 'PAID', provider: 'RAZORPAY', amount: '2679.00', currency: 'INR', failureReason: null, createdAt: '2026-10-29T10:00:00.000Z' }],
+  items: [
+    line('i1', 'Eyelash Conditioning Serum', 'Vitality Wellness & Beauty', { itemType: 'PRODUCT', productId: 'p1', image: 'https://img.test/serum.jpg', lineTotal: '599.00' }),
+    line('i2', 'Steam & Sauna Session', 'UrbanGlow Beauty & Care', { dealId: 'd2', branchNameSnapshot: 'Connaught Place', lineTotal: '2080.00', durationMinutes: 60 }),
+  ],
+} as unknown as Order;
 
-function renderPage(order: Order = baseOrder()) {
-  getMyOrderMock.mockResolvedValue({ data: order });
-  return render(
-    <MemoryRouter>
-      <OrderDetail />
-      <SnackbarHost />
+function renderDetail() {
+  render(
+    <MemoryRouter initialEntries={[`/orders/${ID}`]}>
+      <Routes>
+        <Route path="/orders/:id" element={<OrderDetail />} />
+        <Route path="/checkout" element={<p>checkout page</p>} />
+      </Routes>
     </MemoryRouter>,
   );
 }
 
-/** Each entitlement renders as its own `<p class="field-hint">` under
- *  `.cart-vendor-group__entitlements` (the FIRST such `<p>` is just the "Purchase verification"
- *  heading) — `voucherLabel`/`statusLabel`/the status itself/the dispute-or-Raise-Issue tail are
- *  all sibling text fragments inside that ONE `<p>`, never their own elements, so asserting on
- *  this row's full `textContent` (a substring check) is the reliable way to read it — an exact
- *  `getByText` match fails here since no single node's OWN text equals just the status fragment. */
-function entitlementRows(): HTMLElement[] {
-  return Array.from(document.querySelectorAll('.cart-vendor-group__entitlements p.field-hint')).slice(1) as HTMLElement[];
-}
+const summary = () => screen.getByRole('region', { name: t.summaryHeading });
+const steps = () => within(screen.getByRole('list', { name: t.progressLabel })).getAllByRole('listitem');
+/** A step's visible label, without its marker or the screen-reader "completed". */
+const stepLabel = (li: HTMLElement) => li.querySelector('.step-indicator__label')?.firstChild?.textContent;
+const buttonWith = (text: string) =>
+  Array.from(document.querySelectorAll('md-filled-button, md-outlined-button, md-text-button')).find((b) => b.textContent?.includes(text)) as HTMLElement;
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  m.getMyOrder.mockReset().mockResolvedValue({ data: ORDER });
+  m.cancelMyOrder.mockReset().mockResolvedValue({ data: { ...ORDER, status: 'CANCELLED' } });
 });
 
-/**
- * Feature: Customer order detail — Purchase Verification (voucher display + Raise Issue)
- * Scenario: each entitlement on an item renders its voucher code + status; an entitlement with
- * no open dispute offers "Raise Issue"; one that already has a dispute shows its status instead
- * (never both, and never affecting a sibling entitlement on the same item).
- *
- * Given: an order item with one or more PurchaseEntitlements
- * When: the order detail page renders
- * Then: voucher code/status show per entitlement row; Raise Issue is offered only while there is
- *       no dispute yet on that specific entitlement
- *
- * Edge cases:
- * - an item with no `entitlements` array at all renders no voucher section (backend degrade)
- * - a dispute on one entitlement never affects a sibling entitlement's own row
- *
- * NOTE on coverage: the Raise Issue dialog's reason/description inputs use the shared-ui
- * `OutlinedTextField` REACT WRAPPER (not a raw `createElement('md-outlined-text-field', ...)`
- * element, unlike e.g. `vendor-user-picker.tsx`). Per this repo's own documented Vitest
- * limitation (CLAUDE.md "Testing gotchas" — `@lit/react` resolves to its Node/SSR build under
- * Vitest, so these wrappers never attach a working native event listener in jsdom), typing into
- * that field via `fireEvent.input` cannot be driven in a unit test — confirmed empirically: doing
- * so never reaches `raiseDispute`. This suite therefore verifies the submit GUARD (empty reason
- * never calls the API) rather than a full type-and-submit flow; full dialog-submission coverage
- * would need the dialog's fields switched to raw elements, same as `vendor-user-picker.tsx`.
- */
-describe('OrderDetail — Purchase Verification', () => {
-  it('renders the voucher code, status, and a Raise Issue action for an undisputed entitlement', async () => {
-    renderPage();
-    await screen.findByText('60-min Massage');
-
-    expect(screen.getByText('MSD-DL-ABC123')).toBeTruthy();
-    const rows = entitlementRows();
-    expect(rows).toHaveLength(1);
-    expect(rows[0].textContent).toContain('Not started yet');
-    expect(screen.getByText('Raise Issue')).toBeTruthy();
+describe('OrderDetail', () => {
+  it('heads the page with the short order number, the date and the status, and never the full id', async () => {
+    renderDetail();
+    const h1 = await screen.findByRole('heading', { level: 1 });
+    expect(h1.textContent).toBe('Order ORD-118DFCBD');
+    expect(document.body.textContent).toContain('29 October 2026');
+    expect(document.querySelector('sky-badge')?.getAttribute('status')).toBe('success');
+    expect(screen.getByRole('link', { name: t.breadcrumbOrders }).getAttribute('href')).toBe('/orders');
+    expect(document.body.textContent).not.toContain(ID);
+    expect(document.querySelector('meta[name="robots"]')?.getAttribute('content')).toContain('noindex');
   });
 
-  it('shows the dispute status instead of "Raise Issue" once a dispute already exists on that entitlement', async () => {
-    renderPage(
-      baseOrder({
-        items: [
-          {
-            ...baseOrder().items[0],
-            entitlements: [
-              {
-                id: MASSAGE_ENTITLEMENT_ID,
-                voucherCode: 'MSD-DL-ABC123',
-                fulfilmentKind: 'SERVICE_SESSION',
-                entitlementStatus: 'COMPLETED',
-                dispute: { id: 'dispute-1', status: 'OPEN' },
-              },
-            ],
-          },
-        ],
-      }),
-    );
-    await screen.findByText('60-min Massage');
-
-    const rows = entitlementRows();
-    expect(rows[0].textContent).toContain('Issue raised — pending review');
-    expect(screen.queryByText('Raise Issue')).toBeNull();
+  it('shows one progress list for the order, with the current step marked', async () => {
+    renderDetail();
+    await screen.findByRole('heading', { level: 1 });
+    const items = steps();
+    expect(items.map(stepLabel)).toEqual([t.steps.placed, t.steps.confirmed, t.steps.delivered]);
+    expect(items[1].getAttribute('aria-current')).toBe('step');
+    expect(screen.getAllByRole('list', { name: t.progressLabel })).toHaveLength(1);
   });
 
-  it('renders nothing extra for an item with no entitlements at all (backend degrade)', async () => {
-    renderPage(baseOrder({ items: [{ ...baseOrder().items[0], entitlements: undefined }] }));
-    await screen.findByText('60-min Massage');
-
-    expect(screen.queryByText('Purchase verification')).toBeNull();
-    expect(screen.queryByText('Raise Issue')).toBeNull();
-    expect(document.querySelector('.cart-vendor-group__entitlements')).toBeNull();
+  it('lists every line with its own member and a new-tab link to its detail page', async () => {
+    renderDetail();
+    await screen.findByRole('heading', { level: 1 });
+    const lines = Array.from(document.querySelectorAll('li.purchase-line'));
+    expect(lines).toHaveLength(2);
+    expect(lines[0].textContent).toContain('Vitality Wellness & Beauty');
+    expect(lines[1].textContent).toContain('UrbanGlow Beauty & Care · Connaught Place');
+    const link = screen.getByRole('link', { name: /Eyelash Conditioning Serum/ });
+    expect(link.getAttribute('href')).toBe('/products/p1');
+    expect(link.getAttribute('target')).toBe('_blank');
   });
 
-  it('a disputed entitlement never affects a sibling entitlement on the same item — each row is independent', async () => {
-    renderPage(
-      baseOrder({
-        items: [
-          {
-            ...baseOrder().items[0],
-            entitlements: [
-              { id: MASSAGE_ENTITLEMENT_ID, voucherCode: 'MSD-DL-ABC123', fulfilmentKind: 'SERVICE_SESSION', entitlementStatus: 'COMPLETED', dispute: { id: 'd1', status: 'OPEN' } },
-              { id: PRODUCT_ENTITLEMENT_ID, voucherCode: 'MSD-PR-XYZ789', fulfilmentKind: 'PRODUCT_PICKUP', entitlementStatus: 'ACTIVE', dispute: null },
-            ],
-          },
-        ],
-      }),
-    );
-    await screen.findByText('60-min Massage');
-
-    const rows = entitlementRows();
-    expect(rows).toHaveLength(2);
-    expect(rows[0].textContent).toContain('MSD-DL-ABC123');
-    expect(rows[0].textContent).toContain('Issue raised — pending review');
-    expect(rows[1].textContent).toContain('MSD-PR-XYZ789');
-    expect(rows[1].textContent).not.toContain('Issue raised');
-    // Only the undisputed sibling (row 2) offers Raise Issue — exactly one button on the page.
-    expect(screen.getAllByText('Raise Issue')).toHaveLength(1);
+  it('summarises payment, method, date and total, and shows the delivery address', async () => {
+    renderDetail();
+    await screen.findByRole('heading', { level: 1 });
+    const pairs = Array.from(summary().querySelectorAll('dl > div')).map((row) => [row.querySelector('dt')?.textContent, row.querySelector('dd')?.textContent]);
+    expect(pairs).toEqual([
+      [t.rows.payment, t.paymentStatuses.PAID],
+      [t.rows.paidVia, t.providers.RAZORPAY],
+      [t.rows.placedOn, '29 October 2026'],
+      [t.labels.total, '₹2,679'],
+    ]);
+    expect(screen.getByRole('region', { name: t.deliveryHeading }).textContent).toContain('1457, D Block, Pacchim Vihar');
   });
 
-  it('opens the Raise Issue dialog with the right title on click', async () => {
-    renderPage();
-    await screen.findByText('60-min Massage');
-
-    fireEvent.click(screen.getByText('Raise Issue'));
-
-    expect(await screen.findByText('Raise an issue')).toBeTruthy();
+  it('cancels only after the customer confirms in the dialog', async () => {
+    renderDetail();
+    await screen.findByRole('heading', { level: 1 });
+    const action = Array.from(summary().querySelectorAll('md-outlined-button')).find((b) => b.textContent?.includes(t.actions.cancelOrder)) as HTMLElement;
+    fireEvent.click(action);
+    expect(m.cancelMyOrder).not.toHaveBeenCalled();
+    fireEvent.click(buttonWith(t.cancelDialog.confirm));
+    await waitFor(() => expect(m.cancelMyOrder).toHaveBeenCalledWith('test-token', ID));
+    await waitFor(() => expect(document.querySelector('sky-badge')?.getAttribute('status')).toBe('error'));
   });
 
-  it('clicking Submit with no reason entered never calls raiseDispute (the submit-guard in submitRaiseIssue)', async () => {
-    renderPage();
-    await screen.findByText('60-min Massage');
+  it('a cancelled, paid order shows Cancelled as the last step and the refund notice, with no Cancel action', async () => {
+    m.getMyOrder.mockResolvedValue({ data: { ...ORDER, status: 'CANCELLED' } });
+    renderDetail();
+    await screen.findByRole('heading', { level: 1 });
+    expect(steps().map(stepLabel)).toEqual([t.steps.placed, t.steps.cancelled]);
+    expect(screen.getByRole('heading', { level: 2, name: t.refundHeading })).toBeTruthy();
+    expect(document.querySelector('.step-indicator--error')).not.toBeNull();
+    expect(buttonWith(t.actions.cancelOrder)).toBeUndefined();
+  });
 
-    fireEvent.click(screen.getByText('Raise Issue'));
-    await screen.findByText('Raise an issue');
-    fireEvent.click(screen.getByText('Submit'));
+  it('a failed payment shows the error notice, and Pay opens checkout for this order', async () => {
+    m.getMyOrder.mockResolvedValue({
+      data: { ...ORDER, status: 'PENDING_PAYMENT', payments: [{ ...ORDER.payments[0], status: 'FAILED', failureReason: 'Card declined' }] },
+    });
+    renderDetail();
+    expect(await screen.findByRole('heading', { level: 2, name: t.paymentFailedHeading })).toBeTruthy();
+    expect(document.body.textContent).toContain('Card declined');
+    fireEvent.click(buttonWith(`${t.actions.payPrefix} ₹2,679`));
+    expect(await screen.findByText('checkout page')).toBeTruthy();
+  });
 
-    expect(raiseDisputeMock).not.toHaveBeenCalled();
+  it('shows not found when the order cannot load', async () => {
+    m.getMyOrder.mockRejectedValue(new Error('404'));
+    renderDetail();
+    expect((await screen.findByRole('heading', { level: 1 })).textContent).toBe(t.notFound.heading);
   });
 });

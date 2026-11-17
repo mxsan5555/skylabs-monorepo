@@ -127,6 +127,10 @@ export interface Vendor extends Omit<VendorFields, 'businessName'> {
   offersTherapy: boolean;
   /** Every row, including drafts and inactive items. */
   _count?: { branches: number; deals: number; products: number; therapists: number };
+  /** Distinct customers and orders with an order line from this member. Only on the member detail
+   *  (`GET /members/:id`), same rows as the Customers list (P10-49). */
+  customerCount?: number;
+  orderCount?: number;
   /** Active branches/products/therapists and ACTIVE + APPROVED deals. Only on `GET /vendors` and
    *  `GET /vendors/:id`. Show it as "live of total" next to `_count`. */
   liveCounts?: { branches: number; deals: number; products: number; therapists: number };
@@ -153,6 +157,27 @@ export interface Vendor extends Omit<VendorFields, 'businessName'> {
     dueAt: string | null;
     overdue: boolean;
   };
+}
+
+export interface VendorApplicationInput {
+  businessName: string;
+  businessEmail: string;
+  businessPhone: string;
+  ownerFirstName: string;
+  ownerLastName: string;
+  ownerEmail: string;
+  ownerMobile: string;
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
+}
+
+export interface VendorApplicationResponse {
+  id: string;
+  status: 'PENDING' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
+  message: string;
+  createdAt: string;
 }
 
 export type VendorCreateInput = VendorFields & { ownerUserId?: string };
@@ -587,10 +612,15 @@ export function setMyDealStatus(token: string | null, branchId: string, dealId: 
 export interface CustomerRow {
   id: string;
   name: string | null;
+  /** Shipping city of the customer's latest order with this member that has one. */
+  city: string | null;
+  /** On the member's own list, phone and email are null unless `hasOpenOrder` (D19). */
   phone: string | null;
   email: string | null;
   orderCount: number;
   lastActivityAt: string;
+  /** The customer has a CONFIRMED (paid, not completed) order with this member. */
+  hasOpenOrder: boolean;
 }
 
 /** The logged-in vendor's own customers, resolved server-side from the caller's JWT (never a

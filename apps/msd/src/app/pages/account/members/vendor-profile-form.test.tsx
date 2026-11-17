@@ -91,7 +91,7 @@ describe('VendorProfileForm — scoped save (Part 2 root-cause fix)', () => {
     );
 
     const saveButton = await waitFor(() => {
-      const button = Array.from(document.querySelectorAll('md-filled-button')).find((el) => el.textContent?.includes('Save profile'));
+      const button = Array.from(document.querySelectorAll('md-filled-button')).find((el) => el.textContent?.includes('Save changes'));
       if (!button) throw new Error('Save button not found');
       return button as HTMLElement;
     });
@@ -120,7 +120,7 @@ describe('VendorProfileForm — scoped save (Part 2 root-cause fix)', () => {
     );
 
     const saveButton = await waitFor(() => {
-      const button = Array.from(document.querySelectorAll('md-filled-button')).find((el) => el.textContent?.includes('Save profile'));
+      const button = Array.from(document.querySelectorAll('md-filled-button')).find((el) => el.textContent?.includes('Save changes'));
       if (!button) throw new Error('Save button not found');
       return button as HTMLElement;
     });
@@ -196,7 +196,7 @@ describe('VendorProfileForm — Create Vendor button gating', () => {
     );
 
     const saveButton = await waitFor(() => {
-      const button = Array.from(document.querySelectorAll('md-filled-button')).find((el) => el.textContent?.includes('Save profile'));
+      const button = Array.from(document.querySelectorAll('md-filled-button')).find((el) => el.textContent?.includes('Save changes'));
       if (!button) throw new Error('Save button not found');
       return button as HTMLElement & { disabled?: boolean };
     });
@@ -318,7 +318,7 @@ describe('VendorProfileForm — a stale other-section error never blocks the cur
     );
 
     const saveButton = await waitFor(() => {
-      const button = Array.from(document.querySelectorAll('md-filled-button')).find((el) => el.textContent?.includes('Save profile'));
+      const button = Array.from(document.querySelectorAll('md-filled-button')).find((el) => el.textContent?.includes('Save changes'));
       if (!button) throw new Error('Save button not found');
       return button as HTMLElement & { disabled?: boolean };
     });
@@ -362,7 +362,7 @@ describe('VendorProfileForm — Map Location URL', () => {
     );
 
     const saveButton = await waitFor(() => {
-      const button = Array.from(document.querySelectorAll('md-filled-button')).find((el) => el.textContent?.includes('Save profile'));
+      const button = Array.from(document.querySelectorAll('md-filled-button')).find((el) => el.textContent?.includes('Save changes'));
       if (!button) throw new Error('Save button not found');
       return button as HTMLElement & { disabled?: boolean };
     });
@@ -376,7 +376,7 @@ describe('VendorProfileForm — Map Location URL', () => {
     expect(submitted).not.toHaveProperty('longitude');
   });
 
-  it('renders exactly 6 text fields in the Address section (Address 1/2, City, State, PIN, Map Location) — never a separate Latitude/Longitude field', () => {
+  it('renders Address 1/2, PIN and Map Location as text fields and State and City as lists — never a Latitude/Longitude field', () => {
     render(
       <VendorProfileForm
         vendor={BASE_VENDOR}
@@ -387,7 +387,8 @@ describe('VendorProfileForm — Map Location URL', () => {
         onSave={vi.fn()}
       />,
     );
-    expect(document.querySelectorAll('md-outlined-text-field').length).toBe(6);
+    expect(document.querySelectorAll('md-outlined-text-field').length).toBe(4);
+    expect(Array.from(document.querySelectorAll('md-outlined-select')).map((el) => (el as HTMLElement & { label: string }).label)).toEqual(['State', 'City']);
     expect(screen.queryByText('Latitude')).toBeNull();
     expect(screen.queryByText('Longitude')).toBeNull();
   });
@@ -418,5 +419,67 @@ describe('VendorProfileForm — Map Location URL', () => {
       fieldErrors: { businessEmail: ['Enter a valid email address'] },
     });
     expect(extractVendorFieldErrors(zodError)).toEqual({ businessEmail: 'Enter a valid email address' });
+  });
+});
+
+/** Item 8: Save is never silently disabled; a click names what to fix, and the address uses lists. */
+describe('VendorProfileForm — clear save and address lists (item 8)', () => {
+  const ALL: ('business' | 'owner' | 'address' | 'bank')[] = ['business', 'owner', 'address', 'bank'];
+  const saveButton = () => Array.from(document.querySelectorAll('md-filled-button')).find((el) => el.textContent?.includes('Save changes')) as HTMLElement;
+  // React sets label and disabled as properties on the registered md-outlined-select.
+  type Select = HTMLElement & { value: string; label: string; disabled: boolean };
+  const select = (label: string) =>
+    (Array.from(document.querySelectorAll('md-outlined-select')) as Select[]).find((el) => el.label === label) as Select;
+  // Same as branch-form-page.test.tsx: shadow the Lit value accessor so the change handler reads
+  // the picked value under jsdom.
+  // The own property is removed right after, so Lit's accessor is back before the next render.
+  const pick = (label: string, value: string) => {
+    const el = select(label);
+    Object.defineProperty(el, 'value', { configurable: true, writable: true, enumerable: true, value });
+    fireEvent.change(el);
+    delete (el as Partial<Select>).value;
+  };
+
+  it('keeps Save enabled with an empty address and, on click, lists the missing fields instead of saving', async () => {
+    const onSave = vi.fn();
+    render(<VendorProfileForm vendor={BASE_VENDOR} canEdit saving={false} token="tok" sections={ALL} onSave={onSave} />);
+    expect(saveButton().hasAttribute('disabled')).toBe(false);
+    fireEvent.click(saveButton());
+    const summary = await screen.findByRole('alert', { name: /Fix these fields to save/ });
+    expect(summary.textContent).toContain('Address 1');
+    expect(summary.textContent).toContain('State');
+    expect(summary.textContent).toContain('City');
+    expect(summary.textContent).toContain('PIN code');
+    expect(summary.textContent).toContain('Map location');
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('offers the India states, and the cities of the chosen state once one is picked', () => {
+    render(<VendorProfileForm vendor={BASE_VENDOR} canEdit saving={false} token="tok" sections={['address']} onSave={vi.fn()} />);
+    expect(select('City').disabled).toBe(true);
+    const states = Array.from(select('State').querySelectorAll('md-select-option')).map((o) => o.textContent);
+    expect(states).toContain('Delhi');
+    pick('State', 'Delhi');
+    expect(select('City').disabled).toBe(false);
+    expect(Array.from(select('City').querySelectorAll('md-select-option')).map((o) => o.textContent)).toContain('New Delhi');
+  });
+
+  it('notes unsaved changes and Discard puts the saved values back', async () => {
+    render(<VendorProfileForm vendor={BASE_VENDOR} canEdit saving={false} token="tok" sections={['address']} onSave={vi.fn()} />);
+    expect(screen.queryByText('You have unsaved changes.')).toBeNull();
+    pick('State', 'Delhi');
+    expect(await screen.findByText('You have unsaved changes.')).toBeTruthy();
+    const discard = Array.from(document.querySelectorAll('md-text-button')).find((el) => el.textContent?.includes('Discard')) as HTMLElement;
+    fireEvent.click(discard);
+    await waitFor(() => expect(screen.queryByText('You have unsaved changes.')).toBeNull());
+    expect(select('City').disabled).toBe(true);
+  });
+
+  it('lays each section out as a titled region, not a bordered card', () => {
+    render(<VendorProfileForm vendor={BASE_VENDOR} canEdit saving={false} token="tok" sections={ALL} onSave={vi.fn()} />);
+    expect(document.querySelector('sky-tile-card')).toBeNull();
+    for (const name of ['Business details', 'Owner', 'Registered address', 'Bank details']) {
+      expect(screen.getByRole('region', { name })).toBeTruthy();
+    }
   });
 });

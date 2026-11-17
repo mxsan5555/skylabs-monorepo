@@ -102,35 +102,50 @@ export async function listUsers(
   };
 }
 
-/**
- * The matrix's "Logs (login history)" row is own-scoped for everyone except a genuine
- * SuperAdmin — that applies to `lastLoginAt` too, not just the dedicated login-history endpoint,
- * since a staff-list/detail row would otherwise leak another user's login activity to any caller
- * who merely holds `rbac.users:view` (e.g. Admin). Defaults to `true` so the unscoped
- * self-service `/rbac/users/me` lookup (always the caller's own row) needs no special-casing.
- */
-export function serializeUser(
-  user: {
-    id: string;
-    name: string;
-    email: string | null;
-    phone: string | null;
-    status: string;
-    lastLoginAt: Date | null;
-    createdAt: Date;
-    updatedAt: Date;
-    roles: { role: { id: string; key: string; name: string } }[];
-  },
-  options: { includeLastLogin?: boolean } = {},
-) {
-  const { includeLastLogin = true } = options;
+/** The saved delivery address fields on User (item 2.2, D37). */
+export interface SavedAddress {
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  pincode: string | null;
+}
+
+/** `GET /rbac/users/me`: the caller's own row plus their saved address. Staff lists use
+ *  `serializeUser`, which never carries the address. */
+export function serializeMe(user: Parameters<typeof serializeUser>[0] & Partial<SavedAddress>) {
+  return {
+    ...serializeUser(user),
+    address: user.address ?? null,
+    city: user.city ?? null,
+    state: user.state ?? null,
+    pincode: user.pincode ?? null,
+  };
+}
+
+/** Saves the caller's own delivery address (validated by `MyAddressSchema`). */
+export async function saveMyAddress(userId: string, address: { address: string; state: string; city: string; pincode: string }) {
+  const user = await prisma.user.update({ where: { id: userId }, data: address, include: { roles: { include: { role: true } } } });
+  return serializeMe(user);
+}
+
+export function serializeUser(user: {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  status: string;
+  lastLoginAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  roles: { role: { id: string; key: string; name: string } }[];
+}, options: { includeLastLogin?: boolean } = {}) {
   return {
     id: user.id,
     name: user.name,
     email: user.email,
     phone: user.phone,
     status: user.status,
-    lastLoginAt: includeLastLogin ? user.lastLoginAt : null,
+    lastLoginAt: options.includeLastLogin ? user.lastLoginAt : null,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
     roles: user.roles.map((ur) => ur.role),

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { OutlinedButton, IconButton, Icon } from '@skylabs-monorepo/shared-ui/react';
-import { renderTextField } from './form-controls';
+import { renderTextField } from '../../../components/form-controls/form-controls';
 
 /**
  * A short list of plain-text items (deal highlights, eligibility, package inclusions): add with

@@ -116,6 +116,13 @@ notices go out after commit and never undo the change.
 - `blockWhenReadOnly` rejects every non-GET for an inactive member with 403
   `MEMBER_INACTIVE_READ_ONLY`, except logout and token refresh.
 - OTP request and login for a suspended member return the same 403 and send no OTP.
+- OTP delivery selection is isolated in `services/otp.service.ts`: `OTP_PROVIDER=sms` keeps the
+  existing random hashed challenge and ConnectExpress sender; `dummy` compares role-specific
+  environment values for an existing active account (including the fixed customer phone OTP)
+  and creates no OTP challenge row.
+  Super Admin uses a separate configured mobile/OTP and must already hold `super_admin` in DB.
+  Both modes retain request rate limits; dummy verification adds failure limits because there is
+  no persisted challenge attempt counter. Fixed OTP values are not logged or returned.
 - Storefront visibility: `publicVisibleWhere()` in `services/catalog-visibility.ts` (member
   ACTIVE, branch active, deal ACTIVE and in its date window; therapist and product active) is used
   by every `/catalog` query. The deal approval check is still read until P3-15.
@@ -177,7 +184,7 @@ list and form pages. Status labels, tones and the review flag copy live once in 
 | C-13 | Member edits while inactive | `blockWhenReadOnly` | done (P2-04) |
 | C-14 | Branch phone format | Reuse the member phone rule | open |
 | C-15 | Rich text storage | Sanitize HTML on write (`lib/sanitize-html.ts` allowlist), plain-text copy for search, meta and JSON-LD, length measured on plain text | open |
-| C-16 | Member customers view | `GET /customers` own scope | open (P4-16) |
+| C-16 | Member customers view | `GET /customers` own scope | partly 2026-10-28 (P4-16): `GET /vendors/me/customers` follows D19 (city, contact only with a CONFIRMED order); the flat own-scope `GET /customers` waits for P4-01 |
 | C-17 | Two deal editors (`DealFormPage` without media, `DealDialog` in `vendor-branches.tsx` without therapists) | One `DealFormPage` for staff and member self-service, sections in PLANNING §2.7 order; `DealDialog` deleted | done 2026-10-27 (DL-10) |
 | C-18 | Seed gives Admin, Sales, Marketing, Support no `vendors.deals` grants; Deals tab gated by `members:edit` | Seed per PLANNING §2.7 matrix; console checks `vendors.deals:<action>` (staff) and `members:custom` (member) | done 2026-10-27 (DL-03) |
 | C-19 | Deal detail page reads `deal.discountPercent` before the selected package, hours from a second vendor call | Price and discount from the selected package; one detail response (API §4) | done 2026-10-27 (DL-12) |
@@ -251,9 +258,11 @@ on the create screen they travel with `DealCreate`.
 - **Card tags (API):** `services/offer-tag.ts` (pure) holds the D30 thresholds, `offerTag(item,
   hotIds, now)`, `hotIdsFrom(lines)` and `tagWhere` / `tagsWhere` (a Prisma `where` per tag with
   the higher-priority tags excluded, so filter, count and card always agree; `offer-tag.test.ts`
-  checks the two against each other). `getHotIds(kind)` in `catalog.service.ts` groups paid
-  `OrderItem` lines of the last 30 days by `dealId` / `productId`, cached in memory for 10 minutes
-  (`clearHotCache()` for tests). Product facets: `services/product-facets.ts`.
+  checks the two against each other). `getHotIds(kind)` in `catalog.service.ts` groups
+  `OrderItem` lines from orders with a `PAID` payment in the last 30 days by `dealId` /
+  `productId`; order status alone is not sufficient because COD orders become `CONFIRMED` before
+  cash is collected. Results are cached in memory for 10 minutes (`clearHotCache()` for tests).
+  Product facets: `services/product-facets.ts`.
 - **Therapist listing (API):** Prisma narrows by category, city/state, member and branch;
   `services/therapist-ranking.ts` (pure, like `deal-ranking.ts`) adds the lowest package price
   and distance, then filters by price and radius, sorts and pages in memory. Before ST-40 the
@@ -383,8 +392,24 @@ No code yet (no GA4, GTM or `dataLayer` in `apps/msd`).
 global rate limit plus limiters for upload, status change, payout, refund, export, download;
 production boot fails on a short `JWT_SECRET`, `*` in CORS, or missing `R2_PRIVATE_BUCKET`,
 `DOC_HASH_PEPPER`, `FIELD_ENCRYPTION_KEY`, `CRON_SECRET`; request logger with request id and PII
-redaction; idempotency keys for money; transactional audit; private R2 bucket with 5-minute signed
+redaction (P2-10: `middleware/requestLogger.ts` sets `req.requestId` and `X-Request-Id`, logs one
+`http.request` JSON line per response without body or headers; `lib/logger.ts` redacts tokens,
+OTPs, passwords, document and bank numbers at any depth; unhandled errors log through it and
+answer production clients without detail); idempotency keys for money; transactional audit, every action from the one list in
+`lib/audit.ts` (`AUDIT_ACTIONS`, typed into `writeAuditLog` and `auditLogData`, P2-11; stored
+names never change, new ones are dotted like `member.status.changed`); private R2 bucket with 5-minute signed
 downloads for documents; malware scan decision; gitleaks and `npm audit` in CI.
+
+**Token transport (P2-16, decided 2026-10-29): bearer only.** The access token goes in
+`Authorization: Bearer`; the refresh token is sent in the `/auth/refresh` body. The API sets no
+cookie (no `res.cookie`, cookie parser or session; Passport runs with `session: false`), so a
+browser never attaches credentials on its own and CSRF does not apply. The apps keep the real
+tokens in `localStorage` (keyed per app) and a "Login As" preview in `sessionStorage`
+(`shared-auth`), so XSS is the risk to guard: React escapes text, no CMS HTML is set raw, the rich
+text editor parses values through Quill (P10-36). Any future cookie must be `HttpOnly`, `Secure`,
+`SameSite=Lax` or stricter, with CSRF protection; `lib/token-transport.test.ts` fails on cookie
+code until then. Known gap: the Google callback returns the tokens as JSON on the API domain, so
+the app never receives them (P2-22).
 
 ### 12.3 File storage (decided 2026-10-17)
 

@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BreadcrumbProvider } from '../../../admin/breadcrumb-context';
 import type { Order } from '../../../../api/rbac/orders';
+import { OrderDetailPage } from './order-detail-page';
 
 const navigateMock = vi.fn();
 vi.mock('react-router-dom', async () => {
@@ -45,7 +46,6 @@ vi.mock('../../../../api/rbac/refunds', async () => {
   };
 });
 
-import { OrderDetailPage } from './order-detail-page';
 
 const BASE_ORDER: Order = {
   id: 'order-1',

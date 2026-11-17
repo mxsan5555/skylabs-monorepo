@@ -4,6 +4,7 @@ import {
   extractReturnUrl,
   isCustomerAccountUser,
   isDualRoleUser,
+  isStaffUser,
   isVendorUser,
   resolvePostLoginPath,
   sanitizeReturnUrl,
@@ -92,6 +93,20 @@ describe('sanitizeReturnUrl', () => {
     expect(sanitizeReturnUrl('//evil.example.com')).toBeNull();
   });
 
+  it('rejects backslash and control-character tricks browsers read as another host (P10-38)', () => {
+    expect(sanitizeReturnUrl('/\\evil.example.com')).toBeNull();
+    expect(sanitizeReturnUrl('/\\/evil.example.com')).toBeNull();
+    expect(sanitizeReturnUrl('/\t/evil.example.com')).toBeNull();
+    expect(sanitizeReturnUrl('/\n/evil.example.com')).toBeNull();
+    expect(sanitizeReturnUrl('/%2F%2Fevil.example.com')).toBeNull();
+    expect(sanitizeReturnUrl('/%5Cevil.example.com')).toBeNull();
+  });
+
+  it('only returns paths that stay on this site', () => {
+    expect(sanitizeReturnUrl('/deal/spa-day?x=1#faq')).toBe('/deal/spa-day?x=1#faq');
+    expect(sanitizeReturnUrl('/./evil')).toBe('/./evil');
+  });
+
   it('rejects a path back into /sign-in or /otp', () => {
     expect(sanitizeReturnUrl('/sign-in')).toBeNull();
     expect(sanitizeReturnUrl('/otp')).toBeNull();
@@ -165,19 +180,31 @@ describe('isVendorUser', () => {
   });
 });
 
-describe('isDualRoleUser / resolvePostLoginPath', () => {
-  it('sends a customer+member user to the chooser regardless of which member key is present', () => {
+/** ST-06: where each role lands after sign-in. The member role key is `member` (P1-02); support
+ *  is staff and always uses the console. */
+describe('resolvePostLoginPath and the role checks', () => {
+  it.each([
+    [['super_admin'], '/account/dashboard'],
+    [['admin', 'customer'], '/account/dashboard'],
+    [['sales'], '/account/dashboard'],
+    [['marketing'], '/account/dashboard'],
+    [['support', 'customer'], '/account/dashboard'],
+    [['member'], '/account/dashboard'],
+    [['customer', 'member'], '/choose-experience'],
+    [['customer'], '/'],
+    [[], '/'],
+  ])('%j lands on %s', (roles, path) => {
+    expect(resolvePostLoginPath(withRoles(...roles))).toBe(path);
+  });
+
+  it('treats support as staff', () => {
+    expect(isStaffUser(withRoles('support'))).toBe(true);
+    expect(isCustomerAccountUser(withRoles('support', 'customer'))).toBe(false);
+  });
+
+  it('a customer who is also a member chooses an experience; staff never do', () => {
     expect(isDualRoleUser(withRoles('customer', 'member'))).toBe(true);
-    expect(resolvePostLoginPath(withRoles('customer', 'member'))).toBe('/choose-experience');
-    expect(isDualRoleUser(withRoles('customer', 'vendor'))).toBe(true);
-    expect(resolvePostLoginPath(withRoles('customer', 'vendor'))).toBe('/choose-experience');
-  });
-
-  it('sends a member-only user straight to the admin console', () => {
-    expect(resolvePostLoginPath(withRoles('member'))).toBe('/account/dashboard');
-  });
-
-  it('sends staff to the admin console even if also flagged member (should not happen, but staff wins)', () => {
-    expect(resolvePostLoginPath(withRoles('admin', 'member'))).toBe('/account/dashboard');
+    expect(isDualRoleUser(withRoles('admin', 'customer', 'member'))).toBe(false);
+    expect(isDualRoleUser(withRoles('member'))).toBe(false);
   });
 });

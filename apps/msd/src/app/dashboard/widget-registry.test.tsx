@@ -42,7 +42,9 @@ describe('WIDGET_REGISTRY', () => {
       'orders-recent',
       'products-count',
       'revenue-summary',
+      'services-count',
       'subcategories-count',
+      'therapists-count',
       'vendor-profile',
       'vendors-count',
     ]);

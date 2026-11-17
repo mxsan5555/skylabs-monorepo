@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEqual } from 'crypto';
 import { env } from '../config/env';
+import { FIELD_KEY_BYTES } from '../config/env-checks';
 
 const isProduction = (): boolean => env.nodeEnv === 'production';
 
@@ -9,7 +10,7 @@ function key(): Buffer | null {
     return null;
   }
   const buf = Buffer.from(env.fieldEncryptionKey, 'base64');
-  if (buf.length !== 32) throw new Error('FIELD_ENCRYPTION_KEY must decode to 32 bytes');
+  if (buf.length !== FIELD_KEY_BYTES) throw new Error(`FIELD_ENCRYPTION_KEY must decode to ${FIELD_KEY_BYTES} bytes`);
   return buf;
 }
 

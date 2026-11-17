@@ -34,12 +34,18 @@ const wishlistState = vi.hoisted(() => ({
   itemCount: 0 as number,
 }));
 
+// The wishlist is a signed-in page; its cards read the session for Add to cart.
+vi.mock('@skylabs-monorepo/shared-auth/react', () => ({ useAuth: () => ({ isAuthenticated: true, token: 'test-token' }) }));
 vi.mock('../../../wishlist/wishlist-context', () => ({
   useWishlist: () => ({
     ...wishlistState,
     loading: false,
     remove: vi.fn(),
     removeProduct: vi.fn(),
+    toggle: vi.fn(),
+    toggleProduct: vi.fn(),
+    has: () => true,
+    hasProduct: () => true,
   }),
 }));
 
@@ -53,7 +59,7 @@ vi.mock('../../components/deal-card', () => ({
 }));
 
 describe('Wishlist page', () => {
-  it('shows the total count including saved products', () => {
+  it('lists saved products under the Saved Items heading, with their image', () => {
     wishlistState.items = [
       {
         id: 'wishlist-product-1',
@@ -93,15 +99,11 @@ describe('Wishlist page', () => {
       </MemoryRouter>,
     );
 
-    expect(
-      screen.getByRole('heading', {
-        level: 1,
-        name: 'Saved Items (1 item)',
-      }),
-    ).toBeTruthy();
-    expect(screen.getByText('Massage Oil')).toBeTruthy();
-    expect(screen.getByRole('img', { name: 'Massage Oil' }).getAttribute('src')).toBe(
-      'https://cdn.example.test/products/massage-oil.jpg',
-    );
+    expect(screen.getByRole('heading', { level: 1, name: 'Saved Items' })).toBeTruthy();
+    // Products render as OfferCard (`sky-product-card`): title and single image are attributes
+    // (a slider takes the media slot only with two or more images).
+    const card = document.querySelector('sky-product-card[heading="Massage Oil"]');
+    expect(card).toBeTruthy();
+    expect(card?.getAttribute('image')).toBe('https://cdn.example.test/products/massage-oil.jpg');
   });
 });

@@ -1,8 +1,17 @@
 import { sendEmail } from '../providers/email/smtp.provider';
 import { sendTextSms } from '../providers/sms/connectExpress.provider';
-import { reactivatedMessage, suspendedMessage, welcomeMessage } from '../lib/member-messages';
+import { prisma } from '../lib/prisma';
+import { permissionKeyFor } from '@skylabs-monorepo/shared-permissions';
+import {
+  archivedMessage,
+  inactiveMessage,
+  reactivatedMessage,
+  restoredMessage,
+  suspendedMessage,
+  welcomeMessage,
+} from '../lib/member-messages';
 
-export type MemberNoticeKind = 'WELCOME' | 'SUSPENDED' | 'REACTIVATED';
+export type MemberNoticeKind = 'WELCOME' | 'SUSPENDED' | 'REACTIVATED' | 'INACTIVE' | 'ARCHIVED' | 'RESTORED';
 
 export interface MemberNoticeTarget {
   name?: string | null;
@@ -28,6 +37,9 @@ export interface MemberNoticeResult {
 function build(kind: MemberNoticeKind, target: MemberNoticeTarget, reason?: string | null) {
   if (kind === 'SUSPENDED') return { subject: 'Your MSD member account is suspended', text: suspendedMessage(reason ?? null) };
   if (kind === 'REACTIVATED') return { subject: 'Your MSD member account is active again', text: reactivatedMessage() };
+  if (kind === 'INACTIVE') return { subject: 'Your MSD member account is inactive', text: inactiveMessage(reason ?? null) };
+  if (kind === 'ARCHIVED') return { subject: 'Your MSD member account is archived', text: archivedMessage(reason ?? null) };
+  if (kind === 'RESTORED') return { subject: 'Your MSD member account is restored', text: restoredMessage() };
   return { subject: 'Welcome to MSD', text: welcomeMessage(target.name) };
 }
 
@@ -66,4 +78,43 @@ export async function sendMemberNotice(
   const email = target.email ? await sendOnChannel('email', target, subject, text) : null;
   const sms = target.phone ? await sendOnChannel('sms', target, subject, text) : null;
   return { email, sms };
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  ACTIVE: 'Active',
+  INACTIVE: 'Inactive',
+  SUSPENDED: 'Suspended',
+  ARCHIVED: 'Archived (deleted)',
+};
+
+export interface AdminStatusNotice {
+  businessName: string | null;
+  from: string;
+  to: string;
+  reason: string | null;
+}
+
+/**
+ * Emails every active staff user who can change member statuses (`members:status_change`, or a
+ * Super Admin role) that a member's status changed (item 6). Recipients come from the permission
+ * matrix, never a role name. Never throws; returns how many emails went out.
+ */
+export async function sendAdminStatusNotice(notice: AdminStatusNotice): Promise<number> {
+  const key = permissionKeyFor('members', 'status_change');
+  const admins = await prisma.user.findMany({
+    where: {
+      status: 'active',
+      deletedAt: null,
+      email: { not: null },
+      roles: { some: { role: { isActive: true, OR: [{ isSuperAdmin: true }, { permissions: { some: { permission: { key } } } }] } } },
+    },
+    select: { name: true, email: true },
+  });
+  const who = notice.businessName?.trim() || 'A member';
+  const subject = `Member status changed: ${who} is now ${STATUS_LABEL[notice.to] ?? notice.to}`;
+  const text =
+    `${who} moved from ${STATUS_LABEL[notice.from] ?? notice.from} to ${STATUS_LABEL[notice.to] ?? notice.to}. ` +
+    `Reason: ${notice.reason?.trim() || 'not recorded'}.`;
+  const sent = await Promise.all(admins.map((admin) => sendOnChannel('email', admin, subject, text)));
+  return sent.filter(Boolean).length;
 }

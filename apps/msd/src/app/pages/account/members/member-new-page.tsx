@@ -5,6 +5,7 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { createMember, type MemberCreateInput } from '../../../../api/rbac/members';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
+import { MEMBERS_TRAIL } from './member-crumbs';
 import { useConfirmDialog } from '../../../components/confirm-dialog';
 
 // sky-feature-card shrink-wraps slotted content; it is a size container with 24px padding, so this fills it.
@@ -76,7 +77,7 @@ export function MemberNewPage() {
   const idBase = useId();
   const errorId = (key: FieldKey) => `${idBase}-${key}-error`;
 
-  useSetBreadcrumbs([{ label: 'Members' }, { label: 'All members', to: '/account/members' }, { label: 'Add member' }]);
+  useSetBreadcrumbs([...MEMBERS_TRAIL, { label: 'Add member' }]);
 
   // Move focus to the first invalid field after a failed submit.
   useEffect(() => {

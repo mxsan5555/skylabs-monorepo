@@ -14,7 +14,7 @@ export type ListingFacets = Partial<CatalogDealFacets & CatalogProductFacets>;
 
 export interface FilterPanelProps {
   /** Picks the sections (PLANNING §4): deals = location, distance, price, tags, business,
-   *  branches; products = category (with `onCategories`), price, tags; therapists = deals
+   *  branches; products = category (with `onCategories`), price, tags, business; therapists = deals
    *  without tags; all (explore's mixed list) = location, distance, price. */
   kind: 'deals' | 'products' | 'therapists' | 'all';
   facets: ListingFacets | null;
@@ -71,7 +71,8 @@ export function FilterPanel({
   const countLabel = (count: number) => (count === 1 ? copy.countOne : copy.countMany.replace('{count}', String(count)));
   const located = kind !== 'products';
   const hasTags = kind === 'deals' || kind === 'products';
-  const hasMembers = kind === 'deals' || kind === 'therapists';
+  const hasMembers = kind !== 'all';
+  const hasBranches = kind === 'deals' || kind === 'therapists';
   const facetCopy = { showMore: copy.showMore, showLess: copy.showLess, countLabel };
   const distance = facets?.distance ?? [];
   const distanceDisabled = !location.hasCoords;
@@ -178,7 +179,7 @@ export function FilterPanel({
           </sky-accordion-item>
         )}
 
-        {hasMembers && (
+        {hasBranches && (
           <sky-accordion-item header={copy.branches.title} open>
             <CheckboxFacet
               options={(facets?.branches ?? []).map((b) => ({

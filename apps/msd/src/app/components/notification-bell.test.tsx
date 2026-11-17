@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Notification } from '../../api/notifications';
+import { NotificationBell } from './notification-bell';
 
 const navigateMock = vi.fn();
 vi.mock('react-router-dom', () => ({
@@ -21,7 +22,6 @@ vi.mock('../../api/notifications', () => ({
   markAllNotificationsRead: (...args: unknown[]) => markAllNotificationsReadMock(...args),
 }));
 
-import { NotificationBell } from './notification-bell';
 
 const DEAL_NOTIFICATION: Notification = {
   id: 'notif-1',
@@ -147,7 +147,7 @@ describe('NotificationBell', () => {
 
     fireEvent.click(screen.getByText('New Order Received'));
 
-    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/account/orders/order-1'));
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/account/orders?orderId=order-1'));
     expect(markNotificationReadMock).not.toHaveBeenCalled();
   });
 

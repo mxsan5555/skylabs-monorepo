@@ -1,7 +1,6 @@
 import { createElement, useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import '@skylabs-monorepo/shared-ui';
-import '@skylabs-monorepo/shared-ui/editor';
 import { FilledButton } from '@skylabs-monorepo/shared-ui/react';
 import {
   createVendorProduct,
@@ -15,7 +14,9 @@ import {
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
+import { memberTrail } from './member-crumbs';
 import { resolveCategoryTiers } from '../../../../utils/category-tree';
+import { showSnackbar } from '../../../../snackbar/snackbar';
 import { MediaUploader } from '../../../components/media-uploader';
 
 interface ProductFormPageProps {
@@ -128,6 +129,11 @@ const EMPTY_FORM = {
  *  known dedup opportunity already flagged for `BranchFormPage`/`DealFormPage`/`TherapistFormPage`.
  *  Renders raw M3 elements for the same testability reason those three pages do. */
 export function ProductFormPage({ token }: ProductFormPageProps) {
+  // Quill reads `document` on import, so load it in the browser only (see register-editor.ts).
+  useEffect(() => {
+    void import('../../showcase/register-editor');
+  }, []);
+
   const { vendorId, productId } = useParams<{ vendorId: string; productId?: string }>();
   const navigate = useNavigate();
   const isEdit = Boolean(productId);
@@ -201,9 +207,7 @@ export function ProductFormPage({ token }: ProductFormPageProps) {
 
   const name = product?.name || (isEdit ? 'Product' : 'New product');
   useSetBreadcrumbs([
-    { label: 'Members' },
-    { label: 'All Member', to: '/account/members' },
-    { label: vendorName ?? 'Member', to: `/account/members/${vendorId}` },
+    ...memberTrail(vendorId, vendorName),
     { label: 'Products', to: `/account/members/${vendorId}/products` },
     { label: isEdit ? name : 'Add product' },
   ]);
@@ -258,6 +262,10 @@ export function ProductFormPage({ token }: ProductFormPageProps) {
         isEdit && productId
           ? (await updateVendorProduct(token, vendorId, productId, input)).data
           : (await createVendorProduct(token, vendorId, input)).data;
+      showSnackbar(
+        isEdit ? 'Product updated successfully.' : 'Product created successfully.',
+        { variant: 'success' },
+      );
       navigate(`/account/members/${vendorId}/products/${saved.id}`, { replace: true });
     } catch (err) {
       setSaveError(err instanceof ApiRequestError ? err.message : 'Could not save this product.');

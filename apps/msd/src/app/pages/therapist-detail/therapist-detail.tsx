@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
@@ -16,6 +16,7 @@ import { DurationPackageSelector } from '../../components/duration-package-selec
 import { BranchPanels, DetailGallery, DetailNotFound, DetailPrice, DetailPurchase, discountPercent } from '../../components/detail-page/detail-page';
 import { TherapistCard, lowestPackagePrice } from '../../components/therapist-card/therapist-card';
 import { Seo } from '../../seo/seo';
+import { therapistPath } from '../../seo/public-urls';
 import { fillTemplate, formatINR } from '../../../utils/format';
 import { resolveTherapistMedia } from '../../../utils/media';
 import content from '../../../content.json';
@@ -30,8 +31,9 @@ const d = content.detailPage;
  * `therapistId` + `therapistPackageId`), never through a Deal.
  */
 export function TherapistDetail() {
-  const { slug: id = '' } = useParams<{ slug: string }>();
+  const { slug = '' } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { token } = useAuth();
   const requireSignIn = useRequireSignIn();
   const [therapist, setTherapist] = useState<CatalogTherapist | null>(null);
@@ -46,7 +48,7 @@ export function TherapistDetail() {
     // fresh state with old data (see ProductDetail's/DealDetail's identical comment).
     let cancelled = false;
 
-    if (!id) {
+    if (!slug) {
       setTherapist(null);
       setError(t.errors.invalid);
       setLoading(false);
@@ -55,7 +57,7 @@ export function TherapistDetail() {
   
     setLoading(true);
     setError('');
-    getCatalogTherapist(id)
+    getCatalogTherapist(slug)
       .then(({ data }) => { if (!cancelled) setTherapist(data); })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -64,7 +66,13 @@ export function TherapistDetail() {
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [id]);
+  }, [slug]);
+
+  useEffect(() => {
+    if (!therapist) return;
+    const canonicalPath = therapistPath(therapist);
+    if (location.pathname !== canonicalPath) navigate(canonicalPath, { replace: true });
+  }, [therapist, location.pathname, navigate]);
 
   const vendorId = therapist?.vendor?.id;
   const therapistId = therapist?.id;
@@ -121,7 +129,7 @@ export function TherapistDetail() {
           at: vendorName ? fillTemplate(t.metaAt, { vendor: vendorName }) : '',
           price: fromPrice != null ? formatINR(fromPrice) : '',
         })}
-        path={`/therapist/${therapist.id}`}
+        path={therapistPath(therapist)}
         image={media.images[0]}
         jsonLd={{
           '@context': 'https://schema.org',

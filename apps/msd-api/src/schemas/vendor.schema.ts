@@ -3,8 +3,9 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { PaginationQuerySchema, richTextField } from './common.schema';
 import { normalizeIdentifier } from '../lib/normalizeIdentifier';
 import { isIndiaLocation } from '@skylabs-monorepo/shared-utils';
-
 extendZodWithOpenApi(z);
+
+const vendorReasonSchema = z.string().trim().min(10).max(500);
 
 export const MemberListQuerySchema = PaginationQuerySchema.extend({
   search: z.string().max(200).optional(),
@@ -160,9 +161,9 @@ const VendorFieldsSchema = z.object({
   website: z.string().url().optional(),
   logoUrl: z.string().url().optional(),
 
-  ownerFirstName: z.string().max(75).optional(),
-  ownerLastName: z.string().max(75).optional(),
-  contactPerson: z.string().max(150).optional(),
+  ownerFirstName: z.string().trim().max(75).optional(),
+  ownerLastName: z.string().trim().max(75).optional(),
+  contactPerson: z.string().trim().max(150).optional(),
   ownerEmail: z.string().email().optional(),
   ownerMobile: vendorPhoneSchema,
   alternateOwnerMobile: vendorPhoneSchema,
@@ -230,16 +231,41 @@ export const MemberCreateSchema = z
   .strict()
   .openapi('MemberCreate');
 
+export const VendorApplicationCreateSchema = z
+  .object({
+    businessName: z.string().trim().min(1).max(200),
+    businessEmail: z.string().trim().email().max(254),
+    businessPhone: z
+      .string()
+      .max(30)
+      .transform((v) => normalizeIdentifier(v))
+      .refine((v) => INDIA_MOBILE_REGEX.test(v), { message: 'Enter a valid 10-digit mobile number' }),
+    ownerFirstName: z.string().trim().min(1).max(75),
+    ownerLastName: z.string().trim().min(1).max(75),
+    ownerEmail: z.string().trim().email().max(254),
+    ownerMobile: z
+      .string()
+      .max(30)
+      .transform((v) => normalizeIdentifier(v))
+      .refine((v) => INDIA_MOBILE_REGEX.test(v), { message: 'Enter a valid 10-digit mobile number' }),
+    address: z.string().trim().min(1).max(500),
+    city: z.string().trim().min(1).max(100),
+    state: z.string().trim().min(1).max(100),
+    pincode: z.string().trim().refine((v) => PINCODE_REGEX.test(v), { message: 'Enter a valid 6-digit pincode' }),
+  })
+  .strict()
+  .openapi('VendorApplicationCreate');
+
 export const MemberStatusChangeSchema = z
   .object({
     status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']),
-    reason: z.string().trim().min(10).max(500),
+    reason: vendorReasonSchema,
   })
   .strict()
   .openapi('MemberStatusChange');
 
 export const MemberDeleteSchema = z
-  .object({ reason: z.string().trim().min(10).max(500) })
+  .object({ reason: vendorReasonSchema })
   .strict()
   .openapi('MemberDelete');
 

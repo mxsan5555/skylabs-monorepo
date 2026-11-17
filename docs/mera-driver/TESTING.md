@@ -46,3 +46,6 @@ Run `npx nx run mera-driver:test` whenever `packages/shared-ui` changes.
 | Limited user opens a staff PDF or export | Denied |
 | Staff user management list | Driver and customer accounts excluded |
 | Super Admin clone or removing the last Super Admin | Clone has no bypass; last owner protected |
+| "Login As" preview, then open a new tab or close the tab (X-06) | The new tab and the next visit use the real session; the preview lives in that tab's `sessionStorage` only |
+| Preview token expires or is refused (X-06) | Falls back to the real Super Admin session, no sign-out |
+| Sign out during or after a preview (X-06) | `POST /auth/logout` with the real access token and refresh token; tokens, preview and bootstrap cleared |

@@ -3,6 +3,7 @@ import { FilledTonalButton, Icon } from '@skylabs-monorepo/shared-ui/react';
 import { useCatalogShell } from '../../../catalog/catalog-shell';
 import { useCustomEvent } from '../../../hooks/use-custom-event';
 import { useVisitorLocation } from '../../../location/location-context';
+import { NEAREST_CITY_MAX_KM } from '../../../location/geo';
 import type { CatalogLocation } from '../../../api/catalog';
 import { fillTemplate } from '../../../utils/format';
 import content from '../../../content.json';
@@ -13,8 +14,9 @@ const t = content.header.city;
 /**
  * Location chooser body shared by `CityPickerDialog` and the header search panel: a city filter
  * (Enter picks the first match), "Use my current location", an alert when the browser refuses
- * or fails, and the partner cities. `onDone` runs after a city is set or the browser located the
- * visitor; a failed lookup keeps the picker open so the visitor can pick a city instead.
+ * or fails or the visitor is farther than `NEAREST_CITY_MAX_KM` from every partner city, and the
+ * partner cities. `onDone` runs after a city is set or the browser located the visitor near one;
+ * a failed or far lookup keeps the picker open so the visitor can pick a city instead.
  */
 export function CityPicker({
   onDone,
@@ -29,7 +31,7 @@ export function CityPicker({
     null,
   );
   const [filter, setFilter] = useState('');
-  const [failed, setFailed] = useState(false);
+  const [problem, setProblem] = useState<'failed' | 'far' | null>(null);
   const errorId = useId();
 
   const q = filter.trim().toLowerCase();
@@ -47,10 +49,10 @@ export function CityPicker({
   };
 
   const locate = async () => {
-    setFailed(false);
+    setProblem(null);
     const result = await requestBrowser();
     if (result === 'located') onDone();
-    else if (result === 'failed') setFailed(true);
+    else if (result === 'failed' || result === 'far') setProblem(result);
   };
 
   useEffect(() => {
@@ -86,7 +88,7 @@ export function CityPicker({
       <FilledTonalButton
         className="city-dialog__locate"
         disabled={status === 'locating'}
-        aria-describedby={failed ? errorId : undefined}
+        aria-describedby={problem ? errorId : undefined}
         onClick={() => void locate()}
       >
         <Icon slot="icon" aria-hidden="true">
@@ -94,11 +96,20 @@ export function CityPicker({
         </Icon>
         {status === 'locating' ? t.locating : t.useCurrent}
       </FilledTonalButton>
-      {failed && (
+      {problem && (
         <div id={errorId} className="city-dialog__error" role="alert">
           <Icon aria-hidden="true">error</Icon>
           <p className="body-medium">
-            <strong>{t.locateFailedTitle}</strong> {t.locateFailedText}
+            {problem === 'far' ? (
+              <>
+                <strong>{t.locateFarTitle}</strong>{' '}
+                {fillTemplate(t.locateFarText, { km: String(NEAREST_CITY_MAX_KM) })}
+              </>
+            ) : (
+              <>
+                <strong>{t.locateFailedTitle}</strong> {t.locateFailedText}
+              </>
+            )}
           </p>
         </div>
       )}

@@ -73,6 +73,8 @@ export const CatalogProductQuerySchema = PaginationQuerySchema.extend({
   maxPrice: z.coerce.number().min(0).optional(),
   /** Comma-separated top-level category UUIDs (max 50); wins over `categoryId`. */
   categoryIds: idsParam,
+  /** Comma-separated business (member) UUIDs (max 50), the Business filter (item 4). */
+  vendorIds: idsParam,
   tags: tagsParam,
 }).openapi('CatalogProductQuery');
 

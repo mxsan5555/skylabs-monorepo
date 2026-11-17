@@ -1,24 +1,16 @@
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 
 import App from './app';
 
 describe('App', () => {
-  it('should render successfully', () => {
-    const { baseElement } = render(
+  it('renders the home page inside the public layout: one main landmark and the site header', () => {
+    render(
       <BrowserRouter>
         <App />
       </BrowserRouter>,
     );
-    expect(baseElement).toBeTruthy();
-  });
-
-  it('should render the msd showcase title', () => {
-    const { getAllByText } = render(
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>,
-    );
-    expect(getAllByText(/msd/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    expect(screen.getByRole('banner')).toBeTruthy();
   });
 });
