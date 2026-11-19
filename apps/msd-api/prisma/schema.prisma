@@ -203,16 +203,8 @@ model RefreshSession {
   id          String    @id @default(uuid())
   userId      String
   hashedToken String    @unique
-  /// SHA-256 hex digest of the raw token — a fast, indexed O(1) lookup key. `hashedToken`
-  /// (bcrypt, salted, non-deterministic) can only ever be checked by loading EVERY active
-  /// session and calling bcrypt.compare on each one; that's fine at a handful of sessions but
-  /// becomes a multi-second linear scan once the table has hundreds of active rows (persistent
-  /// login's whole point is frequent automatic refreshes, so this gets hit constantly). SHA-256
-  /// is safe here specifically because the input is already a 48-byte crypto.randomBytes token,
-  /// not a low-entropy secret like a password — the slow/salted properties bcrypt exists for
-  /// don't apply. Nullable + lookup-with-fallback (see token.service.ts#rotateRefreshToken) so
-  /// sessions issued before this column existed keep working via the old path until they next
-  /// rotate, instead of being invalidated.
+  /// SHA-256 lookup key for the high-entropy opaque token. Nullable so existing sessions can
+  /// continue to rotate through the bcrypt fallback until they are next used.
   lookupHash  String?   @unique
   deviceInfo  String?
   ip          String?
