@@ -1,13 +1,7 @@
 <aside class="admin-sidebar" [class.is-open]="open()" [attr.aria-hidden]="open() ? null : 'true'" [attr.inert]="open() ? null : ''">
   <md-icon-button class="md-sidebar-mobile-close" aria-label="Close navigation" title="Close navigation" (click)="close.emit()"><md-icon aria-hidden="true">close</md-icon></md-icon-button>
   <div class="admin-sidebar__brand">
-    <span class="admin-sidebar__logo">
-      <md-icon aria-hidden="true">directions_car</md-icon>
-    </span>
-    <span>
-      <div class="admin-sidebar__brand-name">mera-driver</div>
-      <div class="admin-sidebar__brand-sub">Driver console</div>
-    </span>
+    <img src="/images/logo.png" alt="Mera Driver" class="h-8 w-auto object-contain" />
   </div>
 
   <input
