@@ -152,9 +152,13 @@ export function pay(token: string | null, orderId: string) {
 /** Confirms a Cash on Delivery order — no gateway, no widget. Moves the order straight to
  *  CONFIRMED; the paired Payment stays CREATED (never PAID — cash hasn't been collected yet). */
 export function payCod(token: string | null, orderId: string) {
-  return apiPost<Order>(`/orders/me/${orderId}/pay-cod`, token);
+  return apiPost<Order>(`/orders/me/${orderId}/pay-cod`, token).then((res) => {
+    notifyCartUpdated();
+    return res;
+  });
 }
 
 export function verifyPayment(token: string | null, orderId: string, input: VerifyPaymentInput) {
-  return apiPost<Order>(`/orders/me/${orderId}/verify-payment`, token, input);
+  return apiPost<Order>(`/orders/me/${orderId}/verify-payment`, token, input)
+  .then((res) => {notifyCartUpdated(); return res; });
 }
