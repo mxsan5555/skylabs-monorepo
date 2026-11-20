@@ -107,6 +107,18 @@ export async function createOrReusePayment(customerId: string, orderId: string) 
 }
 
 /**
+ * Cash on Delivery is disabled — MSD only accepts online payment (see docs/msd/PLANNING.md).
+ * The route and this function stay in place (rather than being deleted) so a stray or malicious
+ * client hitting `/pay-cod` gets a clear, deliberate rejection instead of a 404 or a silently
+ * created order. The `PaymentProvider.COD` enum value and every *read* path that branches on it
+ * (order detail, invoices, refunds, payment-method reports) are untouched — historical COD
+ * orders placed before this was disabled must keep displaying and refunding correctly.
+ */
+function rejectCod(): never {
+  throw new ApiError('BAD_REQUEST', 'Cash on Delivery is not available. Please pay online.');
+}
+
+/**
  * Cash on Delivery — no gateway, no widget. Creates a Payment row (status CREATED, provider
  * COD — never PAID, since cash hasn't actually been collected yet) and moves the Order straight
  * to CONFIRMED in the same transaction, mirroring `verifyPayment`'s Order transition without
@@ -116,6 +128,7 @@ export async function createOrReusePayment(customerId: string, orderId: string) 
  * reaching this insert.
  */
 export async function createCodPayment(customerId: string, orderId: string) {
+  rejectCod();
   const order = await getMyOrderOrThrow(customerId, orderId);
   if (order.status !== 'PENDING_PAYMENT') {
     throw new ApiError('CONFLICT', `Cannot pay for an order with status ${order.status}`);
@@ -218,8 +231,9 @@ export async function createOrReuseBatchPayment(customerId: string, orderIds: st
 }
 
 /** Same COD reasoning as `createCodPayment`, batched into one transaction — every order in the
- *  batch moves to CONFIRMED together, or none do. */
+ *  batch moves to CONFIRMED together, or none do. Disabled the same way; see `rejectCod`. */
 export async function createCodBatchPayment(customerId: string, orderIds: string[]) {
+  rejectCod();
   const orders = await loadPayableBatch(customerId, orderIds);
 
   const updatedOrders = await prisma.$transaction(async (tx) => {

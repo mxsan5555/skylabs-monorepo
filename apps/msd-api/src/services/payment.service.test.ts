@@ -52,44 +52,29 @@ beforeEach(() => {
 });
 
 /**
- * Feature: Entitlement-generation wiring — all 5 of payment.service.ts's own CONFIRMED-
+ * Feature: Entitlement-generation wiring — all 3 of payment.service.ts's own CONFIRMED-
  * transition sites must call createEntitlementsForOrder(tx, orderId) inside the SAME transaction
- * that flips Order.status to CONFIRMED, exactly once per order, every time.
+ * that flips Order.status to CONFIRMED, exactly once per order, every time. Cash on Delivery
+ * (`createCodPayment`/`createCodBatchPayment`) is no longer such a site — MSD only accepts online
+ * payment, so both are disabled outright (see `payment.service.ts`'s `rejectCod`), covered below.
  */
-describe('createEntitlementsForOrder wiring — call site 1/5: createCodPayment', () => {
-  it('calls createEntitlementsForOrder(tx, orderId) once the order is marked CONFIRMED', async () => {
-    getMyOrderOrThrowMock.mockResolvedValue(pendingOrder());
-    prismaMock.payment.create.mockResolvedValue({ id: PAYMENT_ID } as never);
-    prismaMock.order.update.mockResolvedValue({ id: ORDER_ID, status: 'CONFIRMED' } as never);
-
-    await createCodPayment(CUSTOMER_ID, ORDER_ID);
-
-    expect(createEntitlementsForOrderMock).toHaveBeenCalledTimes(1);
-    expect(createEntitlementsForOrderMock).toHaveBeenCalledWith(expect.anything(), ORDER_ID);
-  });
-
-  it('a second call on an order that is no longer PENDING_PAYMENT never re-creates entitlements', async () => {
-    getMyOrderOrThrowMock.mockResolvedValue({ id: ORDER_ID, status: 'CONFIRMED', total: 500 });
-    await expect(createCodPayment(CUSTOMER_ID, ORDER_ID)).rejects.toMatchObject({ code: 'CONFLICT' });
+describe('createCodPayment (disabled — online payment only)', () => {
+  it('rejects every call with BAD_REQUEST and never touches the order or its entitlements', async () => {
+    await expect(createCodPayment(CUSTOMER_ID, ORDER_ID)).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(getMyOrderOrThrowMock).not.toHaveBeenCalled();
     expect(createEntitlementsForOrderMock).not.toHaveBeenCalled();
   });
 });
 
-describe('createEntitlementsForOrder wiring — call site 2/5: createCodBatchPayment', () => {
-  it('calls createEntitlementsForOrder once PER ORDER in the batch', async () => {
-    getMyOrderOrThrowMock.mockImplementation((_cust: string, id: string) => Promise.resolve(pendingOrder(id)));
-    prismaMock.payment.create.mockResolvedValue({} as never);
-    prismaMock.order.update.mockImplementation((args: unknown) => Promise.resolve({ id: (args as { where: { id: string } }).where.id, status: 'CONFIRMED' }) as never);
-
-    await createCodBatchPayment(CUSTOMER_ID, [ORDER_ID, ORDER_ID_2]);
-
-    expect(createEntitlementsForOrderMock).toHaveBeenCalledTimes(2);
-    expect(createEntitlementsForOrderMock).toHaveBeenCalledWith(expect.anything(), ORDER_ID);
-    expect(createEntitlementsForOrderMock).toHaveBeenCalledWith(expect.anything(), ORDER_ID_2);
+describe('createCodBatchPayment (disabled — online payment only)', () => {
+  it('rejects every call with BAD_REQUEST and never touches any order in the batch', async () => {
+    await expect(createCodBatchPayment(CUSTOMER_ID, [ORDER_ID, ORDER_ID_2])).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(getMyOrderOrThrowMock).not.toHaveBeenCalled();
+    expect(createEntitlementsForOrderMock).not.toHaveBeenCalled();
   });
 });
 
-describe('createEntitlementsForOrder wiring — call site 3/5: verifyPayment', () => {
+describe('createEntitlementsForOrder wiring — call site 1/3: verifyPayment', () => {
   const RAZORPAY_ORDER_ID = 'rzp_order_1';
   const RAZORPAY_PAYMENT_ID = 'rzp_pay_1';
 
@@ -139,7 +124,7 @@ describe('createEntitlementsForOrder wiring — call site 3/5: verifyPayment', (
   });
 });
 
-describe('createEntitlementsForOrder wiring — call site 4/5: verifyBatchPayment', () => {
+describe('createEntitlementsForOrder wiring — call site 2/3: verifyBatchPayment', () => {
   const RAZORPAY_ORDER_ID = 'rzp_batch_1';
   const RAZORPAY_PAYMENT_ID = 'rzp_batch_pay_1';
 
@@ -163,7 +148,7 @@ describe('createEntitlementsForOrder wiring — call site 4/5: verifyBatchPaymen
   });
 });
 
-describe('createEntitlementsForOrder wiring — call site 5/5: handleWebhookEvent (payment.captured)', () => {
+describe('createEntitlementsForOrder wiring — call site 3/3: handleWebhookEvent (payment.captured)', () => {
   it('calls createEntitlementsForOrder once per newly-confirmed order on a captured-payment webhook', async () => {
     prismaMock.payment.findMany.mockResolvedValue([
       { id: PAYMENT_ID, orderId: ORDER_ID, status: 'CREATED', providerOrderId: 'rzp_webhook_order_1' },

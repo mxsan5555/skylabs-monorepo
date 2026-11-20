@@ -13,7 +13,6 @@ import {
   checkout,
   getMyOrder,
   pay,
-  payCod,
   verifyPayment,
   type Order,
   type OrderContactDetails,
@@ -46,7 +45,6 @@ import {
   FormPanelSection,
 } from '../../components/form-panel/form-panel';
 import { StepIndicator } from '../../components/step-indicator/step-indicator';
-import { RadioCardGroup } from '../../components/radio-card-group/radio-card-group';
 import { StatusPanel } from '../../components/status-panel/status-panel';
 import { SummaryPanel } from '../../components/summary-panel/summary-panel';
 import { Seo } from '../../seo/seo';
@@ -69,7 +67,6 @@ interface CheckoutLocationState {
   orderId?: string;
 }
 type Step = 'details' | 'payment';
-type PaymentMethod = 'online' | 'cod';
 type FieldErrors = Partial<Record<keyof OrderContactDetails, string>>;
 export function Checkout() {
   const { token, bootstrap } = useAuth();
@@ -89,13 +86,11 @@ export function Checkout() {
     null,
   );
 
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('online');
-
   const [loading, setLoading] = useState(isRetryPayment);
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState('');
   const initRef = useRef(false);
-  // Re-entrancy guards for submitDetails/openRazorpay/placeCodOrder — a `disabled` state prop
+  // Re-entrancy guards for submitDetails/openRazorpay — a `disabled` state prop
   // alone can't stop a second click/tap that fires before React commits the disabling re-render
   // (same gap fixed for TherapistFormDialog/PackageFormDialog elsewhere in this app). Checked
   // and set synchronously, before any `await`, so a fast double-click can't start two checkout
@@ -196,12 +191,7 @@ export function Checkout() {
     })();
   }, []);
   useEffect(() => {
-    if (
-      !order ||
-      order.status !== 'PENDING_PAYMENT' ||
-      paymentMethod !== 'online' ||
-      paymentIntent
-    ) {
+    if (!order || order.status !== 'PENDING_PAYMENT' || paymentIntent) {
       return;
     }
     (async () => {
@@ -220,7 +210,7 @@ export function Checkout() {
     })();
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [order, paymentMethod]);
+  }, [order]);
 
   // ---------------------------------------------------------------------------
   // Validation
@@ -346,30 +336,6 @@ export function Checkout() {
       setError(
         err instanceof Error ? err.message : checkoutContent.errors.openGateway,
       );
-      payingRef.current = false;
-      setPaying(false);
-    }
-  };
-
-  const placeCodOrder = async () => {
-    if (payingRef.current) return;
-    if (!order) {
-      return;
-    }
-    payingRef.current = true;
-    setError('');
-    setPaying(true);
-    try {
-      const { data } = await payCod(token, order.id);
-
-      navigate(`/orders/${data.id}/confirmation`);
-    } catch (err) {
-      setError(
-        err instanceof ApiRequestError
-          ? err.message
-          : checkoutContent.errors.placeOrder,
-      );
-
       payingRef.current = false;
       setPaying(false);
     }
@@ -622,35 +588,24 @@ export function Checkout() {
                       {checkoutContent.backLabel}
                     </OutlinedButton>
                   )}
-                  {paymentMethod === 'online' ? (
-                    <FilledButton
-                      onClick={openRazorpay}
-                      disabled={paying || !paymentIntent}
-                    >
-                      {paying
-                        ? checkoutContent.openingPayment
-                        : fillTemplate(checkoutContent.payLabel, {
-                            amount: formatINR(combinedTotal),
-                          })}
-                      <Icon slot="trailing-icon" aria-hidden="true">
-                        arrow_forward
-                      </Icon>
-                    </FilledButton>
-                  ) : (
-                    <FilledButton onClick={placeCodOrder} disabled={paying}>
-                      {paying
-                        ? checkoutContent.placingOrder
-                        : checkoutContent.placeOrderLabel}
-                      <Icon slot="trailing-icon" aria-hidden="true">
-                        check
-                      </Icon>
-                    </FilledButton>
-                  )}
+                  <FilledButton
+                    onClick={openRazorpay}
+                    disabled={paying || !paymentIntent}
+                  >
+                    {paying
+                      ? checkoutContent.openingPayment
+                      : fillTemplate(checkoutContent.payLabel, {
+                          amount: formatINR(combinedTotal),
+                        })}
+                    <Icon slot="trailing-icon" aria-hidden="true">
+                      arrow_forward
+                    </Icon>
+                  </FilledButton>
                 </>
               )
             }
             note={
-              order.status === 'PENDING_PAYMENT' && paymentMethod === 'online'
+              order.status === 'PENDING_PAYMENT'
                 ? checkoutContent.securePaymentNote
                 : undefined
             }
@@ -679,35 +634,26 @@ export function Checkout() {
                 </p>
               </FormPanelSection>
             )}
-            <FormPanelSection>
-              {order.status !== 'PENDING_PAYMENT' ? (
+            {order.status !== 'PENDING_PAYMENT' ? (
+              <FormPanelSection>
                 <p className="body-large">
                   {checkoutContent.orderStatusPrefix}{' '}
                   {order.status.toLowerCase()}.
                 </p>
-              ) : (
-                <RadioCardGroup
-                  legend={checkoutContent.paymentMethod}
-                  name="payment-method"
-                  value={paymentMethod}
-                  options={[
-                    {
-                      value: 'online',
-                      icon: 'account_balance_wallet',
-                      ...checkoutContent.methods.online,
-                    },
-                    {
-                      value: 'cod',
-                      icon: 'payments',
-                      ...checkoutContent.methods.cod,
-                    },
-                  ]}
-                  onChange={(method) =>
-                    setPaymentMethod(method as PaymentMethod)
-                  }
-                />
-              )}
-            </FormPanelSection>
+              </FormPanelSection>
+            ) : (
+              <FormPanelSection
+                title={checkoutContent.paymentMethod}
+                icon="account_balance_wallet"
+              >
+                <p className="body-large">
+                  {checkoutContent.methods.online.title}
+                </p>
+                <p className="body-medium">
+                  {checkoutContent.methods.online.description}
+                </p>
+              </FormPanelSection>
+            )}
           </FormPanel>
         ) : null}
       </SplitLayout>

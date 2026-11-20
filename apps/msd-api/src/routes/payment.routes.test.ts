@@ -166,119 +166,21 @@ describe('POST /api/v1/orders/me/:id/pay', () => {
   });
 });
 
-describe('POST /api/v1/orders/me/:id/pay-cod', () => {
+describe('POST /api/v1/orders/me/:id/pay-cod (disabled — online payment only)', () => {
   it('returns 401 with no token', async () => {
     const res = await request(app).post(`/api/v1/orders/me/${ORDER_ID}/pay-cod`);
     expect(res.status).toBe(401);
   });
 
-  it("404s for another customer's order (never confirms existence)", async () => {
-    prismaMock.order.findUnique.mockResolvedValue({ ...orderFixture, customerId: OTHER_CUSTOMER_ID });
+  it('rejects with a clear 400 error for any authenticated customer, regardless of the order', async () => {
     const res = await request(app)
       .post(`/api/v1/orders/me/${ORDER_ID}/pay-cod`)
       .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
-    expect(res.status).toBe(404);
-  });
-
-  it('creates a CREATED-status COD payment and confirms the order — never marks it PAID', async () => {
-    prismaMock.order.findUnique.mockResolvedValue(orderFixture);
-    prismaMock.payment.create.mockResolvedValue({ ...paymentFixture, provider: 'COD', providerOrderId: `cod_${ORDER_ID}`, status: 'CREATED' });
-    prismaMock.order.update.mockResolvedValue({ ...orderFixture, status: 'CONFIRMED' });
-    const res = await request(app)
-      .post(`/api/v1/orders/me/${ORDER_ID}/pay-cod`)
-      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
-    expect(res.status).toBe(200);
-    expect(res.body.data.status).toBe('CONFIRMED');
-    expect(prismaMock.payment.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ provider: 'COD', status: 'CREATED' }) }),
-    );
-    // Never PAID for COD — cash hasn't actually been collected.
-    expect(prismaMock.payment.create).not.toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'PAID' }) }),
-    );
-    expect(sendOrderNotice).toHaveBeenCalledWith('CONFIRMED', [ORDER_ID]);
-  });
-
-  it('rejects COD confirmation for an order that is not PENDING_PAYMENT', async () => {
-    prismaMock.order.findUnique.mockResolvedValue({ ...orderFixture, status: 'CONFIRMED' });
-    const res = await request(app)
-      .post(`/api/v1/orders/me/${ORDER_ID}/pay-cod`)
-      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toMatch(/cash on delivery/i);
     expect(prismaMock.payment.create).not.toHaveBeenCalled();
     expect(sendOrderNotice).not.toHaveBeenCalled();
-  });
-
-  describe('order-confirmed notifications', () => {
-    it('a successful COD confirmation notifies the order\'s vendor(s) + Superadmin', async () => {
-      prismaMock.order.findUnique.mockResolvedValue(orderFixture);
-      prismaMock.payment.create.mockResolvedValue({ ...paymentFixture, provider: 'COD', status: 'CREATED' });
-      prismaMock.order.update.mockResolvedValue({ ...orderFixture, status: 'CONFIRMED' });
-      prismaMock.orderItem.findMany.mockResolvedValue([{ vendorId: 'vendor-1' }]);
-      prismaMock.member.findUnique.mockResolvedValue({ ownerUserId: 'vendor-1-owner' });
-      prismaMock.user.findMany.mockResolvedValue([{ id: 'superadmin-1' }]);
-      // createEntitlementsForOrder's own supporting calls — this test cares about notifications,
-      // not voucher generation, so these are harmless no-op-shaped defaults.
-      prismaMock.order.findUniqueOrThrow.mockResolvedValue({ customerId: CUSTOMER_ID });
-      prismaMock.financeSettings.upsert.mockResolvedValue({ defaultCommissionRatePercent: '10' });
-      prismaMock.member.findMany.mockResolvedValue([]);
-      prismaMock.purchaseEntitlement.findFirst.mockResolvedValue(null);
-
-      const res = await request(app)
-        .post(`/api/v1/orders/me/${ORDER_ID}/pay-cod`)
-        .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
-
-      expect(res.status).toBe(200);
-      expect(prismaMock.notification.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ recipientUserId: 'vendor-1-owner', recipientType: 'VENDOR', type: 'ORDER_RECEIVED', entityType: 'ORDER', entityId: ORDER_ID }),
-        }),
-      );
-      expect(prismaMock.notification.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ recipientUserId: 'superadmin-1', recipientType: 'SUPERADMIN', type: 'ORDER_RECEIVED' }),
-        }),
-      );
-    });
-
-    it('a multi-vendor order notifies each distinct vendor exactly once, never duplicated', async () => {
-      prismaMock.order.findUnique.mockResolvedValue(orderFixture);
-      prismaMock.payment.create.mockResolvedValue({ ...paymentFixture, provider: 'COD', status: 'CREATED' });
-      prismaMock.order.update.mockResolvedValue({ ...orderFixture, status: 'CONFIRMED' });
-      prismaMock.orderItem.findMany.mockResolvedValue([{ vendorId: 'vendor-A' }, { vendorId: 'vendor-A' }, { vendorId: 'vendor-B' }]);
-      prismaMock.member.findUnique.mockImplementation(({ where }: { where: { id: string } }) =>
-        Promise.resolve({ ownerUserId: where.id === 'vendor-A' ? 'owner-A' : 'owner-B' }),
-      );
-      prismaMock.member.findMany.mockResolvedValue([
-        { id: 'vendor-A', commissionRatePercent: null },
-        { id: 'vendor-B', commissionRatePercent: null },
-      ]);
-      prismaMock.user.findMany.mockResolvedValue([]);
-      // createEntitlementsForOrder's own supporting calls — this test cares about notifications,
-      // not voucher generation, so these are harmless no-op-shaped defaults.
-      prismaMock.order.findUniqueOrThrow.mockResolvedValue({ customerId: CUSTOMER_ID });
-      prismaMock.financeSettings.upsert.mockResolvedValue({ defaultCommissionRatePercent: '10' });
-      prismaMock.member.findMany.mockResolvedValue([]);
-      prismaMock.purchaseEntitlement.findFirst.mockResolvedValue(null);
-
-      const res = await request(app)
-        .post(`/api/v1/orders/me/${ORDER_ID}/pay-cod`)
-        .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
-
-      expect(res.status).toBe(200);
-      const vendorNotifications = prismaMock.notification.create.mock.calls.filter(
-        ([arg]) => arg.data.recipientType === 'VENDOR',
-      );
-      expect(vendorNotifications).toHaveLength(2); // vendor-A once, vendor-B once — never 3
-    });
-
-    it('a rejected COD confirmation (not PENDING_PAYMENT) creates zero notifications', async () => {
-      prismaMock.order.findUnique.mockResolvedValue({ ...orderFixture, status: 'CONFIRMED' });
-      await request(app)
-        .post(`/api/v1/orders/me/${ORDER_ID}/pay-cod`)
-        .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
-      expect(prismaMock.notification.create).not.toHaveBeenCalled();
-    });
+    expect(prismaMock.notification.create).not.toHaveBeenCalled();
   });
 });
 
@@ -437,42 +339,19 @@ describe('POST /api/v1/orders/pay-batch', () => {
   });
 });
 
-describe('POST /api/v1/orders/pay-batch/cod', () => {
-  function findOrderById(orders: Record<string, unknown>[]) {
-    return ({ where }: { where: { id: string } }) => Promise.resolve(orders.find((o) => o.id === where.id) ?? null);
-  }
-
+describe('POST /api/v1/orders/pay-batch/cod (disabled — online payment only)', () => {
   it('returns 401 with no token', async () => {
     const res = await request(app).post('/api/v1/orders/pay-batch/cod').send({ orderIds: [ORDER_ID, ORDER_ID_2] });
     expect(res.status).toBe(401);
   });
 
-  it('confirms every order in the batch together via COD, never marking any of them PAID', async () => {
-    prismaMock.order.findUnique.mockImplementation(findOrderById([orderFixture, orderFixture2]));
-    prismaMock.$transaction.mockImplementation(async (cb: (tx: typeof prismaMock) => unknown) => cb(prismaMock));
-    prismaMock.payment.create.mockResolvedValue({ ...paymentFixture, provider: 'COD', status: 'CREATED' });
-    prismaMock.order.update.mockImplementation(({ where }: { where: { id: string } }) =>
-      Promise.resolve({ ...(where.id === ORDER_ID ? orderFixture : orderFixture2), status: 'CONFIRMED' }),
-    );
+  it('rejects with a clear 400 error for any authenticated customer, regardless of the batch', async () => {
     const res = await request(app)
       .post('/api/v1/orders/pay-batch/cod')
       .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
       .send({ orderIds: [ORDER_ID, ORDER_ID_2] });
-    expect(res.status).toBe(200);
-    expect(res.body.data).toHaveLength(2);
-    expect(res.body.data.every((o: { status: string }) => o.status === 'CONFIRMED')).toBe(true);
-    expect(prismaMock.payment.create).not.toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'PAID' }) }),
-    );
-  });
-
-  it('returns a clean 409 (not a raw 500) when one order in the batch is not PENDING_PAYMENT', async () => {
-    prismaMock.order.findUnique.mockImplementation(findOrderById([orderFixture, { ...orderFixture2, status: 'CANCELLED' }]));
-    const res = await request(app)
-      .post('/api/v1/orders/pay-batch/cod')
-      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
-      .send({ orderIds: [ORDER_ID, ORDER_ID_2] });
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toMatch(/cash on delivery/i);
     expect(prismaMock.payment.create).not.toHaveBeenCalled();
   });
 });
@@ -617,6 +496,7 @@ describe('POST /api/v1/payments/webhook/razorpay', () => {
     // not voucher generation, so these are harmless no-op-shaped defaults.
     prismaMock.order.findUniqueOrThrow.mockResolvedValue({ customerId: CUSTOMER_ID });
     prismaMock.financeSettings.upsert.mockResolvedValue({ defaultCommissionRatePercent: '10' });
+    prismaMock.member.findMany.mockResolvedValue([]);
     prismaMock.purchaseEntitlement.findFirst.mockResolvedValue(null);
     const signature = signWebhook(capturedEvent);
     const res = await request(app).post('/api/v1/payments/webhook/razorpay').set('x-razorpay-signature', signature).send(capturedEvent);

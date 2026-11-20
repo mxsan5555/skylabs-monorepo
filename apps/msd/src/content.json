@@ -1026,15 +1026,10 @@
       "online": {
         "title": "Online payment",
         "description": "Razorpay: UPI, card or net banking"
-      },
-      "cod": {
-        "title": "Cash on delivery",
-        "description": "Pay when your order arrives"
       }
     },
     "payLabel": "Pay {amount}",
     "openingPayment": "Opening payment…",
-    "placingOrder": "Placing order…",
     "payingTo": "You're paying {amount} to {member}.",
     "payingAcross": "You're paying {amount} across {count} members in one payment.",
     "unavailableHeading": "Checkout unavailable",
@@ -1042,7 +1037,6 @@
     "backLabel": "Back",
     "backToCart": "Back to cart",
     "nextLabel": "Continue",
-    "placeOrderLabel": "Place Order",
     "loadingOrder": "Preparing your order…",
     "backToCategories": "Back to Categories",
     "pleaseWait": "Please wait…",
@@ -1087,22 +1081,11 @@
       "emptyCvv": "Please enter your CVV.",
       "invalidCvv": "CVV must contain 3 or 4 digits."
     },
-    "payment": {
-      "methodHeading": "Payment Method",
-      "methodAriaLabel": "Payment method",
-      "online": "Online Payment (Razorpay)",
-      "cod": "Cash on Delivery",
-      "openingPayment": "Opening payment…",
-      "placingOrder": "Placing order…",
-      "payPrefix": "Pay",
-      "payingTo": "You're paying {amount} to {vendor} ({branch})."
-    },
     "errors": {
       "startCheckout": "Could not start checkout.",
       "preparePayment": "Could not prepare payment.",
       "gatewayUnavailable": "Payment gateway unavailable.",
-      "openGateway": "Could not open the payment gateway.",
-      "placeOrder": "Could not place your order. Please try again."
+      "openGateway": "Could not open the payment gateway."
     },
     "successHeading": "Booking Confirmed!",
     "successBody": "We have sent your booking details to your email. You'll hear from the spa within 2 hours."
