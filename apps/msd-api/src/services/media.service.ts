@@ -2,7 +2,7 @@ import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
 import { deleteMediaFile, writeMediaFile } from '../lib/media-storage';
 import { storageFolder } from '../lib/storage-layout';
-import { validateMediaFile, MAX_IMAGES_PER_ENTITY } from './media-validation.service';
+import { validateMediaFile, MAX_IMAGES_PER_ENTITY, LOGO_MAX_BYTES } from './media-validation.service';
 
 /** `category` covers all three Category depth tiers (Category/Subcategory/Type are all just
  *  Category rows — see category.service.ts's module doc comment) with one shared `CategoryImage`
@@ -116,7 +116,13 @@ export async function addImage(entityType: MediaEntityType, parentId: string, fi
   if (existingCount >= MAX_IMAGES_PER_ENTITY) {
     throw new ApiError('VALIDATION_ERROR', `You can upload at most ${MAX_IMAGES_PER_ENTITY} images.`);
   }
-  const validated = validateMediaFile(file.buffer, 'image');
+  // The vendor logo is a simple graphic, not a photo — no forced minimum, and a looser ceiling
+  // that doesn't need the photo pipeline's 30-80KB squeeze (see LOGO_MAX_BYTES's doc comment).
+  const validated = validateMediaFile(
+    file.buffer,
+    'image',
+    entityType === 'vendor' ? { minBytes: 0, maxBytes: LOGO_MAX_BYTES } : undefined,
+  );
   const { storageKey, sizeBytes } = await writeMediaFile(await folderFor(entityType, parentId), file.buffer, validated.extension);
   const isPrimary = existingCount === 0;
   try {

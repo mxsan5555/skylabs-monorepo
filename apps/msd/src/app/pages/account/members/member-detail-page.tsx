@@ -13,6 +13,7 @@ import { DealsListPage } from './deals-list-page';
 import { TherapistsListPage } from './therapists-list-page';
 import { ProductsListPage } from './products-list-page';
 import { VendorProfileForm, extractVendorFieldErrors, type VendorFieldErrors } from './vendor-profile-form';
+import { MediaUploader } from '../../../components/media-uploader';
 import { MemberHeaderActions } from './member-header-actions';
 import { MemberDocumentsTab } from './member-documents-tab';
 import { MemberActivityTab } from './member-activity-tab';
@@ -32,6 +33,7 @@ import {
 
 const TABS = [
   { value: 'profile', label: 'Profile' },
+  { value: 'logo', label: 'Logo' },
   { value: 'documents', label: 'Documents' },
   { value: 'branches', label: 'Branches' },
   { value: 'deals', label: 'Deals' },
@@ -261,6 +263,19 @@ export function MemberDetailPage() {
             sections={['business', 'owner', 'address', 'bank']}
             serverFieldErrors={fieldErrors}
             onSave={saveProfile}
+          />
+        )}
+
+        {tab === 'logo' && (
+          <MediaUploader
+            entityType="vendor"
+            entityId={member.id}
+            selfService={false}
+            maxImages={1}
+            hideVideo
+            existingImages={member.mediaImages ?? []}
+            existingVideo={null}
+            token={token}
           />
         )}
 

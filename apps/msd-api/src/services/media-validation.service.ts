@@ -1,4 +1,4 @@
-import { DOCUMENT_MAX_BYTES } from '@skylabs-monorepo/shared-utils';
+import { DOCUMENT_MAX_BYTES, LOGO_MAX_BYTES } from '@skylabs-monorepo/shared-utils';
 import { ApiError } from '../lib/http';
 import {
   IMAGE_MIME_TYPES,
@@ -16,7 +16,7 @@ export const MAX_IMAGES_PER_ENTITY = 8;
 /** A KYC document is a scanned/photographed real document, not a compressed web image — no
  *  minimum size, and a much larger ceiling than the 30-80KB product-image window. One value,
  *  shared with the msd console's pre-upload check (P10-37). */
-export { DOCUMENT_MAX_BYTES };
+export { DOCUMENT_MAX_BYTES, LOGO_MAX_BYTES };
 
 export interface ValidatedMediaFile {
   sniffedType: SniffedMediaType;
@@ -33,6 +33,9 @@ export interface ValidatedMediaFile {
 export function validateMediaFile(
   buffer: Buffer,
   kind: 'image' | 'video' | 'document',
+  /** Overrides the default 30KB-80KB image window — used for the vendor logo, which has no
+   *  forced minimum and a much larger ceiling (see `LOGO_MAX_BYTES`'s own doc comment). */
+  imageSizeOverride?: { minBytes: number; maxBytes: number },
 ): ValidatedMediaFile {
   const sniffedType = sniffMediaType(buffer);
   if (!sniffedType) {
@@ -52,8 +55,14 @@ export function validateMediaFile(
   }
 
   if (kind === 'image') {
-    if (buffer.length < IMAGE_MIN_BYTES || buffer.length > IMAGE_MAX_BYTES) {
-      throw new ApiError('VALIDATION_ERROR', 'Image size must be between 30 KB and 80 KB.');
+    const { minBytes, maxBytes } = imageSizeOverride ?? { minBytes: IMAGE_MIN_BYTES, maxBytes: IMAGE_MAX_BYTES };
+    if (buffer.length < minBytes || buffer.length > maxBytes) {
+      throw new ApiError(
+        'VALIDATION_ERROR',
+        imageSizeOverride
+          ? `Logo size must not exceed ${Math.round(maxBytes / 1024)} KB.`
+          : 'Image size must be between 30 KB and 80 KB.',
+      );
     }
   } else if (kind === 'video') {
     if (buffer.length > VIDEO_MAX_BYTES) {

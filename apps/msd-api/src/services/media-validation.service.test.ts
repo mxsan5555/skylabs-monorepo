@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateMediaFile, IMAGE_MIN_BYTES, IMAGE_MAX_BYTES, VIDEO_MAX_BYTES } from './media-validation.service';
+import { validateMediaFile, IMAGE_MIN_BYTES, IMAGE_MAX_BYTES, VIDEO_MAX_BYTES, LOGO_MAX_BYTES } from './media-validation.service';
 import { ApiError } from '../lib/http';
 
 /** A byte-exact, magic-byte-valid JPEG buffer padded to `size` bytes. */
@@ -43,6 +43,39 @@ describe('validateMediaFile — image size boundary table', () => {
     } catch (err) {
       expect(err).toBeInstanceOf(ApiError);
       expect((err as ApiError).message).toBe('Image size must be between 30 KB and 80 KB.');
+    }
+  });
+});
+
+describe('validateMediaFile — vendor logo size override', () => {
+  const logoRange = { minBytes: 0, maxBytes: LOGO_MAX_BYTES };
+
+  it.each([
+    [1 * 1024, true],
+    [LOGO_MAX_BYTES, true],
+    [LOGO_MAX_BYTES + 1024, false],
+  ])('%i bytes -> pass=%s', (size, shouldPass) => {
+    const buffer = jpegBuffer(size);
+    if (shouldPass) {
+      expect(() => validateMediaFile(buffer, 'image', logoRange)).not.toThrow();
+    } else {
+      expect(() => validateMediaFile(buffer, 'image', logoRange)).toThrow(ApiError);
+    }
+  });
+
+  it('never rejects a small logo the way the default 30KB-80KB window would', () => {
+    const smallLogo = jpegBuffer(5 * 1024);
+    expect(() => validateMediaFile(smallLogo, 'image')).toThrow(ApiError);
+    expect(() => validateMediaFile(smallLogo, 'image', logoRange)).not.toThrow();
+  });
+
+  it('rejects an oversized logo with a logo-specific message, not the default image message', () => {
+    try {
+      validateMediaFile(jpegBuffer(LOGO_MAX_BYTES + 1024), 'image', logoRange);
+      expect.unreachable();
+    } catch (err) {
+      expect(err).toBeInstanceOf(ApiError);
+      expect((err as ApiError).message).toBe(`Logo size must not exceed ${Math.round(LOGO_MAX_BYTES / 1024)} KB.`);
     }
   });
 });
