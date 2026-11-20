@@ -45,6 +45,7 @@ interface TherapistOption {
   branchId: string;
   personName: string;
   therapistType: string;
+  isActive: boolean;
 }
 
 const EMPTY_FORM = {
@@ -286,7 +287,10 @@ export function DealFormPage({ token, surface = 'staff' }: DealFormPageProps) {
 
   const topCategories = categories.filter((c) => !c.parentId);
   const subcategories = categories.filter((c) => c.parentId === form.categoryId);
-  const branchTherapists = therapists.filter((t) => t.branchId === form.branchId);
+  // Inactive therapists can't be newly assigned (they're off the storefront), but one already
+  // linked to this deal stays listed — switching a therapist off must never silently drop an
+  // existing assignment out from under the vendor on their next save.
+  const branchTherapists = therapists.filter((t) => t.branchId === form.branchId && (t.isActive || therapistIds.has(t.id)));
   const branch = branches?.find((b) => b.id === form.branchId);
   const canEditSlug = !deal?.publishedAt || isStaff;
   const canDelete = isStaff && can('vendors.deals', 'delete');
@@ -331,7 +335,7 @@ export function DealFormPage({ token, surface = 'staff' }: DealFormPageProps) {
       const { data } = isStaff
         ? await createVendorTherapist(token, vendorId, form.branchId, { therapistType, personName })
         : await createTherapist(token, form.branchId, { therapistType, personName });
-      setTherapists((prev) => [...prev, { id: data.id, branchId: form.branchId, personName, therapistType }]);
+      setTherapists((prev) => [...prev, { id: data.id, branchId: form.branchId, personName, therapistType, isActive: true }]);
       setTherapistIds((prev) => new Set(prev).add(data.id));
       setNewTherapist({ therapistType: '', personName: '' });
     } catch (err) {
@@ -745,7 +749,7 @@ export function DealFormPage({ token, surface = 'staff' }: DealFormPageProps) {
               <div className="category-grant-grid">
                 {branchTherapists.map((t) =>
                   renderCheckbox({
-                    label: `${t.personName} · ${t.therapistType}`,
+                    label: `${t.personName} · ${t.therapistType}${t.isActive ? '' : ' (Inactive)'}`,
                     checked: therapistIds.has(t.id),
                     onChange: (checked) =>
                       setTherapistIds((prev) => {
