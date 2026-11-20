@@ -1,5 +1,8 @@
 <aside class="admin-sidebar" [class.is-open]="open()" [attr.aria-hidden]="open() ? null : 'true'" [attr.inert]="open() ? null : ''">
-  <md-icon-button class="md-sidebar-mobile-close" aria-label="Close navigation" title="Close navigation" (click)="close.emit()"><md-icon aria-hidden="true">close</md-icon></md-icon-button>
+  <md-icon-button class="md-sidebar-mobile-close" aria-label="Close navigation" title="Close navigation" (click)="close.emit()">
+    <md-icon aria-hidden="true">close</md-icon>
+  </md-icon-button>
+
   <div class="admin-sidebar__brand">
     <img src="/images/logo.png" alt="Mera Driver" class="h-8 w-auto object-contain" />
   </div>
@@ -14,33 +17,51 @@
   />
 
   <nav class="admin-sidebar__nav" aria-label="Console">
-    <ng-container [ngTemplateOutlet]="tree" [ngTemplateOutletContext]="{ nodes: menu() }"></ng-container>
+    <ul class="admin-nav-list">
+      <ng-container [ngTemplateOutlet]="tree" [ngTemplateOutletContext]="{ nodes: menu() }"></ng-container>
+    </ul>
     <ng-template #tree let-nodes="nodes">
       @for (node of nodes; track node.id) {
-        @if (node.children?.length) {
-          <div class="admin-nav-group">
-            <button type="button" class="admin-nav-item w-full" [attr.aria-expanded]="isGroupExpanded(node)" (click)="toggleGroup(node)">
-              <md-icon aria-hidden="true">{{ node.icon }}</md-icon>
-              <span>{{ node.title }}</span>
-              <md-icon aria-hidden="true">{{ isGroupExpanded(node) ? 'expand_less' : 'expand_more' }}</md-icon>
-            </button>
-            @if (isGroupExpanded(node)) {
-              <div class="pl-3">
+        <li>
+          @if (node.children?.length) {
+            <div class="admin-nav-group">
+              <button
+                type="button"
+                class="admin-nav-item admin-nav-group__trigger"
+                [attr.aria-expanded]="isGroupExpanded(node)"
+                (click)="toggleGroup(node)"
+              >
+                @if (node.icon) {
+                  <md-icon aria-hidden="true">{{ node.icon }}</md-icon>
+                }
+                <span>{{ node.title }}</span>
+                <md-icon aria-hidden="true" class="admin-nav-group__chevron">expand_more</md-icon>
+              </button>
+              <ul class="admin-nav-group__children" [hidden]="!isGroupExpanded(node)">
                 <ng-container [ngTemplateOutlet]="tree" [ngTemplateOutletContext]="{ nodes: node.children }"></ng-container>
-              </div>
-            }
-          </div>
-        } @else {
-          <a class="admin-nav-item" [routerLink]="(accountPath(node) || '').split('?')[0]" [queryParams]="queryParams(node)" [class.active]="isActive(node)" [attr.aria-current]="isActive(node) ? 'page' : null">
-            <md-icon aria-hidden="true">{{ node.icon }}</md-icon>{{ node.title }}
-          </a>
-        }
+              </ul>
+            </div>
+          } @else {
+            <a
+              class="admin-nav-item"
+              [routerLink]="(accountPath(node) || '').split('?')[0]"
+              [queryParams]="queryParams(node)"
+              [class.active]="isActive(node)"
+              [attr.aria-current]="isActive(node) ? 'page' : null"
+            >
+              @if (node.icon) {
+                <md-icon aria-hidden="true">{{ node.icon }}</md-icon>
+              }
+              <span>{{ node.title }}</span>
+            </a>
+          }
+        </li>
       }
     </ng-template>
   </nav>
 
   <div class="admin-sidebar__user">
-    <span class="admin-sidebar__avatar">{{ initial() }}</span>
+    <span class="admin-sidebar__avatar" aria-hidden="true">{{ initial() }}</span>
     <span class="admin-sidebar__user-info">
       <div class="admin-sidebar__user-name" [title]="user()?.name || ''">{{ user()?.name ?? 'Loading…' }}</div>
       <div class="admin-sidebar__user-mail" [title]="roleNames()">{{ roleNames() }}</div>
