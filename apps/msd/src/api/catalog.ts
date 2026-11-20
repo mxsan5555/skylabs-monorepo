@@ -227,6 +227,8 @@ export interface CatalogVendorDetail {
   state: string | null;
   address: string | null;
   branches: CatalogVendorBranch[];
+  mediaImages?: MediaImage[];
+  mediaVideo?: MediaVideo | null;
 }
 
 /** A comma-joined list param, or undefined when empty (so it is left out of the query). */

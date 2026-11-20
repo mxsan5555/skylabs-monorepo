@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { OutlinedButton, Icon, LinearProgress } from '@skylabs-monorepo/shared-ui/react';
+import { LOGO_MAX_BYTES, LOGO_MIME_TYPES } from '@skylabs-monorepo/shared-utils';
 import {
   uploadImage as apiUploadImage,
   deleteImage as apiDeleteImage,
@@ -113,12 +114,24 @@ export function MediaUploader({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entityId]);
 
+  // The vendor logo is a simple graphic, not a photo — keep the original file (and its
+  // transparency) when it's already a valid type within the looser logo ceiling, rather than
+  // forcing every logo through the photo pipeline's 30-80KB squeeze (which always re-encodes to
+  // opaque JPEG). Only compress if the original file is actually too big.
+  async function prepareImage(file: File): Promise<Blob> {
+    if (entityType === 'vendor') {
+      if (file.size <= LOGO_MAX_BYTES && (LOGO_MIME_TYPES as readonly string[]).includes(file.type)) return file;
+      return compressImageToRange(file, 0, LOGO_MAX_BYTES);
+    }
+    return compressImageToRange(file);
+  }
+
   async function flushStaged(readyEntityId: string) {
     const liveRef = { entityType, entityId: readyEntityId, branchId, selfService, vendorId };
     setBusy(true);
     for (const item of staged) {
       try {
-        const compressed = await compressImageToRange(item.file);
+        const compressed = await prepareImage(item.file);
         const res = await apiUploadImage(token, liveRef, compressed, item.file.name);
         setImages((prev) => {
           const next = [...prev, res.data];
@@ -171,7 +184,7 @@ export function MediaUploader({
     setBusy(true);
     for (const file of picked) {
       try {
-        const compressed = await compressImageToRange(file);
+        const compressed = await prepareImage(file);
         const res = await apiUploadImage(token, ref, compressed, file.name);
         setImages((prev) => {
           const next = [...prev, res.data];

@@ -67,8 +67,10 @@ export async function compressImageToRange(
 
   if (lastBlob && lastBlob.size < minBytes) {
     throw new ImageCompressionError(
-      'This image is too simple/small to reach the required 30 KB minimum — try a different photo.',
+      `This image is too simple/small to reach the required ${Math.round(minBytes / 1024)} KB minimum — try a different photo.`,
     );
   }
-  throw new ImageCompressionError('Could not compress this image into the required 30 KB–80 KB range.');
+  throw new ImageCompressionError(
+    `Could not compress this image into the required ${Math.round(minBytes / 1024)} KB–${Math.round(maxBytes / 1024)} KB range.`,
+  );
 }

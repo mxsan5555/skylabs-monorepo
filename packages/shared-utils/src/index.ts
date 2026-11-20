@@ -35,3 +35,4 @@ export function debounce<Args extends unknown[]>(
 
 export { INDIA_LOCATIONS, STATES, citiesForState, isIndiaLocation, type IndiaState } from './india-locations';
 export { DOCUMENT_ACCEPT, DOCUMENT_MAX_BYTES, DOCUMENT_MAX_MB, DOCUMENT_MIME_TYPES, isDocumentTooLarge } from './document-upload';
+export { LOGO_ACCEPT, LOGO_MAX_BYTES, LOGO_MAX_KB, LOGO_MIME_TYPES, isLogoTooLarge } from './logo-upload';

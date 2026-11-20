@@ -21,6 +21,7 @@ const branchesProps = vi.fn();
 const dealsProps = vi.fn();
 const therapistsProps = vi.fn();
 const productsProps = vi.fn();
+const mediaUploaderProps = vi.fn();
 
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
   useAuth: () => useAuthMock(),
@@ -67,6 +68,12 @@ vi.mock('./products-list-page', () => ({
   },
 }));
 vi.mock('./vendor-customers', () => ({ VendorCustomers: (props: { vendorId?: string }) => <p>customers-tab {props.vendorId}</p> }));
+vi.mock('../../../components/media-uploader', () => ({
+  MediaUploader: (props: Record<string, unknown>) => {
+    mediaUploaderProps(props);
+    return <p>media-uploader</p>;
+  },
+}));
 vi.mock('./vendor-profile-form', () => ({
   VendorProfileForm: (props: { canEdit: boolean }) => {
     profileProps(props);
@@ -176,10 +183,10 @@ describe('MemberDetailPage', () => {
     await waitFor(() => expect(screen.getByText('deals-tab')).toBeTruthy());
   });
 
-  it('renders the eight tabs wired to one labelled tab panel', async () => {
+  it('renders the nine tabs wired to one labelled tab panel', async () => {
     renderAt('/account/members/m1/documents');
     await waitFor(() => expect(screen.getByText('documents-tab')).toBeTruthy());
-    expect(tabs().map((t) => t.textContent?.trim())).toEqual(['Profile', 'Documents', 'Branches', 'Deals', 'Therapists', 'Products', 'Customers', 'Activity']);
+    expect(tabs().map((t) => t.textContent?.trim())).toEqual(['Profile', 'Logo', 'Documents', 'Branches', 'Deals', 'Therapists', 'Products', 'Customers', 'Activity']);
     expect(document.querySelector('md-tabs')?.getAttribute('aria-label')).toBe('Vendor sections');
     const active = tab('Documents');
     const panel = screen.getByRole('tabpanel');
@@ -420,6 +427,24 @@ describe('MemberDetailPage customer and order counts', () => {
     renderAt('/account/members/m1/customers');
     expect(await screen.findByText('customers-tab m1')).toBeTruthy();
     expect(screen.getByRole('heading', { level: 2, name: 'Customers' })).toBeTruthy();
+  });
+
+  it('opens the Logo tab with a single-image admin-on-behalf uploader for this vendor', async () => {
+    renderAt('/account/members/m1/logo');
+    expect(await screen.findByText('media-uploader')).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 2, name: 'Logo' })).toBeTruthy();
+    expect(mediaUploaderProps).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entityType: 'vendor',
+        entityId: 'm1',
+        selfService: false,
+        maxImages: 1,
+        hideVideo: true,
+        existingImages: [],
+        existingVideo: null,
+        token: 't',
+      }),
+    );
   });
 
   it('falls back to Profile when the Customers tab is not allowed', async () => {

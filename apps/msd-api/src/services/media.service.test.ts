@@ -133,6 +133,23 @@ describe('media.service.addImage', () => {
       expect.objectContaining({ data: expect.objectContaining({ categoryId: 'category-1' }) }),
     );
   });
+
+  it('accepts a vendor logo well under the 30KB product-photo minimum (logo has no forced minimum)', async () => {
+    prismaMock.vendorImage.count.mockResolvedValue(0);
+    prismaMock.vendorImage.create.mockResolvedValue({ id: 'v-img-1' });
+    await mediaService.addImage('vendor', 'vendor-1', { buffer: jpegBuffer(5 * 1024), originalname: 'logo.jpg' });
+    expect(prismaMock.vendorImage.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ vendorId: 'vendor-1' }) }),
+    );
+  });
+
+  it('still rejects a vendor logo over the 300KB logo ceiling', async () => {
+    prismaMock.vendorImage.count.mockResolvedValue(0);
+    await expect(
+      mediaService.addImage('vendor', 'vendor-1', { buffer: jpegBuffer(301 * 1024), originalname: 'logo.jpg' }),
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    expect(prismaMock.vendorImage.create).not.toHaveBeenCalled();
+  });
 });
 
 describe('media.service category has no video support', () => {

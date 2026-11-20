@@ -16,7 +16,7 @@ import { DurationPackageSelector } from '../../components/duration-package-selec
 import { useDealPurchaseSelection } from '../../../hooks/use-deal-purchase-selection';
 import { useTherapistPurchaseSelection } from '../../../hooks/use-therapist-purchase-selection';
 import { formatINR, pluralize, formatTime12h, formatStreetAddress } from '../../../utils/format';
-import { resolveDealMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
+import { resolveDealMedia, resolveTherapistMedia, resolveVendorMedia, primaryImage } from '../../../utils/media';
 import { showSnackbar } from '../../../snackbar/snackbar';
 import './vendor.css';
 import content from '../../../content.json';
@@ -231,6 +231,9 @@ export function VendorPage() {
   const canonicalUrl = `${SITE_URL}/vendor/${vendor.slug}`;
   const metaDescription = vendor.businessDescription
     ?? `Book deals at ${vendor.businessName}${vendor.city ? `, ${vendor.city}` : ''}.`;
+  // Prefers the uploaded logo (VendorImage) over the legacy logoUrl column — see
+  // resolveVendorMedia's own doc comment.
+  const vendorLogo = primaryImage(resolveVendorMedia(vendor)) ?? null;
   return (
     <div id="main-content" className="vendor-page">
       <title>{`${vendor.businessName} | MSD`}</title>
@@ -239,19 +242,19 @@ export function VendorPage() {
       <meta property="og:type" content="business.business" />
       <meta property="og:title" content={`${vendor.businessName} | MSD`} />
       <meta property="og:description" content={metaDescription} />
-      {vendor.logoUrl && <meta property="og:image" content={vendor.logoUrl} />}
+      {vendorLogo && <meta property="og:image" content={vendorLogo} />}
       <meta property="og:url" content={canonicalUrl} />
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={`${vendor.businessName} | MSD`} />
       <meta name="twitter:description" content={metaDescription.slice(0, 155)} />
-      {vendor.logoUrl && <meta name="twitter:image" content={vendor.logoUrl} />}
+      {vendorLogo && <meta name="twitter:image" content={vendorLogo} />}
       <JsonLd
         data={{
           '@context': 'https://schema.org',
           '@type': 'LocalBusiness',
           name: vendor.businessName,
           description: vendor.businessDescription ?? undefined,
-          image: vendor.logoUrl ?? undefined,
+          image: vendorLogo ?? undefined,
           url: canonicalUrl,
           address: {
             '@type': 'PostalAddress',
@@ -284,8 +287,8 @@ export function VendorPage() {
           { label: vendor.businessName },
         ]}
       />
-      <div className={`vendor-page__hero${vendor.logoUrl ? '' : ' vendor-page__hero--placeholder'}`} aria-hidden="true">
-        {vendor.logoUrl && <img src={vendor.logoUrl} alt="" />}
+      <div className={`vendor-page__hero${vendorLogo ? '' : ' vendor-page__hero--placeholder'}`} aria-hidden="true">
+        {vendorLogo && <img src={vendorLogo} alt="" />}
       </div>
       <div className={`vendor-page__body${activeSection === 'products' ? ' vendor-page__body--full-width' : ''}`}>
         <div className="vendor-page__main-card">
@@ -304,10 +307,10 @@ export function VendorPage() {
                 )}
               </div>
             </div>
-            {vendor.logoUrl && (
+            {vendorLogo && (
               <img
                 className="vendor-page__company-img"
-                src={vendor.logoUrl}
+                src={vendorLogo}
                 alt={`${vendor.businessName} logo`}
                 loading="eager"
               />
