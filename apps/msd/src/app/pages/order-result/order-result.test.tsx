@@ -4,9 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Order } from '../../../api/orders';
 import { OrderResult, outcomeOf } from './order-result';
 
-const { getMyOrder } = vi.hoisted(() => ({ getMyOrder: vi.fn() }));
+const { getMyOrder, notifyCartUpdated } = vi.hoisted(() => ({ getMyOrder: vi.fn(), notifyCartUpdated: vi.fn() }));
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({ useAuth: () => ({ token: 'test-token', isAuthenticated: true }) }));
 vi.mock('../../../api/orders', () => ({ getMyOrder: (...a: unknown[]) => getMyOrder(...a) }));
+vi.mock('../../../api/cart', () => ({ notifyCartUpdated: (...a: unknown[]) => notifyCartUpdated(...a) }));
 
 const ORDER_ID = '11111111-2222-3333-4444-5555abcd1234';
 const ORDER = {
@@ -50,6 +51,7 @@ const heading = () => screen.findByRole('heading', { level: 1 });
 
 beforeEach(() => {
   getMyOrder.mockReset().mockResolvedValue({ data: ORDER });
+  notifyCartUpdated.mockReset();
 });
 
 /** Item 3: a clear page after checkout for every result, read from the server's order. */
@@ -85,6 +87,7 @@ describe('OrderResult', () => {
     expect(card?.textContent).toContain('Alok Kumar Wellness');
     expect(summary.querySelector('.summary-panel__total')?.textContent).toContain('₹3,080');
     expect(getMyOrder).toHaveBeenCalledWith('test-token', ORDER_ID);
+    expect(notifyCartUpdated).toHaveBeenCalled();
   });
 
   it('shows the payment-failed page with Pay now, which reopens checkout for the same order', async () => {
@@ -92,6 +95,7 @@ describe('OrderResult', () => {
     renderAt(`/orders/${ORDER_ID}/confirmation`);
     expect((await heading()).textContent).toBe('Your payment did not go through');
     expect(document.querySelector('.status-panel--error')).not.toBeNull();
+    expect(notifyCartUpdated).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText('Pay now'));
     expect(await screen.findByText('checkout page')).toBeTruthy();
   });

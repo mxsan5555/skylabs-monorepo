@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { FilledButton, OutlinedButton } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getMyOrder, type Order } from '../../../api/orders';
+import { notifyCartUpdated } from '../../../api/cart';
 import { fillTemplate, formatINR, formatLongDate, orderNumber } from '../../../utils/format';
 import { lineFromOrderItem } from '../../../utils/cart-items';
 import { PurchaseLineCard, PurchaseLineList } from '../../components/purchase-line-card/purchase-line-card';
@@ -73,6 +74,14 @@ export function OrderResult() {
     heading?.setAttribute('tabindex', '-1');
     heading?.focus();
   }, [loading, outcome]);
+
+  // The server only ever clears the cart once a payment genuinely succeeds (see
+  // `finalizeCartForOrder` in msd-api). Ping the header's cart count to refetch here, since this
+  // is the one place that derives `outcome` from the order's real, backend-verified status —
+  // covers the Razorpay, COD and webhook-confirmed paths alike, and is idempotent on refresh.
+  useEffect(() => {
+    if (outcome === 'success') notifyCartUpdated();
+  }, [outcome]);
 
   if (loading) return <p className="loading-state" role="status">{t.loading}</p>;
 

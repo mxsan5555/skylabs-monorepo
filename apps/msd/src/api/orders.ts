@@ -126,7 +126,10 @@ function toQuery(params: Record<string, string | number | undefined>): string {
 }
 
 export function checkout(token: string | null, contactDetails: OrderContactDetails = {}) {
-  // Checkout clears the cart server-side — notify so the header badge doesn't stay stale.
+  // Checkout only links the cart to the new Order (`pendingOrderId`) — it does NOT clear items,
+  // so repeat checkout calls stay idempotent. The actual clear happens once payment succeeds
+  // (see the order-result page, which notifies on a backend-confirmed success outcome). This
+  // notify just covers the (harmless) case of re-checking out an order whose contact details changed.
   return apiPost<Order>('/orders/checkout', token, contactDetails).then((res) => {
     notifyCartUpdated();
     return res;
