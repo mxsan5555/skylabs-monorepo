@@ -3,8 +3,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { CityPickerDialog } from './city-picker-dialog';
 import content from '../../../content.json';
 
-const { setCity, requestBrowser, shell } = vi.hoisted(() => ({
-  setCity: vi.fn(),
+const { setState, requestBrowser, shell } = vi.hoisted(() => ({
+  setState: vi.fn(),
   requestBrowser: vi.fn(),
   shell: {
     locations: [
@@ -20,9 +20,8 @@ vi.mock('../../../catalog/catalog-shell', () => ({
 vi.mock('../../../location/location-context', () => ({
   useVisitorLocation: () => ({
     status: 'ready',
-    city: 'Pune',
     state: 'Maharashtra',
-    setCity,
+    setState,
     requestBrowser,
   }),
 }));
@@ -37,12 +36,12 @@ describe('CityPickerDialog', () => {
     expect(within(list).getAllByRole('button')).toHaveLength(2);
   });
 
-  it('sets the chosen city and closes when a city is clicked', () => {
+  it('sets the chosen state and closes when a state is clicked', () => {
     const onClose = vi.fn();
     render(<CityPickerDialog onClose={onClose} />);
     const list = screen.getByRole('list', { name: t.listLabel });
-    fireEvent.click(within(list).getByRole('button', { name: /Gorakhpur/ }));
-    expect(setCity).toHaveBeenCalledWith({ state: 'Uttar Pradesh', city: 'Gorakhpur' });
+    fireEvent.click(within(list).getByRole('button', { name: 'Uttar Pradesh' }));
+    expect(setState).toHaveBeenCalledWith('Uttar Pradesh');
     expect(onClose).toHaveBeenCalled();
   });
 

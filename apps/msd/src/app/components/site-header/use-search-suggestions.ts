@@ -234,6 +234,8 @@ export function useSearchSuggestions(
         listCatalogTherapists({
           search: trimmed,
           pageSize: RESULTS_PER_GROUP,
+          city: city ?? undefined,
+          state: state ?? undefined,
           ...near,
         }),
         listCatalogProducts({ search: trimmed, pageSize: RESULTS_PER_GROUP }),

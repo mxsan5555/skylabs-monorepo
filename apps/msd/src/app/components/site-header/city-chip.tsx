@@ -6,12 +6,12 @@ import content from '../../../content.json';
 
 const t = content.header.city;
 
-/** Shows the visitor's city; opens a dialog to pick a city or use the browser location. */
+/** Shows the visitor's city or state; opens a dialog to pick a state or use the browser location. */
 export function CityChip() {
-  const { status, city } = useVisitorLocation();
+  const { status, city, state } = useVisitorLocation();
   const [open, setOpen] = useState(false);
   const chipRef = useRef<HTMLButtonElement>(null);
-  const label = status === 'locating' ? t.locating : (city ?? t.setLocation);
+  const label = status === 'locating' ? t.locating : (city ?? state ?? t.setLocation);
 
   // The dialog unmounts on close, so md-dialog cannot restore focus itself; return it to the chip.
   const close = () => {

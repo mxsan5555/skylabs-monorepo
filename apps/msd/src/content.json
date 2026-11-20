@@ -83,18 +83,29 @@
     "city": {
       "locating": "Locating…",
       "setLocation": "Set location",
-      "changeLabel": "Change city",
-      "dialogTitle": "Choose your city",
+      "changeLabel": "Change state",
+      "dialogTitle": "Choose your state",
       "useCurrent": "Use my current location",
-      "listLabel": "Cities with partner spas",
+      "listLabel": "States with partner spas",
       "close": "Close",
-      "filterLabel": "Search partner cities",
-      "filterPlaceholder": "Type a city",
-      "noMatch": "No partner city matches “{query}”",
+      "filterLabel": "Search states",
+      "filterPlaceholder": "Search states",
+      "noMatch": "No partner state matches “{query}”",
       "locateFailedTitle": "We could not find your location.",
-      "locateFailedText": "Allow location access for this site in your browser settings, or pick a city below.",
+      "locateFailedText": "Allow location access for this site in your browser settings, or pick a state below.",
       "locateFarTitle": "No partner city near you yet.",
-      "locateFarText": "Our partner cities are more than {km} km from where you are. Pick a city below to see its deals."
+      "locateFarText": "Our partner cities are more than {km} km from where you are. Pick a state below to see its deals."
+    },
+    "searchCity": {
+      "changeLabel": "Change city/area",
+      "dialogTitle": "Search in which city?",
+      "allCities": "City/Area",
+      "allCitiesOption": "All cities",
+      "close": "Close",
+      "filterLabel": "Search cities",
+      "filterPlaceholder": "Search cities",
+      "noMatch": "No partner city matches “{query}”",
+      "listLabel": "Cities"
     },
     "searchSuggestions": {
       "listLabel": "Search results",

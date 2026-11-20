@@ -32,8 +32,20 @@ vi.mock('../../../catalog/catalog-shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../catalog/catalog-shell')>()),
   useCatalogShell: () => m.shell.value,
 }));
+const locationMock = vi.hoisted(() => ({ searchCity: null as string | null, setSearchCity: vi.fn() }));
 vi.mock('../../../location/location-context', () => ({
-  useVisitorLocation: () => ({ status: 'none', source: 'none', city: null, state: null, coords: null, setCity: vi.fn(), requestBrowser: vi.fn() }),
+  useVisitorLocation: () => ({
+    status: 'none',
+    source: 'none',
+    city: null,
+    state: null,
+    coords: null,
+    setCity: vi.fn(),
+    setState: vi.fn(),
+    requestBrowser: vi.fn(),
+    searchCity: locationMock.searchCity,
+    setSearchCity: locationMock.setSearchCity,
+  }),
 }));
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({ useAuth: () => ({ isAuthenticated: false, token: null }) }));
 vi.mock('../../../wishlist/wishlist-context', () => ({
@@ -88,6 +100,7 @@ const panelHeaders = async () => {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+  locationMock.searchCity = null;
   m.shell.value = { status: 'ready', locationsStatus: 'ready', categories: [MASSAGE], socialLinks: [], locations: [] } as CatalogShellValue;
   m.listDeals.mockResolvedValue({ data: [deal('d1')], meta: { total: 5 } });
   m.listProducts.mockResolvedValue({ data: [product], meta: { total: 2 } });
@@ -149,6 +162,38 @@ describe('Explore', () => {
   it('is noindex, follow with canonical /explore', async () => {
     renderAt('/explore?q=massage');
     await waitFor(() => expect(document.head.querySelector('meta[name="robots"]')?.getAttribute('content')).toBe('noindex, follow'));
+  });
+});
+
+/** Item F4: the search bar's own city/area selector, reconciled with the URL's `?city=`. */
+describe('Explore — city/area selector', () => {
+  it('reaches the deal and therapist lists as `city`, never the product list', async () => {
+    renderAt('/explore?q=massage&city=Pune');
+    await waitFor(() => expect(m.listDeals).toHaveBeenCalledWith(expect.objectContaining({ city: 'Pune' })));
+    await waitFor(() => expect(m.listTherapists).toHaveBeenCalledWith(expect.objectContaining({ city: 'Pune' })));
+    expect(m.listProducts).not.toHaveBeenCalledWith(expect.objectContaining({ city: 'Pune' }));
+  });
+
+  it('an incoming shared link\'s ?city= wins, and teaches the header\'s global selector about it', async () => {
+    locationMock.searchCity = 'Nagpur';
+    renderAt('/explore?q=massage&city=Pune');
+    // search.tsx's own job ends at reporting the link's city to the global selector — whether
+    // that then round-trips back into `searchCity` is the real context's own behaviour, already
+    // covered by location-context.test.tsx's `setSearchCity` tests.
+    await waitFor(() => expect(locationMock.setSearchCity).toHaveBeenCalledWith('Pune'));
+  });
+
+  it('a fresh visit with no ?city= pins the visitor\'s current search city into the URL once it resolves', async () => {
+    locationMock.searchCity = 'Nagpur';
+    renderAt('/explore?q=massage');
+    await waitFor(() => expect(currentUrl()).toBe('/explore?q=massage&city=Nagpur'));
+    expect(locationMock.setSearchCity).not.toHaveBeenCalled();
+  });
+
+  it('never rewrites the URL when there is no city anywhere (no link, no selector)', async () => {
+    renderAt('/explore?q=massage');
+    await waitFor(() => expect(m.listDeals).toHaveBeenCalled());
+    expect(currentUrl()).toBe('/explore?q=massage');
   });
 });
 

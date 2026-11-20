@@ -1,0 +1,81 @@
+/* `[ City/Area ▾ ] [ search… 🔍 ]` — the chip sits flush against the search field inside
+   `.site-header__search-wrap` (that wrap's flex layout lives in site-header.css). */
+.search-city-select {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-block-size: 48px;
+  max-inline-size: 40vw;
+  padding-inline: 12px 8px;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: var(--md-sys-shape-corner-full);
+  background-color: transparent;
+  color: var(--md-sys-color-on-surface);
+  cursor: pointer;
+  --md-icon-size: 20px;
+}
+
+.search-city-select__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-inline-size: 100px;
+}
+
+.search-city-select__caret {
+  margin-inline-start: -4px;
+}
+
+.search-city-select:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--md-sys-color-on-surface) calc(var(--md-sys-state-hover-state-layer-opacity) * 100%),
+    transparent
+  );
+}
+
+@media (max-width: 480px) {
+  .search-city-select__text {
+    max-inline-size: 56px;
+  }
+}
+
+/* Dialog content — same pattern as city-picker-dialog.css. */
+.search-city-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.search-city-dialog__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-block-size: 50vh;
+  overflow-y: auto;
+}
+
+.search-city-dialog__option {
+  display: flex;
+  inline-size: 100%;
+  min-block-size: 48px;
+  padding-inline: 12px;
+  border: 0;
+  border-radius: var(--md-sys-shape-corner-small);
+  background: transparent;
+  color: var(--md-sys-color-on-surface);
+  cursor: pointer;
+  text-align: start;
+}
+
+.search-city-dialog__option[aria-current='true'] {
+  background-color: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+.search-city-dialog__empty {
+  margin: 0;
+  padding: 12px;
+  color: var(--md-sys-color-on-surface-variant);
+}

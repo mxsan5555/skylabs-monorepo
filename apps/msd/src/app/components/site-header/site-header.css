@@ -67,9 +67,13 @@
 .site-header__search-wrap {
   position: relative;
   grid-area: search;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .site-header__search {
-  inline-size: 100%;
+  flex: 1;
+  min-inline-size: 0;
 }
 .city-chip {
   grid-area: city;
