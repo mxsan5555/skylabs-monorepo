@@ -25,4 +25,25 @@ describe('StepIndicator', () => {
     render(<StepIndicator label="Steps" steps={['Placed', 'Cancelled']} current={1} doneLabel="completed" tone="error" />);
     expect(document.querySelector('.step-indicator')?.classList.contains('step-indicator--error')).toBe(true);
   });
+
+  it('shows a date under a reached step, never under one not yet reached', () => {
+    render(
+      <StepIndicator
+        label="Delivery"
+        steps={['Ordered', 'Shipped', 'Delivered']}
+        current={1}
+        doneLabel="completed"
+        dates={['1 Jan 2026', '3 Jan 2026', null]}
+      />,
+    );
+    const items = screen.getAllByRole('listitem');
+    expect(items[0].textContent).toContain('1 Jan 2026');
+    expect(items[1].textContent).toContain('3 Jan 2026');
+    expect(items[2].textContent).not.toContain('null');
+  });
+
+  it('omits dates entirely when the caller does not pass any (whole-order checkout progress)', () => {
+    render(<StepIndicator label="Checkout steps" steps={['Your Details', 'Payment']} current={1} doneLabel="completed" />);
+    expect(document.querySelector('.step-indicator__date')).toBeNull();
+  });
 });

@@ -11,15 +11,20 @@ export interface StepIndicatorProps {
   doneLabel: string;
   /** Role of the current step: `primary` (default) or `error` (a cancellation). */
   tone?: 'primary' | 'error';
+  /** One pre-formatted date (or null) per step, shown under its label once that step has been
+   *  reached (done or current) — omitted entirely for callers that don't track per-step dates
+   *  (e.g. the whole-order checkout progress). */
+  dates?: (string | null)[];
 }
 
-/** Read-only progress through a short flow (checkout): numbered markers, a check on done steps,
- *  `aria-current="step"` on the current one. */
-export function StepIndicator({ label, steps, current, doneLabel, tone = 'primary' }: StepIndicatorProps) {
+/** Read-only progress through a short flow (checkout, a per-item delivery timeline): numbered
+ *  markers, a check on done steps, `aria-current="step"` on the current one. */
+export function StepIndicator({ label, steps, current, doneLabel, tone = 'primary', dates }: StepIndicatorProps) {
   return (
     <ol className={tone === 'error' ? 'step-indicator step-indicator--error' : 'step-indicator'} aria-label={label}>
       {steps.map((step, index) => {
         const state = index < current ? 'done' : index === current ? 'current' : 'next';
+        const date = state !== 'next' ? dates?.[index] : null;
         return (
           <li key={step} className={`step-indicator__step step-indicator__step--${state}`} {...(state === 'current' ? { 'aria-current': 'step' as const } : {})}>
             <span className="step-indicator__marker label-large" aria-hidden="true">
@@ -28,6 +33,7 @@ export function StepIndicator({ label, steps, current, doneLabel, tone = 'primar
             <span className="step-indicator__label title-small">
               {step}
               {state === 'done' && <span className="sr-only"> {doneLabel}</span>}
+              {date && <span className="step-indicator__date body-small">{date}</span>}
             </span>
           </li>
         );

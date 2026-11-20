@@ -85,6 +85,11 @@ const CUSTOMER_ORDER_INCLUDE = {
       deal: {
         select: {
           images: true,
+          // Days after purchase the voucher can be redeemed — the only expiry signal that
+          // exists (see `voucher.service.ts`'s own doc comment: there is no stored per-voucher
+          // expiry date). Paired with `purchaseEntitlements.createdAt` below to compute
+          // `isExpired`; null means "no limit stated", never expired.
+          validityDays: true,
           mediaImages: {
             orderBy: DEAL_IMAGE_ORDER_BY,
             select: { storageKey: true, isPrimary: true, sortOrder: true },
@@ -121,6 +126,14 @@ const CUSTOMER_ORDER_INCLUDE = {
         orderBy: { sequenceNo: 'asc' as const },
         select: {
           ...ENTITLEMENT_BASE_SELECT,
+          // `createdAt` (voucher-issued time, i.e. payment success — never the Order's own
+          // createdAt) backs the `isExpired` computation below and is stripped before the
+          // response goes out. `shippedAt`/`completedAt` are the only two real product-delivery
+          // timestamps that exist anywhere (see this file's own `addCustomerOrderItemImages` doc
+          // comment) — exposed as-is for the customer's delivery timeline.
+          createdAt: true,
+          shippedAt: true,
+          completedAt: true,
           disputes: {
             orderBy: { createdAt: 'desc' as const },
             take: 1,
@@ -142,6 +155,23 @@ function firstLegacyImage(value: Prisma.JsonValue | null): string | null {
 
 function firstMediaImage(images: { storageKey: string; isPrimary: boolean }[]): string | null {
   return images.find((image) => image.isPrimary)?.storageKey ?? images[0]?.storageKey ?? null;
+}
+
+// Mirrors voucher.service.ts's own ACTIONABLE_ENTITLEMENT_STATUSES — expiry is only meaningful
+// while a voucher is still unredeemed; once COMPLETED/CANCELLED/REFUNDED it's moot.
+const UNREDEEMED_ENTITLEMENT_STATUSES = ['ACTIVE', 'STARTED', 'OTP_REQUESTED'] as const;
+
+/** True once `validityDays` have passed since the voucher was issued (payment success). `null`
+ *  `validityDays` means "no limit stated" — see CUSTOMER_ORDER_INCLUDE's `deal.validityDays`
+ *  doc comment; there is no other per-voucher expiry concept anywhere in the data model. */
+function isEntitlementExpired(
+  entitlementStatus: string,
+  createdAt: Date,
+  validityDays: number | null | undefined,
+): boolean {
+  if (validityDays == null || !UNREDEEMED_ENTITLEMENT_STATUSES.includes(entitlementStatus as never)) return false;
+  const deadline = new Date(createdAt.getTime() + validityDays * 24 * 60 * 60 * 1000);
+  return new Date() > deadline;
 }
 
 function addCustomerOrderItemImages(order: CustomerOrder) {
@@ -166,10 +196,12 @@ function addCustomerOrderItemImages(order: CustomerOrder) {
         image: getPublicImageUrl(imageKey),
         // Flatten PurchaseEntitlement.disputes (narrowed to the latest one, see
         // CUSTOMER_ORDER_INCLUDE above) into a single `dispute` to match apps/msd's
-        // `OrderItem['entitlements'][number]` shape exactly.
-        entitlements: purchaseEntitlements.map(({ disputes, ...entitlement }) => ({
+        // `OrderItem['entitlements'][number]` shape exactly. `createdAt` is consumed here only
+        // to compute `isExpired`, never sent over the wire.
+        entitlements: purchaseEntitlements.map(({ disputes, createdAt, ...entitlement }) => ({
           ...entitlement,
           dispute: disputes[0] ?? null,
+          isExpired: isEntitlementExpired(entitlement.entitlementStatus, createdAt, deal?.validityDays),
         })),
       };
     }),

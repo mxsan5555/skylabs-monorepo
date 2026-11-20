@@ -66,8 +66,135 @@ describe('getMyOrderOrThrow — entitlements exposure', () => {
     const order = await getMyOrderOrThrow(CUSTOMER_ID, ORDER_ID);
 
     expect(order.items[0].entitlements).toEqual([
-      { id: ENTITLEMENT_ID, voucherCode: 'MSD-DL-ABC', fulfilmentKind: 'SERVICE_SESSION', entitlementStatus: 'ACTIVE', dispute: null },
+      { id: ENTITLEMENT_ID, voucherCode: 'MSD-DL-ABC', fulfilmentKind: 'SERVICE_SESSION', entitlementStatus: 'ACTIVE', dispute: null, isExpired: false },
     ]);
+  });
+
+  it('exposes shippedAt/completedAt for a product entitlement, and never the raw entitlement createdAt', async () => {
+    prismaMock.order.findUnique.mockResolvedValue(
+      orderFixture({
+        items: [
+          {
+            id: 'item-1',
+            itemName: 'Aroma Candle',
+            deal: null,
+            product: null,
+            therapist: null,
+            purchaseEntitlements: [
+              {
+                id: ENTITLEMENT_ID,
+                voucherCode: 'MSD-PR-XYZ',
+                fulfilmentKind: 'PRODUCT_SHIPPED',
+                entitlementStatus: 'STARTED',
+                createdAt: new Date('2026-01-01T00:00:00Z'),
+                shippedAt: new Date('2026-01-03T00:00:00Z'),
+                completedAt: null,
+                disputes: [],
+              },
+            ],
+          },
+        ],
+      }) as never,
+    );
+
+    const order = await getMyOrderOrThrow(CUSTOMER_ID, ORDER_ID);
+    const entitlement = order.items[0].entitlements[0] as unknown as Record<string, unknown>;
+    expect(entitlement.shippedAt).toEqual(new Date('2026-01-03T00:00:00Z'));
+    expect(entitlement.completedAt).toBeNull();
+    expect(entitlement).not.toHaveProperty('createdAt');
+  });
+
+  it('marks a still-unredeemed voucher expired once validityDays have passed since it was issued', async () => {
+    prismaMock.order.findUnique.mockResolvedValue(
+      orderFixture({
+        items: [
+          {
+            id: 'item-1',
+            itemName: '60-min Massage',
+            deal: { validityDays: 30, images: null, mediaImages: [] },
+            product: null,
+            therapist: null,
+            purchaseEntitlements: [
+              {
+                id: ENTITLEMENT_ID,
+                voucherCode: 'MSD-DL-OLD',
+                fulfilmentKind: 'SERVICE_SESSION',
+                entitlementStatus: 'ACTIVE',
+                createdAt: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000),
+                shippedAt: null,
+                completedAt: null,
+                disputes: [],
+              },
+            ],
+          },
+        ],
+      }) as never,
+    );
+
+    const order = await getMyOrderOrThrow(CUSTOMER_ID, ORDER_ID);
+    expect((order.items[0].entitlements[0] as unknown as { isExpired: boolean }).isExpired).toBe(true);
+  });
+
+  it('never marks a COMPLETED voucher expired, even past validityDays — redemption already happened', async () => {
+    prismaMock.order.findUnique.mockResolvedValue(
+      orderFixture({
+        items: [
+          {
+            id: 'item-1',
+            itemName: '60-min Massage',
+            deal: { validityDays: 30, images: null, mediaImages: [] },
+            product: null,
+            therapist: null,
+            purchaseEntitlements: [
+              {
+                id: ENTITLEMENT_ID,
+                voucherCode: 'MSD-DL-DONE',
+                fulfilmentKind: 'SERVICE_SESSION',
+                entitlementStatus: 'COMPLETED',
+                createdAt: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000),
+                shippedAt: null,
+                completedAt: new Date(),
+                disputes: [],
+              },
+            ],
+          },
+        ],
+      }) as never,
+    );
+
+    const order = await getMyOrderOrThrow(CUSTOMER_ID, ORDER_ID);
+    expect((order.items[0].entitlements[0] as unknown as { isExpired: boolean }).isExpired).toBe(false);
+  });
+
+  it('never expires a voucher when the deal states no validity limit (validityDays null)', async () => {
+    prismaMock.order.findUnique.mockResolvedValue(
+      orderFixture({
+        items: [
+          {
+            id: 'item-1',
+            itemName: '60-min Massage',
+            deal: { validityDays: null, images: null, mediaImages: [] },
+            product: null,
+            therapist: null,
+            purchaseEntitlements: [
+              {
+                id: ENTITLEMENT_ID,
+                voucherCode: 'MSD-DL-NOLIMIT',
+                fulfilmentKind: 'SERVICE_SESSION',
+                entitlementStatus: 'ACTIVE',
+                createdAt: new Date('2020-01-01T00:00:00Z'),
+                shippedAt: null,
+                completedAt: null,
+                disputes: [],
+              },
+            ],
+          },
+        ],
+      }) as never,
+    );
+
+    const order = await getMyOrderOrThrow(CUSTOMER_ID, ORDER_ID);
+    expect((order.items[0].entitlements[0] as unknown as { isExpired: boolean }).isExpired).toBe(false);
   });
 
   it('flattens the latest dispute onto `dispute`, never an array, and never raw OTP/payout fields', async () => {

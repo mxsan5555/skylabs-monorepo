@@ -43,19 +43,21 @@ export interface OrderItem {
   durationMinutes: number | null;
   image?: string | null;
   /**
-   * KNOWN GAP: one row per redeemable voucher (`PurchaseEntitlement` — see
-   * `api/rbac/settlements.ts`), surfaced here so a customer can see their own voucher code/status
-   * and raise an issue against a specific one. Optional because the backend does not populate it
-   * yet — `order.service.ts`'s `CUSTOMER_ORDER_INCLUDE` doesn't join `PurchaseEntitlement`, and
-   * there is no `GET /orders/me/:id`-equivalent that returns it. The UI below degrades to
-   * rendering nothing extra until that backend include is added; do not remove this field when
-   * that happens — just drop this comment.
+   * One row per redeemable voucher (`PurchaseEntitlement`), so a customer can see their own
+   * voucher status and raise an issue against a specific one. `shippedAt`/`completedAt` are the
+   * only two real product-delivery timestamps anywhere in the data model — `completedAt` is a
+   * vendor-recorded "delivery evidence" step, not a courier-confirmed delivery. `isExpired` is
+   * computed server-side from the deal's `validityDays` + the voucher's issue date; always
+   * `false` once the status leaves ACTIVE/STARTED/OTP_REQUESTED (redemption already happened).
    */
   entitlements?: {
     id: string;
     voucherCode: string;
     fulfilmentKind: 'SERVICE_SESSION' | 'PRODUCT_PICKUP' | 'PRODUCT_SHIPPED';
     entitlementStatus: 'ACTIVE' | 'STARTED' | 'OTP_REQUESTED' | 'COMPLETED' | 'CANCELLED' | 'REFUNDED';
+    shippedAt: string | null;
+    completedAt: string | null;
+    isExpired: boolean;
     dispute?: { id: string; status: 'OPEN' | 'UNDER_REVIEW' | 'RESOLVED'; resolutionType?: 'NO_ACTION' | 'REFUNDED' | 'OTHER' | null } | null;
   }[];
 }
