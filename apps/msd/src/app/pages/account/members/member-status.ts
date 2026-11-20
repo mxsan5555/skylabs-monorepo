@@ -30,7 +30,7 @@ export function activityText(item: ActivityItem): string {
     return `Status changed from ${MEMBER_STATUS_LABEL[item.fromStatus]} to ${MEMBER_STATUS_LABEL[item.toStatus]}${by}`;
   }
   if (item.kind === 'document' && isDocumentType(item.documentType) && item.event) {
-    const byStaff = item.event === 'uploaded' && item.byStaff ? ' by staff for the member' : '';
+    const byStaff = item.event === 'uploaded' && item.byStaff ? ' by staff for the vendor' : '';
     return `${MEMBER_DOCUMENT_LABEL[item.documentType]} ${item.event}${byStaff}`;
   }
   return item.summary;
@@ -116,8 +116,8 @@ export interface StatusActionOption {
 }
 
 /** Why the next step is not available yet (item 6). Mirrors the msd-api status machine. */
-export const MAKE_INACTIVE_FIRST = 'Make the member inactive first.';
-export const SUSPEND_FIRST = 'Suspend the member first.';
+export const MAKE_INACTIVE_FIRST = 'Make the vendor inactive first.';
+export const SUSPEND_FIRST = 'Suspend the vendor first.';
 
 /**
  * Header actions for a member's status (item 6): Active, then Inactive, then Suspended, then

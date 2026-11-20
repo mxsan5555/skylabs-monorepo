@@ -43,7 +43,7 @@ const CONTENT_MENU_KEYS = [
 const CONTENT_SINGLETON_MENU_KEYS = ['cms.about-us', 'cms.contact-us', 'cms.website-pages'];
 
 export const RBAC_RESOURCE_CATALOG: RbacResourceDefinition[] = [
-  { key: 'members', menuKeys: ['members'], title: 'Members', actions: ['view', 'create', 'edit', 'delete'] },
+  { key: 'members', menuKeys: ['members'], title: 'Vendors', actions: ['view', 'create', 'edit', 'delete'] },
   { key: 'branches', menuKeys: ['vendors.branches'], title: 'Branches', actions: ['view', 'create', 'edit', 'delete'] },
   { key: 'deals', menuKeys: ['vendors.deals'], title: 'Deals', actions: ['view', 'create', 'edit', 'delete'] },
   { key: 'therapists', menuKeys: ['vendors.therapists'], title: 'Therapists', actions: ['view', 'create', 'edit', 'delete'] },

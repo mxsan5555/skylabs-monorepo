@@ -21,10 +21,10 @@ const DEAL_COLUMNS = JSON.stringify([
   { key: 'Created', label: 'Created', type: 'date' },
 ]);
 
-/** Edit opens the one deal form (PLANNING §2.7); View member opens the member page. */
+/** Edit opens the one deal form (PLANNING §2.7); View vendor opens the vendor page. */
 const DEAL_ACTIONS = JSON.stringify([
   { icon: 'edit', label: 'Edit deal', event: 'edit-deal' },
-  { icon: 'open_in_new', label: 'View member', event: 'view-vendor' },
+  { icon: 'open_in_new', label: 'View vendor', event: 'view-vendor' },
 ]);
 
 /** "From ₹X" for a deal with 2+ active packages, the single package's price for exactly one, or
@@ -74,8 +74,8 @@ interface TableParams {
 
 const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 10, search: '' };
 
-/** Cross-vendor Deals sidebar page: every deal of every member. "Edit deal" opens the deal form,
- *  "View member" the member page. Mirrors orders.tsx's <sky-data-table> pattern. */
+/** Cross-vendor Deals sidebar page: every deal of every vendor. "Edit deal" opens the deal form,
+ *  "View vendor" the vendor page. Mirrors orders.tsx's <sky-data-table> pattern. */
 export function DealList() {
   const { token } = useAuth();
   const navigate = useNavigate();

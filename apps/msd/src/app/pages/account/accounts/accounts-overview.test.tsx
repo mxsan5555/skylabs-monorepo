@@ -139,7 +139,7 @@ describe('AccountsOverviewPage — populated state', () => {
     const readyBanner = ctaBanners().find((el) => (attr(el, 'headline') ?? '').includes('ready for payout'));
     expect(readyBanner).toBeTruthy();
     expect(attr(readyBanner!, 'headline')).toBe('₹400 ready for payout');
-    expect(attr(readyBanner!, 'text')).toContain('2 members eligible');
+    expect(attr(readyBanner!, 'text')).toContain('2 vendors eligible');
     expect(attr(readyBanner!, 'cta-href')).toBe('/account/accounts/member-settlements?status=ready');
   });
 
@@ -195,7 +195,7 @@ describe('AccountsOverviewPage — Members ready for payout preview', () => {
     getAccountsOverviewMock.mockResolvedValue({ data: POPULATED_OVERVIEW });
     listMemberSettlementsMock.mockResolvedValue({ data: [] });
     renderPage();
-    expect(await screen.findByText('No member is currently ready for payout.', {}, LONG)).toBeTruthy();
+    expect(await screen.findByText('No vendor is currently ready for payout.', {}, LONG)).toBeTruthy();
   });
 
   it('shows an error state with Retry when the preview table fails to load', async () => {

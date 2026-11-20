@@ -413,7 +413,7 @@ export async function recordMemberPayout(
   const vendor = await prisma.member.findUnique({ where: { id: vendorId } });
   if (!vendor) throw new ApiError('NOT_FOUND', 'Vendor not found');
   if (!vendor.bankAccountNumber || !vendor.bankIfsc || !vendor.bankAccountHolder) {
-    throw new ApiError('VALIDATION_ERROR', "This member's bank details are incomplete — add them before recording a payout.");
+    throw new ApiError('VALIDATION_ERROR', "This vendor's bank details are incomplete — add them before recording a payout.");
   }
 
   const now = new Date();

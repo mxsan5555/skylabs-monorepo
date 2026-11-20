@@ -139,7 +139,7 @@ describe('changeMemberStatus', () => {
     prismaMock.member.updateMany.mockResolvedValue({ count: 0 } as never);
     await expect(changeMemberStatus('m1', 'INACTIVE', REASON, ACTOR)).rejects.toMatchObject({
       code: 'CONFLICT',
-      message: 'The member status changed. Reload and try again.',
+      message: 'The vendor status changed. Reload and try again.',
     });
     expect(prismaMock.memberStatusHistory.create).not.toHaveBeenCalled();
     expect(prismaMock.auditLog.create).not.toHaveBeenCalled();

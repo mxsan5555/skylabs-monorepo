@@ -83,7 +83,7 @@ export function MemberSettlementDetailPage() {
         setVendor(v);
         setLoadError('');
       } catch (err) {
-        if (!silent) setLoadError(err instanceof ApiRequestError ? err.message : 'Could not load this member’s settlement.');
+        if (!silent) setLoadError(err instanceof ApiRequestError ? err.message : 'Could not load this vendor’s settlement.');
       } finally {
         if (!silent) setLoading(false);
       }
@@ -95,10 +95,10 @@ export function MemberSettlementDetailPage() {
     load();
   }, [load]);
 
-  const name = vendor?.businessName ?? detail?.vendor.businessName ?? 'Member';
+  const name = vendor?.businessName ?? detail?.vendor.businessName ?? 'Vendor';
   useSetBreadcrumbs([
     { label: 'Accounts' },
-    { label: 'Member Settlements', to: '/account/accounts/member-settlements' },
+    { label: 'Vendor Settlements', to: '/account/accounts/member-settlements' },
     { label: name },
   ]);
 
@@ -199,15 +199,15 @@ export function MemberSettlementDetailPage() {
   if (loading) {
     return (
       <div className="admin-page admin-page--wide">
-        <p className="loading-state">Loading member settlement…</p>
+        <p className="loading-state">Loading vendor settlement…</p>
       </div>
     );
   }
   if (loadError || !detail) {
     return (
       <div className="admin-page admin-page--wide">
-        <p className="error-state" role="alert">{loadError || 'Member settlement not found.'}</p>
-        <Link to="/account/accounts/member-settlements">Back to Member Settlements</Link>
+        <p className="error-state" role="alert">{loadError || 'Vendor settlement not found.'}</p>
+        <Link to="/account/accounts/member-settlements">Back to Vendor Settlements</Link>
       </div>
     );
   }
@@ -216,7 +216,7 @@ export function MemberSettlementDetailPage() {
 
   return (
     <div className="admin-page admin-page--wide">
-      <title>{`${name} · Member Settlement · MSD`}</title>
+      <title>{`${name} · Vendor Settlement · MSD`}</title>
       <header className="page-head">
         <div>
           <h1>{name}</h1>
@@ -272,7 +272,7 @@ export function MemberSettlementDetailPage() {
       <section aria-labelledby="statement-title">
         <h2 id="statement-title" className="section-title">Order-wise statement ({detail.statement.length})</h2>
         {detail.statement.length === 0 ? (
-          <p className="empty-state">No vouchers yet for this member.</p>
+          <p className="empty-state">No vouchers yet for this vendor.</p>
         ) : (
           <div className="data-table-wrap">
             <table className="data-table">
@@ -284,7 +284,7 @@ export function MemberSettlementDetailPage() {
                   <th scope="col">Status</th>
                   <th scope="col">Gross</th>
                   <th scope="col">Commission</th>
-                  <th scope="col">Member share</th>
+                  <th scope="col">Vendor share</th>
                   <th scope="col">Settlement</th>
                 </tr>
               </thead>

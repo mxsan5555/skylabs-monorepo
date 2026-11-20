@@ -16,17 +16,17 @@ import { MEMBER_STATUS_LABEL } from './member-status';
 import { VendorBranches } from './vendor-branches';
 
 /**
- * Member Management. Two audiences share this one page/route (`/account/members`):
- *  - Staff (`members:view`): the member list with lifecycle filters. Each row opens that
- *    member's own page (`/account/members/:vendorId`).
- *  - Member (`members:custom` only, never `members:view`): "my business" self-service.
+ * Vendor Management. Two audiences share this one page/route (`/account/members`):
+ *  - Staff (`members:view`): the vendor list with lifecycle filters. Each row opens that
+ *    vendor's own page (`/account/members/:vendorId`).
+ *  - Vendor (`members:custom` only, never `members:view`): "my business" self-service.
  *    The server resolves ownership from the caller's JWT, never from a client-supplied id.
  */
 export function MemberManagement() {
   const { token, can } = useAuth();
   if (can('members', 'view')) return <AdminMemberManagement canCreate={can('members', 'create')} />;
   if (can('members', 'custom')) return <SelfVendorManagement token={token} />;
-  return <p className="empty-state">You do not have access to Member Management.</p>;
+  return <p className="empty-state">You do not have access to Vendor Management.</p>;
 }
 
 const isFilterableStatus = (value: string): value is (typeof FILTERABLE_STATUSES)[number] =>
@@ -80,7 +80,7 @@ function AdminMemberManagement({ canCreate }: { canCreate: boolean }) {
       setMembers(data);
       setTotal(meta?.total ?? data.length);
     } catch (err) {
-      setListError(err instanceof ApiRequestError ? err.message : 'Could not load members.');
+      setListError(err instanceof ApiRequestError ? err.message : 'Could not load vendors.');
     } finally {
       setLoading(false);
     }
@@ -97,23 +97,23 @@ function AdminMemberManagement({ canCreate }: { canCreate: boolean }) {
 
   return (
     <div className="admin-page admin-page--wide">
-      <title>Member Management · MSD</title>
+      <title>Vendor Management · MSD</title>
       <header className="page-head">
         <div>
-          <h1>Member Management</h1>
-          <p>Open a member to review their profile, documents and catalog.</p>
+          <h1>Vendor Management</h1>
+          <p>Open a vendor to review their profile, documents and catalog.</p>
         </div>
         <div className="page-head__actions">
           {canCreate && (
             <FilledButton onClick={() => navigate('/account/members/new')}>
               <Icon slot="icon" aria-hidden="true">add</Icon>
-              Add member
+              Add vendor
             </FilledButton>
           )}
         </div>
       </header>
 
-      <section className="" aria-label="Members">
+      <section className="" aria-label="Vendors">
         {listError && <p className="error-state" role="alert">{listError}</p>}
         <MemberList
           members={members}

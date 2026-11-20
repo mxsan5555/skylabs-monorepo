@@ -242,13 +242,13 @@ describe('BranchFormPage — Edit', () => {
     expect(screen.queryByText('Category Access')).toBeNull();
   });
 
-  it('shows the vendor\'s real business name in the breadcrumb, not the literal "Member"', async () => {
+  it('shows the vendor\'s real business name in the breadcrumb, not the literal "Vendor"', async () => {
     renderAt('/account/members/v1/branches/b1', { withTrail: true });
     await screen.findByRole('heading', { name: 'Edit branch' });
     expect(getVendorMock).toHaveBeenCalledWith('tok', 'v1');
     await waitFor(() =>
       expect(screen.getByTestId('trail').textContent).toBe(
-        'Members > All members(/account/members) > Vitality Wellness & Beauty(/account/members/v1) > Branches(/account/members/v1/branches) > Lower Parel Branch',
+        'Vendors > All vendors(/account/members) > Vitality Wellness & Beauty(/account/members/v1) > Branches(/account/members/v1/branches) > Lower Parel Branch',
       ),
     );
   });

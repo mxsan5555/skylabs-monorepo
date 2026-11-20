@@ -204,12 +204,12 @@ export async function runDocumentReminders(now: Date = new Date()): Promise<Remi
 /** "Remind now": one manual reminder, outside the schedule, at most once per cooldown window. */
 export async function sendManualReminder(memberId: string, actor: StatusActor, now: Date = new Date()): Promise<ManualReminderResult> {
   const member = await prisma.member.findUnique({ where: { id: memberId }, select: REMINDER_MEMBER_SELECT });
-  if (!member) throw new ApiError('NOT_FOUND', 'Member not found');
-  if (!isRemindable(member.status)) throw new ApiError('CONFLICT', 'Reminders go to active or inactive members only.');
+  if (!member) throw new ApiError('NOT_FOUND', 'Vendor not found');
+  if (!isRemindable(member.status)) throw new ApiError('CONFLICT', 'Reminders go to active or inactive vendors only.');
   const docs = documentsSummary(member.documents, member.documentsDueAt, now);
-  if (docs.complete) throw new ApiError('CONFLICT', 'This member has provided every document.');
+  if (docs.complete) throw new ApiError('CONFLICT', 'This vendor has provided every document.');
   const target = noticeTargetOf(member.owner);
-  if (noticeChannels(target).length === 0) throw new ApiError('CONFLICT', 'This member has no email or phone on record.');
+  if (noticeChannels(target).length === 0) throw new ApiError('CONFLICT', 'This vendor has no email or phone on record.');
 
   const last = await prisma.memberDocumentReminder.findFirst({
     where: { memberId, sequence: null },
@@ -217,7 +217,7 @@ export async function sendManualReminder(memberId: string, actor: StatusActor, n
     select: { createdAt: true },
   });
   if (manualReminderBlockedUntil(last?.createdAt ?? null, now)) {
-    throw new ApiError('RATE_LIMITED', `A reminder already went to this member in the last ${MANUAL_REMINDER_COOLDOWN_HOURS} hours.`);
+    throw new ApiError('RATE_LIMITED', `A reminder already went to this vendor in the last ${MANUAL_REMINDER_COOLDOWN_HOURS} hours.`);
   }
 
   const row = await prisma.memberDocumentReminder.create({

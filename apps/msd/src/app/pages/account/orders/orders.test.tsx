@@ -135,7 +135,7 @@ describe('OrderManagement — reworked row mapping', () => {
     expect(row.__customerId).toBe('cust-1');
   });
 
-  it('shows "+N more items" and "N members" for a multi-item, multi-vendor order', async () => {
+  it('shows "+N more items" and "N vendors" for a multi-item, multi-vendor order', async () => {
     const order: Order = {
       ...BASE_ORDER,
       id: 'order-2',
@@ -167,7 +167,7 @@ describe('OrderManagement — reworked row mapping', () => {
     await waitForTableLoaded(1);
     const [row] = tableRows();
     expect(row.Purchase).toBe('Swedish Massage +1 more item');
-    expect(row['Purchase Detail']).toBe('Mixed Order · 2 members');
+    expect(row['Purchase Detail']).toBe('Mixed Order · 2 vendors');
   });
 
   it('falls back to "Unknown customer"-style display and "—" phone when customer data is blank', async () => {
@@ -394,11 +394,11 @@ describe('OrderManagement — member filter from the address', () => {
     renderPage('/account/orders?vendorId=vendor-1');
     await waitForTableLoaded(1);
     expect(listOrdersMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ vendorId: 'vendor-1' }));
-    expect(screen.getByText("Showing one member's orders.")).toBeTruthy();
+    expect(screen.getByText("Showing one vendor's orders.")).toBeTruthy();
 
     fireEvent.click(screen.getByRole('link', { name: 'Show all orders' }));
     await waitFor(() => expect(listOrdersMock).toHaveBeenLastCalledWith(expect.anything(), expect.not.objectContaining({ vendorId: 'vendor-1' })));
-    expect(screen.queryByText("Showing one member's orders.")).toBeNull();
+    expect(screen.queryByText("Showing one vendor's orders.")).toBeNull();
   });
 
   it('sends no vendorId and shows no filter note without the parameter', async () => {
@@ -406,6 +406,6 @@ describe('OrderManagement — member filter from the address', () => {
     renderPage();
     await waitForTableLoaded(1);
     expect(listOrdersMock).toHaveBeenCalledWith(expect.anything(), expect.not.objectContaining({ vendorId: expect.anything() }));
-    expect(screen.queryByText("Showing one member's orders.")).toBeNull();
+    expect(screen.queryByText("Showing one vendor's orders.")).toBeNull();
   });
 });

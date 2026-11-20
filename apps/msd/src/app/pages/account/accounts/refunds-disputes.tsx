@@ -225,7 +225,7 @@ export function RefundsDisputesPage() {
             <thead>
               <tr>
                 <th scope="col">Voucher</th>
-                <th scope="col">Member</th>
+                <th scope="col">Vendor</th>
                 <th scope="col">Customer</th>
                 <th scope="col">Reason</th>
                 <th scope="col">Amount</th>

@@ -149,7 +149,7 @@ export function StateItemPicker({
         className: 'item-browser__search',
         type: 'search',
         label: `Search ${where}`,
-        placeholder: 'Title, member or branch',
+        placeholder: 'Title, vendor or branch',
         onInput: (e: ChangeEvent<HTMLElement & { value: string }>) => {
           setQuery(e.currentTarget.value);
           resetPaging();

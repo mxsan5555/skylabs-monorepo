@@ -7,7 +7,7 @@ import { listMemberSettlements, type MemberSettlementRow } from '../../../../api
 import { ApiRequestError } from '../../../../api/rbac/client';
 
 const COLUMNS = JSON.stringify([
-  { key: 'Member', label: 'Member', secondaryKey: 'Branch / City' },
+  { key: 'Vendor', label: 'Vendor', secondaryKey: 'Branch / City' },
   { key: 'Bank Reference', label: 'Bank Reference' },
   { key: 'Pending Fulfilment', label: 'Pending Fulfilment' },
   { key: 'On Hold', label: 'On Hold' },
@@ -20,7 +20,7 @@ const COLUMNS = JSON.stringify([
 // `sky-dt-row-action` at all (same drawer-trap bug fixed on `orders.tsx`'s "View" action;
 // discovered here on this file during this task since it meant the row click below never
 // actually navigated anywhere before this fix).
-const ACTIONS = JSON.stringify([{ icon: 'visibility', label: 'View', event: 'view-member' }]);
+const ACTIONS = JSON.stringify([{ icon: 'visibility', label: 'View', event: 'view-vendor' }]);
 
 /** `Vendor Id` is an extra (non-column) key — never rendered as its own column, just available
  *  for the row-action handler below, same convention as `orders.tsx`'s extra `__orderId` key.
@@ -28,7 +28,7 @@ const ACTIONS = JSON.stringify([{ icon: 'visibility', label: 'View', event: 'vie
  *  detail-page-only (never shipped to this list). */
 function toRow(row: MemberSettlementRow): Record<string, string | number> {
   return {
-    Member: row.businessName ?? 'Draft member',
+    Vendor: row.businessName ?? 'Draft vendor',
     'Branch / City': [row.primaryBranchName, row.primaryBranchCity].filter(Boolean).join(' · ') || '—',
     'Bank Reference': row.bankReferenceMasked ?? (row.bankDetailsOnFile ? 'On file' : 'Missing'),
     'Pending Fulfilment': `₹${row.pendingFulfilment}`,
@@ -47,12 +47,12 @@ interface TableParams {
 
 const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 10, search: '' };
 
-/** Super-Admin "Member Settlements" list — vendor-wise aggregates from `GET
+/** Super-Admin "Vendor Settlements" list — vendor-wise aggregates from `GET
  *  /settlements/members`. Page/pageSize/search live in the URL (same reasoning as
- *  `customers.tsx`'s own doc comment: this list unmounts while a member's detail page is open,
+ *  `customers.tsx`'s own doc comment: this list unmounts while a vendor's detail page is open,
  *  so the browser's own Back button is what restores it). An initial `?status=ready` (the
  *  Accounts Overview "Review Payouts" deep link) is read once on mount and kept in the URL the
- *  same way — toggled off via the "Show all members" button below, never silently dropped on
+ *  same way — toggled off via the "Show all vendors" button below, never silently dropped on
  *  the next page/search change. */
 export function MemberSettlementsPage() {
   const { token } = useAuth();
@@ -115,7 +115,7 @@ export function MemberSettlementsPage() {
       setRows(data);
       setTotal(meta?.total ?? data.length);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not load member settlements.');
+      setError(err instanceof ApiRequestError ? err.message : 'Could not load vendor settlements.');
     } finally {
       setLoading(false);
     }
@@ -149,18 +149,18 @@ export function MemberSettlementsPage() {
 
   return (
     <div className="admin-page admin-page--wide">
-      <title>Member Settlements · MSD</title>
+      <title>Vendor Settlements · MSD</title>
       <meta name="robots" content="noindex" />
       <header className="page-head">
         <div>
-          <h1>Member Settlements</h1>
-          <p>Each member's pending, on-hold, ready-for-payout, and paid balances.</p>
+          <h1>Vendor Settlements</h1>
+          <p>Each vendor's pending, on-hold, ready-for-payout, and paid balances.</p>
         </div>
       </header>
 
       {readyOnly && (
         <p className="field-hint" role="status">
-          Showing only members ready for payout. <TextButton onClick={clearReadyFilter}>Show all members</TextButton>
+          Showing only vendors ready for payout. <TextButton onClick={clearReadyFilter}>Show all vendors</TextButton>
         </p>
       )}
 
@@ -168,7 +168,7 @@ export function MemberSettlementsPage() {
 
       <sky-data-table
         ref={tableRef as RefObject<HTMLElement>}
-        caption="Member Settlements"
+        caption="Vendor Settlements"
         columns={COLUMNS}
         rows={tableRows}
         total={total}
@@ -176,7 +176,7 @@ export function MemberSettlementsPage() {
         page-size={params.pageSize}
         loading={loading}
         searchable
-        search-placeholder="Search by member name…"
+        search-placeholder="Search by vendor name…"
         actions={ACTIONS}
       />
     </div>
