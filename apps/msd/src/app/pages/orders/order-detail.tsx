@@ -5,8 +5,7 @@ import { FilledButton, Icon, OutlinedButton } from '@skylabs-monorepo/shared-ui/
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { cancelMyOrder, getMyOrder, type Order } from '../../../api/orders';
 import { ApiRequestError } from '../../../api/rbac/client';
-import { fillTemplate, formatINR, formatLongDate, formatStreetAddress, orderNumber } from '../../../utils/format';
-import { lineFromOrderItem } from '../../../utils/cart-items';
+import { fillTemplate, formatINR, formatLongDate, orderNumber } from '../../../utils/format';
 import { PageSection } from '../../components/page-section/page-section';
 import { SplitLayout } from '../../components/split-layout/split-layout';
 import { SectionHead } from '../../components/section-head/section-head';
@@ -14,7 +13,7 @@ import { Breadcrumb } from '../../components/breadcrumb';
 import { StepIndicator } from '../../components/step-indicator/step-indicator';
 import { StatusPanel } from '../../components/status-panel/status-panel';
 import { SummaryPanel } from '../../components/summary-panel/summary-panel';
-import { PurchaseLineCard, PurchaseLineList } from '../../components/purchase-line-card/purchase-line-card';
+import { OrderItemCardList } from '../../components/order-item-card/order-item-card';
 import { useConfirmDialog } from '../../components/confirm-dialog';
 import { ORDER_STATUS_TONE } from './customer-order-card';
 import { Seo } from '../../seo/seo';
@@ -23,7 +22,6 @@ import content from '../../../content.json';
 const t = content.orderDetail;
 const TITLE_ID = 'order-detail-title';
 const ITEMS_ID = 'order-detail-items';
-const DELIVERY_ID = 'order-detail-delivery';
 const SUMMARY_ID = 'order-detail-summary';
 
 /** The steps of one order and the index of the current one (past the end = all done). */
@@ -36,8 +34,9 @@ function progressOf(order: Order): { steps: string[]; current: number } {
 
 /**
  * `/orders/:id`: one order. h1 with the short number, date and status; one progress list for the
- * whole order; notices for a failed payment or a refund; every line as a card with its own image,
- * member, branch and new-tab detail link; the delivery address; and an order summary beside it
+ * whole order; notices for a failed payment or a refund; every line as its own card (see
+ * `OrderItemCardList`) — a Deal/Therapist card shows a Redeemed/Not Redeemed/Expired badge, a
+ * Product card shows its own delivery timeline and address; and an order summary beside it
  * (payment, method, date, total, Pay / Download invoice / Cancel). Cancel asks in the app dialog.
  */
 export function OrderDetail() {
@@ -112,7 +111,6 @@ export function OrderDetail() {
   const progress = progressOf(order);
   const total = formatINR(Number(order.total));
   const canCancel = order.status === 'PENDING_PAYMENT' || order.status === 'CONFIRMED';
-  const hasProducts = order.items.some((item) => item.itemType === 'PRODUCT');
   const payNow = () => navigate('/checkout', { state: { orderId: order.id } });
 
   return (
@@ -196,21 +194,8 @@ export function OrderDetail() {
 
         <section aria-labelledby={ITEMS_ID}>
           <SectionHead id={ITEMS_ID} heading={t.itemsHeading} titleClassName="title-large" />
-          <PurchaseLineList>
-            {order.items.map((item) => (
-              <PurchaseLineCard key={item.id} line={lineFromOrderItem(item)} />
-            ))}
-          </PurchaseLineList>
+          <OrderItemCardList order={order} />
         </section>
-
-        {hasProducts && order.shippingAddress && (
-          <section aria-labelledby={DELIVERY_ID}>
-            <SectionHead id={DELIVERY_ID} heading={t.deliveryHeading} titleClassName="title-large" />
-            <p className="body-large">
-              {formatStreetAddress([order.shippingAddress, order.shippingCity, order.shippingState])} {order.shippingPincode}
-            </p>
-          </section>
-        )}
       </SplitLayout>
     </PageSection>
   );

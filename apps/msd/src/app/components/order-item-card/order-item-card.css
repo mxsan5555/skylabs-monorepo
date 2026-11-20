@@ -1,0 +1,148 @@
+/* Order Details page: one card per item, Deal/Therapist and Product each with their own
+   "extra" content below the shared image/title/vendor/price row. M3 roles only. */
+.order-item-cards {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.order-item-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-large);
+  background-color: var(--md-sys-color-surface);
+  list-style: none;
+}
+
+.order-item-card__media {
+  flex: none;
+  display: block;
+  inline-size: 96px;
+  block-size: 96px;
+  overflow: hidden;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background-color: var(--md-sys-color-surface-container);
+}
+
+.order-item-card__media img {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+.order-item-card__body {
+  flex: 1;
+  min-inline-size: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.order-item-card__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.order-item-card__details {
+  min-inline-size: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.order-item-card__kind {
+  justify-self: start;
+  padding: 2px 8px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background-color: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+.order-item-card__title,
+.order-item-card__vendor,
+.order-item-card__meta,
+.order-item-card__price {
+  margin: 0;
+}
+
+.order-item-card__title a {
+  color: var(--md-sys-color-on-surface);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.order-item-card__title a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.order-item-card__title a:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+  border-radius: var(--md-sys-shape-corner-extra-small);
+}
+
+.order-item-card__external {
+  --md-icon-size: 16px;
+  margin-inline-start: 4px;
+  vertical-align: middle;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.order-item-card__vendor {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.order-item-card__vendor md-icon {
+  --md-icon-size: 16px;
+}
+
+.order-item-card__meta {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.order-item-card__price {
+  flex: none;
+  color: var(--md-sys-color-on-surface);
+  font-variant-numeric: tabular-nums;
+}
+
+.order-item-card__extra {
+  display: grid;
+  gap: 12px;
+}
+
+.order-item-card__extra:empty {
+  display: none;
+}
+
+.order-item-card__address-heading {
+  margin: 0 0 4px;
+  color: var(--md-sys-color-on-surface);
+}
+
+.order-item-card__address p {
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Phones: a smaller image, and the top row stacks so the price never crowds the title. */
+@media (max-width: 480px) {
+  .order-item-card__media {
+    inline-size: 64px;
+    block-size: 64px;
+  }
+
+  .order-item-card__top {
+    flex-direction: column;
+  }
+}

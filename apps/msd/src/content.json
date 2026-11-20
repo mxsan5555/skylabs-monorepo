@@ -1245,6 +1245,17 @@
     },
     "itemsHeading": "Items",
     "deliveryHeading": "Delivery address",
+    "itemStatus": {
+      "redeemed": "Redeemed",
+      "notRedeemed": "Not Redeemed",
+      "expired": "Expired"
+    },
+    "deliveryProgress": {
+      "label": "Delivery progress",
+      "ordered": "Ordered",
+      "shipped": "Shipped",
+      "delivered": "Delivered"
+    },
     "summaryHeading": "Order summary",
     "rows": {
       "payment": "Payment",
@@ -1297,25 +1308,6 @@
     "errors": {
       "load": "Could not load this order.",
       "cancel": "Could not cancel this order."
-    },
-    "verification": {
-      "heading": "Voucher status",
-      "voucherLabel": "Voucher",
-      "statusLabel": "Status",
-      "disputeStatus": {
-        "OPEN": "Open",
-        "RESOLVED": "Resolved"
-      },
-      "raiseIssue": {
-        "cta": "Raise issue",
-        "success": "Issue raised successfully.",
-        "error": "Could not raise this issue.",
-        "dialogTitle": "Raise issue",
-        "reasonLabel": "Reason",
-        "descriptionLabel": "Description (optional)",
-        "cancel": "Cancel",
-        "submit": "Submit"
-      }
     },
     "cancelDialog": {
       "title": "Cancel order",
