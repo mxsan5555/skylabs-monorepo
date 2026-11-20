@@ -8,7 +8,15 @@
 import { getTokenStore } from '@skylabs-monorepo/shared-auth/react';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
-const tokenStore = getTokenStore('msd', API_BASE_URL);
+
+// Lazy: `getTokenStore` touches storage/`window` as soon as it runs, so calling it eagerly at
+// module scope breaks any test that mocks `@skylabs-monorepo/shared-auth/react` without also
+// stubbing it. `getTokenStore` already memoizes per `appPrefix`, so deferring to first use returns
+// the same singleton — this only changes when it's constructed, not what it is.
+let tokenStore: ReturnType<typeof getTokenStore> | null = null;
+function getStore(): ReturnType<typeof getTokenStore> {
+  return (tokenStore ??= getTokenStore('msd', API_BASE_URL));
+}
 
 export interface ApiMeta {
   total?: number;
@@ -81,7 +89,7 @@ async function request<T>(
   let { response, body } = await doFetch<T>(path, token, init);
 
   if (response.status === 401 && body?.error?.code === 'UNAUTHORIZED' && token) {
-    const refreshed = await tokenStore.refresh().catch(() => null);
+    const refreshed = await getStore().refresh().catch(() => null);
     if (refreshed) {
       ({ response, body } = await doFetch<T>(path, refreshed, init));
     }
