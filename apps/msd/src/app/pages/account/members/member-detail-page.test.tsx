@@ -186,8 +186,13 @@ describe('MemberDetailPage', () => {
   it('renders the nine tabs wired to one labelled tab panel', async () => {
     renderAt('/account/members/m1/documents');
     await waitFor(() => expect(screen.getByText('documents-tab')).toBeTruthy());
+<<<<<<< HEAD
     expect(tabs().map((t) => t.textContent?.trim())).toEqual(['Profile', 'Logo', 'Documents', 'Branches', 'Deals', 'Therapists', 'Products', 'Customers', 'Activity']);
     expect(document.querySelector('md-tabs')?.getAttribute('aria-label')).toBe('Vendor sections');
+=======
+    expect(tabs().map((t) => t.textContent?.trim())).toEqual(['Profile', 'Documents', 'Branches', 'Deals', 'Therapists', 'Products', 'Customers', 'Activity']);
+    expect(document.querySelector('md-tabs')?.getAttribute('aria-label')).toBe('Member sections');
+>>>>>>> parent of 26122574 (feat(A1): rename "member" to "vendor" in user-visible labels)
     const active = tab('Documents');
     const panel = screen.getByRole('tabpanel');
     expect(active.getAttribute('aria-controls')).toBe(panel.id);
@@ -224,7 +229,7 @@ describe('MemberDetailPage', () => {
   it('explains a suspended member', async () => {
     getMemberMock.mockResolvedValue({ data: { ...MEMBER, status: 'SUSPENDED', statusReason: 'Documents not completed' } });
     renderAt('/account/members/m1');
-    await waitFor(() => expect(screen.getByText(/This vendor cannot log in and the website hides their items\./)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/This member cannot log in and the website hides their items\./)).toBeTruthy());
     expect(screen.getByText(/Documents not completed/)).toBeTruthy();
   });
 
@@ -263,7 +268,7 @@ describe('MemberDetailPage', () => {
     fireEvent.click(screen.getByText('stub-change'));
     await waitFor(() => expect(screen.getByText('activity-tab 1')).toBeTruthy());
     expect(changeStatusMock).toHaveBeenCalledWith('t', 'm1', 'INACTIVE', 'Owner asked for a pause');
-    expect(document.querySelector('sky-snackbar')?.textContent).toContain('Vendor is inactive and view only.');
+    expect(document.querySelector('sky-snackbar')?.textContent).toContain('Member is inactive and view only.');
     expect(getMemberMock).toHaveBeenCalledTimes(2);
     await waitFor(() => expect(Array.from(document.querySelectorAll('sky-badge')).map((b) => b.textContent)).toContain('Inactive'));
   });
@@ -353,7 +358,7 @@ describe('MemberDetailPage', () => {
   it('shows an error when the member cannot load', async () => {
     getMemberMock.mockRejectedValue(new Error('boom'));
     renderAt('/account/members/m1');
-    expect((await screen.findByRole('alert')).textContent).toMatch(/Could not load this vendor/);
+    expect((await screen.findByRole('alert')).textContent).toMatch(/Could not load this member/);
   });
 });
 

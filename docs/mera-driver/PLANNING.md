@@ -209,3 +209,6 @@ with an old token; protected history is never hard-deleted.
 | M-D7 | Does `Assignment` need a state machine beyond Active, Ended, Cancelled? | open |
 | M-D8 | Retrofit real foreign keys on bookings, attendance and locations now or later? | open |
 | M-D9 | Is a `sky-data-table` dashboard enough for vendors and companies? | open |
+
+
+

@@ -48,13 +48,13 @@ type Tab = (typeof TABS)[number]['value'];
 const OWN_HEADING: ReadonlySet<Tab> = new Set(['branches', 'deals', 'therapists', 'products']);
 
 const STATUS_DONE: Record<'ACTIVE' | 'INACTIVE' | 'SUSPENDED', string> = {
-  ACTIVE: 'Vendor is active again.',
-  INACTIVE: 'Vendor is inactive and view only.',
-  SUSPENDED: 'Vendor suspended. We told them by email and SMS.',
+  ACTIVE: 'Member is active again.',
+  INACTIVE: 'Member is inactive and view only.',
+  SUSPENDED: 'Member suspended. We told them by email and SMS.',
 };
 
 /**
- * One vendor's page: `/account/members/:memberId[/:section]`. Status actions and the customer and
+ * One member's page: `/account/members/:memberId[/:section]`. Status actions and the customer and
  * order counts sit in the header, up to eight tabs below (Customers needs `customers:view`).
  * The tab strip is `md-tabs`, which supplies the ARIA tabs pattern (tablist and
  * tab roles, aria-selected, roving tabindex, Arrow, Home and End keys); this page adds the ids,
@@ -94,7 +94,7 @@ export function MemberDetailPage() {
         setMember(data);
         setLoadError('');
       } catch (err) {
-        if (!silent) setLoadError(err instanceof ApiRequestError ? err.message : 'Could not load this vendor.');
+        if (!silent) setLoadError(err instanceof ApiRequestError ? err.message : 'Could not load this member.');
       } finally {
         if (!silent) setLoading(false);
       }
@@ -106,14 +106,14 @@ export function MemberDetailPage() {
     if (canView) load();
   }, [canView, load]);
 
-  const name = member ? member.businessName || member.owner?.name || 'New vendor' : 'Vendor';
+  const name = member ? member.businessName || member.owner?.name || 'New member' : 'Member';
   useSetBreadcrumbs([...MEMBERS_TRAIL, { label: name }]);
 
-  if (!canView) return <p className="empty-state">You do not have access to Vendor Management.</p>;
+  if (!canView) return <p className="empty-state">You do not have access to Member Management.</p>;
   if (loading) {
     return (
       <div className="admin-page admin-page--wide">
-        <p className="loading-state">Loading vendor…</p>
+        <p className="loading-state">Loading member…</p>
       </div>
     );
   }
@@ -121,9 +121,9 @@ export function MemberDetailPage() {
     return (
       <div className="admin-page admin-page--wide">
         <p className="error-state" role="alert">
-          {loadError || 'Vendor not found.'}
+          {loadError || 'Member not found.'}
         </p>
-        <Link to="/account/members">Back to all vendors</Link>
+        <Link to="/account/members">Back to all members</Link>
       </div>
     );
   }
@@ -153,9 +153,9 @@ export function MemberDetailPage() {
   };
 
   const onDelete = async (reason: string) => {
-    // Delete always archives (item 6): nothing is erased and the vendor can be restored.
+    // Delete always archives (item 6): nothing is erased and the member can be restored.
     await deleteMember(token, member.id, reason);
-    showSnackbar('Vendor archived. Restore them any time from the Archived filter.');
+    showSnackbar('Member archived. Restore them any time from the Archived filter.');
     navigate('/account/members', { replace: true });
   };
 
@@ -210,13 +210,13 @@ export function MemberDetailPage() {
 
       {member.status === 'SUSPENDED' && (
         <p className="error-state" role="status">
-          This vendor cannot log in and the website hides their items.
+          This member cannot log in and the website hides their items.
           {member.statusReason ? ` Reason: ${member.statusReason}` : ''}
         </p>
       )}
       {member.status === 'INACTIVE' && (
         <p className="field-hint" role="status">
-          This vendor is inactive and view only. They can log in and look at everything but cannot change anything, and the
+          This member is inactive and view only. They can log in and look at everything but cannot change anything, and the
           website hides their items.
         </p>
       )}
@@ -232,7 +232,7 @@ export function MemberDetailPage() {
       <div className="admin-tabs-wrap">
         {createElement(
           'md-tabs',
-          { className: 'admin-tabs', 'aria-label': 'Vendor sections' },
+          { className: 'admin-tabs', 'aria-label': 'Member sections' },
           visibleTabs.map((t) =>
             createElement(
               'md-primary-tab',

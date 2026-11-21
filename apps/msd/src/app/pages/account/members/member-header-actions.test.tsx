@@ -53,7 +53,7 @@ describe('MemberHeaderActions', () => {
     const suspend = mustButton('Suspend');
     expect(suspend.disabled).toBe(true);
     const hint = document.getElementById(suspend.getAttribute('aria-describedby') ?? '');
-    expect(hint?.textContent).toBe('Make the vendor inactive first.');
+    expect(hint?.textContent).toBe('Make the member inactive first.');
     expect(button('Delete')).toBeUndefined();
   });
 
@@ -150,8 +150,8 @@ describe('MemberHeaderActions', () => {
   it('labels the confirm panel as a group named by an h2, with no h3 or feature card inside', () => {
     renderActions({ status: 'INACTIVE' });
     fireEvent.click(mustButton('Suspend'));
-    const group = screen.getByRole('group', { name: 'Suspend this vendor' });
-    expect(group.querySelector('h2')?.textContent).toBe('Suspend this vendor');
+    const group = screen.getByRole('group', { name: 'Suspend this member' });
+    expect(group.querySelector('h2')?.textContent).toBe('Suspend this member');
     expect(group.querySelector('h3, sky-feature-card')).toBeNull();
     expect(group.textContent).toMatch(/cannot log in/);
     expect(group.contains(reasonField())).toBe(true);

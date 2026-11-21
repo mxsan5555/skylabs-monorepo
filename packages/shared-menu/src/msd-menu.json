@@ -54,7 +54,7 @@
   },
   {
     "id": "vendors",
-    "title": "Vendors",
+    "title": "Members",
     "icon": "storefront",
     "permissionKey": "members.group",
     "parent": null,
@@ -62,7 +62,7 @@
     "children": [
       {
         "id": "member-list",
-        "title": "All vendors",
+        "title": "All members",
         "route": "/account/members",
         "permissionKey": "members",
         "parent": "vendors",
@@ -209,7 +209,7 @@
       },
       {
         "id": "accounts-member-settlements",
-        "title": "Vendor Settlements",
+        "title": "Member Settlements",
         "route": "/account/accounts/member-settlements",
         "permissionKey": "accounts.member-settlements",
         "parent": "accounts",
