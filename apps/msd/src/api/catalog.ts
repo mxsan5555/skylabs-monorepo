@@ -81,7 +81,15 @@ export interface CatalogDeal {
   images: string[] | null;
   category: CatalogCategory | null;
   subcategory: CatalogCategory | null;
-  vendor: { id: string; slug: string | null; businessName: string | null; city: string | null; logoUrl: string | null } | null;
+  vendor: {
+    id: string;
+    slug: string | null;
+    businessName: string | null;
+    city: string | null;
+    logoUrl: string | null;
+    mediaImages?: MediaImage[];
+    mediaVideo?: MediaVideo | null;
+  } | null;
   /** `latitude`/`longitude` are Decimal → string over the wire (same convention as
    *  originalPrice/salePrice below), and nullable — most branches don't have coordinates set
    *  yet. Never fabricate a value when these are null; treat as "location not available". */
@@ -131,7 +139,7 @@ export interface CatalogDealDetail extends Omit<CatalogDeal, 'packages' | 'branc
   packages: CatalogDealDetailPackage[];
   faqs: { id: string; question: string; answer: string }[];
   mediaImages?: (MediaImage & { altText?: string | null })[];
-  vendor: (NonNullable<CatalogDeal['vendor']> & { businessDescription: string | null; website: string | null; mediaImages?: MediaImage[] }) | null;
+  vendor: (NonNullable<CatalogDeal['vendor']> & { businessDescription: string | null; website: string | null }) | null;
   branch:
     | (NonNullable<CatalogDeal['branch']> & {
         addressLine2: string | null;
@@ -195,7 +203,15 @@ export interface CatalogVendorTherapist {
  *  `vendor`/`branch`, since a customer browsing Therapists directly never picks a Deal/vendor
  *  first (see msd-api's PUBLIC_THERAPIST_LISTING_SELECT doc comment). */
 export interface CatalogTherapist extends CatalogVendorTherapist {
-  vendor: { id: string; slug: string | null; businessName: string | null; city: string | null; logoUrl: string | null } | null;
+  vendor: {
+    id: string;
+    slug: string | null;
+    businessName: string | null;
+    city: string | null;
+    logoUrl: string | null;
+    mediaImages?: MediaImage[];
+    mediaVideo?: MediaVideo | null;
+  } | null;
   branch: { id: string; name: string; city: string | null; address: string | null; latitude: string | null; longitude: string | null } | null;
   /** See `CatalogDeal`'s identical field doc comment. */
   distanceKm?: number | null;
@@ -396,7 +412,15 @@ export interface CatalogProduct {
   discount: number | null;
   category: CatalogCategory | null;
   subcategory: CatalogCategory | null;
-  vendor: { id: string; slug: string | null; businessName: string | null; city: string | null; logoUrl: string | null } | null;
+  vendor: {
+    id: string;
+    slug: string | null;
+    businessName: string | null;
+    city: string | null;
+    logoUrl: string | null;
+    mediaImages?: MediaImage[];
+    mediaVideo?: MediaVideo | null;
+  } | null;
   mediaImages?: MediaImage[];
   mediaVideo?: MediaVideo | null;
   popularTags?: CatalogPopularTag[];

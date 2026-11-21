@@ -14,7 +14,7 @@ import {
 import { ApiRequestError } from '../../../api/rbac/client';
 import type { Coordinates } from '../../../location/geo';
 import { type DealCardDeal } from '../../components/deal-card';
-import { resolveDealMedia, resolveProductMedia, } from '../../../utils/media';
+import { primaryImage, resolveDealMedia, resolveProductMedia, resolveVendorMedia } from '../../../utils/media';
 import content from '../../../content.json';
 import { usePrerenderedData } from '../../../prerender-data/prerender-data';
 import type { HomeData } from '../../../prerender-data/loaders';
@@ -40,6 +40,7 @@ export function toDealCardDeal(deal: CatalogDeal): DealCardDeal {
     gallery: media.images.length > 0 ? media.images : undefined,
     video: media.video,
     providerName: deal.vendor?.businessName ?? undefined,
+    providerLogo: deal.vendor ? primaryImage(resolveVendorMedia(deal.vendor)) : undefined,
     location: deal.branch?.city ?? undefined,
     distance: deal.distanceKm != null ? Math.round(deal.distanceKm * 10) / 10 : undefined,
     price: salePrice,

@@ -14,6 +14,8 @@ interface SkyProductCardProps {
   tagIcon?: string;
   eyebrow?: string;
   eyebrowHref?: string;
+  eyebrowImage?: string;
+  eyebrowImageAlt?: string;
   heading?: string;
   location?: string;
   distance?: string;
@@ -37,6 +39,8 @@ const ATTRIBUTE_NAMES = {
   favoriteActive: 'favorite-active',
   tagIcon: 'tag-icon',
   eyebrowHref: 'eyebrow-href',
+  eyebrowImage: 'eyebrow-image',
+  eyebrowImageAlt: 'eyebrow-image-alt',
   scoreLabel: 'score-label',
   originalPrice: 'original-price',
   pricePrefix: 'price-prefix',

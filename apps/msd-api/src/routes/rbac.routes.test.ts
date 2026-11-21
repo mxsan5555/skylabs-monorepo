@@ -1004,7 +1004,7 @@ describe('GET /api/v1/rbac/bootstrap', () => {
       .get('/api/v1/rbac/bootstrap')
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['vendor'] }));
     expect(res.status).toBe(403);
-    expect(res.body.error.message).toContain('Your vendor account is suspended');
+    expect(res.body.error.message).toContain('Your member account is suspended');
   });
 
   it('does not 403 a SuperAdmin previewing a suspended Member (isPreview token)', async () => {

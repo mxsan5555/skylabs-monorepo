@@ -29,7 +29,7 @@ const ALLOWED_NEXT: Record<OrderStatus, OrderStatus[]> = {
 const ORDER_COLUMNS = JSON.stringify([
   { key: 'Order', label: 'Order', secondaryKey: 'Order Date', width: '150px' },
   { key: 'Customer', label: 'Customer', secondaryKey: 'Customer Phone' },
-  { key: 'Purchase', label: 'Purchase / Vendor', secondaryKey: 'Purchase Detail' },
+  { key: 'Purchase', label: 'Purchase / Member', secondaryKey: 'Purchase Detail' },
   { key: 'Amount', label: 'Amount' },
   {
     key: 'Payment Status',
@@ -98,7 +98,7 @@ function toOrderRow(order: Order): Record<string, string | number> {
     : '—';
 
   const memberLabel =
-    vendorIds.size > 1 ? `${vendorIds.size} vendors` : firstItem?.vendorNameSnapshot ?? order.vendorNameSnapshot;
+    vendorIds.size > 1 ? `${vendorIds.size} members` : firstItem?.vendorNameSnapshot ?? order.vendorNameSnapshot;
   const customerName =
     order.customer.name && order.customer.name !== order.customer.phone && order.customer.name !== order.customer.email
       ? order.customer.name
@@ -462,7 +462,7 @@ export function OrderManagement({ scope = 'admin', refreshKey = 0 }: { scope?: '
 
       {vendorIdParam && (
         <p className="field-hint">
-          Showing one vendor's orders.{' '}
+          Showing one member's orders.{' '}
           <Link className="text-link" to="/account/orders">
             Show all orders
           </Link>
@@ -478,7 +478,7 @@ export function OrderManagement({ scope = 'admin', refreshKey = 0 }: { scope?: '
           <sky-tile-card color="tertiary" icon="hourglass_top" icon-style="surface" headline={String(counts?.pendingPayment ?? '—')} text="Awaiting Payment" />
         </CardGrid>
         <p className="field-hint">
-          {scopedByFilter ? 'Totals within your current vendor/search filters.' : 'Totals across every order.'} Order/Payment status
+          {scopedByFilter ? 'Totals within your current member/search filters.' : 'Totals across every order.'} Order/Payment status
           filters never change these three numbers — they stay a stable count of what else you've filtered to.
         </p>
 
@@ -499,16 +499,16 @@ export function OrderManagement({ scope = 'admin', refreshKey = 0 }: { scope?: '
         {scope === 'admin' && (
           <>
             <OutlinedTextField
-              label="Search vendors"
+              label="Search members"
               value={vendorSearch}
               onInput={(e: Event) => setVendorSearch((e.target as HTMLInputElement).value)}
             />
             <OutlinedSelect
-              label="Vendor"
+              label="Member"
               value={params.vendorId}
               onChange={(e: Event) => updateFilter('vendorId', (e.target as HTMLSelectElement).value)}
             >
-              <SelectOption value=""><div slot="headline">All vendors</div></SelectOption>
+              <SelectOption value=""><div slot="headline">All members</div></SelectOption>
               {vendorOptions.map((v) => (
                 <SelectOption key={v.id} value={v.id}><div slot="headline">{v.businessName ?? v.id}</div></SelectOption>
               ))}

@@ -28,7 +28,7 @@ interface LinkItem {
 const count = (n: number) => n.toLocaleString('en-IN');
 
 const MEMBER_CARDS: StatCard[] = [
-  { key: 'members', label: 'All vendors', icon: 'storefront', widget: 'vendors-count', value: (s) => count(s.vendors), link: { to: '/account/members', menuKey: 'members' } },
+  { key: 'members', label: 'All members', icon: 'storefront', widget: 'vendors-count', value: (s) => count(s.vendors), link: { to: '/account/members', menuKey: 'members' } },
   { key: 'branches', label: 'Total branches', icon: 'location_on', value: (s) => count(s.branches), link: { to: '/account/branches', menuKey: 'vendors.branches' } },
   { key: 'deals', label: 'Total deals', icon: 'local_offer', value: (s) => count(s.deals), link: { to: '/account/deals', menuKey: 'vendors.deals' } },
   { key: 'products', label: 'Total products', icon: 'inventory_2', widget: 'products-count', value: (s) => count(s.products), link: { to: '/account/products', menuKey: 'products' } },
@@ -127,7 +127,7 @@ export function DashboardGroups({ stats, loading, widgetKeys }: DashboardGroupsP
   return (
     <>
       <div className="dashboard-pair">
-        <StatGroup title="Vendors" cards={MEMBER_CARDS.filter(visible)} stats={stats} loading={loading} />
+        <StatGroup title="Members" cards={MEMBER_CARDS.filter(visible)} stats={stats} loading={loading} />
         <StatGroup title="Customers" cards={CUSTOMER_CARDS.filter(visible)} stats={stats} loading={loading} />
       </div>
       {(quick.length > 0 || admin.length > 0) && (

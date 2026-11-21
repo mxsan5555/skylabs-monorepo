@@ -79,6 +79,45 @@ describe('sky-product-card', () => {
       const eyebrow = el.shadowRoot?.querySelector('.eyebrow');
       expect(eyebrow?.textContent?.trim()).toBe('Just Relax Spa');
     });
+
+    it('renders no avatar at all when eyebrowImage is unset — same element as before', async () => {
+      const el = createElement();
+      el.eyebrow = 'Just Relax Spa';
+      await el.updateComplete;
+      expect(el.shadowRoot?.querySelector('.eyebrow-row')).toBeNull();
+      expect(el.shadowRoot?.querySelector('.eyebrow-row__avatar')).toBeNull();
+      expect(el.shadowRoot?.querySelector('.eyebrow')?.textContent?.trim()).toBe('Just Relax Spa');
+    });
+
+    it('renders a logo avatar before the eyebrow text when eyebrowImage is set', async () => {
+      const el = createElement();
+      el.eyebrow = 'Just Relax Spa';
+      el.eyebrowImage = 'https://example.com/logo.png';
+      await el.updateComplete;
+      const row = el.shadowRoot?.querySelector('.eyebrow-row') as HTMLElement;
+      const avatar = row?.querySelector('img.eyebrow-row__avatar') as HTMLImageElement;
+      expect(avatar?.src).toBe('https://example.com/logo.png');
+      expect(avatar?.alt).toBe('');
+      expect(row?.querySelector('.eyebrow')?.textContent?.trim()).toBe('Just Relax Spa');
+    });
+
+    it('sets the avatar alt text from eyebrowImageAlt when given', async () => {
+      const el = createElement();
+      el.eyebrow = 'Priya Sharma';
+      el.eyebrowImage = 'https://example.com/logo.png';
+      el.eyebrowImageAlt = 'Just Relax Spa';
+      await el.updateComplete;
+      const avatar = el.shadowRoot?.querySelector('img.eyebrow-row__avatar') as HTMLImageElement;
+      expect(avatar?.alt).toBe('Just Relax Spa');
+    });
+
+    it('never shows an avatar with no eyebrow text, even if eyebrowImage is set', async () => {
+      const el = createElement();
+      el.eyebrowImage = 'https://example.com/logo.png';
+      await el.updateComplete;
+      expect(el.shadowRoot?.querySelector('.eyebrow-row')).toBeNull();
+      expect(el.shadowRoot?.querySelector('.eyebrow-row__avatar')).toBeNull();
+    });
   });
 
   describe('href prop', () => {

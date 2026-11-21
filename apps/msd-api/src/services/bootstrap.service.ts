@@ -22,7 +22,7 @@ export async function getBootstrap(tokenPayload: AccessTokenPayload): Promise<Bo
   if (!tokenPayload.isPreview) {
     const vendor = await prisma.member.findUnique({ where: { ownerUserId: user.id }, select: { status: true } });
     if (vendor?.status === 'SUSPENDED') {
-      throw new ApiError('FORBIDDEN', 'Your vendor account is suspended. Please contact support.');
+      throw new ApiError('FORBIDDEN', 'Your member account is suspended. Please contact support.');
     }
   }
 

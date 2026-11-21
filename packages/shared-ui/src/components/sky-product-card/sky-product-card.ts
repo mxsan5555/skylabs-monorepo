@@ -49,6 +49,9 @@ const TONAL_STATUS = { primary: 'success', secondary: 'info', tertiary: 'warning
  * is from where it is. Under it, the member (left-aligned) and the place row, each on one line
  * (the place truncates with an ellipsis; its full text stays in the accessibility tree). Use it
  * for services, with a heading and no description, to keep the card short and scannable.
+ * `eyebrow-image`: a small round avatar (e.g. the vendor's logo) before the eyebrow text. Omitted
+ * entirely when unset, so a card without one is unaffected; `eyebrow-image-alt` only needs a
+ * value when the image conveys something the eyebrow text doesn't already say.
  *
  * @example
  * <sky-product-card
@@ -75,6 +78,8 @@ export class SkyProductCard extends LitElement {
     tagIcon: { type: String, attribute: 'tag-icon' },
     eyebrow: { type: String },
     eyebrowHref: { type: String, attribute: 'eyebrow-href' },
+    eyebrowImage: { type: String, attribute: 'eyebrow-image' },
+    eyebrowImageAlt: { type: String, attribute: 'eyebrow-image-alt' },
     heading: { type: String },
     description: { type: String },
     priceFirst: { type: Boolean, attribute: 'price-first', reflect: true },
@@ -115,6 +120,14 @@ export class SkyProductCard extends LitElement {
   /** Optional link target for the eyebrow (e.g. vendor storefront). Renders the
    * eyebrow as its own anchor, independent of the card's stretched-link href. */
   declare eyebrowHref?: string;
+  /** Small round avatar shown before the eyebrow (e.g. the vendor's logo). Omitted entirely
+   *  (not even a placeholder) when absent — same "no logo, no broken image" rule as the vendor
+   *  storefront page itself. */
+  declare eyebrowImage?: string;
+  /** Alt text for `eyebrowImage`. Leave unset (renders `alt=""`) when the eyebrow text already
+   *  names what the image shows (redundant); set it when the image conveys something the visible
+   *  text doesn't (e.g. a therapist's own name is the eyebrow, not their vendor's). */
+  declare eyebrowImageAlt?: string;
   declare heading?: string;
   /** Supporting text under the heading. */
   declare description?: string;
@@ -274,6 +287,28 @@ export class SkyProductCard extends LitElement {
     .price__discount,
     .price__note {
       color: var(--md-sys-color-primary);
+    }
+    /* Wraps the eyebrow text with its optional logo avatar; text-only (no eyebrowImage) renders
+       the bare .eyebrow element unchanged, so this never affects a card without one. */
+    .eyebrow-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-inline-size: 0;
+      max-inline-size: 100%;
+    }
+    .eyebrow-row .eyebrow {
+      min-inline-size: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .eyebrow-row__avatar {
+      inline-size: 20px;
+      block-size: 20px;
+      border-radius: var(--md-sys-shape-corner-full);
+      object-fit: cover;
+      flex-shrink: 0;
     }
     /* Independently clickable link above the stretched card link. */
     a.eyebrow {
@@ -577,6 +612,17 @@ export class SkyProductCard extends LitElement {
       : html`<span class="eyebrow body-medium">${this.eyebrow}</span>`;
   }
 
+  /** The eyebrow, plus its optional logo avatar — a plain passthrough to `_renderEyebrow()` (no
+   *  extra wrapper at all) when there is no `eyebrowImage`, so a card without one renders
+   *  byte-for-byte as before. */
+  private _renderEyebrowRow() {
+    const eyebrow = this._renderEyebrow();
+    if (!this.eyebrowImage || eyebrow === nothing) return eyebrow;
+    return html`<span class="eyebrow-row"
+      ><img class="eyebrow-row__avatar" src=${this.eyebrowImage} alt=${this.eyebrowImageAlt ?? ''} loading="lazy" decoding="async" />${eyebrow}</span
+    >`;
+  }
+
   private _renderHeading() {
     return this.heading
       ? html`<h3 id=${this._headingId} class=${this.priceFirst ? 'heading title-medium clamp' : 'heading title-medium'}>
@@ -606,7 +652,7 @@ export class SkyProductCard extends LitElement {
         : nothing}
       ${hasPlace
         ? html`<div class="place">
-            ${this.eyebrow ? html`<span class="truncate">${this._renderEyebrow()}</span>` : nothing}
+            ${this.eyebrow ? html`<span class="truncate">${this._renderEyebrowRow()}</span>` : nothing}
             ${this.location || this.distance
               ? html`<div class="meta body-medium">
                   ${this.location
@@ -637,7 +683,7 @@ export class SkyProductCard extends LitElement {
             ${this._renderHeading()} ${this._renderDescription()}
             ${this.eyebrow
               ? // .meta spreads its items; the empty first item puts the eyebrow at the end.
-                html`<div class="meta"><span></span>${this._renderEyebrow()}</div>`
+                html`<div class="meta"><span></span>${this._renderEyebrowRow()}</div>`
               : nothing}
           </div>`
         : nothing}
@@ -698,7 +744,7 @@ export class SkyProductCard extends LitElement {
           ${this.priceFirst
             ? this._renderPriceFirstBody()
             : html`
-                ${this._renderTag()} ${this._renderEyebrow()} ${this._renderHeading()} ${this._renderDescription()}
+                ${this._renderTag()} ${this._renderEyebrowRow()} ${this._renderHeading()} ${this._renderDescription()}
                 ${this.location || this.distance
                   ? html`<div class="meta body-medium"><span>${this.location}</span>${this._renderDistance()}</div>`
                   : nothing}

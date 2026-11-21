@@ -81,7 +81,7 @@ describe('MemberDocumentsTab', () => {
   it('says "staff" when the uploader name is not known (P5-15)', async () => {
     listMock.mockResolvedValue({ data: [{ ...ROWS[0], uploadedByName: null }] });
     renderTab();
-    expect(await screen.findByText('Uploaded by staff for the vendor')).toBeTruthy();
+    expect(await screen.findByText('Uploaded by staff for the member')).toBeTruthy();
   });
 
   it('shows a row per required document with status, masked number and who uploaded', async () => {
@@ -91,7 +91,7 @@ describe('MemberDocumentsTab', () => {
     expect(screen.getByText('GST registration')).toBeTruthy();
     expect(screen.getByText('ABXXXXX34F')).toBeTruthy();
     // P5-15: the staff member's name when the API has it.
-    expect(screen.getByText('Uploaded by Priya for the vendor')).toBeTruthy();
+    expect(screen.getByText('Uploaded by Priya for the member')).toBeTruthy();
     expect(screen.getByText(/scan is blurry/i)).toBeTruthy();
     expect(screen.getByText('pan.pdf')).toBeTruthy();
     const badges = Array.from(document.querySelectorAll('sky-badge')).map((b) => b.textContent);
@@ -155,13 +155,13 @@ describe('MemberDocumentsTab', () => {
     expect(button('Confirm reject')).toBeUndefined();
   });
 
-  it('uploads a file for the vendor with the typed number', async () => {
+  it('uploads a file for the member with the typed number', async () => {
     renderTab();
     await waitFor(() => expect(screen.getByText('Aadhaar card')).toBeTruthy());
     type('Aadhaar number', '234567890123');
     const file = new File(['x'], 'aadhaar.pdf', { type: 'application/pdf' });
     fireEvent.change(screen.getByLabelText('Upload Aadhaar card file'), { target: { files: [file] } });
-    expect(await screen.findByText('Document uploaded for the vendor.')).toBeTruthy();
+    expect(await screen.findByText('Document uploaded for the member.')).toBeTruthy();
     expect(uploadMock).toHaveBeenCalledWith('t', 'm1', 'AADHAAR', file, 'aadhaar.pdf', '234567890123');
   });
 

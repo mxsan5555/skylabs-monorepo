@@ -62,7 +62,7 @@ export function validateMember(input: MemberCreateInput): FieldErrors {
   return errors;
 }
 
-/** Add vendor: the short form. The rest of the profile is completed on the detail page. */
+/** Add member: the short form. The rest of the profile is completed on the detail page. */
 export function MemberNewPage() {
   const { token, can } = useAuth();
   const navigate = useNavigate();
@@ -77,7 +77,7 @@ export function MemberNewPage() {
   const idBase = useId();
   const errorId = (key: FieldKey) => `${idBase}-${key}-error`;
 
-  useSetBreadcrumbs([...MEMBERS_TRAIL, { label: 'Add vendor' }]);
+  useSetBreadcrumbs([...MEMBERS_TRAIL, { label: 'Add member' }]);
 
   // Move focus to the first invalid field after a failed submit.
   useEffect(() => {
@@ -87,7 +87,7 @@ export function MemberNewPage() {
   }, [focusRequest, errors]);
 
   if (!can('members', 'create')) {
-    return <p className="empty-state">You do not have access to add a vendor.</p>;
+    return <p className="empty-state">You do not have access to add a member.</p>;
   }
 
   const set = (key: FieldKey) => (e: { currentTarget: { value: string } }) => {
@@ -109,9 +109,9 @@ export function MemberNewPage() {
     }
     // Valid form: ask before creating. Discard (or Escape) throws the entry away and leaves the page.
     const create = await confirm({
-      title: 'Create this vendor?',
-      message: `Create "${form.businessName.trim()}" as a new vendor? They are active straight away and get a welcome message.`,
-      confirmLabel: 'Create vendor',
+      title: 'Create this member?',
+      message: `Create "${form.businessName.trim()}" as a new member? They are active straight away and get a welcome message.`,
+      confirmLabel: 'Create member',
       cancelLabel: 'Discard',
     });
     if (!create) {
@@ -139,7 +139,7 @@ export function MemberNewPage() {
           setFormError(zodFormError(err.details) ?? err.message);
         }
       } else {
-        setFormError('Could not create the vendor. Try again.');
+        setFormError('Could not create the member. Try again.');
       }
     } finally {
       setSaving(false);
@@ -191,11 +191,11 @@ export function MemberNewPage() {
 
   return (
     <div className="admin-page admin-page--wide">
-      <title>Add vendor · MSD</title>
+      <title>Add member · MSD</title>
       <header className="page-head">
         <div>
-          <h1>Add vendor</h1>
-          <p>Create the vendor's login. They are active straight away and get a welcome message. You complete the rest of the profile next.</p>
+          <h1>Add member</h1>
+          <p>Create the member's login. They are active straight away and get a welcome message. You complete the rest of the profile next.</p>
         </div>
       </header>
 
@@ -205,7 +205,7 @@ export function MemberNewPage() {
         </p>
       )}
 
-      <form aria-label="Vendor details" noValidate onSubmit={submit} onKeyDown={submitOnEnter}>
+      <form aria-label="Member details" noValidate onSubmit={submit} onKeyDown={submitOnEnter}>
         <sky-feature-card color="surface" variant="filled" shape="medium">
           <section aria-labelledby={`${idBase}-business`} style={{ ...FILL_CARD, marginBlockEnd: 24 }}>
             <h2 id={`${idBase}-business`} className="title-medium" style={SECTION_HEADING}>
@@ -226,7 +226,7 @@ export function MemberNewPage() {
           </section>
           <div slot="actions" className="page-head__actions" style={{ ...FILL_CARD, justifyContent: 'flex-end' }}>
             {createElement('md-text-button', { type: 'button', disabled: saving, onClick: cancel }, 'Cancel')}
-            {createElement('md-filled-button', { type: 'submit', disabled: saving, onClick: submitFromButton }, 'Create vendor')}
+            {createElement('md-filled-button', { type: 'submit', disabled: saving, onClick: submitFromButton }, 'Create member')}
           </div>
         </sky-feature-card>
       </form>

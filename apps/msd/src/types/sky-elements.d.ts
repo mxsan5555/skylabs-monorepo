@@ -85,6 +85,10 @@ declare module 'react' {
         tag?: string;
         tagIcon?: string;
         eyebrow?: string;
+        /** Small round avatar (e.g. the vendor's logo) before the eyebrow text; omitted entirely
+         *  when unset. */
+        'eyebrow-image'?: string;
+        'eyebrow-image-alt'?: string;
         heading?: string;
         /** Supporting text under the heading. */
         description?: string;

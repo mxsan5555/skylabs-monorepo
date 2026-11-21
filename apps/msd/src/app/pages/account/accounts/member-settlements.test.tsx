@@ -82,12 +82,12 @@ describe('MemberSettlementsPage — "View" row action actually navigates (regres
 
     // Confirm the configured action is NOT the magic drawer-trap string.
     const actions = JSON.parse(table()?.getAttribute('actions') ?? '[]');
-    expect(actions).toEqual([{ icon: 'visibility', label: 'View', event: 'view-vendor' }]);
+    expect(actions).toEqual([{ icon: 'visibility', label: 'View', event: 'view-member' }]);
     expect(actions.some((a: { event: string }) => a.event === '__view_detail__')).toBe(false);
 
     fireEvent(
       table(),
-      new CustomEvent('sky-dt-row-action', { detail: { action: 'view-vendor', row: tableRows()[0] } }),
+      new CustomEvent('sky-dt-row-action', { detail: { action: 'view-member', row: tableRows()[0] } }),
     );
 
     expect(navigateMock).toHaveBeenCalledWith('/account/accounts/member-settlements/vendor-1');
@@ -98,7 +98,7 @@ describe('MemberSettlementsPage — "View" row action actually navigates (regres
     renderAt('/account/accounts/member-settlements');
     await waitFor(() => expect(table()?.getAttribute('total')).toBe('1'), LONG);
 
-    fireEvent(table(), new CustomEvent('sky-dt-row-action', { detail: { action: 'view-vendor', row: { Vendor: 'ABC Spa' } } }));
+    fireEvent(table(), new CustomEvent('sky-dt-row-action', { detail: { action: 'view-member', row: { Member: 'ABC Spa' } } }));
 
     expect(navigateMock).not.toHaveBeenCalled();
   });
@@ -117,7 +117,7 @@ describe('MemberSettlementsPage — ?status=ready round-trip', () => {
 
     await waitFor(() => expect(listMemberSettlementsMock).toHaveBeenCalled(), LONG);
     expect(listMemberSettlementsMock).toHaveBeenCalledWith('test-token', expect.objectContaining({ status: 'ready' }));
-    expect(await findByText(/Showing only vendors ready for payout/, {}, LONG)).toBeTruthy();
+    expect(await findByText(/Showing only members ready for payout/, {}, LONG)).toBeTruthy();
   });
 
   it('never passes status at all when the URL has no ?status=ready', async () => {
@@ -128,12 +128,12 @@ describe('MemberSettlementsPage — ?status=ready round-trip', () => {
     expect(call.status).toBeUndefined();
   });
 
-  it('"Show all vendors" clears the ready filter and re-fetches without it', async () => {
+  it('"Show all members" clears the ready filter and re-fetches without it', async () => {
     listMemberSettlementsMock.mockResolvedValue({ data: [ROW], meta: { total: 1 } });
     const { findByText } = renderAt('/account/accounts/member-settlements?status=ready');
     await waitFor(() => expect(listMemberSettlementsMock).toHaveBeenCalled(), LONG);
 
-    const clearButton = await findByText('Show all vendors', {}, LONG);
+    const clearButton = await findByText('Show all members', {}, LONG);
     fireEvent.click(clearButton);
 
     await waitFor(() => {

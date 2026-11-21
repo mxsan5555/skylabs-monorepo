@@ -43,7 +43,7 @@ function validReason(raw: string | undefined): string {
   return reason;
 }
 
-const STATUS_CHANGED = 'The vendor status changed. Reload and try again.';
+const STATUS_CHANGED = 'The member status changed. Reload and try again.';
 
 /** Throws 409 when a conditional write matched no row: someone moved the member first. */
 function assertWritten(result: { count: number }): void {
@@ -52,7 +52,7 @@ function assertWritten(result: { count: number }): void {
 
 async function loadMember(memberId: string) {
   const member = await prisma.member.findUnique({ where: { id: memberId }, select: MEMBER_SELECT });
-  if (!member) throw new ApiError('NOT_FOUND', 'Vendor not found');
+  if (!member) throw new ApiError('NOT_FOUND', 'Member not found');
   return member;
 }
 
@@ -156,7 +156,7 @@ export async function deleteMember(memberId: string, rawReason: string, actor: S
   const reason = validReason(rawReason);
   const member = await loadMember(memberId);
   if (member.status !== 'SUSPENDED') {
-    throw new ApiError('MEMBER_NOT_SUSPENDED', 'Suspend this vendor before deleting. The journey is Inactive, then Suspended, then Delete.');
+    throw new ApiError('MEMBER_NOT_SUSPENDED', 'Suspend this member before deleting. The journey is Inactive, then Suspended, then Delete.');
   }
 
   const now = new Date();
