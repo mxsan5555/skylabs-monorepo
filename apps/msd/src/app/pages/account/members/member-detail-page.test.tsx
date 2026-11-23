@@ -186,13 +186,8 @@ describe('MemberDetailPage', () => {
   it('renders the nine tabs wired to one labelled tab panel', async () => {
     renderAt('/account/members/m1/documents');
     await waitFor(() => expect(screen.getByText('documents-tab')).toBeTruthy());
-<<<<<<< HEAD
     expect(tabs().map((t) => t.textContent?.trim())).toEqual(['Profile', 'Logo', 'Documents', 'Branches', 'Deals', 'Therapists', 'Products', 'Customers', 'Activity']);
-    expect(document.querySelector('md-tabs')?.getAttribute('aria-label')).toBe('Vendor sections');
-=======
-    expect(tabs().map((t) => t.textContent?.trim())).toEqual(['Profile', 'Documents', 'Branches', 'Deals', 'Therapists', 'Products', 'Customers', 'Activity']);
     expect(document.querySelector('md-tabs')?.getAttribute('aria-label')).toBe('Member sections');
->>>>>>> parent of 26122574 (feat(A1): rename "member" to "vendor" in user-visible labels)
     const active = tab('Documents');
     const panel = screen.getByRole('tabpanel');
     expect(active.getAttribute('aria-controls')).toBe(panel.id);
