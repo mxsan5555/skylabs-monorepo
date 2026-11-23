@@ -97,7 +97,9 @@ describe('POST /api/v1/auth/otp/request', () => {
 describe('POST /api/v1/auth/otp/verify', () => {
   const identifier = 'verify-happy@example.com';
 
-  function mockPendingChallenge(overrides: Partial<{ attempts: number; expiresAt: Date; hashedOtp: string }> = {}) {
+  function mockPendingChallenge(
+    overrides: Partial<{ attempts: number; expiresAt: Date; hashedOtp: string; verifiedAt: Date | null }> = {},
+  ) {
     prismaMock.otpChallenge.findFirst.mockResolvedValue({
       id: OTP_CHALLENGE_ID,
       identifier,
@@ -199,6 +201,19 @@ describe('POST /api/v1/auth/otp/verify', () => {
       .send({ identifier: 'never-requested@example.com', otp: '123456' });
     expect(res.status).toBe(401);
     expect(res.body.error.message).toMatch(/No pending OTP/);
+    expect(res.body.error.details).toEqual({ reason: 'not_requested' });
+  });
+
+  it('returns a distinct "already used" reason for a replayed/double-submitted OTP, not "No pending OTP"', async () => {
+    mockPendingChallenge({ verifiedAt: new Date() });
+    const res = await request(app)
+      .post('/api/v1/auth/otp/verify')
+      .send({ identifier, otp: '123456' });
+    expect(res.status).toBe(401);
+    expect(res.body.error.message).toMatch(/already been used/);
+    expect(res.body.error.details).toEqual({ reason: 'already_used' });
+    // Already-consumed challenges are never re-marked or re-compared against.
+    expect(prismaMock.otpChallenge.update).not.toHaveBeenCalled();
   });
 
   it('rate-limits repeated dummy OTP failures without storing the fixed value', async () => {

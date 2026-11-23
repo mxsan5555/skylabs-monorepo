@@ -12,6 +12,14 @@ import content from '../../../content.json';
 // redirects); the URL-resolution logic itself is covered exhaustively by role-routing.test.ts,
 // and the post-verify `navigate(returnUrl ?? resolvePostLoginPath(bootstrap))` line was verified
 // by direct code review plus a live browser check (see PR notes).
+//
+// Same constraint applies to `otpErrorMessage`/`otpErrorNeedsResend` (the `details.reason` →
+// friendly-copy mapping added for the "No pending OTP" bug fix): every `reason` value
+// ('not_requested' | 'expired' | 'already_used' | 'too_many_attempts' | 'incorrect') is exercised
+// server-side in `apps/msd-api/src/routes/auth.routes.test.ts`; the mapping itself is a plain
+// switch verified by direct code review (confirmed dispatching a synthetic `input` event at the
+// host `md-outlined-text-field` does not reach `code` state under this test setup either, so the
+// same workaround used elsewhere in this file doesn't apply here).
 
 const navigateMock = vi.fn();
 vi.mock('react-router-dom', async (importOriginal) => {

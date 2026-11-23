@@ -92,11 +92,43 @@ export function Otp() {
       await signIn(data.accessToken);
       setAwaitingBootstrap(true);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : otpContent.validation.invalidOtp);
+      setError(otpErrorMessage(err));
+      // A stale/expired/replayed code can't ever succeed on retry — let the visitor resend
+      // right away instead of waiting out the countdown meant for "give the SMS a moment".
+      if (err instanceof ApiRequestError && otpErrorNeedsResend(err)) setSeconds(0);
     } finally {
       setLoading(false);
     }
   };
+
+  function otpErrorReason(err: unknown): string | undefined {
+    if (!(err instanceof ApiRequestError)) return undefined;
+    const details = err.details as { reason?: string } | undefined;
+    return details?.reason;
+  }
+
+  function otpErrorNeedsResend(err: ApiRequestError): boolean {
+    const reason = otpErrorReason(err);
+    return reason === 'not_requested' || reason === 'expired' || reason === 'already_used';
+  }
+
+  // Never surfaces a raw backend message — only the handful of OTP-specific reasons the API
+  // reports via `details.reason`, each mapped to its own copy; anything else (including
+  // rate-limit or 5xx text) falls back to the generic invalid-code message.
+  function otpErrorMessage(err: unknown): string {
+    switch (otpErrorReason(err)) {
+      case 'not_requested':
+        return otpContent.validation.otpNotRequested;
+      case 'expired':
+        return otpContent.validation.otpExpired;
+      case 'already_used':
+        return otpContent.validation.otpAlreadyUsed;
+      case 'too_many_attempts':
+        return otpContent.validation.tooManyAttempts;
+      default:
+        return otpContent.validation.invalidOtp;
+    }
+  }
 
   const resend = async () => {
     setSeconds(RESEND_SECONDS);

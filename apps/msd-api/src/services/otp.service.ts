@@ -189,9 +189,10 @@ export async function requestOtp(identifier: string, purpose: OtpPurpose): Promi
 }
 
 /**
- * Verifies the most recent unconsumed, unexpired OtpChallenge for (identifier, purpose is
- * ignored here — verify matches on identifier only per the spec's request shape) and marks
- * it consumed. Throws ApiError with a code the route maps to the documented 401s.
+ * Verifies the most recent OtpChallenge for `identifier` (purpose is ignored here — verify
+ * matches on identifier only per the spec's request shape) and marks it consumed. Throws
+ * ApiError with a `details.reason` ('not_requested' | 'already_used' | 'expired' |
+ * 'too_many_attempts' | 'incorrect') the frontend maps to a user-friendly message.
  */
 export async function verifyOtp(identifier: string, otp: string): Promise<void> {
   if (isPhoneIdentifier(identifier)) {
@@ -216,21 +217,33 @@ export async function verifyOtp(identifier: string, otp: string): Promise<void> 
     throw new ApiError('UNAUTHORIZED', 'Incorrect OTP');
   }
 
+  // Looks at the single latest challenge regardless of verifiedAt (not just `verifiedAt: null`)
+  // so a replayed/double-submitted code — the same OTP verified twice, e.g. a slow network retry
+  // or a double-tap on Verify — gets a distinct "already used" reason instead of being
+  // indistinguishable from "never requested one at all".
   const challenge = await prisma.otpChallenge.findFirst({
-    where: { identifier, verifiedAt: null },
+    where: { identifier },
     orderBy: { createdAt: 'desc' },
   });
 
   if (!challenge) {
-    throw new ApiError('UNAUTHORIZED', 'No pending OTP for this identifier');
+    throw new ApiError('UNAUTHORIZED', 'No pending OTP for this identifier', { reason: 'not_requested' });
+  }
+
+  if (challenge.verifiedAt) {
+    throw new ApiError('UNAUTHORIZED', 'This OTP has already been used. Please request a new one.', {
+      reason: 'already_used',
+    });
   }
 
   if (challenge.expiresAt.getTime() < Date.now()) {
-    throw new ApiError('UNAUTHORIZED', 'OTP has expired');
+    throw new ApiError('UNAUTHORIZED', 'OTP has expired', { reason: 'expired' });
   }
 
   if (challenge.attempts >= env.otpMaxAttempts) {
-    throw new ApiError('RATE_LIMITED', 'Too many incorrect attempts, request a new OTP');
+    throw new ApiError('RATE_LIMITED', 'Too many incorrect attempts, request a new OTP', {
+      reason: 'too_many_attempts',
+    });
   }
 
   const isMatch = await bcrypt.compare(otp, challenge.hashedOtp);
@@ -239,7 +252,7 @@ export async function verifyOtp(identifier: string, otp: string): Promise<void> 
       where: { id: challenge.id },
       data: { attempts: { increment: 1 } },
     });
-    throw new ApiError('UNAUTHORIZED', 'Incorrect OTP');
+    throw new ApiError('UNAUTHORIZED', 'Incorrect OTP', { reason: 'incorrect' });
   }
 
   await prisma.otpChallenge.update({
