@@ -4,17 +4,17 @@ import { PaginationQuerySchema } from './common.schema';
 
 extendZodWithOpenApi(z);
 
-/** Super-Admin-managed commission + hold-period + completion-OTP config — reuses the existing
- *  `system-settings` menu/permission (no new menu node, see msd-menu.json). Every field optional
- *  on the PATCH body — a partial update leaves the rest of the singleton row untouched. */
+/** Super-Admin-managed commission + hold-period config — reuses the existing `system-settings`
+ *  menu/permission (no new menu node, see msd-menu.json). Every field optional on the PATCH
+ *  body — a partial update leaves the rest of the singleton row untouched. The matching
+ *  `completionOtp*` columns on `FinanceSettings` are no longer configurable here — the
+ *  Completion-OTP system they backed was retired (see voucher.service.ts's `finishService`/
+ *  `markProductPickedUp`) — but are left in the schema, unused, rather than dropped. */
 export const FinanceSettingsUpdateSchema = z
   .object({
     defaultCommissionRatePercent: z.coerce.number().min(0).max(100).optional(),
     serviceHoldHours: z.coerce.number().int().min(0).optional(),
     productReturnHoldHours: z.coerce.number().int().min(0).optional(),
-    completionOtpExpiryMinutes: z.coerce.number().int().min(1).optional(),
-    completionOtpMaxAttempts: z.coerce.number().int().min(1).optional(),
-    completionOtpResendCooldownSeconds: z.coerce.number().int().min(0).optional(),
   })
   .strict()
   .openapi('FinanceSettingsUpdate');

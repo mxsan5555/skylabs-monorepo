@@ -29,9 +29,6 @@ export async function updateFinanceSettings(
     defaultCommissionRatePercent: number;
     serviceHoldHours: number;
     productReturnHoldHours: number;
-    completionOtpExpiryMinutes: number;
-    completionOtpMaxAttempts: number;
-    completionOtpResendCooldownSeconds: number;
   }>,
 ) {
   await getFinanceSettings(); // ensure the singleton row exists before a partial update
