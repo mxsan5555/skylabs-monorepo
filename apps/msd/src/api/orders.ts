@@ -58,6 +58,12 @@ export interface OrderItem {
     shippedAt: string | null;
     completedAt: string | null;
     isExpired: boolean;
+    /** The entitlement's own creation time (payment confirmation) — D40's QR block needs the
+     *  purchase date; not used by `isExpired` on the client, which stays server-computed. */
+    purchasedAt: string;
+    /** D40 — the QR's own, independent 30-day expiry. `null` for a `PRODUCT_PICKUP`/
+     *  `PRODUCT_SHIPPED` entitlement, which never gets a QR. */
+    qrExpiresAt: string | null;
     dispute?: { id: string; status: 'OPEN' | 'UNDER_REVIEW' | 'RESOLVED'; resolutionType?: 'NO_ACTION' | 'REFUNDED' | 'OTHER' | null } | null;
   }[];
 }

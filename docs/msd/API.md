@@ -457,6 +457,49 @@ Planned: `POST /orders/:id/cancel {reason}` (`orders:status_change`); `POST /ord
 for members (C-16); `PATCH /customers/:id/status {status: active|blocked, reason}` documented in
 OpenAPI.
 
+**Purchase Verification (vouchers)** — member-only, every route below router-wide guarded by
+`vendor-portal.orders:custom` (not previously listed in this table):
+
+| Method | Path | Guard |
+|---|---|---|
+| POST | `/api/v1/vouchers/verify` | `vendor-portal.orders:custom` |
+| GET | `/api/v1/vouchers/queue` | `vendor-portal.orders:custom` |
+| POST | `/api/v1/vouchers/:code/start` | `vendor-portal.orders:custom` |
+| POST | `/api/v1/vouchers/:code/request-completion-otp` | `vendor-portal.orders:custom` |
+| POST | `/api/v1/vouchers/:code/complete` | `vendor-portal.orders:custom` |
+| POST | `/api/v1/vouchers/:code/ship` | `vendor-portal.orders:custom` |
+| POST | `/api/v1/vouchers/:code/record-delivery-evidence` | `vendor-portal.orders:custom` |
+| POST | `/api/v1/vouchers/:code/redeem-qr` | `vendor-portal.orders:custom` |
+
+`POST /vouchers/verify` (`{ code: string }`, 1 to 64 characters, `.strict()`) is the one read both
+the existing wizard and the new QR scanner use — it never mutates. Response `entitlement` now also
+carries `purchasedAt` (ISO timestamp, the entitlement's own creation time) and `qrExpiresAt` (ISO
+timestamp or `null` — `null` for any non-`SERVICE_SESSION` entitlement, i.e. every product) and a
+derived `qrRedeemable` boolean (`true` only when `fulfilmentKind === 'SERVICE_SESSION'`,
+`entitlementStatus` is `ACTIVE` or `STARTED`, and `qrExpiresAt` is still in the future — computed
+fresh on every call, never cached or trusted from a prior response).
+
+**`POST /vouchers/:code/redeem-qr`** (D40) — the new, OTP-free redemption path. No request body.
+Response: the updated `PurchaseEntitlement` (same shape `startService`/`completeVoucher` already
+return). Validation and error cases, in the order they're checked:
+- Voucher code doesn't exist → 404 `NOT_FOUND`.
+- Caller has no vendor profile, or the voucher belongs to a different vendor → 403 `FORBIDDEN`
+  (same "never confirm existence to the wrong business" rule as every other voucher action).
+- `fulfilmentKind !== 'SERVICE_SESSION'` (a product entitlement) → 422 `VALIDATION_ERROR` — this
+  path never redeems a product, regardless of its state.
+- Not currently `ACTIVE` or `STARTED` (already `COMPLETED`, `CANCELLED`, or `REFUNDED`), or
+  `settlementStatus` is `VOID`/`DISPUTED_BLOCKED`, or the order isn't `CONFIRMED`/`COMPLETED`, or
+  `qrExpiresAt` is `null` or at/before the server's current time → 409 `CONFLICT`. These are all
+  checked atomically in one guarded `updateMany`, not as separate round trips, so two concurrent
+  calls for the same voucher can never both succeed — the loser always gets this 409, never a
+  partial write. The request body supplies no expiry or status value; the server is the only
+  source for all of them.
+- Success → `entitlementStatus: 'COMPLETED'`, `completedAt`, `redeemedByUserId` (the calling
+  member user), `settlementStatus: 'ON_HOLD'`, `holdUntil` set exactly as `completeVoucher` sets
+  them — the payout pipeline treats a QR redemption identically to an OTP-wizard completion.
+  Audited as `voucher.redeem_qr` against `PurchaseEntitlement`. Never reads or writes `Deal`,
+  `DealPackage`, `Therapist`, or `Branch` — the catalog listing is untouched.
+
 ## 4. Storefront
 
 | Method | Path | Guard |

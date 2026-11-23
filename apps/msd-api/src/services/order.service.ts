@@ -132,6 +132,10 @@ const CUSTOMER_ORDER_INCLUDE = {
           // timestamps that exist anywhere (see this file's own `addCustomerOrderItemImages` doc
           // comment) — exposed as-is for the customer's delivery timeline.
           createdAt: true,
+          // D40 — the QR's own, independent 30-day expiry (null for a product entitlement, which
+          // never gets a QR). Exposed as-is, unlike `createdAt`: it is not a secret, and the
+          // customer order page needs it to show the QR's expiry date/remaining validity.
+          qrExpiresAt: true,
           shippedAt: true,
           completedAt: true,
           disputes: {
@@ -196,11 +200,13 @@ function addCustomerOrderItemImages(order: CustomerOrder) {
         image: getPublicImageUrl(imageKey),
         // Flatten PurchaseEntitlement.disputes (narrowed to the latest one, see
         // CUSTOMER_ORDER_INCLUDE above) into a single `dispute` to match apps/msd's
-        // `OrderItem['entitlements'][number]` shape exactly. `createdAt` is consumed here only
-        // to compute `isExpired`, never sent over the wire.
+        // `OrderItem['entitlements'][number]` shape exactly. `createdAt` backs `isExpired` (as
+        // before) and is now ALSO sent over the wire as `purchasedAt` (D40 — the QR block needs
+        // the purchase date); `qrExpiresAt` passes through unchanged from the select above.
         entitlements: purchaseEntitlements.map(({ disputes, createdAt, ...entitlement }) => ({
           ...entitlement,
           dispute: disputes[0] ?? null,
+          purchasedAt: createdAt,
           isExpired: isEntitlementExpired(entitlement.entitlementStatus, createdAt, deal?.validityDays),
         })),
       };

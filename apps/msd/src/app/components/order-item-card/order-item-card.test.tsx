@@ -1,8 +1,10 @@
 import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Order, OrderItem } from '../../../api/orders';
 import content from '../../../content.json';
-import { DealOrderItemCard, ProductOrderItemCard, dealStatusOf, deliveryProgressOf, OrderItemCardList } from './order-item-card';
+import { DealOrderItemCard, ProductOrderItemCard, dealStatusOf, deliveryProgressOf, qrStatusOf, OrderItemCardList } from './order-item-card';
+
+vi.mock('qrcode', () => ({ toDataURL: () => Promise.resolve('data:image/png;base64,stub') }));
 
 const t = content.orderDetail;
 
@@ -111,8 +113,9 @@ describe('DealOrderItemCard', () => {
         <DealOrderItemCard
           item={{
             ...BASE_ITEM,
-            entitlements: [{ id: 'e1', voucherCode: 'A', fulfilmentKind: 'SERVICE_SESSION', entitlementStatus: 'COMPLETED', shippedAt: null, completedAt: null, isExpired: false }],
+            entitlements: [{ id: 'e1', voucherCode: 'A', fulfilmentKind: 'SERVICE_SESSION', entitlementStatus: 'COMPLETED', shippedAt: null, completedAt: null, isExpired: false, purchasedAt: '2026-10-29T10:00:00.000Z', qrExpiresAt: '2026-11-28T10:00:00.000Z' }],
           }}
+          order={ORDER}
         />
       </ul>,
     );
@@ -128,14 +131,141 @@ describe('DealOrderItemCard', () => {
         <DealOrderItemCard
           item={{
             ...BASE_ITEM,
-            entitlements: [{ id: 'e1', voucherCode: 'A', fulfilmentKind: 'SERVICE_SESSION', entitlementStatus: 'ACTIVE', shippedAt: null, completedAt: null, isExpired: true }],
+            entitlements: [{ id: 'e1', voucherCode: 'A', fulfilmentKind: 'SERVICE_SESSION', entitlementStatus: 'ACTIVE', shippedAt: null, completedAt: null, isExpired: true, purchasedAt: '2026-10-29T10:00:00.000Z', qrExpiresAt: '2020-01-01T00:00:00.000Z' }],
           }}
+          order={ORDER}
         />
       </ul>,
     );
     const badge = document.querySelector('sky-badge') as HTMLElement;
     expect(badge.getAttribute('status')).toBe('error');
     expect(badge.textContent).toBe(t.itemStatus.expired);
+  });
+});
+
+/**
+ * Feature: D40 — per-unit redemption QR on the customer order page
+ * Scenario: QR eligibility is derived purely from `entitlementStatus`/`qrExpiresAt`, independent
+ * of the deal's own `isExpired` (validityDays-based) status.
+ */
+describe('qrStatusOf', () => {
+  it('is "active" for an ACTIVE/STARTED entitlement whose qrExpiresAt is still in the future', () => {
+    expect(qrStatusOf({ entitlementStatus: 'ACTIVE', qrExpiresAt: '2099-01-01T00:00:00.000Z' })).toBe('active');
+    expect(qrStatusOf({ entitlementStatus: 'STARTED', qrExpiresAt: '2099-01-01T00:00:00.000Z' })).toBe('active');
+  });
+
+  it('is "redeemed" once COMPLETED, regardless of qrExpiresAt', () => {
+    expect(qrStatusOf({ entitlementStatus: 'COMPLETED', qrExpiresAt: '2020-01-01T00:00:00.000Z' })).toBe('redeemed');
+  });
+
+  it('is "expired" once qrExpiresAt has passed, even though the entitlement is still ACTIVE (never redeemed the OTP way either)', () => {
+    expect(qrStatusOf({ entitlementStatus: 'ACTIVE', qrExpiresAt: '2020-01-01T00:00:00.000Z' })).toBe('expired');
+  });
+
+  it('is null (no QR block) for CANCELLED or REFUNDED, even with a future qrExpiresAt', () => {
+    expect(qrStatusOf({ entitlementStatus: 'CANCELLED', qrExpiresAt: '2099-01-01T00:00:00.000Z' })).toBeNull();
+    expect(qrStatusOf({ entitlementStatus: 'REFUNDED', qrExpiresAt: '2099-01-01T00:00:00.000Z' })).toBeNull();
+  });
+
+  it('is null when there is no qrExpiresAt at all (defensive — a product line never reaches this path anyway)', () => {
+    expect(qrStatusOf({ entitlementStatus: 'ACTIVE', qrExpiresAt: null })).toBeNull();
+  });
+});
+
+describe('DealOrderItemCard — QR block', () => {
+  it('renders one QR block per purchased unit, each with its own order reference, purchase date and expiry', () => {
+    render(
+      <ul>
+        <DealOrderItemCard
+          item={{
+            ...BASE_ITEM,
+            quantity: 2,
+            entitlements: [
+              { id: 'e1', voucherCode: 'MSD-DL-AAA111', fulfilmentKind: 'SERVICE_SESSION', entitlementStatus: 'ACTIVE', shippedAt: null, completedAt: null, isExpired: false, purchasedAt: '2026-10-29T10:00:00.000Z', qrExpiresAt: '2099-01-01T00:00:00.000Z' },
+              { id: 'e2', voucherCode: 'MSD-DL-BBB222', fulfilmentKind: 'SERVICE_SESSION', entitlementStatus: 'ACTIVE', shippedAt: null, completedAt: null, isExpired: false, purchasedAt: '2026-10-29T10:00:00.000Z', qrExpiresAt: '2099-01-01T00:00:00.000Z' },
+            ],
+          }}
+          order={ORDER}
+        />
+      </ul>,
+    );
+    const blocks = document.querySelectorAll('.entitlement-qr');
+    expect(blocks).toHaveLength(2);
+    expect(document.body.textContent).toContain('ORD-' + ORDER.id.slice(-8).toUpperCase());
+  });
+
+  it('shows the Active status and a QR image for a still-valid voucher', async () => {
+    render(
+      <ul>
+        <DealOrderItemCard
+          item={{
+            ...BASE_ITEM,
+            entitlements: [{ id: 'e1', voucherCode: 'MSD-DL-AAA111', fulfilmentKind: 'SERVICE_SESSION', entitlementStatus: 'ACTIVE', shippedAt: null, completedAt: null, isExpired: false, purchasedAt: '2026-10-29T10:00:00.000Z', qrExpiresAt: '2099-01-01T00:00:00.000Z' }],
+          }}
+          order={ORDER}
+        />
+      </ul>,
+    );
+    expect(await screen.findByText(t.qr.status.active)).toBeTruthy();
+    const img = await screen.findByRole('img', { name: /MSD-DL-AAA111/ });
+    expect(img.getAttribute('src')).toMatch(/^data:image\/png/);
+  });
+
+  it('shows the Redeemed status with no QR image for a COMPLETED voucher', () => {
+    render(
+      <ul>
+        <DealOrderItemCard
+          item={{
+            ...BASE_ITEM,
+            entitlements: [{ id: 'e1', voucherCode: 'MSD-DL-AAA111', fulfilmentKind: 'SERVICE_SESSION', entitlementStatus: 'COMPLETED', shippedAt: null, completedAt: null, isExpired: false, purchasedAt: '2026-10-29T10:00:00.000Z', qrExpiresAt: '2026-11-28T10:00:00.000Z' }],
+          }}
+          order={ORDER}
+        />
+      </ul>,
+    );
+    const qrBlock = document.querySelector('.entitlement-qr') as HTMLElement;
+    expect(within(qrBlock).getByText(t.qr.status.redeemed)).toBeTruthy();
+    expect(document.querySelector('.entitlement-qr__image')).toBeNull();
+  });
+
+  it('shows the Expired status with no QR image once qrExpiresAt has passed', () => {
+    render(
+      <ul>
+        <DealOrderItemCard
+          item={{
+            ...BASE_ITEM,
+            entitlements: [{ id: 'e1', voucherCode: 'MSD-DL-AAA111', fulfilmentKind: 'SERVICE_SESSION', entitlementStatus: 'ACTIVE', shippedAt: null, completedAt: null, isExpired: false, purchasedAt: '2026-10-29T10:00:00.000Z', qrExpiresAt: '2020-01-01T00:00:00.000Z' }],
+          }}
+          order={ORDER}
+        />
+      </ul>,
+    );
+    expect(screen.getByText(t.qr.status.expired)).toBeTruthy();
+    expect(document.querySelector('.entitlement-qr__image')).toBeNull();
+  });
+
+  it('renders no QR block at all for a cancelled/refunded voucher', () => {
+    render(
+      <ul>
+        <DealOrderItemCard
+          item={{
+            ...BASE_ITEM,
+            entitlements: [{ id: 'e1', voucherCode: 'MSD-DL-AAA111', fulfilmentKind: 'SERVICE_SESSION', entitlementStatus: 'CANCELLED', shippedAt: null, completedAt: null, isExpired: false, purchasedAt: '2026-10-29T10:00:00.000Z', qrExpiresAt: '2099-01-01T00:00:00.000Z' }],
+          }}
+          order={ORDER}
+        />
+      </ul>,
+    );
+    expect(document.querySelector('.entitlement-qr')).toBeNull();
+  });
+
+  it('renders no QR block when the order has no entitlements yet (unpaid)', () => {
+    render(
+      <ul>
+        <DealOrderItemCard item={{ ...BASE_ITEM, entitlements: [] }} order={ORDER} />
+      </ul>,
+    );
+    expect(document.querySelector('.entitlement-qr')).toBeNull();
   });
 });
 

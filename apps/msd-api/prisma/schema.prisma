@@ -1886,6 +1886,13 @@ model PurchaseEntitlement {
   preDisputeStatus         SettlementStatus?
   holdUntil                DateTime?
   payoutItemId             String?
+  // D40 — QR redemption. Set once, at creation, only for a SERVICE_SESSION entitlement
+  // (createdAt + 30 days); null for a product entitlement, which never gets a QR. Independent of
+  // Deal.validityDays (display-only, computed per read, never stored here) — see PLANNING.md §3.
+  qrExpiresAt              DateTime?
+  // Who closed this entitlement via the QR one-tap path (redeemViaQr); null if closed the
+  // existing OTP-wizard way (completeVoucher) or not yet closed.
+  redeemedByUserId         String?
   createdAt                DateTime               @default(now())
   updatedAt                DateTime               @updatedAt
   orderItem                OrderItem              @relation(fields: [orderItemId], references: [id], onDelete: Cascade)

@@ -7,10 +7,12 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getVoucherQueue, type VoucherQueueRow } from '../../../../api/rbac/vouchers';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { OrderManagement } from '../orders/orders';
+import { ScanQrPanel } from './scan-qr-panel';
 
 const TABS = [
   { key: 'history', label: 'Order History' },
   { key: 'verify', label: 'Verify & Complete' },
+  { key: 'scan', label: 'Scan QR' },
 ] as const;
 type TabKey = (typeof TABS)[number]['key'];
 
@@ -91,6 +93,8 @@ const DEFAULT_QUEUE_PARAMS: QueueParams = { page: 1, pageSize: 10, search: '' };
  * - **Verify & Complete**: a voucher-code lookup (content-sized button, never full-width) plus
  *   the backend-sourced Service Queue (`GET /vouchers/queue`) — both routed to the resumable
  *   `/account/vendor-orders/verify/:code` detail page, never a page-local verify panel/state.
+ * - **Scan QR** (D40): `ScanQrPanel` — camera-based voucher lookup with a manual-entry fallback,
+ *   routed to the same `/account/vendor-orders/verify/:code` page as every other lookup path.
  */
 export function MemberOrdersPage() {
   const { token } = useAuth();
@@ -265,6 +269,12 @@ export function MemberOrdersPage() {
               actions={QUEUE_ACTIONS}
             />
           </section>
+        </div>
+      )}
+
+      {tab === 'scan' && (
+        <div className="admin-tab-panel" aria-label="Scan QR">
+          <ScanQrPanel />
         </div>
       )}
     </div>

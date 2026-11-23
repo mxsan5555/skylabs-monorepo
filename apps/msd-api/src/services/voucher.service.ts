@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
-import { Prisma, type EntitlementStatus } from '../generated/prisma-client';
+import { Prisma, type EntitlementStatus, type SettlementStatus } from '../generated/prisma-client';
 import { getVendorByOwnerUserId } from './vendor.service';
 import { getFinanceSettings, maskBankAccountNumber } from './settlement.service';
 import { shortOrderNumber } from './notification.service';
@@ -73,6 +73,46 @@ async function projectOtpChallenge(entitlementId: string) {
 }
 
 /**
+ * The one eligibility classification every voucher action shares — the existing wizard's
+ * read path (`verifyVoucher`) AND the new QR one-tap path (`redeemViaQr`'s pre-check and
+ * `qrRedeemable`) evaluate through this SAME function, so there is never a second, looser copy
+ * of "is this voucher usable" drifting out of sync with the first. `qrExpiresAt` is deliberately
+ * NOT checked here — it is independent of this classification (D40, PLANNING.md §3) and is
+ * layered on top by callers that care about it.
+ */
+function classifyVoucher(
+  entitlement: { entitlementStatus: EntitlementStatus; settlementStatus: SettlementStatus; vendorId: string; orderItem: { order: { status: string } } },
+  vendor: { id: string } | null,
+): VoucherVerifyResult {
+  if (!vendor || vendor.id !== entitlement.vendorId) return 'WRONG_MEMBER_BRANCH';
+  if (!['CONFIRMED', 'COMPLETED'].includes(entitlement.orderItem.order.status)) return 'ADMIN_REVIEW_REQUIRED';
+  if (entitlement.entitlementStatus === 'CANCELLED' || entitlement.entitlementStatus === 'REFUNDED' || entitlement.settlementStatus === 'VOID') {
+    return 'CANCELLED_REFUNDED';
+  }
+  if (entitlement.settlementStatus === 'DISPUTED_BLOCKED') return 'ADMIN_REVIEW_REQUIRED';
+  if (entitlement.entitlementStatus === 'COMPLETED') return 'ALREADY_USED';
+  return 'VALID';
+}
+
+/** D40 — whether the QR one-tap path specifically (not the OTP wizard) can redeem this
+ *  entitlement right now: classified `VALID`, a service voucher, not already started down the
+ *  OTP path (`ACTIVE`/`STARTED` only — `OTP_REQUESTED` finishes through the existing wizard), and
+ *  still inside its own, independent 30-day `qrExpiresAt` window. Computed fresh on every call —
+ *  the API response is never trusted back as input. */
+function isQrRedeemable(
+  result: VoucherVerifyResult,
+  entitlement: { fulfilmentKind: string; entitlementStatus: EntitlementStatus; qrExpiresAt: Date | null },
+): boolean {
+  return (
+    result === 'VALID' &&
+    entitlement.fulfilmentKind === 'SERVICE_SESSION' &&
+    (entitlement.entitlementStatus === 'ACTIVE' || entitlement.entitlementStatus === 'STARTED') &&
+    entitlement.qrExpiresAt != null &&
+    entitlement.qrExpiresAt.getTime() > Date.now()
+  );
+}
+
+/**
  * Read-only — never mutates state. Returns one of the exact result states the spec lists; a
  * voucher that simply doesn't exist is a 404 (route-level error), not one of these states.
  * `EXPIRED` has no backing field yet (no per-voucher expiry concept was part of the approved data
@@ -89,21 +129,8 @@ async function projectOtpChallenge(entitlementId: string) {
 export async function verifyVoucher(callerUserId: string, code: string) {
   const entitlement = await findEntitlementOrThrow(code);
   const vendor = await getVendorByOwnerUserId(callerUserId);
-
-  let result: VoucherVerifyResult;
-  if (!vendor || vendor.id !== entitlement.vendorId) {
-    result = 'WRONG_MEMBER_BRANCH';
-  } else if (!['CONFIRMED', 'COMPLETED'].includes(entitlement.orderItem.order.status)) {
-    result = 'ADMIN_REVIEW_REQUIRED';
-  } else if (entitlement.entitlementStatus === 'CANCELLED' || entitlement.entitlementStatus === 'REFUNDED' || entitlement.settlementStatus === 'VOID') {
-    result = 'CANCELLED_REFUNDED';
-  } else if (entitlement.settlementStatus === 'DISPUTED_BLOCKED') {
-    result = 'ADMIN_REVIEW_REQUIRED';
-  } else if (entitlement.entitlementStatus === 'COMPLETED') {
-    result = 'ALREADY_USED';
-  } else {
-    result = 'VALID';
-  }
+  const result = classifyVoucher(entitlement, vendor);
+  const qrRedeemable = isQrRedeemable(result, entitlement);
 
   const otpChallenge = entitlement.entitlementStatus === 'OTP_REQUESTED' ? await projectOtpChallenge(entitlement.id) : undefined;
 
@@ -129,6 +156,9 @@ export async function verifyVoucher(callerUserId: string, code: string) {
       grossAmount: new Prisma.Decimal(entitlement.grossAmount).toFixed(2),
       memberShareAmount,
       settlementStatus: entitlement.settlementStatus,
+      purchasedAt: entitlement.createdAt,
+      qrExpiresAt: entitlement.qrExpiresAt,
+      qrRedeemable,
       ...(otpChallenge ? { otpChallenge } : {}),
     },
   };
@@ -162,6 +192,56 @@ export async function shipProduct(callerUserId: string, code: string, input: { c
 
 function holdHoursFor(fulfilmentKind: string, settings: { serviceHoldHours: number; productReturnHoldHours: number }) {
   return fulfilmentKind === 'SERVICE_SESSION' ? settings.serviceHoldHours : settings.productReturnHoldHours;
+}
+
+/**
+ * D40 — QR-initiated redemption. A second, simpler route to the exact same `COMPLETED` state
+ * `completeVoucher` already reaches, for `SERVICE_SESSION` entitlements only (a deal or direct
+ * therapist booking) — never a product. There is no OTP anywhere in this path: no
+ * `CompletionOtpChallenge` row is ever created, sent, or checked, and `completeVoucher`'s manual
+ * wizard is untouched and remains the only way to redeem an entitlement that has no QR, or whose
+ * QR has expired.
+ *
+ * Every rule `classifyVoucher` already enforces for the read path (ownership via
+ * `assertCallerOwnsVoucher`, order status, settlement status, not already closed) still applies
+ * here — `qrExpiresAt` is an ADDITIONAL, independent check, never a replacement for any of them.
+ * All of it is evaluated in ONE guarded `updateMany`, atomically, server-side only (the request
+ * carries no expiry or status value for the server to trust) — exactly the same
+ * "conditional-update-and-check-the-count" discipline `startService`/`shipProduct`/
+ * `completeVoucher` already use, so two concurrent redemptions of the same voucher can never both
+ * succeed. Feeds the identical `settlementStatus`/`holdUntil` payout pipeline `completeVoucher`
+ * feeds — which path closed the entitlement makes no difference downstream. Never reads or
+ * writes `Deal`/`DealPackage`/`Therapist`/`Branch` — the catalog listing is untouched.
+ */
+export async function redeemViaQr(callerUserId: string, code: string) {
+  const entitlement = await assertCallerOwnsVoucher(callerUserId, code);
+  if (entitlement.fulfilmentKind !== 'SERVICE_SESSION') {
+    throw new ApiError('VALIDATION_ERROR', 'Only a deal or therapist-booking voucher can be redeemed by QR');
+  }
+
+  const settings = await getFinanceSettings();
+  const holdUntil = new Date(Date.now() + holdHoursFor(entitlement.fulfilmentKind, settings) * 60 * 60 * 1000);
+
+  const result = await prisma.purchaseEntitlement.updateMany({
+    where: {
+      id: entitlement.id,
+      entitlementStatus: { in: ['ACTIVE', 'STARTED'] },
+      settlementStatus: { notIn: ['VOID', 'DISPUTED_BLOCKED'] },
+      qrExpiresAt: { gt: new Date() },
+      orderItem: { order: { status: { in: ['CONFIRMED', 'COMPLETED'] } } },
+    },
+    data: {
+      entitlementStatus: 'COMPLETED',
+      completedAt: new Date(),
+      redeemedByUserId: callerUserId,
+      settlementStatus: 'ON_HOLD',
+      holdUntil,
+    },
+  });
+  if (result.count === 0) {
+    throw new ApiError('CONFLICT', 'This QR code can no longer be redeemed — it may already be redeemed, expired, or on hold for review');
+  }
+  return prisma.purchaseEntitlement.findUniqueOrThrow({ where: { id: entitlement.id } });
 }
 
 /**

@@ -26,7 +26,7 @@ vi.mock('./media-validation.service', () => ({ validateMediaFile: () => ({ exten
 
 import { prisma } from '../lib/prisma';
 import { Prisma } from '../generated/prisma-client';
-import { verifyVoucher, startService, requestCompletionOtp, completeVoucher, listMyVoucherQueue, recordDeliveryEvidence } from './voucher.service';
+import { verifyVoucher, startService, requestCompletionOtp, completeVoucher, listMyVoucherQueue, recordDeliveryEvidence, redeemViaQr } from './voucher.service';
 
 const prismaMock = vi.mocked(prisma, true);
 
@@ -48,6 +48,10 @@ const financeSettingsFixture = {
   completionOtpResendCooldownSeconds: 60,
 };
 
+const NOW = new Date('2026-11-21T10:00:00.000Z');
+const FUTURE_QR_EXPIRY = new Date('2026-12-21T10:00:00.000Z'); // NOW + 30 days
+const PAST_QR_EXPIRY = new Date('2026-11-01T10:00:00.000Z');
+
 function entitlementFixture(overrides: Record<string, unknown> = {}) {
   return {
     id: ENTITLEMENT_ID,
@@ -62,6 +66,8 @@ function entitlementFixture(overrides: Record<string, unknown> = {}) {
     grossAmount: '1000.00',
     memberShareAmount: '800.00',
     adjustments: [],
+    createdAt: new Date('2026-11-01T10:00:00.000Z'),
+    qrExpiresAt: FUTURE_QR_EXPIRY,
     ...overrides,
   };
 }

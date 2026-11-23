@@ -12,6 +12,8 @@ vi.mock('../../../api/orders', () => ({
   getMyOrder: (...a: unknown[]) => m.getMyOrder(...a),
   cancelMyOrder: (...a: unknown[]) => m.cancelMyOrder(...a),
 }));
+// D40 — the per-unit QR block's image generation; stubbed the same way as its own component test.
+vi.mock('qrcode', () => ({ toDataURL: () => Promise.resolve('data:image/png;base64,stub') }));
 
 const ID = '79f93d36-8e4f-4674-8a05-2334118dfcbd';
 const line = (id: string, name: string, member: string, extra: Record<string, unknown>) => ({
@@ -122,6 +124,59 @@ describe('OrderDetail', () => {
     const card = document.querySelector('li.order-item-card') as HTMLElement;
     expect(within(card).getByText(t.itemStatus.redeemed)).toBeTruthy();
     expect(card.textContent).not.toContain(t.deliveryHeading);
+  });
+
+  it('D40: a still-valid deal voucher shows an Active redemption QR with the order reference and expiry', async () => {
+    m.getMyOrder.mockResolvedValue({
+      data: {
+        ...ORDER,
+        items: [
+          line('i1', 'Steam & Sauna Session', 'UrbanGlow Beauty & Care', {
+            dealId: 'd1',
+            entitlements: [
+              {
+                id: 'e1',
+                voucherCode: 'MSD-DL-ABC123',
+                fulfilmentKind: 'SERVICE_SESSION',
+                entitlementStatus: 'ACTIVE',
+                shippedAt: null,
+                completedAt: null,
+                isExpired: false,
+                purchasedAt: '2026-10-29T10:00:00.000Z',
+                qrExpiresAt: '2099-01-01T00:00:00.000Z',
+              },
+            ],
+          }),
+        ],
+      },
+    });
+    renderDetail();
+    await screen.findByRole('heading', { level: 1 });
+    const card = document.querySelector('li.order-item-card') as HTMLElement;
+    const qrBlock = within(card).getByText(t.qr.heading).closest('.entitlement-qr') as HTMLElement;
+    expect(within(qrBlock).getByText(t.qr.status.active)).toBeTruthy();
+    expect(await within(qrBlock).findByRole('img')).toBeTruthy();
+    expect(within(qrBlock).getByText('ORD-' + ORDER.id.slice(-8).toUpperCase())).toBeTruthy();
+  });
+
+  it('D40: no QR block renders for a product line, even with entitlements present', async () => {
+    m.getMyOrder.mockResolvedValue({
+      data: {
+        ...ORDER,
+        items: [
+          line('i1', 'Eyelash Conditioning Serum', 'Vitality Wellness & Beauty', {
+            itemType: 'PRODUCT',
+            productId: 'p1',
+            entitlements: [
+              { id: 'e1', voucherCode: 'MSD-PR-1', fulfilmentKind: 'PRODUCT_PICKUP', entitlementStatus: 'ACTIVE', shippedAt: null, completedAt: null, isExpired: false, purchasedAt: '2026-10-29T10:00:00.000Z', qrExpiresAt: null },
+            ],
+          }),
+        ],
+      },
+    });
+    renderDetail();
+    await screen.findByRole('heading', { level: 1 });
+    expect(document.querySelector('.entitlement-qr')).toBeNull();
   });
 
   it('a deal voucher past its validity window shows Expired, even while still ACTIVE', async () => {

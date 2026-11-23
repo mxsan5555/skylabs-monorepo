@@ -58,6 +58,21 @@ router.post('/:code/start', validateParams(VoucherCodeParamSchema), async (req, 
   }
 });
 
+/**
+ * D40 — the QR one-tap redemption path. No body: the server never takes an expiry or status
+ * value from the client (see `voucher.service.ts#redeemViaQr`'s own doc comment). Same
+ * router-wide gate as every other route here, no new permission key.
+ */
+router.post('/:code/redeem-qr', validateParams(VoucherCodeParamSchema), async (req, res, next) => {
+  try {
+    const entitlement = await voucherService.redeemViaQr(req.user!.sub, req.params.code);
+    await writeAuditLog({ actorUserId: req.user!.sub, action: 'voucher.redeem_qr', targetType: 'PurchaseEntitlement', targetId: entitlement.id, after: entitlement });
+    sendData(res, entitlement);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post('/:code/request-completion-otp', validateParams(VoucherCodeParamSchema), async (req, res, next) => {
   try {
     await voucherService.requestCompletionOtp(req.user!.sub, req.params.code);

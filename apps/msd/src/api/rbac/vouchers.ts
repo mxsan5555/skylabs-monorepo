@@ -47,6 +47,14 @@ export interface VoucherVerifyResponse {
      *  the one "current payable" formula, never re-derived differently on the client. */
     memberShareAmount: string;
     settlementStatus: SettlementStatus;
+    /** The entitlement's own creation time (payment confirmation). */
+    purchasedAt: string;
+    /** D40 — the QR's own, independent 30-day expiry. `null` for a non-`SERVICE_SESSION`
+     *  entitlement (every product), which never gets a QR. */
+    qrExpiresAt: string | null;
+    /** D40 — whether `POST /vouchers/:code/redeem-qr` would succeed right now: computed fresh by
+     *  the server on every call, never derived or cached client-side. */
+    qrRedeemable: boolean;
     /** Only present when `entitlementStatus === 'OTP_REQUESTED'`. */
     otpChallenge?: VoucherOtpChallenge;
   };
@@ -109,6 +117,13 @@ export function requestCompletionOtp(token: string | null, code: string) {
 
 export function completeVoucher(token: string | null, code: string, otp: string) {
   return apiPost<VoucherEntitlement>(`/vouchers/${code}/complete`, token, { otp });
+}
+
+/** D40 — the QR one-tap redemption path: no OTP, no body. Only succeeds for a `SERVICE_SESSION`
+ *  entitlement that is currently `qrRedeemable` (see `verifyVoucher`'s response) — the server
+ *  re-checks every eligibility rule atomically regardless of what the client believes. */
+export function redeemViaQr(token: string | null, code: string) {
+  return apiPost<VoucherEntitlement>(`/vouchers/${code}/redeem-qr`, token);
 }
 
 export function shipVoucher(token: string | null, code: string, input: { carrier: string; trackingNumber: string }) {

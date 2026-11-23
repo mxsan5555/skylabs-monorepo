@@ -431,6 +431,53 @@ A member who opens another member's deal, branch, package or therapist gets 404.
   not open. City is the shipping city of the customer's latest order with this member that has
   one, else empty. Staff on the member's page keep full contact details (D12).
 
+- **Deal/Therapist QR redemption (D40, decided 2026-11-21):** payment confirmation already
+  creates one `PurchaseEntitlement` per purchased unit (an opaque `voucherCode`, no PII, no
+  sequential id ever exposed) that a vendor redeems today through a resumable **Start Service →
+  Send Completion OTP → customer reads the OTP to the vendor → Confirm & Complete** wizard
+  (`/account/vendor-orders/verify/:code`). QR adds a second, simpler redemption path on top of
+  that existing system — it is not a new booking or order architecture, and it does not change
+  the wizard above, which stays exactly as it is for a vendor who looks a voucher up by hand.
+  - **Who gets a QR:** every `SERVICE_SESSION` entitlement — a Deal purchase or a direct Therapist
+    booking, one QR per purchased unit (quantity 2 gets 2 separate, independently redeemable
+    QRs). Products never get a QR; a `PRODUCT_PICKUP`/`PRODUCT_SHIPPED` entitlement is out of
+    scope for this feature and is untouched.
+  - **30-day QR validity, independent of the deal's own window:** the QR is scannable for exactly
+    30 days from payment confirmation (the entitlement's own creation time), tracked by a new,
+    dedicated expiry. This does **not** replace or extend the deal's existing, separately
+    configurable `validityDays` (§2.7: 1 to 365 days, optional, never expires if unset) — the two
+    never interact. Once the QR's 30 days pass, scanning that QR can no longer redeem the voucher,
+    but the voucher itself is otherwise unaffected: manual code entry and the existing OTP wizard
+    keep working exactly as before, for exactly as long as `validityDays` (or "no limit") already
+    allowed. A voucher can therefore be "QR expired" while still fully redeemable the old way.
+  - **Customer view:** the order detail page shows, per purchased unit, the QR image, order
+    reference, purchase date, expiry date, remaining validity, and a status — Active, Redeemed, or
+    Expired. No QR is ever shown for an unpaid order (no entitlement exists until payment
+    confirms) or once the entitlement is redeemed, cancelled or refunded.
+  - **Vendor redemption, no OTP:** a "Scan QR" entry point (camera, with a manual voucher-code
+    entry fallback) on the existing vendor Orders screen looks the code up and shows a
+    confirmation screen (customer, deal or therapist name, order reference, purchase date,
+    expiry) with one explicit "Confirm redemption" action — no customer OTP step anywhere in this
+    path. This reaches the same `COMPLETED` state the OTP wizard's "Confirm & Complete" already
+    reaches, by a second, shorter route; the OTP wizard is not removed, changed, or bypassed for
+    anyone not using the scanner.
+  - **Eligibility — every existing restriction still applies, QR only adds one more:** the
+    voucher must belong to the scanning vendor (a cross-vendor scan is rejected with the same
+    "never confirm existence to the wrong business" discipline as every other voucher action),
+    must not already be redeemed, cancelled or refunded, and must not be held for admin review
+    (an order that is not `CONFIRMED`/`COMPLETED`, or a settlement that is disputed or voided).
+    The 30-day QR window is an additional, independent check on top of all of these — it never
+    substitutes for or loosens any of them.
+  - **Duplicate and concurrent redemption:** redemption is atomic, the same guarded-update
+    discipline every other voucher state change already uses — two simultaneous scans of the same
+    voucher can only ever produce one redemption; the loser always sees "already redeemed," never
+    a second success.
+  - **Settlement:** QR redemption feeds the exact same payout hold and settlement pipeline the OTP
+    wizard's "Confirm & Complete" already feeds (§9) — which path closed the entitlement makes no
+    difference to payout timing or amount.
+  - Redeeming a purchased unit never changes the master Deal's or Therapist's own catalog status;
+    the listing stays exactly as it was before redemption.
+
 ## 4. Storefront
 
 - **Shell:** desktop two-row header (logo, city chip, search, wishlist, cart, account; then
@@ -759,6 +806,7 @@ expire after 5 minutes (ARCHITECTURE.md §12.3).
 | D37 | Customer checkout details (2026-10-29, Q1) | Saved on the customer's account (address, state, city, pincode), pre-filled at checkout, editable, updated on each order |
 | D38 | Order and status SMS (2026-10-29, Q3) | Email for every notice now; an SMS goes out only for notice types whose DLT template id is set in env |
 | D39 | Product business (2026-10-29, item 4) | Overrides D29's "products have no Business filter": product cards show the member's business name and product listings (`/products`, product categories) get a Business filter; `GET /catalog/products` takes `vendorIds`, `/products/facets` returns `vendors` counts |
+| D40 | Deal/Therapist QR redemption (2026-11-21) | Section 3; a new, dedicated 30-day QR expiry on `PurchaseEntitlement`, independent of `Deal.validityDays`; a second, OTP-free one-tap confirm redemption path for `SERVICE_SESSION` entitlements only (deals and direct therapist bookings), reached by scanning or manually entering the voucher code; the existing OTP wizard is unchanged; products are out of scope |
 | B2 | Vendor rename | Prisma `Vendor` → `Member`, `VendorDocument` → `MemberDocument` with `@@map`; FK columns stay `vendorId` |
 | B5 | Permission key | `vendors` → `members`; role `vendor` → `member`; role `support` added |
 | N1 | Reminder decisions (2026-10-17) | Clear the flag when documents complete; bell alert to `members:status_change` holders; Remind now in this release |

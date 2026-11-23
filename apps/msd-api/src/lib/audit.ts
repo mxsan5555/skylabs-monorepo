@@ -153,6 +153,7 @@ export const AUDIT_ACTIONS = [
   'vendor_video.upsert',
   'voucher.complete',
   'voucher.record_delivery_evidence',
+  'voucher.redeem_qr',
   'voucher.ship',
   'voucher.start',
   'website_page.update',

@@ -197,6 +197,7 @@ value and hash) is not built yet (task P5-16).
 | Order | 20 | pendingForCart -> Cart; branch -> Branch; customer -> User; vendor -> Member; items -> OrderItem[]; payments -> Payment[] | index(customerId); index(vendorId); index(branchId); index(status) |
 | OrderItem | 17 | branch -> Branch; deal -> Deal; dealPackage -> DealPackage; order -> Order; therapist -> Therapist; therapistPackage -> TherapistPackage; vendor -> Member; product -> Product | index(orderId); index(dealId); index(vendorId); index(therapistId); index(therapistPackageId); index(dealPackageId); index(productId) |
 | Payment | 12 | order -> Order | index(orderId); index(status); index(providerOrderId); index(providerPaymentId) |
+| PurchaseEntitlement | 29 | orderItem -> OrderItem; customer -> User; vendor -> Member; branch -> Branch; adjustments -> SettlementAdjustment[]; completionOtpChallenges -> CompletionOtpChallenge[]; disputes -> PurchaseDispute[]; payoutItem -> MemberPayoutItem | unique(voucherCode); unique(orderItemId, sequenceNo); index(vendorId, settlementStatus); index(voucherCode); index(customerId); index(orderItemId) |
 | SupportRequest | 6 | customer -> User | index(customerId); index(createdAt) |
 
 - `OrderItem.vendorId` (not `Order`'s own vendor column) says which member sold each line; own
@@ -205,6 +206,24 @@ value and hash) is not built yet (task P5-16).
 - `User.address`, `city`, `state`, `pincode` (nullable, S25): the customer's saved delivery address
   (D37). Checkout pre-fills it and a placed order with a complete address replaces it; orders keep
   their own copy in `shipping*`, so history never changes.
+- **`PurchaseEntitlement`** (one row per purchased unit, created idempotently once per order on
+  payment confirmation — `settlement.service.ts#createEntitlementsForOrder`): `voucherCode` is an
+  opaque, sequence-backed, no-PII code (`MSD-DL-…`/`MSD-TH-…`/`MSD-PR-…`); `fulfilmentKind`
+  (`SERVICE_SESSION` for a deal or direct therapist booking, `PRODUCT_PICKUP`/`PRODUCT_SHIPPED`
+  for a product) and `entitlementStatus` (`ACTIVE → STARTED → OTP_REQUESTED → COMPLETED`, or
+  `CANCELLED`/`REFUNDED`) drive the existing member-facing redemption wizard
+  (`/account/vendor-orders/verify/:code`). `settlementStatus`/`holdUntil`/`payoutItemId` feed the
+  payout pipeline (§9) once `COMPLETED`.
+  - **D40 — QR redemption (2026-11-21, migration `20261121121014_add_qr_redemption`):** two new
+    nullable columns, additive, no backfill. `qrExpiresAt DateTime?` is set once, at creation,
+    only for `SERVICE_SESSION` entitlements (`createdAt + 30 days`; `null` for a product
+    entitlement — it never gets a QR). It is a separate expiry from `Deal.validityDays` (which
+    remains display-only, computed per order read, never stored on the entitlement) — see
+    PLANNING.md §3 D40 for how the two do and don't interact. `redeemedByUserId String?` records
+    who closed the entitlement via the new QR one-tap path (set alongside `completedAt`, exactly
+    like the existing OTP wizard's `completeVoucher` already sets `completedAt`, just also
+    capturing who redeemed it); unset (`null`) for an entitlement closed the old way, or not yet
+    closed at all.
 
 ## 4. Storefront
 

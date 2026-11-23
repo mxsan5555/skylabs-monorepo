@@ -45,6 +45,10 @@ vi.mock('../../../../api/rbac/vouchers', () => ({
   getVoucherQueue: (...args: unknown[]) => getVoucherQueueMock(...args),
 }));
 
+// ScanQrPanel (camera + jsqr) is fully covered by its own `scan-qr-panel.test.tsx` — stubbed here
+// so this file only exercises MemberOrdersPage's own tab-selection/URL-sync logic.
+vi.mock('./scan-qr-panel', () => ({ ScanQrPanel: () => <p>scan-qr-stub</p> }));
+
 const navigateMock = vi.fn();
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
@@ -103,6 +107,13 @@ describe('MemberOrdersPage — tab selection', () => {
   it('an unrecognized ?tab value falls back to Order History rather than crashing', async () => {
     renderAt('/account/vendor-orders?tab=nonsense');
     expect(await screen.findByText('order-history-stub', {}, LONG)).toBeTruthy();
+  });
+
+  it('?tab=scan opens the Scan QR tab (D40)', async () => {
+    renderAt('/account/vendor-orders?tab=scan');
+    expect(await screen.findByText('scan-qr-stub', {}, LONG)).toBeTruthy();
+    expect(screen.queryByText('order-history-stub')).toBeNull();
+    expect(screen.queryByText('Unique Voucher Code')).toBeNull();
   });
 
   // NOTE: "switching tabs updates the URL" (the other half of this feature) is not asserted here.

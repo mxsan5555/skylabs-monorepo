@@ -1250,6 +1250,20 @@
       "notRedeemed": "Not Redeemed",
       "expired": "Expired"
     },
+    "qr": {
+      "heading": "Redemption QR",
+      "altText": "QR code for voucher {code}",
+      "order": "Order",
+      "purchased": "Purchased",
+      "expires": "Expires",
+      "daysLeftOne": "1 day left",
+      "daysLeftMany": "{days} days left",
+      "status": {
+        "active": "Active",
+        "redeemed": "Redeemed",
+        "expired": "Expired"
+      }
+    },
     "deliveryProgress": {
       "label": "Delivery progress",
       "ordered": "Ordered",
@@ -1454,7 +1468,11 @@
       },
       "validation": {
         "emptyOtp": "Please enter the OTP.",
-        "invalidOtp": "Invalid OTP. Please try again."
+        "invalidOtp": "Invalid OTP. Please try again.",
+        "otpExpired": "This code has expired. Request a new one to continue.",
+        "otpAlreadyUsed": "This code has already been used. Request a new one to continue.",
+        "otpNotRequested": "We couldn't find a pending code for this account. Request a new one to continue.",
+        "tooManyAttempts": "Too many incorrect attempts. Request a new code to continue."
       }
     }
   },

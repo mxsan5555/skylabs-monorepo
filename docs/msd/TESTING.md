@@ -385,6 +385,43 @@ transform doesn't type-check, which is why these don't block `msd-api:test`.
 - Payment state changes only through provider verification (Razorpay signature, webhook HMAC).
 - Refunds (after P7): Support can raise, cannot approve; a double click refunds once; amount
   capped at paid minus refunded.
+- **Deal/Therapist QR redemption (D40, QR-01 to QR-08):**
+  - A `CONFIRMED` payment creates a `PurchaseEntitlement` with `qrExpiresAt = createdAt + 30 days`
+    for a deal or direct-therapist-booking line; a product line's entitlement gets `qrExpiresAt:
+    null` and never shows a QR.
+  - A failed or pending payment creates no entitlement and no QR (existing behaviour, unchanged).
+  - A duplicate webhook/retry for the same order does not create a second entitlement or QR
+    (existing idempotency, unchanged).
+  - The QR is scannable within its 30 days and rejected once `qrExpiresAt` has passed, checked
+    against the server's own clock only — a client-supplied expiry or status is never trusted.
+  - A valid, owning vendor redeeming an `ACTIVE`/`STARTED` entitlement within the 30-day window
+    succeeds with no OTP step anywhere in the call path (no `CompletionOtpChallenge` row is
+    created, sent, or checked); `entitlementStatus` becomes `COMPLETED`, `redeemedByUserId` is set,
+    and the same `settlementStatus: ON_HOLD`/`holdUntil` the existing OTP wizard's "Confirm &
+    Complete" sets is set identically.
+  - A vendor who does not own the voucher is rejected (403) before any state check.
+  - A voucher that is already `COMPLETED`, `CANCELLED`, `REFUNDED`, disputed (`settlementStatus:
+    DISPUTED_BLOCKED`/`VOID`), or whose order is not `CONFIRMED`/`COMPLETED`, cannot be redeemed
+    via QR — the same eligibility rules the existing manual/OTP flow already enforces, plus the
+    30-day window on top, never instead of them.
+  - Two concurrent redemption requests for the same voucher: exactly one succeeds, the other gets
+    a clean "already redeemed"/conflict response, never a double-completed or partially-updated
+    row.
+  - An expired QR is never redeemable, even by the owning vendor, even before any other check.
+  - A product purchase never generates a deal/therapist-style QR and is never redeemable through
+    `POST /vouchers/:code/redeem-qr` (422).
+  - The existing manual-voucher-code/OTP wizard (Start Service → Send Completion OTP → Confirm &
+    Complete) and the Service Queue are unaffected — same routes, same behaviour, reachable
+    exactly as before, for every entitlement regardless of whether it also has a QR.
+  - Redeeming an entitlement (either path) never changes the master Deal's or Therapist's own
+    catalog `status` — the listing stays exactly as it was.
+  - Customer order detail: no QR renders for an unpaid order, a cancelled/refunded line, or a
+    product line; Active/Redeemed/Expired on a deal/therapist line matches
+    `entitlementStatus`/`qrExpiresAt` exactly.
+  - Vendor scan tab: reachable only under the existing `vendor-portal.orders` permission gate; the
+    manual voucher-code fallback reaches the same confirmation screen and redeem action as a
+    camera scan; the camera `MediaStream` is stopped on tab switch/unmount; a scan or submit made
+    while a verify/redeem call is already in flight is ignored (no duplicate request).
 
 ### 4.4 Storefront
 

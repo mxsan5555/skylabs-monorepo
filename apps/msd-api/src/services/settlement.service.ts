@@ -60,6 +60,18 @@ function voucherPrefixFor(item: { dealId: string | null; therapistId: string | n
   return 'PR';
 }
 
+/** D40 — fixed QR-redemption window, independent of `Deal.validityDays` (display-only, never
+ *  enforced). Deliberately a plain constant, not a `FinanceSettings` column: the task calls for
+ *  exactly 30 days, not a configurable one. */
+const QR_VALIDITY_DAYS = 30;
+
+/** Every entitlement created for the same order shares one instant, so a multi-unit purchase's
+ *  QRs all expire together rather than drifting by the per-row insert order. `null` for a
+ *  PRODUCT entitlement — it never gets a QR. */
+function qrExpiresAtFor(isService: boolean, now: Date): Date | null {
+  return isService ? new Date(now.getTime() + QR_VALIDITY_DAYS * 24 * 60 * 60 * 1000) : null;
+}
+
 /** Splits `lineTotal` evenly across `units` whole-paise amounts, with the rounding remainder
  *  absorbed entirely by the LAST unit — so `Σ returned === lineTotal` exactly, every time. */
 function splitEvenly(lineTotal: Prisma.Decimal, units: number): Prisma.Decimal[] {
@@ -98,6 +110,7 @@ export async function createEntitlementsForOrder(tx: Prisma.TransactionClient, o
   const vendorIds = [...new Set(items.map((i) => i.vendorId))];
   const vendors = await tx.member.findMany({ where: { id: { in: vendorIds } }, select: { id: true, commissionRatePercent: true } });
   const vendorById = new Map(vendors.map((v) => [v.id, v]));
+  const now = new Date();
 
   for (const item of items) {
     const vendor = vendorById.get(item.vendorId);
@@ -126,6 +139,7 @@ export async function createEntitlementsForOrder(tx: Prisma.TransactionClient, o
           // fresh PRODUCT entitlement always starts PICKUP — `POST /vouchers/:code/ship` is what
           // flips it to PRODUCT_SHIPPED, since checkout collects no pickup-vs-ship choice today.
           fulfilmentKind: isService ? 'SERVICE_SESSION' : 'PRODUCT_PICKUP',
+          qrExpiresAt: qrExpiresAtFor(isService, now),
           grossAmount,
           commissionRatePercent,
           commissionAmount,

@@ -33,6 +33,7 @@ const requestCompletionOtpMock = vi.fn();
 const completeVoucherMock = vi.fn();
 const shipVoucherMock = vi.fn();
 const recordDeliveryEvidenceMock = vi.fn();
+const redeemViaQrMock = vi.fn();
 vi.mock('../../../../api/rbac/vouchers', () => ({
   verifyVoucher: (...args: unknown[]) => verifyVoucherMock(...args),
   startService: (...args: unknown[]) => startServiceMock(...args),
@@ -40,6 +41,7 @@ vi.mock('../../../../api/rbac/vouchers', () => ({
   completeVoucher: (...args: unknown[]) => completeVoucherMock(...args),
   shipVoucher: (...args: unknown[]) => shipVoucherMock(...args),
   recordDeliveryEvidence: (...args: unknown[]) => recordDeliveryEvidenceMock(...args),
+  redeemViaQr: (...args: unknown[]) => redeemViaQrMock(...args),
 }));
 
 const navigateMock = vi.fn();
@@ -54,6 +56,7 @@ interface EntitlementOverrides {
   fulfilmentKind?: 'SERVICE_SESSION' | 'PRODUCT_PICKUP' | 'PRODUCT_SHIPPED';
   customerPhoneMasked?: string | null;
   customerEmailMasked?: string | null;
+  qrRedeemable?: boolean;
   otpChallenge?: {
     requestedAt: string;
     expiresAt: string;
@@ -81,6 +84,10 @@ function verifyResponse(
         // unavailable, fall back to email") — only default when the key is absent entirely.
         customerPhoneMasked: 'customerPhoneMasked' in overrides ? overrides.customerPhoneMasked : '••••3210',
         customerEmailMasked: 'customerEmailMasked' in overrides ? overrides.customerEmailMasked : null,
+        orderNumber: 'ORD-AB123456',
+        purchasedAt: '2026-10-29T10:00:00.000Z',
+        qrExpiresAt: overrides.qrRedeemable ? '2099-01-01T00:00:00.000Z' : null,
+        qrRedeemable: overrides.qrRedeemable ?? false,
         ...(overrides.otpChallenge ? { otpChallenge: overrides.otpChallenge } : {}),
       },
     },
@@ -412,6 +419,80 @@ describe('VoucherVerificationPage — masked destination display', () => {
     renderAt();
     await waitForSummaryTitle();
     expect(screen.getByText(/Sent to ••••\.com/)).toBeTruthy();
+  });
+});
+
+/**
+ * Feature: D40 — QR one-tap redemption panel
+ * Scenario: "Confirm Redemption" renders only when the server says `qrRedeemable`, regardless of
+ * which OTP-wizard step the entitlement is also sitting on, and calls `redeemViaQr` with no OTP.
+ */
+describe('VoucherVerificationPage — QR one-tap redemption', () => {
+  it('shows "Confirm Redemption" alongside "Start Service" when qrRedeemable is true (ACTIVE)', async () => {
+    verifyVoucherMock.mockResolvedValue(verifyResponse('VALID', 'ACTIVE', { qrRedeemable: true }));
+    renderAt();
+    await waitForSummaryTitle();
+
+    expect(hasButton('Start Service')).toBe(true);
+    expect(hasButton('Confirm Redemption')).toBe(true);
+  });
+
+  it('shows "Confirm Redemption" alongside "Send Completion OTP" when qrRedeemable is true (STARTED)', async () => {
+    verifyVoucherMock.mockResolvedValue(verifyResponse('VALID', 'STARTED', { qrRedeemable: true }));
+    renderAt();
+    await waitForSummaryTitle();
+
+    expect(hasButton('Send Completion OTP')).toBe(true);
+    expect(hasButton('Confirm Redemption')).toBe(true);
+  });
+
+  it('hides "Confirm Redemption" when qrRedeemable is false', async () => {
+    verifyVoucherMock.mockResolvedValue(verifyResponse('VALID', 'ACTIVE', { qrRedeemable: false }));
+    renderAt();
+    await waitForSummaryTitle();
+
+    expect(hasButton('Confirm Redemption')).toBe(false);
+  });
+
+  it('the summary shows the order reference, purchase date and QR expiry so the vendor can confirm before tapping', async () => {
+    verifyVoucherMock.mockResolvedValue(verifyResponse('VALID', 'ACTIVE', { qrRedeemable: true }));
+    renderAt();
+    await waitForSummaryTitle();
+
+    expect(screen.getByText('ORD-AB123456')).toBeTruthy();
+    expect(screen.getByText('29 October 2026')).toBeTruthy();
+    expect(screen.getByText('1 January 2099')).toBeTruthy();
+  });
+
+  it('omits the QR Expires row when the voucher has no qrExpiresAt (a product entitlement)', async () => {
+    verifyVoucherMock.mockResolvedValue(verifyResponse('VALID', 'ACTIVE', { fulfilmentKind: 'PRODUCT_PICKUP', qrRedeemable: false }));
+    renderAt();
+    await waitForSummaryTitle();
+
+    expect(screen.queryByText('QR Expires')).toBeNull();
+  });
+
+  it('clicking "Confirm Redemption" calls redeemViaQr with no OTP value, then refreshes', async () => {
+    verifyVoucherMock.mockResolvedValue(verifyResponse('VALID', 'ACTIVE', { qrRedeemable: true }));
+    redeemViaQrMock.mockResolvedValue({ data: { entitlementStatus: 'COMPLETED' } });
+    renderAt();
+    await waitForSummaryTitle();
+
+    clickButton('Confirm Redemption');
+
+    await waitFor(() => expect(redeemViaQrMock).toHaveBeenCalledWith('tok', CODE), LONG);
+    expect(redeemViaQrMock).not.toHaveBeenCalledWith('tok', CODE, expect.anything());
+    await waitFor(() => expect(verifyVoucherMock).toHaveBeenCalledTimes(2), LONG);
+  });
+
+  it('a failed redeemViaQr call shows an error instead of crashing', async () => {
+    verifyVoucherMock.mockResolvedValue(verifyResponse('VALID', 'ACTIVE', { qrRedeemable: true }));
+    redeemViaQrMock.mockRejectedValue(new Error('conflict'));
+    renderAt();
+    await waitForSummaryTitle();
+
+    clickButton('Confirm Redemption');
+    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy(), LONG);
   });
 });
 

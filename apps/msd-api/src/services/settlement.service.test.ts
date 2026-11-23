@@ -151,6 +151,67 @@ describe('createEntitlementsForOrder', () => {
     expect((data.voucherCode as string).startsWith('MSD-PR-')).toBe(true);
   });
 
+  /**
+   * Feature: D40 — QR redemption window
+   * Scenario: a SERVICE entitlement (deal or direct therapist booking) gets a qrExpiresAt exactly
+   * 30 days after creation; a PRODUCT entitlement never gets one.
+   */
+  it('sets qrExpiresAt to exactly 30 days from now for a SERVICE (deal) entitlement', async () => {
+    const now = new Date('2026-11-21T10:00:00.000Z');
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+
+    prismaMock.orderItem.findMany.mockResolvedValue([
+      { id: ITEM_ID, orderId: ORDER_ID, itemType: 'SERVICE', quantity: 1, lineTotal: new Prisma.Decimal('1000.00'), vendorId: VENDOR_ID, branchId: BRANCH_ID, dealId: 'deal-1', therapistId: null, productId: null } as never,
+    ]);
+    prismaMock.purchaseEntitlement.findFirst.mockResolvedValue(null);
+    prismaMock.order.findUniqueOrThrow.mockResolvedValue({ customerId: CUSTOMER_ID } as never);
+    prismaMock.financeSettings.upsert.mockResolvedValue(financeSettingsFixture as never);
+    prismaMock.member.findMany.mockResolvedValue([{ id: VENDOR_ID, commissionRatePercent: null }] as never);
+    prismaMock.purchaseEntitlement.create.mockResolvedValue({} as never);
+
+    await createEntitlementsForOrder(prismaMock as never, ORDER_ID);
+
+    const data = (prismaMock.purchaseEntitlement.create.mock.calls[0][0] as { data: Record<string, unknown> }).data;
+    expect(data.qrExpiresAt).toEqual(new Date('2026-12-21T10:00:00.000Z'));
+  });
+
+  it('sets qrExpiresAt for a direct therapist-booking entitlement too (also SERVICE_SESSION)', async () => {
+    const now = new Date('2026-11-21T10:00:00.000Z');
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+
+    prismaMock.orderItem.findMany.mockResolvedValue([
+      { id: ITEM_ID, orderId: ORDER_ID, itemType: 'SERVICE', quantity: 1, lineTotal: new Prisma.Decimal('500.00'), vendorId: VENDOR_ID, branchId: BRANCH_ID, dealId: null, therapistId: 'therapist-1', productId: null } as never,
+    ]);
+    prismaMock.purchaseEntitlement.findFirst.mockResolvedValue(null);
+    prismaMock.order.findUniqueOrThrow.mockResolvedValue({ customerId: CUSTOMER_ID } as never);
+    prismaMock.financeSettings.upsert.mockResolvedValue(financeSettingsFixture as never);
+    prismaMock.member.findMany.mockResolvedValue([{ id: VENDOR_ID, commissionRatePercent: null }] as never);
+    prismaMock.purchaseEntitlement.create.mockResolvedValue({} as never);
+
+    await createEntitlementsForOrder(prismaMock as never, ORDER_ID);
+
+    const data = (prismaMock.purchaseEntitlement.create.mock.calls[0][0] as { data: Record<string, unknown> }).data;
+    expect(data.qrExpiresAt).toEqual(new Date('2026-12-21T10:00:00.000Z'));
+  });
+
+  it('never sets qrExpiresAt for a PRODUCT entitlement — products are out of scope for QR (D40)', async () => {
+    prismaMock.orderItem.findMany.mockResolvedValue([
+      { id: PRODUCT_ITEM_ID, orderId: ORDER_ID, itemType: 'PRODUCT', quantity: 2, lineTotal: new Prisma.Decimal('250.00'), vendorId: VENDOR_ID, branchId: null, dealId: null, therapistId: null, productId: 'product-1' } as never,
+    ]);
+    prismaMock.purchaseEntitlement.findFirst.mockResolvedValue(null);
+    prismaMock.order.findUniqueOrThrow.mockResolvedValue({ customerId: CUSTOMER_ID } as never);
+    prismaMock.financeSettings.upsert.mockResolvedValue(financeSettingsFixture as never);
+    prismaMock.member.findMany.mockResolvedValue([{ id: VENDOR_ID, commissionRatePercent: null }] as never);
+    prismaMock.purchaseEntitlement.create.mockResolvedValue({} as never);
+
+    await createEntitlementsForOrder(prismaMock as never, ORDER_ID);
+
+    const data = (prismaMock.purchaseEntitlement.create.mock.calls[0][0] as { data: Record<string, unknown> }).data;
+    expect(data.qrExpiresAt).toBeNull();
+  });
+
   it("resolves the vendor's own commissionRatePercent override instead of the global default when one is set", async () => {
     prismaMock.orderItem.findMany.mockResolvedValue([
       { id: ITEM_ID, orderId: ORDER_ID, itemType: 'SERVICE', quantity: 1, lineTotal: new Prisma.Decimal('100.00'), vendorId: VENDOR_ID, branchId: BRANCH_ID, dealId: null, therapistId: 'therapist-1', productId: null } as never,

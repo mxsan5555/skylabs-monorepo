@@ -2,8 +2,9 @@ import type { ReactNode } from 'react';
 import { Icon } from '@skylabs-monorepo/shared-ui/react';
 import type { Order, OrderItem } from '../../../api/orders';
 import { lineFromOrderItem } from '../../../utils/cart-items';
-import { formatINR, formatLongDate, formatStreetAddress } from '../../../utils/format';
+import { formatINR, formatLongDate, formatStreetAddress, orderNumber } from '../../../utils/format';
 import { StepIndicator } from '../step-indicator/step-indicator';
+import { EntitlementQr, type EntitlementQrStatus } from '../entitlement-qr/entitlement-qr';
 import content from '../../../content.json';
 import './order-item-card.css';
 
@@ -79,15 +80,47 @@ export function dealStatusOf(item: OrderItem): 'redeemed' | 'notRedeemed' | 'exp
   return 'notRedeemed';
 }
 
+/** D40 — per-voucher QR eligibility for the customer order page, independent of `isExpired`
+ *  (that's the deal's own `validityDays`-based window; this is the QR's dedicated 30-day one —
+ *  see PLANNING.md §3 D40). `null` means no QR block: a cancelled/refunded voucher, or one with
+ *  no `qrExpiresAt` at all (defensive — every `SERVICE_SESSION` entitlement gets one at creation). */
+export function qrStatusOf(entitlement: { entitlementStatus: string; qrExpiresAt?: string | null }): EntitlementQrStatus | null {
+  if (entitlement.entitlementStatus === 'CANCELLED' || entitlement.entitlementStatus === 'REFUNDED') return null;
+  if (entitlement.entitlementStatus === 'COMPLETED') return 'redeemed';
+  if (!entitlement.qrExpiresAt) return null;
+  return new Date(entitlement.qrExpiresAt).getTime() > Date.now() ? 'active' : 'expired';
+}
+
 /** Deal and direct Therapist-booking lines share identical entitlement-based redemption
  *  semantics (both are `SERVICE_SESSION` vouchers) — one card kind covers both. No address: a
- *  service is redeemed at the vendor, never delivered. */
-export function DealOrderItemCard({ item }: { item: OrderItem }) {
+ *  service is redeemed at the vendor, never delivered. One QR block per purchased unit (D40),
+ *  below the overall redemption badge. */
+export function DealOrderItemCard({ item, order }: { item: OrderItem; order: Order }) {
   const status = dealStatusOf(item);
+  const entitlements = item.entitlements ?? [];
+  const number = orderNumber(order.id);
   return (
     <OrderItemCardShell
       item={item}
-      extra={<sky-badge status={ITEM_STATUS_TONE[status]}>{t.itemStatus[status]}</sky-badge>}
+      extra={
+        <>
+          <sky-badge status={ITEM_STATUS_TONE[status]}>{t.itemStatus[status]}</sky-badge>
+          {entitlements.map((entitlement) => {
+            const qrStatus = qrStatusOf(entitlement);
+            if (!qrStatus || !entitlement.qrExpiresAt) return null;
+            return (
+              <EntitlementQr
+                key={entitlement.id}
+                voucherCode={entitlement.voucherCode}
+                orderNumber={number}
+                purchasedAt={entitlement.purchasedAt}
+                qrExpiresAt={entitlement.qrExpiresAt}
+                status={qrStatus}
+              />
+            );
+          })}
+        </>
+      }
     />
   );
 }
@@ -148,7 +181,7 @@ export function OrderItemCardList({ order }: OrderItemCardListProps) {
         item.productId ? (
           <ProductOrderItemCard key={item.id} item={item} order={order} />
         ) : (
-          <DealOrderItemCard key={item.id} item={item} />
+          <DealOrderItemCard key={item.id} item={item} order={order} />
         ),
       )}
     </ul>

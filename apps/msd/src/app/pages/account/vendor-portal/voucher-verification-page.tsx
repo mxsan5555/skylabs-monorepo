@@ -10,13 +10,14 @@ import {
   completeVoucher,
   shipVoucher,
   recordDeliveryEvidence,
+  redeemViaQr,
   type VoucherVerifyResponse,
   type VoucherVerifyResult,
 } from '../../../../api/rbac/vouchers';
 import type { EntitlementStatus, FulfilmentKind } from '../../../../api/rbac/settlements';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { showSnackbar } from '../../../../snackbar/snackbar';
-import { formatINR } from '../../../../utils/format';
+import { formatINR, formatLongDate } from '../../../../utils/format';
 
 const RESULT_COPY: Record<VoucherVerifyResult, { icon: string; title: string; tone: 'success' | 'error' }> = {
   VALID: { icon: 'check_circle', title: 'Valid — ready to fulfil', tone: 'success' },
@@ -146,6 +147,7 @@ export function VoucherVerificationPage() {
       await completeVoucher(token, code, otp.trim());
       setOtp('');
     }, 'Marked complete.');
+  const doRedeemViaQr = () => runAction(async () => { await redeemViaQr(token, code); }, 'Redeemed via QR.');
   const doShip = () =>
     runAction(async () => {
       await shipVoucher(token, code, { carrier: carrier.trim(), trackingNumber: trackingNumber.trim() });
@@ -254,6 +256,14 @@ export function VoucherVerificationPage() {
                     <div><dt>Branch</dt><dd>{verify.entitlement.branchName ?? '?'}</dd></div>
                     <div><dt>Service</dt><dd>{verify.entitlement.itemName}</dd></div>
                     <div><dt>Fulfilment</dt><dd>{FULFILMENT_LABEL[verify.entitlement.fulfilmentKind]}</dd></div>
+                    <div><dt>Order</dt><dd>{verify.entitlement.orderNumber}</dd></div>
+                    <div><dt>Purchased</dt><dd>{formatLongDate(verify.entitlement.purchasedAt)}</dd></div>
+                    {/* D40 — the QR's own 30-day expiry, shown whenever this entitlement has one
+                        (every SERVICE_SESSION voucher does), independent of the OTP wizard's own
+                        steps below. */}
+                    {verify.entitlement.qrExpiresAt && (
+                      <div><dt>QR Expires</dt><dd>{formatLongDate(verify.entitlement.qrExpiresAt)}</dd></div>
+                    )}
                   </dl>
                 </sky-card>
                 <sky-card variant="outlined">
@@ -268,6 +278,16 @@ export function VoucherVerificationPage() {
               </div>
 
               {actionError && <p className="error-state" role="alert">{actionError}</p>}
+
+              {verify.entitlement.qrRedeemable && (
+                <section className="panel" aria-labelledby="voucher-qr-redeem-title">
+                  <h2 id="voucher-qr-redeem-title" className="section-title">Redeem via QR</h2>
+                  <p className="field-hint">
+                    This voucher was scanned or entered within its 30-day QR window — one tap confirms redemption, no customer OTP needed.
+                  </p>
+                  <FilledButton onClick={doRedeemViaQr} disabled={actionBusy}>Confirm Redemption</FilledButton>
+                </section>
+              )}
 
               <section className="panel member-next-action" aria-labelledby="voucher-action-title">
                 <h2 id="voucher-action-title" className="section-title">Next step</h2>
