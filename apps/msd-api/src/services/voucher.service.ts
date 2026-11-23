@@ -100,7 +100,8 @@ function classifyVoucher(
  *
  * `customerPhone` is plain, unmasked (the vendor needs to actually contact this customer — see
  * PLANNING.md's resolved decision); email is dropped entirely, no vendor screen needs it.
- * `completedAt` drives the "Already used on <date>" copy. Still exactly one `findUnique` — no
+ * `completedAt` drives the "Already used on <date>" copy; `serviceStartedAt` drives the "Service
+ * in progress, started <time>" copy. Still exactly one `findUnique` — no
  * `update`/`updateMany` call is ever added here.
  */
 export async function verifyVoucher(callerUserId: string, code: string) {
@@ -132,6 +133,7 @@ export async function verifyVoucher(callerUserId: string, code: string) {
       purchasedAt: entitlement.createdAt,
       qrExpiresAt: entitlement.qrExpiresAt,
       completedAt: entitlement.completedAt,
+      serviceStartedAt: entitlement.serviceStartedAt,
     },
   };
 }

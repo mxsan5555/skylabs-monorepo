@@ -51,6 +51,7 @@ function entitlementFixture(overrides: Record<string, unknown> = {}) {
     adjustments: [],
     createdAt: new Date('2026-11-01T10:00:00.000Z'),
     completedAt: null,
+    serviceStartedAt: null,
     qrExpiresAt: FUTURE_QR_EXPIRY,
     ...overrides,
   };
@@ -213,6 +214,15 @@ describe('verifyVoucher', () => {
 
     const { entitlement } = await verifyVoucher(CALLER_ID, CODE);
     expect(entitlement.completedAt).toEqual(completedAt);
+  });
+
+  it('includes serviceStartedAt so the "Service in progress, started <time>" copy can be shown', async () => {
+    const serviceStartedAt = new Date('2026-11-10T09:00:00.000Z');
+    prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture({ entitlementStatus: 'STARTED', serviceStartedAt }) as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+
+    const { entitlement } = await verifyVoucher(CALLER_ID, CODE);
+    expect(entitlement.serviceStartedAt).toEqual(serviceStartedAt);
   });
 });
 
