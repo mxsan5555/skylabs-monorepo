@@ -1,26 +1,21 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/authenticate';
 import { requirePermission } from '../middleware/requirePermission';
-import { validateBody, validateParams, validateQuery } from '../middleware/validate';
+import { validateBody, validateParams } from '../middleware/validate';
 import { documentUpload } from '../lib/media-upload.middleware';
-import {
-  VoucherCodeParamSchema,
-  VoucherVerifySchema,
-  VoucherCompleteSchema,
-  VoucherShipSchema,
-  VoucherDeliveryEvidenceSchema,
-  VoucherQueueQuerySchema,
-} from '../schemas/voucher.schema';
+import { VoucherCodeParamSchema, VoucherVerifySchema, VoucherShipSchema, VoucherDeliveryEvidenceSchema } from '../schemas/voucher.schema';
 import * as voucherService from '../services/voucher.service';
 import { writeAuditLog } from '../services/audit.service';
 import { sendData, ApiError } from '../lib/http';
 
 /**
- * Member-only Purchase Verification surface — voucher lookup + the Start/OTP/Complete/Ship/
- * Evidence actions. Gated on `vendor-portal.orders:custom` the whole router through (same
- * self-service plumbing gate `/vendors/me/*` uses — see seed.ts's `EXTRA_ACTIONS_BY_MENU_KEY`
- * doc comment), never `vendor-portal.orders:view` alone. Lives on the same page/route as the
- * existing vendor-portal Orders screen (`business-order` menu node) — no new menu node.
+ * Member-only Purchase Verification surface — voucher lookup (via a QR scan only; there is no
+ * manual code-entry path anywhere in this router's callers) + the Start/Finish/Pick-up/Ship/
+ * Evidence actions. No OTP anywhere. Gated on `vendor-portal.orders:custom` the whole router
+ * through (same self-service plumbing gate `/vendors/me/*` uses — see seed.ts's
+ * `EXTRA_ACTIONS_BY_MENU_KEY` doc comment), never `vendor-portal.orders:view` alone. Lives on the
+ * same page/route as the existing vendor-portal Orders screen (`business-order` menu node) — no
+ * new menu node.
  */
 const router = Router();
 router.use(authenticate, requirePermission('vendor-portal.orders', 'custom'));
@@ -34,15 +29,13 @@ router.post('/verify', validateBody(VoucherVerifySchema), async (req, res, next)
 });
 
 /**
- * Service Queue — the caller's own vendor's PurchaseEntitlement rows, paginated/searchable (see
- * voucher.service.ts#listMyVoucherQueue). Same single router-wide gate as every other route
- * here — no new permission key.
+ * Orders page's "Services waiting" / "Products to give or send" lists (see
+ * voucher.service.ts#listPendingFulfilment). Same single router-wide gate as every other route
+ * here — no new permission key, no query params (unpaginated, unsearchable by design).
  */
-router.get('/queue', validateQuery(VoucherQueueQuerySchema), async (req, res, next) => {
+router.get('/pending-fulfilment', async (req, res, next) => {
   try {
-    const { page, pageSize, search } = req.validatedQuery as ReturnType<typeof VoucherQueueQuerySchema.parse>;
-    const { items, total } = await voucherService.listMyVoucherQueue(req.user!.sub, { page, pageSize, search });
-    sendData(res, items, { meta: { total, page, pageSize } });
+    sendData(res, await voucherService.listPendingFulfilment(req.user!.sub));
   } catch (err) {
     next(err);
   }
@@ -58,34 +51,23 @@ router.post('/:code/start', validateParams(VoucherCodeParamSchema), async (req, 
   }
 });
 
-/**
- * D40 — the QR one-tap redemption path. No body: the server never takes an expiry or status
- * value from the client (see `voucher.service.ts#redeemViaQr`'s own doc comment). Same
- * router-wide gate as every other route here, no new permission key.
- */
-router.post('/:code/redeem-qr', validateParams(VoucherCodeParamSchema), async (req, res, next) => {
+/** No body: the server never takes a status value from the client (see
+ *  `voucher.service.ts#finishService`'s own doc comment). */
+router.post('/:code/finish-service', validateParams(VoucherCodeParamSchema), async (req, res, next) => {
   try {
-    const entitlement = await voucherService.redeemViaQr(req.user!.sub, req.params.code);
-    await writeAuditLog({ actorUserId: req.user!.sub, action: 'voucher.redeem_qr', targetType: 'PurchaseEntitlement', targetId: entitlement.id, after: entitlement });
+    const entitlement = await voucherService.finishService(req.user!.sub, req.params.code);
+    await writeAuditLog({ actorUserId: req.user!.sub, action: 'voucher.finish_service', targetType: 'PurchaseEntitlement', targetId: entitlement.id, after: entitlement });
     sendData(res, entitlement);
   } catch (err) {
     next(err);
   }
 });
 
-router.post('/:code/request-completion-otp', validateParams(VoucherCodeParamSchema), async (req, res, next) => {
+/** No body — same discipline as `/finish-service`. */
+router.post('/:code/pick-up', validateParams(VoucherCodeParamSchema), async (req, res, next) => {
   try {
-    await voucherService.requestCompletionOtp(req.user!.sub, req.params.code);
-    sendData(res, { requested: true });
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.post('/:code/complete', validateParams(VoucherCodeParamSchema), validateBody(VoucherCompleteSchema), async (req, res, next) => {
-  try {
-    const entitlement = await voucherService.completeVoucher(req.user!.sub, req.params.code, req.body.otp);
-    await writeAuditLog({ actorUserId: req.user!.sub, action: 'voucher.complete', targetType: 'PurchaseEntitlement', targetId: entitlement.id, after: entitlement });
+    const entitlement = await voucherService.markProductPickedUp(req.user!.sub, req.params.code);
+    await writeAuditLog({ actorUserId: req.user!.sub, action: 'voucher.pick_up', targetType: 'PurchaseEntitlement', targetId: entitlement.id, after: entitlement });
     sendData(res, entitlement);
   } catch (err) {
     next(err);

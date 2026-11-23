@@ -43,12 +43,14 @@ function entitlementFixture(overrides: Record<string, unknown> = {}) {
     entitlementStatus: 'ACTIVE',
     settlementStatus: 'PENDING_FULFILMENT',
     fulfilmentKind: 'SERVICE_SESSION',
-    customer: { id: 'cust-1', name: 'Jane', phone: '+919999999999', email: null },
+    customer: { id: 'cust-1', name: 'Jane', phone: '+919999999999' },
     orderItem: { order: { id: '30000000-0000-4000-8000-000000000006', status: 'CONFIRMED' }, itemName: 'Deep Tissue Massage' },
     branch: { name: 'MG Road' },
     grossAmount: '1000.00',
     memberShareAmount: '800.00',
     adjustments: [],
+    completedAt: null,
+    qrExpiresAt: new Date('2099-01-01T00:00:00.000Z'),
     ...overrides,
   };
 }
@@ -173,9 +175,9 @@ describe('POST /api/v1/vouchers/:code/start — ownership + audit', () => {
   });
 });
 
-describe('GET /api/v1/vouchers/queue — Service Queue', () => {
+describe('GET /api/v1/vouchers/pending-fulfilment', () => {
   it('401s with no token', async () => {
-    const res = await request(app).get('/api/v1/vouchers/queue');
+    const res = await request(app).get('/api/v1/vouchers/pending-fulfilment');
     expect(res.status).toBe(401);
   });
 
@@ -183,11 +185,11 @@ describe('GET /api/v1/vouchers/queue — Service Queue', () => {
     resolveMock.mockResolvedValue(['vendor-portal.orders:view']);
 
     const res = await request(app)
-      .get('/api/v1/vouchers/queue')
+      .get('/api/v1/vouchers/pending-fulfilment')
       .set('Authorization', bearerFor({ sub: MEMBER_USER_ID, roles: ['vendor'] }));
 
     expect(res.status).toBe(403);
-    expect(prismaMock.purchaseEntitlement.count).not.toHaveBeenCalled();
+    expect(prismaMock.purchaseEntitlement.findMany).not.toHaveBeenCalled();
   });
 
   it('404s when the caller has the permission but no vendor profile yet', async () => {
@@ -195,78 +197,134 @@ describe('GET /api/v1/vouchers/queue — Service Queue', () => {
     prismaMock.member.findUnique.mockResolvedValue(null);
 
     const res = await request(app)
-      .get('/api/v1/vouchers/queue')
+      .get('/api/v1/vouchers/pending-fulfilment')
       .set('Authorization', bearerFor({ sub: MEMBER_USER_ID, roles: ['vendor'] }));
 
     expect(res.status).toBe(404);
   });
 
-  it("returns only the caller's own vendor's rows, paginated, with meta.total", async () => {
+  it("returns only the caller's own vendor's services/products, split into servicesWaiting/productsPending", async () => {
     resolveMock.mockResolvedValue(['vendor-portal.orders:custom']);
     prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
-    prismaMock.purchaseEntitlement.count.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
-    prismaMock.purchaseEntitlement.findMany.mockResolvedValue([
-      {
-        id: ENTITLEMENT_ID,
-        voucherCode: VOUCHER_CODE,
-        entitlementStatus: 'ACTIVE',
-        fulfilmentKind: 'SERVICE_SESSION',
-        settlementStatus: 'PENDING_FULFILMENT',
-        orderItem: { itemName: 'Deep Tissue Massage' },
-        customer: { name: 'Jane' },
-      },
-    ] as never);
+    prismaMock.purchaseEntitlement.findMany
+      .mockResolvedValueOnce([
+        {
+          id: ENTITLEMENT_ID,
+          voucherCode: VOUCHER_CODE,
+          qrExpiresAt: new Date('2099-01-01T00:00:00.000Z'),
+          orderItem: { itemName: 'Deep Tissue Massage', dealId: 'd1', therapistId: null, orderId: 'order-1' },
+          customer: { phone: '+919999999999' },
+        },
+      ] as never)
+      .mockResolvedValueOnce([]);
 
     const res = await request(app)
-      .get('/api/v1/vouchers/queue')
+      .get('/api/v1/vouchers/pending-fulfilment')
       .set('Authorization', bearerFor({ sub: MEMBER_USER_ID, roles: ['vendor'] }));
 
     expect(res.status).toBe(200);
-    expect(res.body.meta).toMatchObject({ total: 1, page: 1, pageSize: 20 });
-    expect(res.body.data).toEqual([
+    expect(res.body.data.servicesWaiting).toEqual([
       {
         id: ENTITLEMENT_ID,
         voucherCode: VOUCHER_CODE,
         itemName: 'Deep Tissue Massage',
-        customerName: 'Jane',
-        entitlementStatus: 'ACTIVE',
-        fulfilmentKind: 'SERVICE_SESSION',
-        settlementStatus: 'PENDING_FULFILMENT',
+        kind: 'DEAL',
+        customerPhone: '+919999999999',
+        validTill: '2099-01-01T00:00:00.000Z',
+        orderId: 'order-1',
       },
     ]);
-    expect(prismaMock.purchaseEntitlement.count).toHaveBeenCalledWith({
-      where: { vendorId: VENDOR_ID, entitlementStatus: { in: ['ACTIVE', 'STARTED', 'OTP_REQUESTED'] } },
-    });
+    expect(res.body.data.productsPending).toEqual([]);
   });
 
-  it("a second member's own vendor never sees the first member's queue rows (isolation is in the query, not just the gate)", async () => {
+  it("a second member's own vendor never sees the first member's rows (isolation is in the query, not just the gate)", async () => {
     resolveMock.mockResolvedValue(['vendor-portal.orders:custom']);
     prismaMock.member.findUnique.mockResolvedValue({ id: OTHER_VENDOR_ID } as never);
-    prismaMock.purchaseEntitlement.count.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
     prismaMock.purchaseEntitlement.findMany.mockResolvedValue([]);
 
     const res = await request(app)
-      .get('/api/v1/vouchers/queue')
+      .get('/api/v1/vouchers/pending-fulfilment')
       .set('Authorization', bearerFor({ sub: OTHER_MEMBER_USER_ID, roles: ['vendor'] }));
 
     expect(res.status).toBe(200);
-    expect(res.body.data).toEqual([]);
-    expect(prismaMock.purchaseEntitlement.count).toHaveBeenCalledWith({
-      where: { vendorId: OTHER_VENDOR_ID, entitlementStatus: { in: ['ACTIVE', 'STARTED', 'OTP_REQUESTED'] } },
-    });
+    expect(res.body.data).toEqual({ servicesWaiting: [], productsPending: [] });
+    expect(prismaMock.purchaseEntitlement.findMany).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ where: expect.objectContaining({ vendorId: OTHER_VENDOR_ID }) }),
+    );
   });
 });
 
-describe('POST /api/v1/vouchers/:code/complete — schema validation', () => {
-  it('422s a missing/malformed otp before reaching the service', async () => {
+describe('POST /api/v1/vouchers/:code/finish-service — ownership + audit', () => {
+  it("403s (via the service's FORBIDDEN) when the voucher belongs to a different member", async () => {
     resolveMock.mockResolvedValue(['vendor-portal.orders:custom']);
+    prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture({ vendorId: VENDOR_ID, entitlementStatus: 'STARTED' }) as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: OTHER_VENDOR_ID } as never);
 
     const res = await request(app)
-      .post(`/api/v1/vouchers/${VOUCHER_CODE}/complete`)
-      .set('Authorization', bearerFor({ sub: MEMBER_USER_ID, roles: ['vendor'] }))
-      .send({});
+      .post(`/api/v1/vouchers/${VOUCHER_CODE}/finish-service`)
+      .set('Authorization', bearerFor({ sub: OTHER_MEMBER_USER_ID, roles: ['vendor'] }));
 
-    expect(res.status).toBe(422);
-    expect(prismaMock.completionOtpChallenge.findFirst).not.toHaveBeenCalled();
+    expect(res.status).toBe(403);
+    expect(prismaMock.purchaseEntitlement.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('writes an audit log entry on a successful Service done — no body, no OTP', async () => {
+    resolveMock.mockResolvedValue(['vendor-portal.orders:custom']);
+    prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture({ entitlementStatus: 'STARTED' }) as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.financeSettings.upsert.mockResolvedValue({ serviceHoldHours: 24, productReturnHoldHours: 168 } as never);
+    prismaMock.purchaseEntitlement.updateMany.mockResolvedValue({ count: 1 } as never);
+    prismaMock.purchaseEntitlement.findUniqueOrThrow.mockResolvedValue(entitlementFixture({ entitlementStatus: 'COMPLETED' }) as never);
+
+    const res = await request(app)
+      .post(`/api/v1/vouchers/${VOUCHER_CODE}/finish-service`)
+      .set('Authorization', bearerFor({ sub: MEMBER_USER_ID, roles: ['vendor'] }));
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ action: 'voucher.finish_service', targetType: 'PurchaseEntitlement', targetId: ENTITLEMENT_ID }),
+      }),
+    );
+  });
+});
+
+describe('POST /api/v1/vouchers/:code/pick-up — ownership + audit', () => {
+  it("403s (via the service's FORBIDDEN) when the voucher belongs to a different member", async () => {
+    resolveMock.mockResolvedValue(['vendor-portal.orders:custom']);
+    prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(
+      entitlementFixture({ vendorId: VENDOR_ID, fulfilmentKind: 'PRODUCT_PICKUP' }) as never,
+    );
+    prismaMock.member.findUnique.mockResolvedValue({ id: OTHER_VENDOR_ID } as never);
+
+    const res = await request(app)
+      .post(`/api/v1/vouchers/${VOUCHER_CODE}/pick-up`)
+      .set('Authorization', bearerFor({ sub: OTHER_MEMBER_USER_ID, roles: ['vendor'] }));
+
+    expect(res.status).toBe(403);
+    expect(prismaMock.purchaseEntitlement.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('writes an audit log entry on a successful Picked up — no body, no OTP', async () => {
+    resolveMock.mockResolvedValue(['vendor-portal.orders:custom']);
+    prismaMock.purchaseEntitlement.findUnique.mockResolvedValue(entitlementFixture({ fulfilmentKind: 'PRODUCT_PICKUP' }) as never);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.financeSettings.upsert.mockResolvedValue({ serviceHoldHours: 24, productReturnHoldHours: 168 } as never);
+    prismaMock.purchaseEntitlement.updateMany.mockResolvedValue({ count: 1 } as never);
+    prismaMock.purchaseEntitlement.findUniqueOrThrow.mockResolvedValue(
+      entitlementFixture({ fulfilmentKind: 'PRODUCT_PICKUP', entitlementStatus: 'COMPLETED' }) as never,
+    );
+
+    const res = await request(app)
+      .post(`/api/v1/vouchers/${VOUCHER_CODE}/pick-up`)
+      .set('Authorization', bearerFor({ sub: MEMBER_USER_ID, roles: ['vendor'] }));
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ action: 'voucher.pick_up', targetType: 'PurchaseEntitlement', targetId: ENTITLEMENT_ID }),
+      }),
+    );
   });
 });

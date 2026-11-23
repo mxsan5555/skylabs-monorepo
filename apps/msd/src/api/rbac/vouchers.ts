@@ -2,40 +2,33 @@ import { apiGet, apiPost, apiPostForm } from './client';
 import type { EntitlementStatus, FulfilmentKind, SettlementStatus } from './settlements';
 
 /**
- * Member-only Purchase Verification surface — voucher lookup + the Start/OTP/Complete/Ship/
- * Evidence actions. Mirrors `apps/msd-api`'s `vouchers.routes.ts` exactly; the whole router is
- * gated `vendor-portal.orders:custom` server-side (lives on the same route as the existing
- * vendor-portal Orders screen, no new menu node).
+ * Member-only Purchase Verification surface — voucher lookup (via a QR scan only, never typed)
+ * + the Start/Finish/Pick-up/Ship/Evidence actions. No OTP anywhere. Mirrors `apps/msd-api`'s
+ * `vouchers.routes.ts` exactly; the whole router is gated `vendor-portal.orders:custom`
+ * server-side (lives on the same route as the existing vendor-portal Orders screen, no new menu
+ * node).
  */
 
-export type VoucherVerifyResult = 'VALID' | 'ALREADY_USED' | 'EXPIRED' | 'CANCELLED_REFUNDED' | 'WRONG_MEMBER_BRANCH' | 'ADMIN_REVIEW_REQUIRED';
-
-/** Safe, non-mutating projection of "the latest unverified CompletionOtpChallenge" — only present
- *  when `entitlementStatus === 'OTP_REQUESTED'` (omitted entirely otherwise, never `null`). All
- *  time fields are ISO date strings. Never includes the OTP itself (hashed or plaintext) — see
- *  msd-api's `voucher.service.ts#projectOtpChallenge` doc comment. `resendAvailableAt` is the one
- *  source of truth for whether "Resend" is enabled — compute the cooldown client-side from this
- *  timestamp rather than inventing a separate client-side timer. */
-export interface VoucherOtpChallenge {
-  requestedAt: string;
-  expiresAt: string;
-  attempts: number;
-  maxAttempts: number;
-  resendAvailableAt: string;
-}
+export type VoucherScanResult =
+  | 'VALID'
+  | 'ALREADY_USED'
+  | 'EXPIRED'
+  | 'CANCELLED_REFUNDED'
+  | 'WRONG_MEMBER_BRANCH'
+  | 'PAYMENT_NOT_COMPLETE'
+  | 'NEEDS_REVIEW'
+  | 'NOT_QR_ELIGIBLE';
 
 export interface VoucherVerifyResponse {
-  result: VoucherVerifyResult;
+  result: VoucherScanResult;
   entitlement: {
     voucherCode: string;
     itemName: string;
     fulfilmentKind: FulfilmentKind;
     entitlementStatus: EntitlementStatus;
     customerName: string | null;
-    /** `••••<last4>`-style masked destination, `null` when nothing to mask (same convention as
-     *  `settlement.service.ts#maskBankAccountNumber`) — never the real phone/email. */
-    customerPhoneMasked: string | null;
-    customerEmailMasked: string | null;
+    /** Plain, unmasked — the vendor needs to actually contact this customer. */
+    customerPhone: string | null;
     orderId: string;
     /** Derived display reference (`ORD-xxxxxxxx`), same `shortOrderNumber` convention used
      *  everywhere else an order is shown — never a second numbering scheme. */
@@ -49,19 +42,16 @@ export interface VoucherVerifyResponse {
     settlementStatus: SettlementStatus;
     /** The entitlement's own creation time (payment confirmation). */
     purchasedAt: string;
-    /** D40 — the QR's own, independent 30-day expiry. `null` for a non-`SERVICE_SESSION`
-     *  entitlement (every product), which never gets a QR. */
+    /** The QR's own, independent 30-day expiry. `null` for a non-`SERVICE_SESSION` entitlement
+     *  (every product), which never gets a QR. */
     qrExpiresAt: string | null;
-    /** D40 — whether `POST /vouchers/:code/redeem-qr` would succeed right now: computed fresh by
-     *  the server on every call, never derived or cached client-side. */
-    qrRedeemable: boolean;
-    /** Only present when `entitlementStatus === 'OTP_REQUESTED'`. */
-    otpChallenge?: VoucherOtpChallenge;
+    /** Set once the entitlement is COMPLETED — drives the "Already used on &lt;date&gt;" copy. */
+    completedAt: string | null;
   };
 }
 
-/** Minimal entitlement shape every mutating voucher action (`start`/`complete`/`ship`/
- *  `record-delivery-evidence`) returns — enough to drive the Verify Purchase panel's next step. */
+/** Minimal entitlement shape every mutating voucher action (`start`/`finish-service`/`pick-up`/
+ *  `ship`/`record-delivery-evidence`) returns — enough to drive the next screen. */
 export interface VoucherEntitlement {
   id: string;
   voucherCode: string;
@@ -75,55 +65,59 @@ export interface VoucherEntitlement {
   shippedAt: string | null;
 }
 
+/** The one check the scan flow runs on every decode, and the one the Voucher Fulfilment page
+ *  re-runs on every mount — "reachable only from a scan" is enforced by always re-verifying,
+ *  never by trusting how the page was opened. */
 export function verifyVoucher(token: string | null, code: string) {
   return apiPost<VoucherVerifyResponse>('/vouchers/verify', token, { code });
 }
 
-function toQuery(params: Record<string, string | number | undefined>): string {
-  const usp = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== '') usp.set(key, String(value));
-  }
-  const qs = usp.toString();
-  return qs ? `?${qs}` : '';
-}
-
-/** One row of the Service Queue — the caller's own vendor's `PurchaseEntitlement` rows,
- *  server-paginated/searched, actionable rows (not yet COMPLETED/CANCELLED/REFUNDED) sorted
- *  before closed ones. See `GET /vouchers/queue`, same `vendor-portal.orders:custom` gate as the
- *  rest of this router. */
-export interface VoucherQueueRow {
+/** One deal/therapist-booking voucher still waiting to be scanned, or a product still waiting to
+ *  be given/sent — the Orders page's "Services waiting" / "Products to give or send" lists. */
+export interface PendingServiceRow {
   id: string;
   voucherCode: string;
   itemName: string;
-  customerName: string | null;
-  entitlementStatus: EntitlementStatus;
-  fulfilmentKind: FulfilmentKind;
-  settlementStatus: SettlementStatus;
+  kind: 'DEAL' | 'THERAPIST';
+  customerPhone: string | null;
+  validTill: string | null;
+  orderId: string;
 }
 
-export function getVoucherQueue(token: string | null, opts: { page?: number; pageSize?: number; search?: string } = {}) {
-  return apiGet<VoucherQueueRow[]>(`/vouchers/queue${toQuery(opts)}`, token);
+export interface PendingProductRow {
+  id: string;
+  voucherCode: string;
+  itemName: string;
+  fulfilmentKind: Extract<FulfilmentKind, 'PRODUCT_PICKUP' | 'PRODUCT_SHIPPED'>;
+  customerPhone: string | null;
+  orderId: string;
+}
+
+export interface PendingFulfilmentResponse {
+  servicesWaiting: PendingServiceRow[];
+  productsPending: PendingProductRow[];
+}
+
+/** Unpaginated and unsearchable by design — see `voucher.service.ts#listPendingFulfilment`'s own
+ *  doc comment; search by voucher code is gone entirely now that scanning is the only lookup. */
+export function listPendingFulfilment(token: string | null) {
+  return apiGet<PendingFulfilmentResponse>('/vouchers/pending-fulfilment', token);
 }
 
 export function startService(token: string | null, code: string) {
   return apiPost<VoucherEntitlement>(`/vouchers/${code}/start`, token);
 }
 
-/** Sends the completion OTP straight to the CUSTOMER's own phone/email — never returned here. */
-export function requestCompletionOtp(token: string | null, code: string) {
-  return apiPost<{ requested: true }>(`/vouchers/${code}/request-completion-otp`, token);
+/** No body — the server never takes a status value from the client. Only succeeds for a
+ *  `STARTED` (or legacy `OTP_REQUESTED`) `SERVICE_SESSION` entitlement. */
+export function finishService(token: string | null, code: string) {
+  return apiPost<VoucherEntitlement>(`/vouchers/${code}/finish-service`, token);
 }
 
-export function completeVoucher(token: string | null, code: string, otp: string) {
-  return apiPost<VoucherEntitlement>(`/vouchers/${code}/complete`, token, { otp });
-}
-
-/** D40 — the QR one-tap redemption path: no OTP, no body. Only succeeds for a `SERVICE_SESSION`
- *  entitlement that is currently `qrRedeemable` (see `verifyVoucher`'s response) — the server
- *  re-checks every eligibility rule atomically regardless of what the client believes. */
-export function redeemViaQr(token: string | null, code: string) {
-  return apiPost<VoucherEntitlement>(`/vouchers/${code}/redeem-qr`, token);
+/** No body — same discipline as `finishService`. Only succeeds for an `ACTIVE` (or legacy
+ *  `OTP_REQUESTED`) `PRODUCT_PICKUP` entitlement. */
+export function markProductPickedUp(token: string | null, code: string) {
+  return apiPost<VoucherEntitlement>(`/vouchers/${code}/pick-up`, token);
 }
 
 export function shipVoucher(token: string | null, code: string, input: { carrier: string; trackingNumber: string }) {

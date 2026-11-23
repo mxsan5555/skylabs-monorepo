@@ -1890,8 +1890,8 @@ model PurchaseEntitlement {
   // (createdAt + 30 days); null for a product entitlement, which never gets a QR. Independent of
   // Deal.validityDays (display-only, computed per read, never stored here) — see PLANNING.md §3.
   qrExpiresAt              DateTime?
-  // Who closed this entitlement via the QR one-tap path (redeemViaQr); null if closed the
-  // existing OTP-wizard way (completeVoucher) or not yet closed.
+  // The vendor user who closed this entitlement — set by finishService, markProductPickedUp,
+  // shipProduct+recordDeliveryEvidence; null if not yet closed.
   redeemedByUserId         String?
   createdAt                DateTime               @default(now())
   updatedAt                DateTime               @updatedAt

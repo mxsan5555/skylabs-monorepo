@@ -102,7 +102,7 @@ import {
   MemberSettlementsQuerySchema,
   RecordPayoutSchema,
 } from '../schemas/settlement.schema';
-import { VoucherVerifySchema, VoucherCompleteSchema, VoucherShipSchema } from '../schemas/voucher.schema';
+import { VoucherVerifySchema, VoucherShipSchema } from '../schemas/voucher.schema';
 import { DisputeCreateSchema, DisputeListQuerySchema, DisputeResolveSchema } from '../schemas/dispute.schema';
 import { RefundCreateSchema } from '../schemas/refund.schema';
 
@@ -2803,17 +2803,26 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'post',
     path: '/vouchers/verify',
-    summary: 'Verify a voucher code (member — never mutates state)',
+    summary: 'Scan/verify a voucher code (member — never mutates state)',
     tags: ['Purchase Verification'],
     security: bearer,
     request: { body: { content: { 'application/json': { schema: VoucherVerifySchema } } } },
-    responses: { 200: { description: 'Verification result' }, 403: errorResponse },
+    responses: { 200: { description: 'Scan result' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/vouchers/pending-fulfilment',
+    summary: "The caller's own still-open deal/therapist and product entitlements (Orders page lists)",
+    tags: ['Purchase Verification'],
+    security: bearer,
+    responses: { 200: { description: 'Pending fulfilment lists' }, 403: errorResponse },
   });
 
   for (const [path, summary, schema] of [
     ['/vouchers/{code}/start', 'Start a service voucher', undefined],
-    ['/vouchers/{code}/request-completion-otp', 'Request a completion OTP, sent to the customer', undefined],
-    ['/vouchers/{code}/complete', 'Complete a voucher with the customer-shared OTP', VoucherCompleteSchema],
+    ['/vouchers/{code}/finish-service', 'Finish a started deal/therapist service voucher (no OTP)', undefined],
+    ['/vouchers/{code}/pick-up', 'Mark a product voucher picked up in person (no OTP, no QR)', undefined],
     ['/vouchers/{code}/ship', 'Mark a product voucher shipped', VoucherShipSchema],
   ] as const) {
     registry.registerPath({

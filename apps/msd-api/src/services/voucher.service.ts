@@ -1,15 +1,11 @@
-import crypto from 'crypto';
-import bcrypt from 'bcrypt';
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
 import { Prisma, type EntitlementStatus, type SettlementStatus } from '../generated/prisma-client';
 import { getVendorByOwnerUserId } from './vendor.service';
-import { getFinanceSettings, maskBankAccountNumber } from './settlement.service';
+import { getFinanceSettings } from './settlement.service';
 import { shortOrderNumber } from './notification.service';
 import { validateMediaFile } from './media-validation.service';
 import { writeMediaFile } from '../lib/media-storage';
-import { sendOtp as sendSmsOtp } from '../providers/sms/connectExpress.provider';
-import { sendOtpEmail } from '../providers/email/smtp.provider';
 import type { MediaFile } from './media.service';
 
 /**
@@ -21,12 +17,30 @@ import type { MediaFile } from './media.service';
 
 const ENTITLEMENT_INCLUDE = {
   orderItem: { select: { order: { select: { id: true, status: true } }, itemName: true } },
-  customer: { select: { id: true, name: true, phone: true, email: true } },
+  customer: { select: { id: true, name: true, phone: true } },
   branch: { select: { name: true } },
   adjustments: { select: { amount: true } },
 } as const;
 
-export type VoucherVerifyResult = 'VALID' | 'ALREADY_USED' | 'EXPIRED' | 'CANCELLED_REFUNDED' | 'WRONG_MEMBER_BRANCH' | 'ADMIN_REVIEW_REQUIRED';
+/**
+ * Every state a scanned/looked-up voucher can resolve to. Ownership (`WRONG_MEMBER_BRANCH`) is
+ * checked first and always wins — never leak a voucher's fulfilment kind or status to a vendor
+ * who doesn't own it. `NOT_QR_ELIGIBLE` covers a product code (products are never QR-redeemable).
+ * `PAYMENT_NOT_COMPLETE` (an unpaid order) and `NEEDS_REVIEW` (disputed/voided/anomalous) used to
+ * be one combined `ADMIN_REVIEW_REQUIRED` bucket — split so the scan screen can show "Payment not
+ * completed" instead of a generic "needs review" message. `EXPIRED` is the QR's own independent
+ * 30-day window (D40) — distinct from `ALREADY_USED`, which always wins when both could apply (a
+ * used-then-later-expired voucher says "already used", not "expired").
+ */
+export type VoucherScanResult =
+  | 'VALID'
+  | 'ALREADY_USED'
+  | 'EXPIRED'
+  | 'CANCELLED_REFUNDED'
+  | 'WRONG_MEMBER_BRANCH'
+  | 'PAYMENT_NOT_COMPLETE'
+  | 'NEEDS_REVIEW'
+  | 'NOT_QR_ELIGIBLE';
 
 async function findEntitlementOrThrow(code: string) {
   const entitlement = await prisma.purchaseEntitlement.findUnique({ where: { voucherCode: code }, include: ENTITLEMENT_INCLUDE });
@@ -46,93 +60,53 @@ async function assertCallerOwnsVoucher(callerUserId: string, code: string) {
 }
 
 /**
- * Safe, non-mutating projection of "the latest unverified CompletionOtpChallenge" for the
- * resumable verification page's OTP step — looked up the exact same way
- * `requestCompletionOtp`/`completeVoucher` already find it (`findFirst` on
- * `{ entitlementId, verifiedAt: null }`, newest first). NEVER includes `hashedOtp` or any
- * plaintext (there is no plaintext stored anywhere in this schema) — only timing/attempt
- * metadata the frontend needs to render "OTP sent, N attempts left, resend available at …"
- * without re-sending.
- */
-async function projectOtpChallenge(entitlementId: string) {
-  const [settings, challenge] = await Promise.all([
-    getFinanceSettings(),
-    prisma.completionOtpChallenge.findFirst({
-      where: { entitlementId, verifiedAt: null },
-      orderBy: { createdAt: 'desc' },
-    }),
-  ]);
-  if (!challenge) return undefined;
-  return {
-    requestedAt: challenge.lastSentAt,
-    expiresAt: challenge.expiresAt,
-    attempts: challenge.attempts,
-    maxAttempts: settings.completionOtpMaxAttempts,
-    resendAvailableAt: new Date(challenge.lastSentAt.getTime() + settings.completionOtpResendCooldownSeconds * 1000),
-  };
-}
-
-/**
- * The one eligibility classification every voucher action shares — the existing wizard's
- * read path (`verifyVoucher`) AND the new QR one-tap path (`redeemViaQr`'s pre-check and
- * `qrRedeemable`) evaluate through this SAME function, so there is never a second, looser copy
- * of "is this voucher usable" drifting out of sync with the first. `qrExpiresAt` is deliberately
- * NOT checked here — it is independent of this classification (D40, PLANNING.md §3) and is
- * layered on top by callers that care about it.
+ * The one eligibility classification every voucher action shares — `verifyVoucher` (the scan-time
+ * check) and the atomic `updateMany` guards in `finishService`/`markProductPickedUp` encode the
+ * SAME rules, so there is never a second, looser copy of "is this voucher usable" drifting out of
+ * sync. Order matters (first match wins): ownership first (never leak a voucher's state to the
+ * wrong vendor), then QR-eligibility (a product code was scanned), then closed/blocked states,
+ * then payment/order problems, then already-used (more specific than expired), then the QR
+ * window, then `VALID`.
  */
 function classifyVoucher(
-  entitlement: { entitlementStatus: EntitlementStatus; settlementStatus: SettlementStatus; vendorId: string; orderItem: { order: { status: string } } },
+  entitlement: {
+    entitlementStatus: EntitlementStatus;
+    settlementStatus: SettlementStatus;
+    vendorId: string;
+    fulfilmentKind: string;
+    qrExpiresAt: Date | null;
+    orderItem: { order: { status: string } };
+  },
   vendor: { id: string } | null,
-): VoucherVerifyResult {
+): VoucherScanResult {
   if (!vendor || vendor.id !== entitlement.vendorId) return 'WRONG_MEMBER_BRANCH';
-  if (!['CONFIRMED', 'COMPLETED'].includes(entitlement.orderItem.order.status)) return 'ADMIN_REVIEW_REQUIRED';
+  if (entitlement.fulfilmentKind !== 'SERVICE_SESSION') return 'NOT_QR_ELIGIBLE';
   if (entitlement.entitlementStatus === 'CANCELLED' || entitlement.entitlementStatus === 'REFUNDED' || entitlement.settlementStatus === 'VOID') {
     return 'CANCELLED_REFUNDED';
   }
-  if (entitlement.settlementStatus === 'DISPUTED_BLOCKED') return 'ADMIN_REVIEW_REQUIRED';
+  if (entitlement.settlementStatus === 'DISPUTED_BLOCKED') return 'NEEDS_REVIEW';
+  if (entitlement.orderItem.order.status === 'PENDING_PAYMENT') return 'PAYMENT_NOT_COMPLETE';
+  if (entitlement.orderItem.order.status === 'CANCELLED') return 'NEEDS_REVIEW';
   if (entitlement.entitlementStatus === 'COMPLETED') return 'ALREADY_USED';
+  if (!entitlement.qrExpiresAt || entitlement.qrExpiresAt.getTime() <= Date.now()) return 'EXPIRED';
   return 'VALID';
 }
 
-/** D40 — whether the QR one-tap path specifically (not the OTP wizard) can redeem this
- *  entitlement right now: classified `VALID`, a service voucher, not already started down the
- *  OTP path (`ACTIVE`/`STARTED` only — `OTP_REQUESTED` finishes through the existing wizard), and
- *  still inside its own, independent 30-day `qrExpiresAt` window. Computed fresh on every call —
- *  the API response is never trusted back as input. */
-function isQrRedeemable(
-  result: VoucherVerifyResult,
-  entitlement: { fulfilmentKind: string; entitlementStatus: EntitlementStatus; qrExpiresAt: Date | null },
-): boolean {
-  return (
-    result === 'VALID' &&
-    entitlement.fulfilmentKind === 'SERVICE_SESSION' &&
-    (entitlement.entitlementStatus === 'ACTIVE' || entitlement.entitlementStatus === 'STARTED') &&
-    entitlement.qrExpiresAt != null &&
-    entitlement.qrExpiresAt.getTime() > Date.now()
-  );
-}
-
 /**
- * Read-only — never mutates state. Returns one of the exact result states the spec lists; a
- * voucher that simply doesn't exist is a 404 (route-level error), not one of these states.
- * `EXPIRED` has no backing field yet (no per-voucher expiry concept was part of the approved data
- * model — see the final report's own "known gap" note) — included in the result union for
- * forward API-shape compatibility, never actually returned today.
+ * Read-only — never mutates state. A voucher that simply doesn't exist is a 404 (route-level
+ * error), not one of the `VoucherScanResult` states. This is the single check the scan flow runs
+ * on every decode AND the one the Voucher Fulfilment page re-runs on every mount — "reachable only
+ * from a scan" is enforced by always re-verifying here, never by trusting how the page was opened.
  *
- * Also the resumable Verification page's entire data source: masked
- * `customerPhoneMasked`/`customerEmailMasked` (same `••••<last4>` convention as
- * `settlement.service.ts#maskBankAccountNumber`, reused literally rather than re-implemented)
- * and, only when `entitlementStatus === 'OTP_REQUESTED'`, an `otpChallenge` block (see
- * `projectOtpChallenge` above) — omitted entirely otherwise, never `null`. Still exactly one
- * `findUnique` + (conditionally) one more read — no `update`/`updateMany` call is ever added here.
+ * `customerPhone` is plain, unmasked (the vendor needs to actually contact this customer — see
+ * PLANNING.md's resolved decision); email is dropped entirely, no vendor screen needs it.
+ * `completedAt` drives the "Already used on <date>" copy. Still exactly one `findUnique` — no
+ * `update`/`updateMany` call is ever added here.
  */
 export async function verifyVoucher(callerUserId: string, code: string) {
   const entitlement = await findEntitlementOrThrow(code);
   const vendor = await getVendorByOwnerUserId(callerUserId);
   const result = classifyVoucher(entitlement, vendor);
-  const qrRedeemable = isQrRedeemable(result, entitlement);
-
-  const otpChallenge = entitlement.entitlementStatus === 'OTP_REQUESTED' ? await projectOtpChallenge(entitlement.id) : undefined;
 
   // Same "payable = memberShareAmount + Σadjustments" formula already used everywhere else this
   // is computed (e.g. settlement.service.ts's own aggregates) — never a second, divergent one.
@@ -148,8 +122,7 @@ export async function verifyVoucher(callerUserId: string, code: string) {
       fulfilmentKind: entitlement.fulfilmentKind,
       entitlementStatus: entitlement.entitlementStatus,
       customerName: entitlement.customer.name,
-      customerPhoneMasked: maskBankAccountNumber(entitlement.customer.phone),
-      customerEmailMasked: maskBankAccountNumber(entitlement.customer.email),
+      customerPhone: entitlement.customer.phone,
       orderId: entitlement.orderItem.order.id,
       orderNumber: shortOrderNumber(entitlement.orderItem.order.id),
       branchName: entitlement.branch?.name ?? null,
@@ -158,8 +131,7 @@ export async function verifyVoucher(callerUserId: string, code: string) {
       settlementStatus: entitlement.settlementStatus,
       purchasedAt: entitlement.createdAt,
       qrExpiresAt: entitlement.qrExpiresAt,
-      qrRedeemable,
-      ...(otpChallenge ? { otpChallenge } : {}),
+      completedAt: entitlement.completedAt,
     },
   };
 }
@@ -195,28 +167,28 @@ function holdHoursFor(fulfilmentKind: string, settings: { serviceHoldHours: numb
 }
 
 /**
- * D40 — QR-initiated redemption. A second, simpler route to the exact same `COMPLETED` state
- * `completeVoucher` already reaches, for `SERVICE_SESSION` entitlements only (a deal or direct
- * therapist booking) — never a product. There is no OTP anywhere in this path: no
- * `CompletionOtpChallenge` row is ever created, sent, or checked, and `completeVoucher`'s manual
- * wizard is untouched and remains the only way to redeem an entitlement that has no QR, or whose
- * QR has expired.
+ * Vendor confirms a service is finished — reached only after a QR scan already validated the
+ * voucher (`verifyVoucher`) and the vendor tapped "Start service" (`startService`). `SERVICE_SESSION`
+ * entitlements only (a deal or direct therapist booking) — never a product, see
+ * `markProductPickedUp` for that. No OTP anywhere in this path: no `CompletionOtpChallenge` row is
+ * ever created, sent, or checked.
  *
- * Every rule `classifyVoucher` already enforces for the read path (ownership via
- * `assertCallerOwnsVoucher`, order status, settlement status, not already closed) still applies
- * here — `qrExpiresAt` is an ADDITIONAL, independent check, never a replacement for any of them.
- * All of it is evaluated in ONE guarded `updateMany`, atomically, server-side only (the request
- * carries no expiry or status value for the server to trust) — exactly the same
- * "conditional-update-and-check-the-count" discipline `startService`/`shipProduct`/
- * `completeVoucher` already use, so two concurrent redemptions of the same voucher can never both
- * succeed. Feeds the identical `settlementStatus`/`holdUntil` payout pipeline `completeVoucher`
- * feeds — which path closed the entitlement makes no difference downstream. Never reads or
- * writes `Deal`/`DealPackage`/`Therapist`/`Branch` — the catalog listing is untouched.
+ * Accepts `STARTED` (the normal path) and `OTP_REQUESTED` (a voucher that was mid-OTP before that
+ * system was retired — treated identically to `STARTED` so it isn't permanently stuck; see
+ * PLANNING.md's migration note). Deliberately does NOT re-check `qrExpiresAt` here — the window
+ * was already validated at scan time, and a service legitimately in progress should not expire out
+ * from under itself while the vendor is finishing it.
+ *
+ * Evaluated in ONE guarded `updateMany`, atomically, server-side only (the request carries no
+ * status value for the server to trust) — same "conditional-update-and-check-the-count"
+ * discipline `startService`/`shipProduct`/`markProductPickedUp` use, so two concurrent finish
+ * calls for the same voucher can never both succeed. Never reads or writes `Deal`/`DealPackage`/
+ * `Therapist`/`Branch` — the catalog listing is untouched.
  */
-export async function redeemViaQr(callerUserId: string, code: string) {
+export async function finishService(callerUserId: string, code: string) {
   const entitlement = await assertCallerOwnsVoucher(callerUserId, code);
   if (entitlement.fulfilmentKind !== 'SERVICE_SESSION') {
-    throw new ApiError('VALIDATION_ERROR', 'Only a deal or therapist-booking voucher can be redeemed by QR');
+    throw new ApiError('VALIDATION_ERROR', 'Only a deal or therapist-booking voucher can be finished this way');
   }
 
   const settings = await getFinanceSettings();
@@ -225,9 +197,8 @@ export async function redeemViaQr(callerUserId: string, code: string) {
   const result = await prisma.purchaseEntitlement.updateMany({
     where: {
       id: entitlement.id,
-      entitlementStatus: { in: ['ACTIVE', 'STARTED'] },
+      entitlementStatus: { in: ['STARTED', 'OTP_REQUESTED'] },
       settlementStatus: { notIn: ['VOID', 'DISPUTED_BLOCKED'] },
-      qrExpiresAt: { gt: new Date() },
       orderItem: { order: { status: { in: ['CONFIRMED', 'COMPLETED'] } } },
     },
     data: {
@@ -239,7 +210,44 @@ export async function redeemViaQr(callerUserId: string, code: string) {
     },
   });
   if (result.count === 0) {
-    throw new ApiError('CONFLICT', 'This QR code can no longer be redeemed — it may already be redeemed, expired, or on hold for review');
+    throw new ApiError('CONFLICT', 'This service can no longer be finished — it may already be completed or on hold for review');
+  }
+  return prisma.purchaseEntitlement.findUniqueOrThrow({ where: { id: entitlement.id } });
+}
+
+/**
+ * Vendor confirms a product was picked up by the customer in person — one tap, no OTP, no QR
+ * (products are never QR-eligible, see `classifyVoucher`). The voucher code is always sourced
+ * from the vendor's own Orders/Order Detail list, never typed in by anyone. Mirrors
+ * `finishService`'s shape exactly, just gated to `PRODUCT_PICKUP` and `ACTIVE`/`OTP_REQUESTED`
+ * (pickup has no separate "start" step the way a service does).
+ */
+export async function markProductPickedUp(callerUserId: string, code: string) {
+  const entitlement = await assertCallerOwnsVoucher(callerUserId, code);
+  if (entitlement.fulfilmentKind !== 'PRODUCT_PICKUP') {
+    throw new ApiError('VALIDATION_ERROR', 'Only a product awaiting pickup can be marked picked up');
+  }
+
+  const settings = await getFinanceSettings();
+  const holdUntil = new Date(Date.now() + holdHoursFor(entitlement.fulfilmentKind, settings) * 60 * 60 * 1000);
+
+  const result = await prisma.purchaseEntitlement.updateMany({
+    where: {
+      id: entitlement.id,
+      entitlementStatus: { in: ['ACTIVE', 'OTP_REQUESTED'] },
+      settlementStatus: { notIn: ['VOID', 'DISPUTED_BLOCKED'] },
+      orderItem: { order: { status: { in: ['CONFIRMED', 'COMPLETED'] } } },
+    },
+    data: {
+      entitlementStatus: 'COMPLETED',
+      completedAt: new Date(),
+      redeemedByUserId: callerUserId,
+      settlementStatus: 'ON_HOLD',
+      holdUntil,
+    },
+  });
+  if (result.count === 0) {
+    throw new ApiError('CONFLICT', 'This item can no longer be marked picked up — it may already be done or on hold for review');
   }
   return prisma.purchaseEntitlement.findUniqueOrThrow({ where: { id: entitlement.id } });
 }
@@ -276,211 +284,87 @@ export async function recordDeliveryEvidence(callerUserId: string, code: string,
   return prisma.purchaseEntitlement.findUniqueOrThrow({ where: { id: entitlement.id } });
 }
 
-// ─── Completion OTP (service completion / product pickup) ────────────────────
+// ─── Pending fulfilment (vendor's Orders page, screens 1/6) ───────────────────
 
-function isPhoneIdentifier(identifier: string): boolean {
-  return !identifier.includes('@');
+const OPEN_ENTITLEMENT_STATUSES: EntitlementStatus[] = ['ACTIVE', 'STARTED', 'OTP_REQUESTED'];
+
+export interface PendingServiceRow {
+  id: string;
+  voucherCode: string;
+  itemName: string;
+  kind: 'DEAL' | 'THERAPIST';
+  customerPhone: string | null;
+  validTill: Date | null;
+  orderId: string;
 }
 
-const OTP_HASH_ROUNDS = 10;
-
-export async function requestCompletionOtp(callerUserId: string, code: string) {
-  const entitlement = await assertCallerOwnsVoucher(callerUserId, code);
-  if (entitlement.entitlementStatus !== 'ACTIVE' && entitlement.entitlementStatus !== 'STARTED' && entitlement.entitlementStatus !== 'OTP_REQUESTED') {
-    throw new ApiError('CONFLICT', 'This voucher is not awaiting completion');
-  }
-  if (entitlement.fulfilmentKind === 'PRODUCT_SHIPPED') {
-    throw new ApiError('VALIDATION_ERROR', 'A shipped product is completed via delivery evidence, not an OTP');
-  }
-
-  const settings = await getFinanceSettings();
-  const lastChallenge = await prisma.completionOtpChallenge.findFirst({
-    where: { entitlementId: entitlement.id, verifiedAt: null },
-    orderBy: { createdAt: 'desc' },
-  });
-  if (lastChallenge) {
-    const cooldownMs = settings.completionOtpResendCooldownSeconds * 1000;
-    const elapsed = Date.now() - lastChallenge.lastSentAt.getTime();
-    if (elapsed < cooldownMs) {
-      throw new ApiError('RATE_LIMITED', `Please wait before requesting another OTP (${Math.ceil((cooldownMs - elapsed) / 1000)}s)`);
-    }
-  }
-
-  const customer = entitlement.customer;
-  const identifier = customer.phone ?? customer.email;
-  if (!identifier) throw new ApiError('SERVER_ERROR', 'This customer has no phone or email on file to send the OTP to');
-
-  const otp = crypto.randomInt(100000, 999999).toString();
-  const hashedOtp = await bcrypt.hash(otp, OTP_HASH_ROUNDS);
-  const expiresAt = new Date(Date.now() + settings.completionOtpExpiryMinutes * 60 * 1000);
-  const purpose = entitlement.fulfilmentKind === 'SERVICE_SESSION' ? 'SERVICE_COMPLETION' : 'PRODUCT_PICKUP';
-
-  await prisma.$transaction([
-    prisma.completionOtpChallenge.create({
-      data: {
-        entitlementId: entitlement.id,
-        purpose,
-        hashedOtp,
-        expiresAt,
-        resendCount: lastChallenge ? lastChallenge.resendCount + 1 : 0,
-        lastSentAt: new Date(),
-        requestedByUserId: callerUserId,
-      },
-    }),
-    prisma.purchaseEntitlement.updateMany({
-      where: { id: entitlement.id, entitlementStatus: { in: ['ACTIVE', 'STARTED'] } },
-      data: { entitlementStatus: 'OTP_REQUESTED' },
-    }),
-  ]);
-
-  // Member never sees the plaintext OTP through this (or any) API response — it's sent directly
-  // to the CUSTOMER's own identifier, same provider functions `otp.service.ts` uses for login.
-  const delivered = isPhoneIdentifier(identifier) ? await sendSmsOtp(identifier, otp) : await sendOtpEmail(identifier, otp);
-  if (!delivered) {
-    throw new ApiError('SERVER_ERROR', 'Failed to send the completion OTP — please try again in a moment');
-  }
+export interface PendingProductRow {
+  id: string;
+  voucherCode: string;
+  itemName: string;
+  fulfilmentKind: 'PRODUCT_PICKUP' | 'PRODUCT_SHIPPED';
+  customerPhone: string | null;
+  orderId: string;
 }
 
 /**
- * Member submits the OTP the customer read out to them. Guards against two concurrent `complete`
- * calls succeeding for the same voucher with a CONDITIONAL `updateMany` (not a blind `update`) —
- * only the first one flips state; the second gets a clean "already completed" conflict, never a
- * duplicate financial eligibility (see PurchaseEntitlement's own schema doc comment).
+ * The Orders page's "Services waiting" / "Products to give or send" lists — the caller's own
+ * vendor's still-open entitlements, oldest-waiting-first. Replaces the old searchable/paginated
+ * Service Queue: these render as plain counted lists now, never a searchable table — search by
+ * voucher code is gone entirely (scanning is the only way to act on a service voucher; a product
+ * action is one tap from this same list, no lookup needed).
  */
-export async function completeVoucher(callerUserId: string, code: string, otp: string) {
-  const entitlement = await assertCallerOwnsVoucher(callerUserId, code);
-  const settings = await getFinanceSettings();
-
-  const challenge = await prisma.completionOtpChallenge.findFirst({
-    where: { entitlementId: entitlement.id, verifiedAt: null },
-    orderBy: { createdAt: 'desc' },
-  });
-  if (!challenge) throw new ApiError('UNAUTHORIZED', 'No pending OTP for this voucher — request one first');
-  if (challenge.expiresAt.getTime() < Date.now()) throw new ApiError('UNAUTHORIZED', 'OTP has expired — request a new one');
-  if (challenge.attempts >= settings.completionOtpMaxAttempts) {
-    throw new ApiError('RATE_LIMITED', 'Too many incorrect attempts — request a new OTP');
-  }
-
-  const isMatch = await bcrypt.compare(otp, challenge.hashedOtp);
-  if (!isMatch) {
-    await prisma.completionOtpChallenge.update({ where: { id: challenge.id }, data: { attempts: { increment: 1 } } });
-    throw new ApiError('UNAUTHORIZED', 'Incorrect OTP');
-  }
-
-  const holdUntil = new Date(Date.now() + holdHoursFor(entitlement.fulfilmentKind, settings) * 60 * 60 * 1000);
-
-  return prisma.$transaction(async (tx) => {
-    const result = await tx.purchaseEntitlement.updateMany({
-      where: { id: entitlement.id, entitlementStatus: { in: ['STARTED', 'OTP_REQUESTED'] } },
-      data: { entitlementStatus: 'COMPLETED', completedAt: new Date(), settlementStatus: 'ON_HOLD', holdUntil },
-    });
-    if (result.count === 0) throw new ApiError('CONFLICT', 'This voucher has already been completed');
-    await tx.completionOtpChallenge.update({ where: { id: challenge.id }, data: { verifiedAt: new Date() } });
-    return tx.purchaseEntitlement.findUniqueOrThrow({ where: { id: entitlement.id } });
-  });
-}
-
-// ─── Service Queue (member-facing list of own entitlements) ──────────────────
-
-/** Not yet closed out — sorts before `CLOSED_ENTITLEMENT_STATUSES` on the Service Queue. */
-const ACTIONABLE_ENTITLEMENT_STATUSES: EntitlementStatus[] = ['ACTIVE', 'STARTED', 'OTP_REQUESTED'];
-const CLOSED_ENTITLEMENT_STATUSES: EntitlementStatus[] = ['COMPLETED', 'CANCELLED', 'REFUNDED'];
-
-/** Narrow, list-row-only select — deliberately omits `adjustments`/`completionOtps`/`disputes`
- *  (none needed for a queue row, and including a to-many relation here would multiply rows). */
-const QUEUE_SELECT = {
-  id: true,
-  voucherCode: true,
-  entitlementStatus: true,
-  fulfilmentKind: true,
-  settlementStatus: true,
-  orderItem: { select: { itemName: true } },
-  customer: { select: { name: true } },
-} as const;
-
-type QueueRow = Prisma.PurchaseEntitlementGetPayload<{ select: typeof QUEUE_SELECT }>;
-
-function queueWhere(vendorId: string, statuses: EntitlementStatus[], search?: string): Prisma.PurchaseEntitlementWhereInput {
-  return {
-    vendorId,
-    entitlementStatus: { in: statuses },
-    ...(search
-      ? {
-          OR: [
-            { voucherCode: { contains: search, mode: 'insensitive' as const } },
-            { orderItem: { is: { itemName: { contains: search, mode: 'insensitive' as const } } } },
-            { customer: { is: { name: { contains: search, mode: 'insensitive' as const } } } },
-          ],
-        }
-      : {}),
-  };
-}
-
-function mapQueueRow(row: QueueRow) {
-  return {
-    id: row.id,
-    voucherCode: row.voucherCode,
-    itemName: row.orderItem.itemName,
-    customerName: row.customer.name,
-    entitlementStatus: row.entitlementStatus,
-    fulfilmentKind: row.fulfilmentKind,
-    settlementStatus: row.settlementStatus,
-  };
-}
-
-/**
- * Service Queue — the caller's own vendor's `PurchaseEntitlement` rows, paginated/searchable.
- * One DB row = one queue row by construction (`QUEUE_SELECT` includes no to-many relation), so
- * there is no de-duplication step. Actionable rows (`ACTIONABLE_ENTITLEMENT_STATUSES` — not yet
- * COMPLETED/CANCELLED/REFUNDED) sort before closed ones; rather than leaning on the DB's native
- * enum declaration order (fragile — breaks silently if the enum is ever reordered), this runs the
- * two groups as two separate `count`+`findMany` queries, each ordered by recency, and stitches
- * them into one page — at most 4 queries total, same "batch, never a fragile shortcut" discipline
- * as the rest of this codebase.
- */
-export async function listMyVoucherQueue(callerUserId: string, opts: { page: number; pageSize: number; search?: string }) {
+export async function listPendingFulfilment(callerUserId: string) {
   const vendor = await getVendorByOwnerUserId(callerUserId);
   if (!vendor) throw new ApiError('NOT_FOUND', 'Complete your business profile first');
 
-  const actionableWhere = queueWhere(vendor.id, ACTIONABLE_ENTITLEMENT_STATUSES, opts.search);
-  const closedWhere = queueWhere(vendor.id, CLOSED_ENTITLEMENT_STATUSES, opts.search);
+  const base = { vendorId: vendor.id, entitlementStatus: { in: OPEN_ENTITLEMENT_STATUSES } } as const;
 
-  const [actionableTotal, closedTotal] = await Promise.all([
-    prisma.purchaseEntitlement.count({ where: actionableWhere }),
-    prisma.purchaseEntitlement.count({ where: closedWhere }),
+  const [services, products] = await Promise.all([
+    prisma.purchaseEntitlement.findMany({
+      where: { ...base, fulfilmentKind: 'SERVICE_SESSION' },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        voucherCode: true,
+        qrExpiresAt: true,
+        orderItem: { select: { itemName: true, dealId: true, therapistId: true, orderId: true } },
+        customer: { select: { phone: true } },
+      },
+    }),
+    prisma.purchaseEntitlement.findMany({
+      where: { ...base, fulfilmentKind: { in: ['PRODUCT_PICKUP', 'PRODUCT_SHIPPED'] } },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        voucherCode: true,
+        fulfilmentKind: true,
+        orderItem: { select: { itemName: true, orderId: true } },
+        customer: { select: { phone: true } },
+      },
+    }),
   ]);
-  const total = actionableTotal + closedTotal;
-  const skip = (opts.page - 1) * opts.pageSize;
 
-  let rows: QueueRow[];
-  if (skip < actionableTotal) {
-    const fromActionable = await prisma.purchaseEntitlement.findMany({
-      where: actionableWhere,
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take: opts.pageSize,
-      select: QUEUE_SELECT,
-    });
-    const remaining = opts.pageSize - fromActionable.length;
-    const fromClosed =
-      remaining > 0 && closedTotal > 0
-        ? await prisma.purchaseEntitlement.findMany({
-            where: closedWhere,
-            orderBy: { createdAt: 'desc' },
-            take: remaining,
-            select: QUEUE_SELECT,
-          })
-        : [];
-    rows = [...fromActionable, ...fromClosed];
-  } else {
-    rows = await prisma.purchaseEntitlement.findMany({
-      where: closedWhere,
-      orderBy: { createdAt: 'desc' },
-      skip: skip - actionableTotal,
-      take: opts.pageSize,
-      select: QUEUE_SELECT,
-    });
-  }
+  const servicesWaiting: PendingServiceRow[] = services.map((e) => ({
+    id: e.id,
+    voucherCode: e.voucherCode,
+    itemName: e.orderItem.itemName,
+    // Deal and direct Therapist-booking lines are mutually exclusive (settlement.service.ts's
+    // own `voucherPrefixFor` relies on the same distinction) — no "neither" case to handle here.
+    kind: e.orderItem.therapistId ? 'THERAPIST' : 'DEAL',
+    customerPhone: e.customer.phone,
+    validTill: e.qrExpiresAt,
+    orderId: e.orderItem.orderId,
+  }));
 
-  return { items: rows.map(mapQueueRow), total };
+  const productsPending: PendingProductRow[] = products.map((e) => ({
+    id: e.id,
+    voucherCode: e.voucherCode,
+    itemName: e.orderItem.itemName,
+    fulfilmentKind: e.fulfilmentKind as 'PRODUCT_PICKUP' | 'PRODUCT_SHIPPED',
+    customerPhone: e.customer.phone,
+    orderId: e.orderItem.orderId,
+  }));
+
+  return { servicesWaiting, productsPending };
 }
