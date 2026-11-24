@@ -394,7 +394,7 @@ router.get('/me/customers', requirePermission('members', 'custom'), validateQuer
  */
 router.get(
   '/me/customers/:customerId',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   validateParams(VendorCustomerIdParamSchema),
   async (req, res, next) => {
     try {
