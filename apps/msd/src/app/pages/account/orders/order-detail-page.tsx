@@ -176,7 +176,7 @@ export function OrderDetailPage() {
 
   const backTo =
     (location.state as BackState | null)?.backTo ??
-    (customerId ? `/account/customers/${customerId}/orders` : isAdminViewer ? '/account/orders' : '/account/vendor-orders?tab=history');
+    (customerId ? `/account/customers/${customerId}/orders` : isAdminViewer ? '/account/orders' : '/account/vendor-orders');
 
   useSetBreadcrumbs(
     order
@@ -214,13 +214,13 @@ export function OrderDetailPage() {
   // "Customer's Other Orders" (Customer card) opens the full, filterable Order History page
   // instead of an inline table — see orders.tsx's own `customerId`/`excludeOrderId` handling.
   // Context-aware target: an admin lands on the full `/account/orders` list; a member (who never
-  // holds `orders:view`) lands on their own 2-tab `/account/vendor-orders` page's History tab —
-  // same `OrderManagement` component either way, just a different route/scope wrapping it.
+  // holds `orders:view`) lands on their own `/account/vendor-orders` page's own order history
+  // section — same `OrderManagement` component either way, just a different route/scope wrapping it.
   const openCustomersOtherOrders = useCallback(() => {
     if (!order?.customerId) return;
     const target = isAdminViewer
       ? `/account/orders?customerId=${order.customerId}&excludeOrderId=${order.id}`
-      : `/account/vendor-orders?tab=history&customerId=${order.customerId}&excludeOrderId=${order.id}`;
+      : `/account/vendor-orders?customerId=${order.customerId}&excludeOrderId=${order.id}`;
     navigate(target, {
       state: {
         fromOrderId: order.id,

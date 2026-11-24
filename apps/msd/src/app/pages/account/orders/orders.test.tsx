@@ -21,6 +21,12 @@ vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
   }),
 }));
 
+const navigateMock = vi.fn();
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return { ...actual, useNavigate: () => navigateMock };
+});
+
 const listOrdersMock = vi.fn();
 const getOrderCountsMock = vi.fn();
 const setOrderStatusMock = vi.fn();
@@ -407,5 +413,75 @@ describe('OrderManagement — member filter from the address', () => {
     await waitForTableLoaded(1);
     expect(listOrdersMock).toHaveBeenCalledWith(expect.anything(), expect.not.objectContaining({ vendorId: expect.anything() }));
     expect(screen.queryByText("Showing one member's orders.")).toBeNull();
+  });
+});
+
+/**
+ * Feature: vendor-panel display rule — "show only the phone number when there's no customer
+ * name; never render a literal placeholder" (the Simple Vendor Orders redesign)
+ * Scenario: `scope="member"` shows the customer's phone instead of the "Name not added" label
+ * used everywhere else; `scope="admin"` is provably unchanged.
+ */
+describe('OrderManagement — customer name fallback is scope-aware', () => {
+  const noRealName: Order = { ...BASE_ORDER, customer: { ...BASE_ORDER.customer, name: BASE_ORDER.customer.phone! } };
+
+  it('scope="member" shows the phone number instead of "Name not added"', async () => {
+    listOrdersMock.mockResolvedValue({ data: [noRealName], meta: { total: 1 } });
+    render(
+      <MemoryRouter initialEntries={['/account/vendor-orders']}>
+        <OrderManagement scope="member" />
+      </MemoryRouter>,
+    );
+    await waitForTableLoaded(1);
+
+    const table = document.querySelector('sky-data-table');
+    const rows = JSON.parse(table?.getAttribute('rows') ?? '[]');
+    expect(rows[0].Customer).toBe(noRealName.customer.phone);
+    expect(rows[0].Customer).not.toBe('Name not added');
+  });
+
+  it('scope="admin" (default) still shows "Name not added" — unchanged existing behaviour', async () => {
+    listOrdersMock.mockResolvedValue({ data: [noRealName], meta: { total: 1 } });
+    renderPage();
+    await waitForTableLoaded(1);
+
+    const table = document.querySelector('sky-data-table');
+    const rows = JSON.parse(table?.getAttribute('rows') ?? '[]');
+    expect(rows[0].Customer).toBe('Name not added');
+  });
+});
+
+/**
+ * Feature: the "View" row action opens the right order-detail route for the caller's own context
+ * Scenario: `scope="member"` navigates to the vendor-only `/account/vendor-orders/:id` (never the
+ * vendor profile, never the shared admin page); `scope="admin"` is provably unchanged.
+ */
+describe('OrderManagement — "View" row action targets the right order-detail route per scope', () => {
+  function table() {
+    return document.querySelector('sky-data-table') as HTMLElement;
+  }
+
+  it('scope="member" navigates to /account/vendor-orders/:id', async () => {
+    listOrdersMock.mockResolvedValue({ data: [BASE_ORDER], meta: { total: 1 } });
+    render(
+      <MemoryRouter initialEntries={['/account/vendor-orders']}>
+        <OrderManagement scope="member" />
+      </MemoryRouter>,
+    );
+    await waitForTableLoaded(1);
+
+    fireEvent(table(), new CustomEvent('sky-dt-row-action', { detail: { action: 'view-order', row: { __orderId: 'order-1' } } }));
+
+    expect(navigateMock).toHaveBeenCalledWith('/account/vendor-orders/order-1', expect.anything());
+  });
+
+  it('scope="admin" (default) still navigates to /account/orders/:id — unchanged existing behaviour', async () => {
+    listOrdersMock.mockResolvedValue({ data: [BASE_ORDER], meta: { total: 1 } });
+    renderPage();
+    await waitForTableLoaded(1);
+
+    fireEvent(table(), new CustomEvent('sky-dt-row-action', { detail: { action: 'view-order', row: { __orderId: 'order-1' } } }));
+
+    expect(navigateMock).toHaveBeenCalledWith('/account/orders/order-1', expect.anything());
   });
 });

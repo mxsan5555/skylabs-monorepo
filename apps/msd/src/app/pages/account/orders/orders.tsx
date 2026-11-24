@@ -82,7 +82,7 @@ export function describeOrderComposition(order: Order): string {
  *  (same convention this file already used for extra fields) carrying the raw ids the row
  *  actions need; every visible column uses the new Order/Date, Customer/Phone, Purchase/Member
  *  groups via `secondaryKey` instead of the old one-field-per-column layout. */
-function toOrderRow(order: Order): Record<string, string | number> {
+function toOrderRow(order: Order, scope: 'admin' | 'member'): Record<string, string | number> {
   const latestPayment = order.payments.length
     ? [...order.payments].sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
@@ -99,10 +99,11 @@ function toOrderRow(order: Order): Record<string, string | number> {
 
   const memberLabel =
     vendorIds.size > 1 ? `${vendorIds.size} members` : firstItem?.vendorNameSnapshot ?? order.vendorNameSnapshot;
-  const customerName =
-    order.customer.name && order.customer.name !== order.customer.phone && order.customer.name !== order.customer.email
-      ? order.customer.name
-      : 'Name not added';
+  const hasRealName = order.customer.name && order.customer.name !== order.customer.phone && order.customer.name !== order.customer.email;
+  // A vendor sees the phone instead of a "Name not added" label — they need a usable contact
+  // fact, not a placeholder (the admin Customers console still shows "Name not added" as a cue
+  // that the record itself is incomplete, which is this page's unchanged default elsewhere).
+  const customerName = hasRealName ? order.customer.name : scope === 'member' ? order.customer.phone ?? '—' : 'Name not added';
 
   return {
     Order: shortOrderNumber(order.id),
@@ -345,7 +346,7 @@ export function OrderManagement({ scope = 'admin', refreshKey = 0 }: { scope?: '
 
   const scopedByFilter = Boolean(params.vendorId || params.search || params.customerId);
 
-  const rows = useMemo(() => JSON.stringify(orders.map(toOrderRow)), [orders]);
+  const rows = useMemo(() => JSON.stringify(orders.map((o) => toOrderRow(o, scope))), [orders, scope]);
 
   const actions = useMemo(
     () =>
@@ -376,7 +377,8 @@ export function OrderManagement({ scope = 'admin', refreshKey = 0 }: { scope?: '
       const detail = (e as CustomEvent<{ action: string; row: Record<string, unknown> }>).detail;
       const orderId = detail.row['__orderId'];
       if (detail.action === 'view-order' && typeof orderId === 'string') {
-        navigate(`/account/orders/${orderId}`, { state: { backTo: `${location.pathname}${location.search}` } });
+        const target = scope === 'member' ? `/account/vendor-orders/${orderId}` : `/account/orders/${orderId}`;
+        navigate(target, { state: { backTo: `${location.pathname}${location.search}` } });
         return;
       }
       if (detail.action === 'view-customer') {
@@ -396,7 +398,7 @@ export function OrderManagement({ scope = 'admin', refreshKey = 0 }: { scope?: '
       el.removeEventListener('sky-dt-params-change', onParamsChange);
       el.removeEventListener('sky-dt-row-action', onRowAction);
     };
-  }, [orders, openStatusDialog, navigate, location.pathname, location.search, setParams]);
+  }, [orders, openStatusDialog, navigate, location.pathname, location.search, setParams, scope]);
 
   const closeStatusDialog = () => {
     statusDialogRef.current?.close();

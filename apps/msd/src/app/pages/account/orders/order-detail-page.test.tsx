@@ -361,8 +361,8 @@ describe('OrderDetailPage — multi-vendor order total leak fix (Payment Summary
 /**
  * Feature: "Customer's Other Orders" — context-aware routing
  * Scenario: an admin caller's click still targets the full `/account/orders` list; a member
- * caller (who never holds `orders:view`) targets their own 2-tab `/account/vendor-orders` page's
- * History tab instead, carrying the same `customerId`/`excludeOrderId` filters either way.
+ * caller (who never holds `orders:view`) targets their own `/account/vendor-orders` page instead,
+ * carrying the same `customerId`/`excludeOrderId` filters either way.
  */
 describe('OrderDetailPage — "Customer\'s Other Orders" context-aware routing', () => {
   // `OutlinedButton` is a `@lit/react`-wrapped `md-outlined-button` — same "query by rendered
@@ -389,7 +389,7 @@ describe('OrderDetailPage — "Customer\'s Other Orders" context-aware routing',
     );
   });
 
-  it('navigates a member caller to /account/vendor-orders?tab=history&customerId=...&excludeOrderId=...', async () => {
+  it('navigates a member caller to /account/vendor-orders?customerId=...&excludeOrderId=... (no tab param — the vendor Orders page no longer has tabs)', async () => {
     grantedPermissions = new Set(['vendor-portal.orders:custom']); // no orders:view
     renderAtOrderWideRoute(BASE_ORDER);
     await screen.findByRole('heading', { level: 1 }, LONG);
@@ -397,7 +397,7 @@ describe('OrderDetailPage — "Customer\'s Other Orders" context-aware routing',
     clickCustomersOtherOrders();
 
     expect(navigateMock).toHaveBeenCalledWith(
-      `/account/vendor-orders?tab=history&customerId=${BASE_ORDER.customerId}&excludeOrderId=${BASE_ORDER.id}`,
+      `/account/vendor-orders?customerId=${BASE_ORDER.customerId}&excludeOrderId=${BASE_ORDER.id}`,
       expect.objectContaining({ state: expect.objectContaining({ fromOrderId: BASE_ORDER.id }) }),
     );
   });
