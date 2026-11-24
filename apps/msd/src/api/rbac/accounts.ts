@@ -82,14 +82,14 @@ export async function exportCustomerPayments(
   return res.blob();
 }
 
+/** `completionOtp*` columns still exist on the row (unused, not dropped — see
+ *  `settlement.schema.ts`'s own doc comment) but are no longer part of this type: the Completion
+ *  OTP system they backed was retired, so there is nothing for the UI to read or edit. */
 export interface FinanceSettings {
   id: string;
   defaultCommissionRatePercent: string;
   serviceHoldHours: number;
   productReturnHoldHours: number;
-  completionOtpExpiryMinutes: number;
-  completionOtpMaxAttempts: number;
-  completionOtpResendCooldownSeconds: number;
   updatedByUserId: string | null;
   updatedAt: string;
 }
@@ -98,9 +98,6 @@ export interface FinanceSettingsUpdateInput {
   defaultCommissionRatePercent?: number;
   serviceHoldHours?: number;
   productReturnHoldHours?: number;
-  completionOtpExpiryMinutes?: number;
-  completionOtpMaxAttempts?: number;
-  completionOtpResendCooldownSeconds?: number;
 }
 
 export function getFinanceSettings(token: string | null) {

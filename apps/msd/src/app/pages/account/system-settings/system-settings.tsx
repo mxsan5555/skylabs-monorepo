@@ -9,9 +9,6 @@ interface FormState {
   defaultCommissionRatePercent: string;
   serviceHoldHours: string;
   productReturnHoldHours: string;
-  completionOtpExpiryMinutes: string;
-  completionOtpMaxAttempts: string;
-  completionOtpResendCooldownSeconds: string;
 }
 
 function toForm(s: FinanceSettings): FormState {
@@ -19,17 +16,14 @@ function toForm(s: FinanceSettings): FormState {
     defaultCommissionRatePercent: s.defaultCommissionRatePercent,
     serviceHoldHours: String(s.serviceHoldHours),
     productReturnHoldHours: String(s.productReturnHoldHours),
-    completionOtpExpiryMinutes: String(s.completionOtpExpiryMinutes),
-    completionOtpMaxAttempts: String(s.completionOtpMaxAttempts),
-    completionOtpResendCooldownSeconds: String(s.completionOtpResendCooldownSeconds),
   };
 }
 
 /**
  * Fills the `/account/system-settings` stub (`system-settings:view`/`:edit`) with the Finance
- * Settings form — default commission rate, service/product hold periods, and completion-OTP
- * config. Singleton row (`GET`/`PUT /accounts/finance-settings`) — a partial `PUT` leaves every
- * other field untouched server-side.
+ * Settings form — default commission rate and service/product hold periods. Singleton row
+ * (`GET`/`PUT /accounts/finance-settings`) — a partial `PUT` leaves every other field untouched
+ * server-side.
  */
 export function SystemSettingsPage() {
   const { token, can } = useAuth();
@@ -64,9 +58,6 @@ export function SystemSettingsPage() {
         defaultCommissionRatePercent: Number(form.defaultCommissionRatePercent),
         serviceHoldHours: Number(form.serviceHoldHours),
         productReturnHoldHours: Number(form.productReturnHoldHours),
-        completionOtpExpiryMinutes: Number(form.completionOtpExpiryMinutes),
-        completionOtpMaxAttempts: Number(form.completionOtpMaxAttempts),
-        completionOtpResendCooldownSeconds: Number(form.completionOtpResendCooldownSeconds),
       });
       setForm(toForm(data));
       showSnackbar('Finance settings saved.', { variant: 'success' });
@@ -82,7 +73,7 @@ export function SystemSettingsPage() {
       <title>System Settings · MSD</title>
       <header className="admin-page__head">
         <h1 className="admin-page__title">System Settings</h1>
-        <p className="admin-page__subtitle">Commission default and hold-period / completion-OTP configuration.</p>
+        <p className="admin-page__subtitle">Commission default and hold-period configuration.</p>
       </header>
 
       {error && <p className="error-state" role="alert">{error}</p>}
@@ -118,30 +109,6 @@ export function SystemSettingsPage() {
               value={form.productReturnHoldHours}
               disabled={!canEdit}
               onInput={(e: Event) => setField('productReturnHoldHours', (e.target as HTMLInputElement).value)}
-            />
-            <OutlinedTextField
-              label="Completion OTP expiry (minutes)"
-              type="number"
-              min="1"
-              value={form.completionOtpExpiryMinutes}
-              disabled={!canEdit}
-              onInput={(e: Event) => setField('completionOtpExpiryMinutes', (e.target as HTMLInputElement).value)}
-            />
-            <OutlinedTextField
-              label="Completion OTP max attempts"
-              type="number"
-              min="1"
-              value={form.completionOtpMaxAttempts}
-              disabled={!canEdit}
-              onInput={(e: Event) => setField('completionOtpMaxAttempts', (e.target as HTMLInputElement).value)}
-            />
-            <OutlinedTextField
-              label="Completion OTP resend cooldown (seconds)"
-              type="number"
-              min="0"
-              value={form.completionOtpResendCooldownSeconds}
-              disabled={!canEdit}
-              onInput={(e: Event) => setField('completionOtpResendCooldownSeconds', (e.target as HTMLInputElement).value)}
             />
           </div>
           {canEdit && (
