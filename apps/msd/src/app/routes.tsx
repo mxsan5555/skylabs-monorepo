@@ -69,8 +69,10 @@ import { CustomerPaymentsPage } from './pages/account/accounts/customer-payments
 import { MemberSettlementsPage } from './pages/account/accounts/member-settlements';
 import { MemberSettlementDetailPage } from './pages/account/accounts/member-settlement-detail';
 import { RefundsDisputesPage } from './pages/account/accounts/refunds-disputes';
-import { MemberOrdersPage } from './pages/account/vendor-portal/member-orders-page';
-import { VoucherVerificationPage } from './pages/account/vendor-portal/voucher-verification-page';
+import { VendorOrdersPage } from './pages/account/vendor-portal/vendor-orders-page';
+import { ScanQrPage } from './pages/account/vendor-portal/scan-qr-page';
+import { VoucherFulfilmentPage } from './pages/account/vendor-portal/voucher-fulfilment-page';
+import { VendorOrderDetailPage } from './pages/account/vendor-portal/vendor-order-detail-page';
 import { VendorCustomerDetailPage } from './pages/account/vendor-portal/vendor-customer-detail-page';
 import { EarningsPayouts } from './pages/account/vendor-portal/earnings-payouts';
 import { SystemSettingsPage } from './pages/account/system-settings/system-settings';
@@ -625,31 +627,58 @@ export function AppRoutes() {
               </RequirePermission>
             }
           />
-          {/* Vendor-facing "Orders" — a real 2-tab page (`MemberOrdersPage`): Order History
-            (`<OrderManagement scope="member" />`, its GET/PATCH calls already force-scoped to the
-            caller's own vendorId server-side — order.service.ts#listOrders) and Verify & Complete
-            (voucher lookup + the backend-sourced Service Queue, `GET /vouchers/queue`). Replaces
-            the old single-page `OrdersAndVerify`. Same route, no new menu node — the whole voucher
-            router is gated `vendor-portal.orders:custom` server-side either way. */}
+          {/* Vendor-facing "Orders" — no tabs: a "Scan customer QR" entry point, the vendor's own
+            still-open deals/therapist-bookings and products (`GET /vouchers/pending-fulfilment`),
+            then the existing order history (`<OrderManagement scope="member" />`, its GET/PATCH
+            calls already force-scoped to the caller's own vendorId server-side —
+            order.service.ts#listOrders). No manual voucher-code entry anywhere — a service
+            voucher can only be advanced by scanning it. Same route, no new menu node — the whole
+            voucher router is gated `vendor-portal.orders:custom` server-side either way. */}
           <Route
             path="/account/vendor-orders"
             element={
               <RequirePermission menuKey="vendor-portal.orders">
-                <MemberOrdersPage />
+                <VendorOrdersPage />
               </RequirePermission>
             }
           />
-          {/* Resumable, step-based voucher verification detail page — reached from the Service
-            Queue, the "Open Voucher" lookup, and the per-entitlement "Continue Verification"/
-            "View Record" links on Order Details. `voucherCode` (not the entitlement's id) is the
-            only identifier the voucher API accepts, is DB-unique and permanent. Gated
+          {/* Camera-only QR scanner — the only way a service voucher's code is ever identified
+            (no manual entry). Runs the real `verifyVoucher` check on every decode before
+            navigating anywhere. Gated `vendor-portal.orders:custom`, same as the rest of this
+            surface. */}
+          <Route
+            path="/account/vendor-orders/scan"
+            element={
+              <RequirePermission menuKey="vendor-portal.orders" action="custom">
+                <ScanQrPage />
+              </RequirePermission>
+            }
+          />
+          {/* Voucher Fulfilment page (Valid voucher → In service → Done) — reached from a scan,
+            but re-runs the FULL server-side check on every mount regardless of how it was opened
+            (typing this URL directly works identically). `voucherCode` (not the entitlement's id)
+            is the only identifier the voucher API accepts, is DB-unique and permanent. Gated
             `vendor-portal.orders:custom` — the same action key the whole `vouchers.routes.ts`
             router requires. */}
           <Route
             path="/account/vendor-orders/verify/:code"
             element={
               <RequirePermission menuKey="vendor-portal.orders" action="custom">
-                <VoucherVerificationPage />
+                <VoucherFulfilmentPage />
+              </RequirePermission>
+            }
+          />
+          {/* Vendor-only Order Detail — order id/date/customer phone/paid amount + one row per
+            item with its own status/action (Picked up / Ship / Waiting for scan / In service /
+            Completed). A new, small page rather than a further extension of the shared, 3-call-
+            site `OrderDetailPage` below — reuses the same `GET /orders/:id`, already vendor-
+            scoped server-side (order.service.ts#getOrderOrThrow). View-level gate; the page's own
+            per-item action buttons each check the `custom` action before rendering. */}
+          <Route
+            path="/account/vendor-orders/:orderId"
+            element={
+              <RequirePermission menuKey="vendor-portal.orders">
+                <VendorOrderDetailPage />
               </RequirePermission>
             }
           />

@@ -47,6 +47,8 @@ export interface VoucherVerifyResponse {
     qrExpiresAt: string | null;
     /** Set once the entitlement is COMPLETED — drives the "Already used on &lt;date&gt;" copy. */
     completedAt: string | null;
+    /** Set once "Start service" is tapped — drives the "Service in progress, started &lt;time&gt;" copy. */
+    serviceStartedAt: string | null;
   };
 }
 

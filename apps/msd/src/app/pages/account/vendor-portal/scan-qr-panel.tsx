@@ -1,58 +1,85 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import jsQR from 'jsqr';
-import { FilledButton, OutlinedTextField } from '@skylabs-monorepo/shared-ui/react';
+import { OutlinedButton } from '@skylabs-monorepo/shared-ui/react';
+import { useAuth } from '@skylabs-monorepo/shared-auth/react';
+import { verifyVoucher } from '../../../../api/rbac/vouchers';
+import { ApiRequestError } from '../../../../api/rbac/client';
+import { scanResultCopy, UNKNOWN_QR_COPY } from './voucher-scan-copy';
 
 /**
- * D40 — vendor "Scan QR" entry point (`/account/vendor-orders?tab=scan`). Decodes the camera
- * feed client-side (`jsqr`, no network round trip for the decode itself) looking for a voucher
- * code, then routes to the SAME `/account/vendor-orders/verify/:code` confirmation screen the
- * existing manual-entry/"Open Voucher" lookup already reaches — one confirmation UI and one
- * "Confirm Redemption" action for every redemption path, camera or manual, never a second parallel
- * flow. The manual code field here is the camera's fallback for a denied/unavailable permission,
- * not a duplicate of the Verify & Complete tab's own lookup.
+ * Vendor "Scan QR" page (`/account/vendor-orders/scan`) — camera-only, scan-only: there is no
+ * manual code entry anywhere in this panel. Decodes the camera feed client-side (`jsqr`), then
+ * runs the real server-side check (`verifyVoucher`) on every decode before navigating anywhere —
+ * "Checking…" while that call is in flight. Only `VALID` navigates, to the Voucher Fulfilment
+ * page (`/account/vendor-orders/verify/:code`), which re-verifies again on its own mount (never
+ * trusts this screen's result). Every other result — or a 404 for a code that isn't a voucher at
+ * all — shows its plain-language message inline and the camera keeps scanning for the next
+ * customer; `checkingRef` is the busy-guard that makes "one request per scan" real (the decode
+ * loop keeps running every frame, cheaply, but skips a new decode attempt while a check for the
+ * last one is still in flight).
  *
- * The camera `MediaStream` is stopped on unmount — which covers tab switch, since `MemberOrdersPage`
- * only renders the active tab's panel — and the decode loop (`requestAnimationFrame`) is cancelled
- * the same way. `navigatedRef` is the busy-guard: once one decode (or manual submit) has fired the
- * navigation, every later frame/submit is a no-op, so a jittery scan can never fire it twice.
+ * The camera `MediaStream` is stopped on unmount — which covers navigating away or a tab switch,
+ * since `MemberOrdersPage`'s predecessor only ever rendered the active panel, and this page is no
+ * different.
  */
 export function ScanQrPanel() {
   const navigate = useNavigate();
+  const { token } = useAuth();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
+  const checkingRef = useRef(false);
   const navigatedRef = useRef(false);
 
   const [cameraError, setCameraError] = useState('');
-  const [manualCode, setManualCode] = useState('');
+  const [cameraAttempt, setCameraAttempt] = useState(0);
+  const [checking, setChecking] = useState(false);
+  const [scanError, setScanError] = useState('');
 
-  const goToVoucher = useCallback((code: string) => {
-    const trimmed = code.trim();
-    if (!trimmed || navigatedRef.current) return;
-    navigatedRef.current = true;
-    navigate(`/account/vendor-orders/verify/${encodeURIComponent(trimmed)}`);
-  }, [navigate]);
+  const checkCode = useCallback(
+    async (code: string) => {
+      const trimmed = code.trim();
+      if (!trimmed || checkingRef.current || navigatedRef.current) return;
+      checkingRef.current = true;
+      setChecking(true);
+      setScanError('');
+      try {
+        const { data } = await verifyVoucher(token, trimmed);
+        if (data.result === 'VALID') {
+          navigatedRef.current = true;
+          navigate(`/account/vendor-orders/verify/${encodeURIComponent(data.entitlement.voucherCode)}`);
+          return;
+        }
+        setScanError(scanResultCopy(data.result, data.entitlement));
+      } catch (err) {
+        setScanError(err instanceof ApiRequestError && err.status === 404 ? UNKNOWN_QR_COPY : 'Could not check this voucher. Try again.');
+      } finally {
+        checkingRef.current = false;
+        setChecking(false);
+      }
+    },
+    [navigate, token],
+  );
 
   useEffect(() => {
     let cancelled = false;
 
     function tick() {
       if (cancelled || navigatedRef.current) return;
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      if (video && canvas && video.readyState === video.HAVE_ENOUGH_DATA) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const result = jsQR(imageData.data, imageData.width, imageData.height);
-          if (result?.data) {
-            goToVoucher(result.data);
-            return;
+      if (!checkingRef.current) {
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        if (video && canvas && video.readyState === video.HAVE_ENOUGH_DATA) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const result = jsQR(imageData.data, imageData.width, imageData.height);
+            if (result?.data) checkCode(result.data);
           }
         }
       }
@@ -61,7 +88,7 @@ export function ScanQrPanel() {
 
     async function start() {
       if (!navigator.mediaDevices?.getUserMedia) {
-        setCameraError('Camera is not available on this device. Use manual entry below.');
+        setCameraError('Allow camera access to scan QR codes');
         return;
       }
       try {
@@ -78,7 +105,7 @@ export function ScanQrPanel() {
         }
         tick();
       } catch {
-        if (!cancelled) setCameraError('Camera access was denied or unavailable. Use manual entry below.');
+        if (!cancelled) setCameraError('Allow camera access to scan QR codes');
       }
     }
 
@@ -90,27 +117,24 @@ export function ScanQrPanel() {
       streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     };
-  }, [goToVoucher]);
-
-  const submitManual = (e: FormEvent) => {
-    e.preventDefault();
-    goToVoucher(manualCode);
-  };
+  }, [checkCode, cameraAttempt]);
 
   return (
     <section aria-labelledby="scan-qr-title" className="panel">
-      <h2 id="scan-qr-title" className="section-title">Scan QR</h2>
-      <p className="field-hint">Point the camera at the customer&apos;s voucher QR code.</p>
+      <h2 id="scan-qr-title" className="section-title">Point the camera at the customer&apos;s QR</h2>
       {/* eslint-disable-next-line jsx-a11y/media-has-caption -- a live decode viewfinder, not media content */}
       <video ref={videoRef} className="scan-qr-video" muted playsInline aria-hidden="true" />
       <canvas ref={canvasRef} hidden />
-      {cameraError && <p className="error-state" role="alert">{cameraError}</p>}
 
-      <h3 className="section-title">Or enter the voucher code</h3>
-      <form className="voucher-lookup-row member-action-row" onSubmit={submitManual}>
-        <OutlinedTextField label="Voucher code" value={manualCode} onInput={(e: Event) => setManualCode((e.target as HTMLInputElement).value)} />
-        <FilledButton type="submit" disabled={!manualCode.trim()}>Open Voucher</FilledButton>
-      </form>
+      {cameraError && (
+        <div role="alert">
+          <p className="error-state">{cameraError}</p>
+          <OutlinedButton onClick={() => { setCameraError(''); setCameraAttempt((n) => n + 1); }}>Try again</OutlinedButton>
+        </div>
+      )}
+
+      {!cameraError && checking && <p className="field-hint" role="status">Checking…</p>}
+      {!cameraError && !checking && scanError && <p className="error-state" role="alert">{scanError}</p>}
     </section>
   );
 }
