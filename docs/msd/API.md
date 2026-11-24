@@ -458,47 +458,50 @@ for members (C-16); `PATCH /customers/:id/status {status: active|blocked, reason
 OpenAPI.
 
 **Purchase Verification (vouchers)** — member-only, every route below router-wide guarded by
-`vendor-portal.orders:custom` (not previously listed in this table):
+`vendor-portal.orders:custom`. No OTP anywhere and no manual-code-entry caller exists anywhere in
+the frontend — scanning is the only way a service voucher's code is ever identified (D40.1,
+2026-11-23; the original D40 OTP wizard and `/request-completion-otp`/`/complete`/`/queue`/
+`/redeem-qr` routes it used no longer exist):
 
 | Method | Path | Guard |
 |---|---|---|
 | POST | `/api/v1/vouchers/verify` | `vendor-portal.orders:custom` |
-| GET | `/api/v1/vouchers/queue` | `vendor-portal.orders:custom` |
+| GET | `/api/v1/vouchers/pending-fulfilment` | `vendor-portal.orders:custom` |
 | POST | `/api/v1/vouchers/:code/start` | `vendor-portal.orders:custom` |
-| POST | `/api/v1/vouchers/:code/request-completion-otp` | `vendor-portal.orders:custom` |
-| POST | `/api/v1/vouchers/:code/complete` | `vendor-portal.orders:custom` |
+| POST | `/api/v1/vouchers/:code/finish-service` | `vendor-portal.orders:custom` |
+| POST | `/api/v1/vouchers/:code/pick-up` | `vendor-portal.orders:custom` |
 | POST | `/api/v1/vouchers/:code/ship` | `vendor-portal.orders:custom` |
 | POST | `/api/v1/vouchers/:code/record-delivery-evidence` | `vendor-portal.orders:custom` |
-| POST | `/api/v1/vouchers/:code/redeem-qr` | `vendor-portal.orders:custom` |
 
-`POST /vouchers/verify` (`{ code: string }`, 1 to 64 characters, `.strict()`) is the one read both
-the existing wizard and the new QR scanner use — it never mutates. Response `entitlement` now also
-carries `purchasedAt` (ISO timestamp, the entitlement's own creation time) and `qrExpiresAt` (ISO
-timestamp or `null` — `null` for any non-`SERVICE_SESSION` entitlement, i.e. every product) and a
-derived `qrRedeemable` boolean (`true` only when `fulfilmentKind === 'SERVICE_SESSION'`,
-`entitlementStatus` is `ACTIVE` or `STARTED`, and `qrExpiresAt` is still in the future — computed
-fresh on every call, never cached or trusted from a prior response).
+`POST /vouchers/verify` (`{ code: string }`, 1 to 64 characters, `.strict()`) is the one read-only
+check both the Scan QR page (on every decode) and the Voucher Fulfilment page (on every mount,
+regardless of how it was reached) run — it never mutates. Response `entitlement` carries
+`purchasedAt`, `qrExpiresAt` (`null` for any non-`SERVICE_SESSION` entitlement), `completedAt`,
+`serviceStartedAt`, and a plain, unmasked `customerPhone` (no `customerEmailMasked`/
+`customerPhoneMasked`/`qrRedeemable`/`otpChallenge` — all removed). `result` is one of 8 values
+(`voucher.service.ts#VoucherScanResult`): `VALID`, `ALREADY_USED`, `EXPIRED`, `CANCELLED_REFUNDED`,
+`WRONG_MEMBER_BRANCH`, `PAYMENT_NOT_COMPLETE`, `NEEDS_REVIEW`, `NOT_QR_ELIGIBLE` (a product code).
 
-**`POST /vouchers/:code/redeem-qr`** (D40) — the new, OTP-free redemption path. No request body.
-Response: the updated `PurchaseEntitlement` (same shape `startService`/`completeVoucher` already
-return). Validation and error cases, in the order they're checked:
-- Voucher code doesn't exist → 404 `NOT_FOUND`.
-- Caller has no vendor profile, or the voucher belongs to a different vendor → 403 `FORBIDDEN`
-  (same "never confirm existence to the wrong business" rule as every other voucher action).
-- `fulfilmentKind !== 'SERVICE_SESSION'` (a product entitlement) → 422 `VALIDATION_ERROR` — this
-  path never redeems a product, regardless of its state.
-- Not currently `ACTIVE` or `STARTED` (already `COMPLETED`, `CANCELLED`, or `REFUNDED`), or
-  `settlementStatus` is `VOID`/`DISPUTED_BLOCKED`, or the order isn't `CONFIRMED`/`COMPLETED`, or
-  `qrExpiresAt` is `null` or at/before the server's current time → 409 `CONFLICT`. These are all
-  checked atomically in one guarded `updateMany`, not as separate round trips, so two concurrent
-  calls for the same voucher can never both succeed — the loser always gets this 409, never a
-  partial write. The request body supplies no expiry or status value; the server is the only
-  source for all of them.
-- Success → `entitlementStatus: 'COMPLETED'`, `completedAt`, `redeemedByUserId` (the calling
-  member user), `settlementStatus: 'ON_HOLD'`, `holdUntil` set exactly as `completeVoucher` sets
-  them — the payout pipeline treats a QR redemption identically to an OTP-wizard completion.
-  Audited as `voucher.redeem_qr` against `PurchaseEntitlement`. Never reads or writes `Deal`,
-  `DealPackage`, `Therapist`, or `Branch` — the catalog listing is untouched.
+**`GET /vouchers/pending-fulfilment`** — the caller's own vendor's still-open deal/therapist and
+product entitlements, oldest-waiting-first, as `{ servicesWaiting: [...], productsPending: [...] }`.
+Unpaginated, unsearchable by design (voucher-code search is gone entirely). 404 `NOT_FOUND` if the
+caller has no vendor profile yet.
+
+**`POST /vouchers/:code/finish-service`** — no request body. Response: the updated
+`PurchaseEntitlement`. Validation/error cases, in order: voucher doesn't exist → 404; wrong vendor
+→ 403; `fulfilmentKind !== 'SERVICE_SESSION'` → 422; not currently `STARTED` or `OTP_REQUESTED`
+(a legacy pre-redesign voucher stuck mid-OTP, treated identically to `STARTED`), or
+`settlementStatus` is `VOID`/`DISPUTED_BLOCKED`, or the order isn't `CONFIRMED`/`COMPLETED` → 409
+`CONFLICT` (one guarded `updateMany`, so two concurrent calls can never both succeed). Does **not**
+re-check `qrExpiresAt` — that window was already validated at scan time (`verifyVoucher`); a
+service in progress shouldn't expire out from under itself. Success →
+`entitlementStatus: 'COMPLETED'`, `completedAt`, `redeemedByUserId`, `settlementStatus: 'ON_HOLD'`,
+`holdUntil` via the same `holdHoursFor` the rest of this router uses. Audited as
+`voucher.finish_service`.
+
+**`POST /vouchers/:code/pick-up`** — same shape as `finish-service`, for a product: no body, 404/
+403 the same way, `fulfilmentKind !== 'PRODUCT_PICKUP'` → 422, not currently `ACTIVE` or
+`OTP_REQUESTED` → 409, success sets the identical completion fields. Audited as `voucher.pick_up`.
 
 ## 4. Storefront
 

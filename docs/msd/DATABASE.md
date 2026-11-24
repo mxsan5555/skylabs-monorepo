@@ -208,22 +208,31 @@ value and hash) is not built yet (task P5-16).
   their own copy in `shipping*`, so history never changes.
 - **`PurchaseEntitlement`** (one row per purchased unit, created idempotently once per order on
   payment confirmation — `settlement.service.ts#createEntitlementsForOrder`): `voucherCode` is an
-  opaque, sequence-backed, no-PII code (`MSD-DL-…`/`MSD-TH-…`/`MSD-PR-…`); `fulfilmentKind`
+  opaque, sequence-backed, no-PII code (`MSD-DL-…`/`MSD-TH-…`/`MSD-PR-…`, not cryptographically
+  random — see PLANNING.md §3 D40's own flagged-not-fixed note); `fulfilmentKind`
   (`SERVICE_SESSION` for a deal or direct therapist booking, `PRODUCT_PICKUP`/`PRODUCT_SHIPPED`
-  for a product) and `entitlementStatus` (`ACTIVE → STARTED → OTP_REQUESTED → COMPLETED`, or
-  `CANCELLED`/`REFUNDED`) drive the existing member-facing redemption wizard
-  (`/account/vendor-orders/verify/:code`). `settlementStatus`/`holdUntil`/`payoutItemId` feed the
-  payout pipeline (§9) once `COMPLETED`.
+  for a product) and `entitlementStatus` (`ACTIVE → STARTED → COMPLETED`, or `CANCELLED`/
+  `REFUNDED`) drive the vendor's scan-only Voucher Fulfilment page
+  (`/account/vendor-orders/verify/:code`). `OTP_REQUESTED` remains a valid enum value but nothing
+  sets it anymore since D40.1 retired the OTP wizard — `finishService`/`markProductPickedUp` treat
+  a legacy row still sitting in it as equivalent to `STARTED`/`ACTIVE`, so none were orphaned by
+  removing that path. `settlementStatus`/`holdUntil`/`payoutItemId` feed the payout pipeline (§9)
+  once `COMPLETED`.
   - **D40 — QR redemption (2026-11-21, migration `20261121121014_add_qr_redemption`):** two new
-    nullable columns, additive, no backfill. `qrExpiresAt DateTime?` is set once, at creation,
-    only for `SERVICE_SESSION` entitlements (`createdAt + 30 days`; `null` for a product
+    nullable columns, additive, no backfill at the time. `qrExpiresAt DateTime?` is set once, at
+    creation, only for `SERVICE_SESSION` entitlements (`createdAt + 30 days`; `null` for a product
     entitlement — it never gets a QR). It is a separate expiry from `Deal.validityDays` (which
     remains display-only, computed per order read, never stored on the entitlement) — see
     PLANNING.md §3 D40 for how the two do and don't interact. `redeemedByUserId String?` records
-    who closed the entitlement via the new QR one-tap path (set alongside `completedAt`, exactly
-    like the existing OTP wizard's `completeVoucher` already sets `completedAt`, just also
-    capturing who redeemed it); unset (`null`) for an entitlement closed the old way, or not yet
-    closed at all.
+    who closed the entitlement (`finishService`, `markProductPickedUp`, or `shipProduct` +
+    `recordDeliveryEvidence`'s completion); `null` if not yet closed.
+  - **D40.1 backfill (2026-11-23, migration `20261123120000_backfill_service_qr_expires_at`):**
+    one-time data repair — `qrExpiresAt = createdAt + 30 days` for every `SERVICE_SESSION`
+    entitlement still `ACTIVE`/`STARTED`/`OTP_REQUESTED` that predated the D40 migration and so
+    never got one. Needed before the OTP escape hatch could be removed, since the scan-only
+    `finishService`/`markProductPickedUp` guards never match a `null` expiry. Not reversible (see
+    the migration's own `down.sql` comment) and deliberately scoped to open rows only —
+    `COMPLETED`/`CANCELLED`/`REFUNDED` rows never needed a QR again.
 
 ## 4. Storefront
 

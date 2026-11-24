@@ -431,52 +431,83 @@ A member who opens another member's deal, branch, package or therapist gets 404.
   not open. City is the shipping city of the customer's latest order with this member that has
   one, else empty. Staff on the member's page keep full contact details (D12).
 
-- **Deal/Therapist QR redemption (D40, decided 2026-11-21):** payment confirmation already
-  creates one `PurchaseEntitlement` per purchased unit (an opaque `voucherCode`, no PII, no
-  sequential id ever exposed) that a vendor redeems today through a resumable **Start Service →
-  Send Completion OTP → customer reads the OTP to the vendor → Confirm & Complete** wizard
-  (`/account/vendor-orders/verify/:code`). QR adds a second, simpler redemption path on top of
-  that existing system — it is not a new booking or order architecture, and it does not change
-  the wizard above, which stays exactly as it is for a vendor who looks a voucher up by hand.
+- **Deal/Therapist QR redemption (D40, 2026-11-21) and the scan-only, no-OTP redesign (D40.1,
+  2026-11-23):** payment confirmation creates one `PurchaseEntitlement` per purchased unit (an
+  opaque `voucherCode`, no PII, no sequential id ever exposed). D40 first added a QR scan/one-tap
+  path alongside the existing manual-code/OTP wizard; D40.1 then retired the OTP wizard and manual
+  code entry entirely — **scanning the QR is now the only way a service voucher is identified**,
+  and every vendor screen is a single plain-language action. This section describes the current
+  (D40.1) design; D40's original OTP wizard no longer exists.
   - **Who gets a QR:** every `SERVICE_SESSION` entitlement — a Deal purchase or a direct Therapist
     booking, one QR per purchased unit (quantity 2 gets 2 separate, independently redeemable
-    QRs). Products never get a QR; a `PRODUCT_PICKUP`/`PRODUCT_SHIPPED` entitlement is out of
-    scope for this feature and is untouched.
+    QRs). Products never get a QR and are never scanned — a `PRODUCT_PICKUP` is closed with one
+    "Picked up" tap, a `PRODUCT_SHIPPED` with the existing carrier/tracking Ship form, both from
+    the vendor's own order list (the voucher code there comes from the row, never typed).
   - **30-day QR validity, independent of the deal's own window:** the QR is scannable for exactly
-    30 days from payment confirmation (the entitlement's own creation time), tracked by a new,
-    dedicated expiry. This does **not** replace or extend the deal's existing, separately
-    configurable `validityDays` (§2.7: 1 to 365 days, optional, never expires if unset) — the two
-    never interact. Once the QR's 30 days pass, scanning that QR can no longer redeem the voucher,
-    but the voucher itself is otherwise unaffected: manual code entry and the existing OTP wizard
-    keep working exactly as before, for exactly as long as `validityDays` (or "no limit") already
-    allowed. A voucher can therefore be "QR expired" while still fully redeemable the old way.
+    30 days from payment confirmation (the entitlement's own creation time). This does **not**
+    replace or extend the deal's existing, separately configurable `validityDays` (§2.7: 1 to 365
+    days, optional, never expires if unset) — the two never interact. Entitlements created before
+    this expiry column existed were backfilled once (`createdAt + 30 days`, scoped to still-open
+    rows only — migration `20261123120000_backfill_service_qr_expires_at`) so the cutover never
+    orphaned anything already in flight.
   - **Customer view:** the order detail page shows, per purchased unit, the QR image, order
     reference, purchase date, expiry date, remaining validity, and a status — Active, Redeemed, or
     Expired. No QR is ever shown for an unpaid order (no entitlement exists until payment
     confirms) or once the entitlement is redeemed, cancelled or refunded.
-  - **Vendor redemption, no OTP:** a "Scan QR" entry point (camera, with a manual voucher-code
-    entry fallback) on the existing vendor Orders screen looks the code up and shows a
-    confirmation screen (customer, deal or therapist name, order reference, purchase date,
-    expiry) with one explicit "Confirm redemption" action — no customer OTP step anywhere in this
-    path. This reaches the same `COMPLETED` state the OTP wizard's "Confirm & Complete" already
-    reaches, by a second, shorter route; the OTP wizard is not removed, changed, or bypassed for
-    anyone not using the scanner.
-  - **Eligibility — every existing restriction still applies, QR only adds one more:** the
-    voucher must belong to the scanning vendor (a cross-vendor scan is rejected with the same
-    "never confirm existence to the wrong business" discipline as every other voucher action),
-    must not already be redeemed, cancelled or refunded, and must not be held for admin review
-    (an order that is not `CONFIRMED`/`COMPLETED`, or a settlement that is disputed or voided).
-    The 30-day QR window is an additional, independent check on top of all of these — it never
-    substitutes for or loosens any of them.
-  - **Duplicate and concurrent redemption:** redemption is atomic, the same guarded-update
-    discipline every other voucher state change already uses — two simultaneous scans of the same
-    voucher can only ever produce one redemption; the loser always sees "already redeemed," never
-    a second success.
-  - **Settlement:** QR redemption feeds the exact same payout hold and settlement pipeline the OTP
-    wizard's "Confirm & Complete" already feeds (§9) — which path closed the entitlement makes no
-    difference to payout timing or amount.
+  - **Vendor screens (no tabs, no stepper, no typed codes):**
+    1. **Orders** (`/account/vendor-orders`) — one "Scan customer QR" button, "Services waiting"
+       (open deal/therapist entitlements, oldest first — no action here, only a scan advances
+       one), "Products to give or send" (`PRODUCT_PICKUP` → Picked up / Ship instead,
+       `PRODUCT_SHIPPED` → a Shipped status line), then the existing order history, unchanged.
+    2. **Scan QR** (`/account/vendor-orders/scan`) — camera only. Every decode runs the real
+       server-side check before navigating anywhere ("Checking…"); only a `VALID` result
+       navigates onward. Every other result (including a decoded string that isn't a voucher at
+       all) shows its plain-language message inline and the camera keeps scanning — one check in
+       flight at a time, never a duplicate request for the same decode.
+    3–5. **Voucher Fulfilment** (`/account/vendor-orders/verify/:code`) — re-runs the full check
+       on every mount, so typing this URL directly behaves identically to a fresh scan. Renders
+       purely from `{result, entitlementStatus}`: `ACTIVE` → "Valid voucher" + one "Start service"
+       button; `STARTED` or legacy `OTP_REQUESTED` → "Service in progress" + one "Service done"
+       button; `ALREADY_USED` (⇔ `COMPLETED`) → the finished/payout-eligible screen with "Scan
+       next customer" and "Back to orders"; anything else is a read-only error card.
+    6. **Order Detail** (`/account/vendor-orders/:orderId`, new) — order id/date, customer phone,
+       paid amount, one row per item with its own status/action (the same Picked up/Ship/Record
+       delivery evidence actions as the Orders page, plus the static Waiting for scan/In
+       service/Completed labels for a service line).
+  - **Scan error copy (exact, plain words):** "Already used on `<date, time>`", "Expired on
+    `<date>`", "This voucher is for another spa", "Payment not completed", "Products don't need a
+    QR. Use the Picked up button on the orders page.", "This QR isn't a My Spa Deal voucher"
+    (an unreadable/unknown code), "This purchase was cancelled or refunded", "This voucher needs
+    admin review — contact support".
+  - **Classification (`voucher.service.ts#classifyVoucher`, backend):** an 8-value
+    `VoucherScanResult` — `VALID`, `ALREADY_USED`, `EXPIRED` (now actually enforced — it was dead
+    code under D40), `CANCELLED_REFUNDED`, `WRONG_MEMBER_BRANCH`, `PAYMENT_NOT_COMPLETE` and
+    `NEEDS_REVIEW` (split from one combined bucket), `NOT_QR_ELIGIBLE` (a product code). Order of
+    checks: ownership first (never leak a voucher's state to the wrong vendor), then QR
+    eligibility, then closed/blocked states, then payment/order problems, then already-used, then
+    the 30-day window, then `VALID`.
+  - **No OTP anywhere, no manual code entry anywhere:** `requestCompletionOtp`/`completeVoucher`
+    and their routes are deleted outright; `CompletionOtpChallenge` rows from before this change
+    are left as harmless historical data. `finishService` (renamed from the QR-era `redeemViaQr`)
+    and the new `markProductPickedUp` both accept the entitlement's prior-OTP state
+    (`OTP_REQUESTED`) as equivalent to `STARTED`/`ACTIVE` respectively, so nothing stuck mid-OTP
+    before this change was orphaned by removing the escape hatch.
+  - **Vendor-visible customer phone is now plain, not masked** — the vendor needs to actually
+    contact this specific paying customer; email is dropped from every vendor screen entirely (no
+    screen needs it).
+  - **Duplicate and concurrent redemption:** still atomic, the same guarded-update discipline
+    every voucher state change uses — two simultaneous attempts on the same voucher can only ever
+    produce one success; the loser always sees a clean conflict, never a second completion.
+  - **Settlement:** `finishService`/`markProductPickedUp` feed the identical payout-hold pipeline
+    (§9) the deleted OTP wizard fed — which path closed the entitlement makes no difference to
+    payout timing or amount.
   - Redeeming a purchased unit never changes the master Deal's or Therapist's own catalog status;
     the listing stays exactly as it was before redemption.
+  - **Voucher-code guessability (flagged, not fixed):** `voucherCode` is a sequential,
+    base36-encoded Postgres counter (`lib/voucher.ts#nextVoucherCode`), not cryptographically
+    random. Left as-is for this change — cross-vendor ownership checks already block the main
+    risk (one vendor can never redeem another vendor's voucher regardless of knowing the code) —
+    revisit separately if ever needed.
 
 ## 4. Storefront
 
@@ -806,7 +837,7 @@ expire after 5 minutes (ARCHITECTURE.md §12.3).
 | D37 | Customer checkout details (2026-10-29, Q1) | Saved on the customer's account (address, state, city, pincode), pre-filled at checkout, editable, updated on each order |
 | D38 | Order and status SMS (2026-10-29, Q3) | Email for every notice now; an SMS goes out only for notice types whose DLT template id is set in env |
 | D39 | Product business (2026-10-29, item 4) | Overrides D29's "products have no Business filter": product cards show the member's business name and product listings (`/products`, product categories) get a Business filter; `GET /catalog/products` takes `vendorIds`, `/products/facets` returns `vendors` counts |
-| D40 | Deal/Therapist QR redemption (2026-11-21) | Section 3; a new, dedicated 30-day QR expiry on `PurchaseEntitlement`, independent of `Deal.validityDays`; a second, OTP-free one-tap confirm redemption path for `SERVICE_SESSION` entitlements only (deals and direct therapist bookings), reached by scanning or manually entering the voucher code; the existing OTP wizard is unchanged; products are out of scope |
+| D40 | Deal/Therapist QR redemption (2026-11-21); scan-only, no-OTP redesign (D40.1, 2026-11-23) | Section 3; a dedicated 30-day QR expiry on `PurchaseEntitlement`, independent of `Deal.validityDays`. D40.1 retired the manual-code/OTP wizard entirely — scanning is now the only way a service voucher is identified; vendor screens are 6 single-purpose, no-tab, no-stepper pages (`finishService`/`markProductPickedUp` replace `completeVoucher`/`requestCompletionOtp`) |
 | B2 | Vendor rename | Prisma `Vendor` → `Member`, `VendorDocument` → `MemberDocument` with `@@map`; FK columns stay `vendorId` |
 | B5 | Permission key | `vendors` → `members`; role `vendor` → `member`; role `support` added |
 | N1 | Reminder decisions (2026-10-17) | Clear the flag when documents complete; bell alert to `members:status_change` holders; Remind now in this release |
