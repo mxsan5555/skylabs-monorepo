@@ -190,7 +190,8 @@ describe('VoucherFulfilmentPage — every other result is a read-only error card
     });
     renderAt();
 
-    const card = await waitForFeatureCard(expectedText.split(' ')[0]!);
+    const [firstWord] = expectedText.split(' ');
+    const card = await waitForFeatureCard(firstWord);
     expect(card.getAttribute('headline')?.toLowerCase()).toContain(expectedText.toLowerCase());
     expect(hasButton('md-filled-button', 'Start service')).toBe(false);
     expect(hasButton('md-outlined-button', 'Back to orders')).toBe(true);
