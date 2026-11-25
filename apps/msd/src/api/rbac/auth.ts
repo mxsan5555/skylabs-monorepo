@@ -26,6 +26,8 @@ export function verifyOtp(identifier: string, otp: string) {
 }
 
 /** Full URL to kick off the Google OAuth redirect flow (not a fetch — used as a link href). */
-export function googleSignInUrl(apiBaseUrl: string): string {
-  return `${apiBaseUrl}/auth/google`;
+export function googleSignInUrl(apiBaseUrl: string, returnTo?: string | null): string {
+  const url = new URL(`${apiBaseUrl}/auth/google`);
+  if (returnTo) url.searchParams.set('next', returnTo);
+  return url.toString();
 }

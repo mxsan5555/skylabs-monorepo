@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import { passport } from '../lib/passport';
 import { authenticate } from '../middleware/authenticate';
 import { validateBody } from '../middleware/validate';
@@ -26,6 +26,16 @@ import {
 import { prisma } from '../lib/prisma';
 import { getMemberAccessState } from '../services/member-access.service';
 import { suspendedMessage } from '../lib/member-messages';
+import {
+  clearGoogleCookies,
+  clearGoogleReturnCookie,
+  createGoogleState,
+  googleFrontendRedirect,
+  hasValidGoogleState,
+  sanitizeGoogleReturnTo,
+  setGoogleReturnCookie,
+  setGoogleStateCookie,
+} from '../lib/google-oauth-redirect';
 
 const router = Router();
 
@@ -79,23 +89,41 @@ router.post(
   },
 );
 
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'], session: false }));
+router.get('/google', (req, res, next) => {
+  const state = createGoogleState();
+  setGoogleStateCookie(res, state);
+  const returnTo = sanitizeGoogleReturnTo(req.query.next);
+  if (returnTo) setGoogleReturnCookie(res, returnTo);
+  else clearGoogleReturnCookie(res);
+  (
+    passport.authenticate('google', { scope: ['profile', 'email'], session: false, state }) as RequestHandler
+  )(req, res, next);
+});
 
-router.get(
-  '/google/callback',
-  passport.authenticate('google', { session: false, failureRedirect: '/api/v1/auth/google/failure' }),
-  (req, res) => {
-    // passport attaches the value returned by the strategy's `done(null, value)` to req.user;
-    // lib/passport.ts casts the login result (accessToken/refreshToken/user) through
-    // Express.User to get it here — cast it back to its real shape.
-    const { refreshToken, ...result } = req.user as unknown as Awaited<ReturnType<typeof loginWithIdentifier>>;
+router.get('/google/callback', (req, res, next) => {
+  const returnTo = sanitizeGoogleReturnTo(req.cookies?.msd_google_return_to);
+  if (!hasValidGoogleState(req)) {
+    clearGoogleCookies(res);
+    res.redirect(303, googleFrontendRedirect('/sign-in?error=google'));
+    return;
+  }
+  clearGoogleCookies(res);
+  const complete = (err: unknown, user: Express.User | false | null) => {
+    if (err || !user) {
+      res.redirect(303, googleFrontendRedirect('/sign-in?error=google'));
+      return;
+    }
+    const { refreshToken } = user as unknown as Awaited<ReturnType<typeof loginWithIdentifier>>;
     setAuthCookies(res, refreshToken);
-    sendData(res, result);
-  },
-);
+    const destination = `/auth/google/callback${returnTo ? `?next=${encodeURIComponent(returnTo)}` : ''}`;
+    res.redirect(303, googleFrontendRedirect(destination));
+  };
+  (passport.authenticate('google', { session: false }, complete) as RequestHandler)(req, res, next);
+});
 
 router.get('/google/failure', (_req, res) => {
-  sendData(res, null, { status: 401 });
+  clearGoogleCookies(res);
+  res.redirect(303, googleFrontendRedirect('/sign-in?error=google'));
 });
 
 router.get('/csrf', (req, res) => {

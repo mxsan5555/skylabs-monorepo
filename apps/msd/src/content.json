@@ -1447,6 +1447,8 @@
       "divider": "or continue with",
       "note": "New users are registered automatically.",
       "googleIcon": "language",
+      "googleError": "Google sign-in could not be completed. Please try again.",
+      "googleRedirecting": "Finishing sign-in...",
       "validation": {
         "emptyPhone": "Please enter your mobile number.",
         "emptyEmail": "Please enter your email address.",

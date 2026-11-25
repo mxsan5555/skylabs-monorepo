@@ -105,3 +105,25 @@ API modules yet.
 - Dashboard widgets (`drivers-active`, `trips-today`, `payments-summary`) show placeholders; no
   metrics endpoint yet.
 - Known cosmetic bug: menu nodes `pricing` and `attendance` share `order: 6`.
+
+### Admin panel assessment (2026-11-23)
+
+Live review: signed in with the **Admin** role at `/account/dashboard`. The dashboard displayed
+driver/KYC and booking cards, quick actions, an attention area and recent-records area. The local
+dataset returned zero counts and no records; this alone does not indicate missing functionality.
+The visible sidebar included Dashboard, Drivers & KYC, Customers, Trips & Bookings, Accounts,
+Reports, Masters, Administration and Settings.
+
+| Area | Finding | Requirement / recommendation |
+|---|---|---|
+| Navigation and permissions | Vehicles, Promotions and FAQs were not visible in the Admin sidebar, despite Admin access in `PLANNING.md` §1.2. Role Management was visible and readable, while permission changes were disabled. | Reconcile baseline grants and the filtered menu with A-01. Role/permission management should remain Super Admin-only by default. |
+| Dashboard | The operational summary and links loaded. Role Management offers dashboard-widget choices, but the dashboard service does not consume those choices. | Apply saved role widget choices, or remove the unused choices UI. |
+| KYC | A final-approval endpoint exists and is audited, but it requires `drivers:edit` plus `drivers:assign` rather than a dedicated approval permission. | Implement the distinct final-approval permission in K-01; driver edit alone must never approve KYC. |
+| Reports | The Reports page is visible, but uses local JSON and in-memory edits; the `/reports` API is a stub. | Implement real report data/generation and export before presenting this as a working report module. |
+| FAQs, feedback, promotions | Screens exist, but edits are not persisted to a backend API. | Implement the required APIs and connect the screens (S-01). |
+| Settings | The sidebar link opens a shared “module being built” placeholder. | Clarify and approve the settings scope before treating this as a working module. |
+| Vendors, companies and request assignments | These entities and portals are not modelled; they are proposed in `PLANNING.md` §8 and related decisions M-D3, M-D6 and M-D9 remain open. | Do not treat these as committed features until the open decisions are resolved. |
+
+**Keep out of the Admin role by default:** editing role permissions (Super Admin responsibility),
+cross-app business data, customer/driver self-service accounts outside their own portals, and
+hard-deleting bookings, KYC decisions, audit history or ledger entries.

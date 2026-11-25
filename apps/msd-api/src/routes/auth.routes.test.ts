@@ -23,6 +23,7 @@ vi.mock('../providers/email/smtp.provider', () => ({ sendOtpEmail: sendOtpEmailM
 import app from '../app';
 import { prisma } from '../lib/prisma';
 import { env } from '../config/env';
+import { passport } from '../lib/passport';
 
 const prismaMock = vi.mocked(prisma, true);
 
@@ -290,5 +291,72 @@ describe('GET /api/v1/auth/csrf', () => {
     expect(res.status).toBe(200);
     expect(typeof res.body.data.csrfToken).toBe('string');
     expect(String(res.headers['set-cookie'])).toContain('msd_csrf_token=');
+  });
+});
+
+describe('Google OAuth browser callback', () => {
+  const oauthUser = {
+    accessToken: 'access-token-must-not-leak',
+    refreshToken: 'refresh-token-must-stay-http-only',
+    user: { id: USER_ID, roles: ['customer'] },
+  };
+
+  it('validates state and redirects successful authentication to the frontend callback with only a safe return path', async () => {
+    const agent = request.agent(app);
+    const authenticate = vi.spyOn(passport, 'authenticate').mockImplementation(((strategy: string, options: any, callback?: any) => {
+      if (callback) {
+        return (_req: any, res: any) => callback(null, oauthUser);
+      }
+      return (_req: any, res: any) => res.redirect(`https://accounts.google.com/mock?state=${options.state}`);
+    }) as never);
+
+    const started = await agent.get('/api/v1/auth/google').query({ next: '/my-dashboard?tab=orders' });
+    expect(started.status).toBe(302);
+    const googleLocation = new URL(started.headers.location);
+    const state = googleLocation.searchParams.get('state');
+    expect(state).toBeTruthy();
+    expect(String(started.headers['set-cookie'])).toContain('HttpOnly');
+
+    const completed = await agent.get('/api/v1/auth/google/callback').query({ state });
+    expect(completed.status).toBe(303);
+    const location = new URL(completed.headers.location);
+    expect(env.corsOrigin).toContain(location.origin);
+    expect(location.pathname).toBe('/auth/google/callback');
+    expect(location.searchParams.get('next')).toBe('/my-dashboard?tab=orders');
+    expect(completed.headers.location).not.toContain(oauthUser.accessToken);
+    expect(completed.headers.location).not.toContain(oauthUser.refreshToken);
+    expect(String(completed.headers['set-cookie'])).toContain('msd_refresh_token=');
+    expect(String(completed.headers['set-cookie'])).toContain('HttpOnly');
+    authenticate.mockRestore();
+  });
+
+  it('redirects failed Google authentication to sign-in without exposing provider details', async () => {
+    const agent = request.agent(app);
+    vi.spyOn(passport, 'authenticate').mockImplementation(((strategy: string, options: any, callback?: any) => {
+      if (callback) return (_req: any, _res: any) => callback(new Error('provider detail with secret'), false);
+      return (_req: any, res: any) => res.redirect(`https://accounts.google.com/mock?state=${options.state}`);
+    }) as never);
+    const started = await agent.get('/api/v1/auth/google');
+    const state = new URL(started.headers.location).searchParams.get('state');
+    const completed = await agent.get('/api/v1/auth/google/callback').query({ state });
+    expect(completed.status).toBe(303);
+    expect(completed.headers.location).toMatch(/\/sign-in\?error=google$/);
+    expect(completed.headers.location).not.toContain('provider detail');
+    vi.restoreAllMocks();
+  });
+
+  it('rejects missing or invalid OAuth state before invoking Passport', async () => {
+    const authenticate = vi.spyOn(passport, 'authenticate');
+    const missing = await request(app).get('/api/v1/auth/google/callback');
+    expect(missing.status).toBe(303);
+    expect(missing.headers.location).toMatch(/\/sign-in\?error=google$/);
+    const invalid = await request(app)
+      .get('/api/v1/auth/google/callback')
+      .set('Cookie', 'msd_google_oauth_state=expected-state')
+      .query({ state: 'invalid-state' });
+    expect(invalid.status).toBe(303);
+    expect(invalid.headers.location).toMatch(/\/sign-in\?error=google$/);
+    expect(authenticate).not.toHaveBeenCalled();
+    authenticate.mockRestore();
   });
 });

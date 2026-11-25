@@ -58,7 +58,7 @@ silently ships the bare SPA); preview and local builds fall back to the SPA. Red
 | `R2_PUBLIC_URL` | optional public URL of the bucket | |
 | `R2_PRIVATE_BUCKET` | `msd-private` (public access off); member documents. Uploads return 503 until set | |
 | `SUPPORT_EMAIL` / `SUPPORT_PHONE` | support contact printed in member and order notices | |
-| `PUBLIC_SITE_URL` | storefront origin for links in customer emails (default: the first `CORS_ORIGIN`) | |
+| `PUBLIC_SITE_URL` | exact public Vercel storefront origin, e.g. `https://msd.example.com`; must also appear in `CORS_ORIGIN` (used for email links and OAuth redirects) | |
 | `SMS_DLT_TEMPLATE_ORDER_CONFIRMED` / `SMS_DLT_TEMPLATE_PAYMENT_FAILED` | DLT template ids; an order SMS goes out only when its id is set (D38), email always goes | |
 | `FIELD_ENCRYPTION_KEY` | 32 random bytes, base64; encrypts full Aadhaar and PAN numbers | 🔒 |
 | `DOC_HASH_PEPPER` | secret for the document number duplicate hash | 🔒 |
@@ -67,6 +67,22 @@ silently ships the bare SPA); preview and local builds fall back to the SPA. Red
 `SUPERADMIN_PHONE` (or `SUPERADMIN_EMAIL`) is read only by the seed script, from `.env.local`.
 SMTP, SMS, Razorpay and R2 are checked on first use, so the API boots without them; that feature
 just fails until its group is filled.
+
+For Google sign-in, set `PUBLIC_SITE_URL` in the Railway API service to the exact public Vercel
+origin and include the same origin in `CORS_ORIGIN`. Keep `GOOGLE_CALLBACK_URL` and the Google
+Cloud OAuth authorized redirect URI pointed at the Railway API callback. After deploying the API
+and frontend, verify the OAuth callback redirects to `/auth/google/callback`, then to
+`/my-dashboard` for a customer. The callback uses the existing refresh cookie and does not
+shorten or replace the current session refresh behavior.
+
+**SMTP connectivity check (run inside the deployed Railway service).** Railway currently allows
+outbound SMTP only on Pro and above; Free, Trial and Hobby services cannot reach SMTP ports 25,
+465 or 587. On an eligible plan, use Railway's documented outbound networking check from the
+service shell against `smtp.gmail.com` ports 465 and 587. Test after every plan change and redeploy.
+The SMTP provider forces IPv4, so an IPv4 TCP success rules out the IPv6 route failure and confirms
+TCP egress to that port; it does not prove Gmail authentication or successful message acceptance.
+An unreachable port on an eligible plan needs investigation with Railway and/or the SMTP host.
+Do not switch providers as a code workaround; an HTTPS email API requires owner approval.
 
 **Production boot check (P2-09).** With `NODE_ENV=production` the API refuses to start, naming
 each problem (never a value), when `JWT_SECRET` is under 32 characters, `CORS_ORIGIN` is empty or

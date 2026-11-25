@@ -100,6 +100,11 @@ transform doesn't type-check, which is why these don't block `msd-api:test`.
   unknown, inactive, suspended, deleted and wrong-role accounts cannot obtain staff tokens.
 - `OTP_PROVIDER=sms` preserves random OTP expiry/attempt behavior and the ConnectExpress sender;
   provider failure never falls back to dummy. Refresh, logout, JWT roles and RBAC remain unchanged.
+- Google OAuth callback tests cover state validation, success/failure frontend redirects, safe
+  customer return-to/dashboard routing, and the existing HttpOnly refresh-cookie session; OTP
+  request/verify and refresh tests continue to run in `auth.routes.test.ts`.
+- SMTP provider tests assert bounded connection/greeting/socket timeouts, IPv4 socket selection,
+  and failure logging that redacts the OTP and SMTP credentials (`smtp.provider.test.ts`).
 
 - Matrix snapshot test: 7 roles × 14 resources × actions × scope equals `PLANNING.md` §1.2 (P1-08,
   still open for the full 14-resource spec — `prisma/permission-matrix.test.ts` covers the
