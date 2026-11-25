@@ -23,19 +23,19 @@ function note(partial: Partial<Notification>): Notification {
 
 describe('notificationLink', () => {
   it('opens the deal itself for a deal notification', () => {
-    expect(notificationLink(note({}))).toBe('/account/members/vendor-1/deals/deal-1');
+    expect(notificationLink(note({}))).toBe('/account/vendors/vendor-1/deals/deal-1');
   });
 
   it('falls back to the member deals tab when the deal id is missing', () => {
-    expect(notificationLink(note({ entityId: null }))).toBe('/account/members/vendor-1/deals');
+    expect(notificationLink(note({ entityId: null }))).toBe('/account/vendors/vendor-1/deals');
   });
 
   it('falls back to the member list when the member id is missing', () => {
-    expect(notificationLink(note({ metadata: null }))).toBe('/account/members');
+    expect(notificationLink(note({ metadata: null }))).toBe('/account/vendors');
   });
 
   it('opens the member page for a vendor notification', () => {
-    expect(notificationLink(note({ entityType: 'VENDOR', entityId: 'vendor-2', metadata: null }))).toBe('/account/members/vendor-2');
+    expect(notificationLink(note({ entityType: 'VENDOR', entityId: 'vendor-2', metadata: null }))).toBe('/account/vendors/vendor-2');
   });
 
   it('opens the order for an order notification', () => {
@@ -43,6 +43,6 @@ describe('notificationLink', () => {
   });
 
   it('encodes ids so a stray character never changes the route', () => {
-    expect(notificationLink(note({ entityId: 'a/b', metadata: { vendorId: 'v 1' } }))).toBe('/account/members/v%201/deals/a%2Fb');
+    expect(notificationLink(note({ entityId: 'a/b', metadata: { vendorId: 'v 1' } }))).toBe('/account/vendors/v%201/deals/a%2Fb');
   });
 });

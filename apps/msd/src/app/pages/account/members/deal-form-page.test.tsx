@@ -139,8 +139,8 @@ function renderStaff(url: string) {
   return render(
     <MemoryRouter initialEntries={[url]}>
       <Routes>
-        <Route path="/account/members/:vendorId/deals/new" element={<DealFormPage token="tok" />} />
-        <Route path="/account/members/:vendorId/deals/:dealId" element={<DealFormPage token="tok" />} />
+        <Route path="/account/vendors/:vendorId/deals/new" element={<DealFormPage token="tok" />} />
+        <Route path="/account/vendors/:vendorId/deals/:dealId" element={<DealFormPage token="tok" />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -161,15 +161,15 @@ beforeEach(() => {
 describe('DealFormPage — branch first', () => {
   it('a member with no branch is asked to add one and sees no form', async () => {
     listBranchesMock.mockResolvedValue({ data: [] });
-    renderStaff('/account/members/v1/deals/new');
+    renderStaff('/account/vendors/v1/deals/new');
     expect(await screen.findByText(/Add a branch first/)).toBeTruthy();
     expect(selectByLabel('Branch')).toBeUndefined();
     fireEvent.click(button('Add a branch') as HTMLElement);
-    expect(navigateMock).toHaveBeenCalledWith('/account/members/v1/branches/new');
+    expect(navigateMock).toHaveBeenCalledWith('/account/vendors/v1/branches/new');
   });
 
   it('lists every active SERVICE category (D10), not branch grants, and the subcategories of the picked one', async () => {
-    renderStaff('/account/members/v1/deals/new');
+    renderStaff('/account/vendors/v1/deals/new');
     await waitFor(() => expect(selectByLabel('Category')).toBeTruthy());
     expect(listCategoriesMock).toHaveBeenCalledWith('tok', { type: 'SERVICE' });
     expect(selectByLabel('Subcategory (optional)')).toBeUndefined();
@@ -178,14 +178,14 @@ describe('DealFormPage — branch first', () => {
   });
 
   it('?branchId= preselects the branch and shows its therapists', async () => {
-    renderStaff('/account/members/v1/deals/new?branchId=b1');
+    renderStaff('/account/vendors/v1/deals/new?branchId=b1');
     expect(await screen.findByRole('checkbox', { name: /Ramesh Kumar/ })).toBeTruthy();
   });
 });
 
 describe('DealFormPage — create', () => {
   it('validates branch, category, title (5+) and packages, and never calls create', async () => {
-    renderStaff('/account/members/v1/deals/new');
+    renderStaff('/account/vendors/v1/deals/new');
     await waitFor(() => expect(button('Save as draft')).toBeTruthy());
     fireEvent.click(button('Save as draft') as HTMLElement);
     expect(await screen.findByText('Select a branch.')).toBeTruthy();
@@ -196,7 +196,7 @@ describe('DealFormPage — create', () => {
 
   it('creates a draft with package cards, therapists and no price, status or slug fields, then opens its edit page', async () => {
     api.create.mockResolvedValue({ data: { ...EXISTING, id: 'new-1' } });
-    renderStaff('/account/members/v1/deals/new?branchId=b1');
+    renderStaff('/account/vendors/v1/deals/new?branchId=b1');
     await waitFor(() => expect(selectByLabel('Category')).toBeTruthy());
     pickOption(selectByLabel('Category') as HTMLElement, 'c1');
     setText(fieldByLabel('Title'), 'Swedish full body massage');
@@ -226,11 +226,11 @@ describe('DealFormPage — create', () => {
       expect(body).not.toHaveProperty(key);
     }
     expect(dealApiMock).toHaveBeenCalledWith('tok', { kind: 'staff', vendorId: 'v1' });
-    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/account/members/v1/deals/new-1', { replace: true }));
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/account/vendors/v1/deals/new-1', { replace: true }));
   });
 
   it('a package card refuses a duplicate duration + people', async () => {
-    renderStaff('/account/members/v1/deals/new?branchId=b1');
+    renderStaff('/account/vendors/v1/deals/new?branchId=b1');
     await waitFor(() => expect(fieldByLabel('Duration (minutes)')).toBeTruthy());
     setText(fieldByLabel('Price'), '999');
     fireEvent.click(button('Save package') as HTMLElement);
@@ -244,7 +244,7 @@ describe('DealFormPage — create', () => {
 
   it('adds a therapist inline on the picked branch and ticks it', async () => {
     createVendorTherapistMock.mockResolvedValue({ data: { id: 't2' } });
-    renderStaff('/account/members/v1/deals/new?branchId=b1');
+    renderStaff('/account/vendors/v1/deals/new?branchId=b1');
     await screen.findByRole('checkbox', { name: /Ramesh Kumar/ });
     setText(fieldByLabel('Type (for example Massage therapist)'), 'Physio');
     setText(fieldByLabel('Name'), 'Asha Rao');
@@ -257,7 +257,7 @@ describe('DealFormPage — create', () => {
 
 describe('DealFormPage — edit', () => {
   it('loads the deal with the branch fixed and the media uploader on the deal', async () => {
-    renderStaff('/account/members/v1/deals/d1');
+    renderStaff('/account/vendors/v1/deals/d1');
     expect(await screen.findByRole('heading', { name: 'Edit deal' })).toBeTruthy();
     await waitFor(() => expect(fieldByLabel('Title')?.value).toBe('Deep tissue massage'));
     expect(selectByLabel('Branch')).toBeUndefined();
@@ -269,7 +269,7 @@ describe('DealFormPage — edit', () => {
 
   it('saves fields with update; packages are not sent (they save per card)', async () => {
     api.update.mockResolvedValue({ data: EXISTING });
-    renderStaff('/account/members/v1/deals/d1');
+    renderStaff('/account/vendors/v1/deals/d1');
     await waitFor(() => expect(fieldByLabel('Title')?.value).toBe('Deep tissue massage'));
     fireEvent.click(button('Save', 'md-filled-button') as HTMLElement);
     await waitFor(() => expect(api.update).toHaveBeenCalled());
@@ -282,7 +282,7 @@ describe('DealFormPage — edit', () => {
 
   it('a package edit on a saved deal calls the package route at once', async () => {
     api.updatePackage.mockResolvedValue({ data: EXISTING });
-    renderStaff('/account/members/v1/deals/d1');
+    renderStaff('/account/vendors/v1/deals/d1');
     await screen.findByText('60 min');
     fireEvent.click(button('Edit', 'md-outlined-button') as HTMLElement);
     setText(fieldByLabel('Package name (optional)'), 'Long session');
@@ -294,14 +294,14 @@ describe('DealFormPage — edit', () => {
 
   it('a package delete on a saved deal shows the API refusal (409 LAST_PACKAGE)', async () => {
     api.deletePackage.mockRejectedValue(new ApiRequestError('LAST_PACKAGE', 'A deal needs at least one active package', 409));
-    renderStaff('/account/members/v1/deals/d1');
+    renderStaff('/account/vendors/v1/deals/d1');
     await screen.findByText('60 min');
     fireEvent.click(button('Delete', 'md-outlined-button') as HTMLElement);
     expect(await screen.findByText('A deal needs at least one active package')).toBeTruthy();
   });
 
   it('lists what stops it going live (no image yet)', async () => {
-    renderStaff('/account/members/v1/deals/d1');
+    renderStaff('/account/vendors/v1/deals/d1');
     expect(await screen.findByText('Add at least one image')).toBeTruthy();
     expect(screen.queryByText('Add an active package')).toBeNull();
     expect(button('Go live')).toBeTruthy();
@@ -310,7 +310,7 @@ describe('DealFormPage — edit', () => {
   it('Go live on a ready deal calls the status route', async () => {
     api.listAll.mockResolvedValue({ data: [{ ...EXISTING, mediaImages: [{ id: 'i1', storageKey: 'k', isPrimary: true, sortOrder: 0 }] }] });
     api.setStatus.mockResolvedValue({ data: { ...EXISTING, status: 'ACTIVE' } });
-    renderStaff('/account/members/v1/deals/d1');
+    renderStaff('/account/vendors/v1/deals/d1');
     expect(await screen.findByText('Ready to go live.')).toBeTruthy();
     fireEvent.click(button('Go live') as HTMLElement);
     await waitFor(() => expect(api.setStatus).toHaveBeenCalledWith('b1', 'd1', 'ACTIVE'));
@@ -318,30 +318,30 @@ describe('DealFormPage — edit', () => {
 
   it('copies to another branch as a draft and opens the copy', async () => {
     api.copy.mockResolvedValue({ data: { ...EXISTING, id: 'copy-1', branchId: 'b2' } });
-    renderStaff('/account/members/v1/deals/d1');
+    renderStaff('/account/vendors/v1/deals/d1');
     await waitFor(() => expect(selectByLabel('Target branch')).toBeTruthy());
     pickOption(selectByLabel('Target branch') as HTMLElement, 'b2');
     fireEvent.click(button('Copy') as HTMLElement);
     await waitFor(() => expect(api.copy).toHaveBeenCalledWith('b1', 'd1', 'b2'));
-    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/account/members/v1/deals/copy-1'));
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/account/vendors/v1/deals/copy-1'));
   });
 
   it('Delete shows only with vendors.deals:delete', async () => {
     canMock.mockReturnValue(false);
-    renderStaff('/account/members/v1/deals/d1');
+    renderStaff('/account/vendors/v1/deals/d1');
     await screen.findByRole('heading', { name: 'Edit deal' });
     expect(button('Delete deal')).toBeUndefined();
   });
 
   it('a deal id that is not the member\'s shows an error', async () => {
     api.listAll.mockResolvedValue({ data: [] });
-    renderStaff('/account/members/v1/deals/missing');
+    renderStaff('/account/vendors/v1/deals/missing');
     expect(await screen.findByText('Deal not found.')).toBeTruthy();
   });
 
   it('shows the save error when update rejects', async () => {
     api.update.mockRejectedValue(new ApiRequestError('VALIDATION_ERROR', 'Could not save this deal.', 422));
-    renderStaff('/account/members/v1/deals/d1');
+    renderStaff('/account/vendors/v1/deals/d1');
     await waitFor(() => expect(fieldByLabel('Title')?.value).toBe('Deep tissue massage'));
     fireEvent.click(button('Save', 'md-filled-button') as HTMLElement);
     expect(await screen.findByText('Could not save this deal.')).toBeTruthy();

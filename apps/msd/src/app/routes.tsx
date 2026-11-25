@@ -106,7 +106,7 @@ import { ScrollToTop } from './components/ScrollToTop';
 import CustomerDashboard from './pages/customer-dashboard/customer-dashboard';
 import { Support } from './pages/support/support';
 /**
- * `/account/members` serves three audiences under different permission keys: admins hold
+ * `/account/vendors` serves three audiences under different permission keys: admins hold
  * `members:view`, vendor-role users hold `members:custom` (never `view` — that would also
  * unlock the admin "list every vendor" endpoint, see vendors.tsx's doc comment) plus the
  * narrower `vendor-portal:view` that only surfaces the "My Business" sidebar item.
@@ -115,10 +115,18 @@ import { Support } from './pages/support/support';
  * `RequirePermission` component used by every other route in the app.
  */
 
-/** Old `/account/vendors/...` links (bookmarks, notification metadata) land on the members route. */
+/** Old `/account/members/...` links (bookmarks, notification metadata) land on the vendors route. */
 function LegacyMemberRedirect() {
   const { pathname, search } = useLocation();
-  return <Navigate to={`${pathname.replace('/account/vendors', '/account/members')}${search}`} replace />;
+  return <Navigate to={`${pathname.replace('/account/members', '/account/vendors')}${search}`} replace />;
+}
+
+/** Old `/account/accounts/member-settlements...` links land on the vendor-settlements route. */
+function LegacyMemberSettlementsRedirect() {
+  const { pathname, search } = useLocation();
+  return (
+    <Navigate to={`${pathname.replace('/account/accounts/member-settlements', '/account/accounts/vendor-settlements')}${search}`} replace />
+  );
 }
 
 function VendorsRouteGuard({ children }: { children: ReactNode }) {
@@ -326,9 +334,10 @@ export function AppRoutes() {
           <Route path="/careers" element={<Careers />} />
           {/* Public, unauthenticated Vendor self-registration ("Become a Vendor") — the storefront
             counterpart of the admin "Add Vendor" wizard, see become-vendor.tsx's own doc
-            comment. Linked from the header's "Become a Member" and the footer's "Partner With Us"
-            entries (content.json). */}
-          <Route path="/become-member" element={<BecomeVendor />} />
+            comment. Linked from the header's "Become a Vendor" and the footer's "Partner With Us"
+            entries (content.json). Old /become-member bookmarks/links only redirect below. */}
+          <Route path="/become-vendor" element={<BecomeVendor />} />
+          <Route path="/become-member" element={<Navigate to="/become-vendor" replace />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
           {/* One legal page component for the 4 fixed WebsitePage rows (see website-page.tsx). */}
           <Route path="/privacy" element={<WebsitePage page="privacy" />} />
@@ -393,7 +402,7 @@ export function AppRoutes() {
             }
           />
           {/* One customer's own page: real routes (not tabs), same shape as Member Detail's
-            `/account/members/:memberId`/`:section` below — see `customer-detail-page.tsx`'s own
+            `/account/vendors/:memberId`/`:section` below — see `customer-detail-page.tsx`'s own
             doc comment. The static `/account/customers` list route above always wins over this
             dynamic segment. */}
           <Route
@@ -432,34 +441,34 @@ export function AppRoutes() {
               </RequirePermission>
             }
           />
-          <Route path="/account/vendors" element={<LegacyMemberRedirect />} />
-          <Route path="/account/vendors/*" element={<LegacyMemberRedirect />} />
+          <Route path="/account/members" element={<LegacyMemberRedirect />} />
+          <Route path="/account/members/*" element={<LegacyMemberRedirect />} />
           <Route
-            path="/account/members"
+            path="/account/vendors"
             element={
               <VendorsRouteGuard>
                 <MemberManagement />
               </VendorsRouteGuard>
             }
           />
-          {/* Add member: the short form. Same route guard as /account/members; MemberNewPage itself
+          {/* Add vendor: the short form. Same route guard as /account/vendors; MemberNewPage itself
             checks the finer-grained `members:create` action and shows an empty state otherwise
             (the backend route is the real enforcement either way). */}
           <Route
-            path="/account/members/new"
+            path="/account/vendors/new"
             element={
               <VendorsRouteGuard>
                 <MemberNewPage />
               </VendorsRouteGuard>
             }
           />
-          {/* One member's own page: status actions in the header and seven tabs, each tab its
+          {/* One vendor's own page: status actions in the header and seven tabs, each tab its
             own URL (`:section`) so the back button and shared links land on the same tab.
             Admin only: MemberDetailPage checks `members:view` itself, and every API call it
             makes is permission-gated server-side. The static `new` route above wins over this
             dynamic segment. */}
           <Route
-            path="/account/members/:memberId"
+            path="/account/vendors/:memberId"
             element={
               <VendorsRouteGuard>
                 <MemberDetailPage />
@@ -467,7 +476,7 @@ export function AppRoutes() {
             }
           />
           <Route
-            path="/account/members/:memberId/:section"
+            path="/account/vendors/:memberId/:section"
             element={
               <VendorsRouteGuard>
                 <MemberDetailPage />
@@ -477,7 +486,7 @@ export function AppRoutes() {
           {/* Branch add/edit — real pages, never a popup (see the branch-management design spec).
             The static `new` segment wins over the dynamic `:branchId` below it. */}
           <Route
-            path="/account/members/:vendorId/branches/new"
+            path="/account/vendors/:vendorId/branches/new"
             element={
               <VendorsRouteGuard>
                 <BranchFormPageRoute />
@@ -485,7 +494,7 @@ export function AppRoutes() {
             }
           />
           <Route
-            path="/account/members/:vendorId/branches/:branchId"
+            path="/account/vendors/:vendorId/branches/:branchId"
             element={
               <VendorsRouteGuard>
                 <BranchFormPageRoute />
@@ -495,7 +504,7 @@ export function AppRoutes() {
           {/* Deal add/edit — same real-page pattern as Branch above, never a popup. The static
             `new` segment wins over the dynamic `:dealId` below it. */}
           <Route
-            path="/account/members/:vendorId/deals/new"
+            path="/account/vendors/:vendorId/deals/new"
             element={
               <VendorsRouteGuard>
                 <DealFormPageRoute />
@@ -503,7 +512,7 @@ export function AppRoutes() {
             }
           />
           <Route
-            path="/account/members/:vendorId/deals/:dealId"
+            path="/account/vendors/:vendorId/deals/:dealId"
             element={
               <VendorsRouteGuard>
                 <DealFormPageRoute />
@@ -513,7 +522,7 @@ export function AppRoutes() {
           {/* Therapist add/edit — same real-page pattern as Branch/Deal above, never a popup.
             The static `new` segment wins over the dynamic `:therapistId` below it. */}
           <Route
-            path="/account/members/:vendorId/therapists/new"
+            path="/account/vendors/:vendorId/therapists/new"
             element={
               <VendorsRouteGuard>
                 <TherapistFormPageRoute />
@@ -521,7 +530,7 @@ export function AppRoutes() {
             }
           />
           <Route
-            path="/account/members/:vendorId/therapists/:therapistId"
+            path="/account/vendors/:vendorId/therapists/:therapistId"
             element={
               <VendorsRouteGuard>
                 <TherapistFormPageRoute />
@@ -531,7 +540,7 @@ export function AppRoutes() {
           {/* Product add/edit — same real-page pattern as Branch/Deal/Therapist above, never a
             popup. The static `new` segment wins over the dynamic `:productId` below it. */}
           <Route
-            path="/account/members/:vendorId/products/new"
+            path="/account/vendors/:vendorId/products/new"
             element={
               <VendorsRouteGuard>
                 <ProductFormPageRoute />
@@ -539,7 +548,7 @@ export function AppRoutes() {
             }
           />
           <Route
-            path="/account/members/:vendorId/products/:productId"
+            path="/account/vendors/:vendorId/products/:productId"
             element={
               <VendorsRouteGuard>
                 <ProductFormPageRoute />
@@ -733,8 +742,10 @@ export function AppRoutes() {
               </RequirePermission>
             }
           />
+          <Route path="/account/accounts/member-settlements" element={<LegacyMemberSettlementsRedirect />} />
+          <Route path="/account/accounts/member-settlements/*" element={<LegacyMemberSettlementsRedirect />} />
           <Route
-            path="/account/accounts/member-settlements"
+            path="/account/accounts/vendor-settlements"
             element={
               <RequirePermission menuKey="accounts.member-settlements">
                 <MemberSettlementsPage />
@@ -742,7 +753,7 @@ export function AppRoutes() {
             }
           />
           <Route
-            path="/account/accounts/member-settlements/:vendorId"
+            path="/account/accounts/vendor-settlements/:vendorId"
             element={
               <RequirePermission menuKey="accounts.member-settlements">
                 <MemberSettlementDetailPage />

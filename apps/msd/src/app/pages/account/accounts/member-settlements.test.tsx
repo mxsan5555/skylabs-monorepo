@@ -47,7 +47,7 @@ function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/account/accounts/member-settlements" element={<MemberSettlementsPage />} />
+        <Route path="/account/accounts/vendor-settlements" element={<MemberSettlementsPage />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -77,7 +77,7 @@ beforeEach(() => {
 describe('MemberSettlementsPage — "View" row action actually navigates (regression)', () => {
   it('dispatches sky-dt-row-action with an ordinary action string (never the magic __view_detail__) and navigates by vendorId', async () => {
     listMemberSettlementsMock.mockResolvedValue({ data: [ROW], meta: { total: 1 } });
-    renderAt('/account/accounts/member-settlements');
+    renderAt('/account/accounts/vendor-settlements');
     await waitFor(() => expect(table()?.getAttribute('total')).toBe('1'), LONG);
 
     // Confirm the configured action is NOT the magic drawer-trap string.
@@ -90,12 +90,12 @@ describe('MemberSettlementsPage — "View" row action actually navigates (regres
       new CustomEvent('sky-dt-row-action', { detail: { action: 'view-member', row: tableRows()[0] } }),
     );
 
-    expect(navigateMock).toHaveBeenCalledWith('/account/accounts/member-settlements/vendor-1');
+    expect(navigateMock).toHaveBeenCalledWith('/account/accounts/vendor-settlements/vendor-1');
   });
 
   it('never navigates when the row carries no vendor id (defensive — malformed row)', async () => {
     listMemberSettlementsMock.mockResolvedValue({ data: [ROW], meta: { total: 1 } });
-    renderAt('/account/accounts/member-settlements');
+    renderAt('/account/accounts/vendor-settlements');
     await waitFor(() => expect(table()?.getAttribute('total')).toBe('1'), LONG);
 
     fireEvent(table(), new CustomEvent('sky-dt-row-action', { detail: { action: 'view-member', row: { Member: 'ABC Spa' } } }));
@@ -113,7 +113,7 @@ describe('MemberSettlementsPage — "View" row action actually navigates (regres
 describe('MemberSettlementsPage — ?status=ready round-trip', () => {
   it('passes status: "ready" to listMemberSettlements and shows the "ready only" banner when the URL carries ?status=ready', async () => {
     listMemberSettlementsMock.mockResolvedValue({ data: [ROW], meta: { total: 1 } });
-    const { findByText } = renderAt('/account/accounts/member-settlements?status=ready');
+    const { findByText } = renderAt('/account/accounts/vendor-settlements?status=ready');
 
     await waitFor(() => expect(listMemberSettlementsMock).toHaveBeenCalled(), LONG);
     expect(listMemberSettlementsMock).toHaveBeenCalledWith('test-token', expect.objectContaining({ status: 'ready' }));
@@ -122,7 +122,7 @@ describe('MemberSettlementsPage — ?status=ready round-trip', () => {
 
   it('never passes status at all when the URL has no ?status=ready', async () => {
     listMemberSettlementsMock.mockResolvedValue({ data: [ROW], meta: { total: 1 } });
-    renderAt('/account/accounts/member-settlements');
+    renderAt('/account/accounts/vendor-settlements');
     await waitFor(() => expect(listMemberSettlementsMock).toHaveBeenCalled(), LONG);
     const call = listMemberSettlementsMock.mock.calls[0][1] as Record<string, unknown>;
     expect(call.status).toBeUndefined();
@@ -130,7 +130,7 @@ describe('MemberSettlementsPage — ?status=ready round-trip', () => {
 
   it('"Show all members" clears the ready filter and re-fetches without it', async () => {
     listMemberSettlementsMock.mockResolvedValue({ data: [ROW], meta: { total: 1 } });
-    const { findByText } = renderAt('/account/accounts/member-settlements?status=ready');
+    const { findByText } = renderAt('/account/accounts/vendor-settlements?status=ready');
     await waitFor(() => expect(listMemberSettlementsMock).toHaveBeenCalled(), LONG);
 
     const clearButton = await findByText('Show all vendors', {}, LONG);
@@ -149,7 +149,7 @@ describe('MemberSettlementsPage — ?status=ready round-trip', () => {
 describe('MemberSettlementsPage — list rendering + URL-persisted search/pagination', () => {
   it('renders the masked bank reference, never the full account number', async () => {
     listMemberSettlementsMock.mockResolvedValue({ data: [ROW], meta: { total: 1 } });
-    renderAt('/account/accounts/member-settlements');
+    renderAt('/account/accounts/vendor-settlements');
     await waitFor(() => expect(table()?.getAttribute('total')).toBe('1'), LONG);
     const [row] = tableRows();
     expect(row['Bank Reference']).toBe('••••1234');
@@ -157,7 +157,7 @@ describe('MemberSettlementsPage — list rendering + URL-persisted search/pagina
 
   it('reads page/pageSize/search from the URL on mount', async () => {
     listMemberSettlementsMock.mockResolvedValue({ data: [], meta: { total: 0 } });
-    renderAt('/account/accounts/member-settlements?page=2&pageSize=20&search=abc');
+    renderAt('/account/accounts/vendor-settlements?page=2&pageSize=20&search=abc');
     await waitFor(() => expect(listMemberSettlementsMock).toHaveBeenCalled(), LONG);
     expect(listMemberSettlementsMock).toHaveBeenCalledWith(
       'test-token',

@@ -31,7 +31,7 @@ function vendorDisplayName(vendor: Vendor): string | null {
   return vendor.businessName || vendor.owner?.name || null;
 }
 
-/** Add/Edit branch — `/account/members/:vendorId/branches/new` and `.../branches/:branchId`.
+/** Add/Edit branch — `/account/vendors/:vendorId/branches/new` and `.../branches/:branchId`.
  *  One page, `sky-accordion` sections: Location (State first — every other field starts
  *  disabled until a state is picked) and Opening Hours. No category step: categories are open
  *  to every member (D10). */
@@ -90,7 +90,7 @@ export function BranchFormPage({ token }: BranchFormPageProps) {
   const name = branch?.name || (isEdit ? 'Branch' : 'New branch');
   useSetBreadcrumbs([
     ...memberTrail(vendorId, vendorName),
-    { label: 'Branches', to: `/account/members/${vendorId}/branches` },
+    { label: 'Branches', to: `/account/vendors/${vendorId}/branches` },
     { label: isEdit ? name : 'Add branch' },
   ]);
 
@@ -133,7 +133,7 @@ export function BranchFormPage({ token }: BranchFormPageProps) {
         ? (await updateBranch(token, vendorId, branchId, input)).data
         : (await createBranch(token, vendorId, input)).data;
 
-      navigate(`/account/members/${vendorId}/branches/${saved.id}`, { replace: true });
+      navigate(`/account/vendors/${vendorId}/branches/${saved.id}`, { replace: true });
     } catch (err) {
       setSaveError(err instanceof ApiRequestError ? err.message : 'Could not save this branch.');
     } finally {

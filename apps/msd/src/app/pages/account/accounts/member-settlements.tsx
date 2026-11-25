@@ -137,7 +137,7 @@ export function MemberSettlementsPage() {
     const onRowAction = (e: Event) => {
       const detail = (e as CustomEvent<{ action: string; row: Record<string, unknown> }>).detail;
       const vendorId = detail.row['Vendor Id'];
-      if (typeof vendorId === 'string') navigate(`/account/accounts/member-settlements/${vendorId}`);
+      if (typeof vendorId === 'string') navigate(`/account/accounts/vendor-settlements/${vendorId}`);
     };
     el.addEventListener('sky-dt-params-change', onParamsChange);
     el.addEventListener('sky-dt-row-action', onRowAction);

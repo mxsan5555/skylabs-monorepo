@@ -97,7 +97,7 @@ describe('DealsListPage', () => {
     renderPage(true);
     const addButton = await screen.findByText('Add deal');
     fireEvent.click(addButton);
-    expect(navigateMock).toHaveBeenCalledWith('/account/members/v1/deals/new');
+    expect(navigateMock).toHaveBeenCalledWith('/account/vendors/v1/deals/new');
   });
 
   it('hides "Add deal" and row edit/status actions when canEdit is false', async () => {
@@ -119,7 +119,7 @@ describe('DealsListPage', () => {
     renderPage();
     await waitFor(() => expect(JSON.parse(table().getAttribute('rows') ?? '[]')).toHaveLength(2));
     fireEvent(table(), new CustomEvent('sky-dt-row-action', { detail: { action: 'edit', rowIndex: 0 } }));
-    expect(navigateMock).toHaveBeenCalledWith('/account/members/v1/deals/d1');
+    expect(navigateMock).toHaveBeenCalledWith('/account/vendors/v1/deals/d1');
   });
 
   it('toggle-status flips an ACTIVE deal to INACTIVE and reloads', async () => {
@@ -212,7 +212,7 @@ describe('DealsListPage', () => {
       </MemoryRouter>,
     );
     expect(await screen.findByText(/Add a branch first/)).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Add a branch' }).getAttribute('href')).toBe('/account/members/v1/branches/new');
+    expect(screen.getByRole('link', { name: 'Add a branch' }).getAttribute('href')).toBe('/account/vendors/v1/branches/new');
     expect(screen.queryByText('Add deal')).toBeNull();
   });
 });

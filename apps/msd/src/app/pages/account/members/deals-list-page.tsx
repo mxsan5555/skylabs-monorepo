@@ -104,7 +104,7 @@ export function DealsListPage({ token, vendorId, canEdit, canDelete }: DealsList
       const detail = (e as CustomEvent<{ action: string; rowIndex: number }>).detail;
       const deal = deals[detail.rowIndex];
       if (!deal) return;
-      if (detail.action === 'edit') navigate(`/account/members/${vendorId}/deals/${deal.id}`);
+      if (detail.action === 'edit') navigate(`/account/vendors/${vendorId}/deals/${deal.id}`);
       else if (detail.action === 'toggle-status') toggleStatus(deal);
       else if (detail.action === 'delete') remove(deal);
     };
@@ -122,7 +122,7 @@ export function DealsListPage({ token, vendorId, canEdit, canDelete }: DealsList
         </div>
         {canEdit && branchCount !== 0 && (
           <div className="page-head__actions">
-            <FilledButton onClick={() => navigate(`/account/members/${vendorId}/deals/new`)}>
+            <FilledButton onClick={() => navigate(`/account/vendors/${vendorId}/deals/new`)}>
               <Icon slot="icon" aria-hidden="true">add</Icon>
               Add deal
             </FilledButton>
@@ -134,7 +134,7 @@ export function DealsListPage({ token, vendorId, canEdit, canDelete }: DealsList
 
       {!loading && error ? null : !loading && branchCount === 0 ? (
         <p className="empty-state">
-          Add a branch first: a deal is sold at one branch. <Link to={`/account/members/${vendorId}/branches/new`}>Add a branch</Link>
+          Add a branch first: a deal is sold at one branch. <Link to={`/account/vendors/${vendorId}/branches/new`}>Add a branch</Link>
         </p>
       ) : !loading && deals.length === 0 ? (
         <p className="empty-state">No deals yet. Add one for a branch.</p>

@@ -55,11 +55,11 @@ function fillValid() {
 
 function renderPage() {
   render(
-    <MemoryRouter initialEntries={['/account/members/new']}>
+    <MemoryRouter initialEntries={['/account/vendors/new']}>
       <Routes>
-        <Route path="/account/members/new" element={<MemberNewPage />} />
-        <Route path="/account/members" element={<p>list-page</p>} />
-        <Route path="/account/members/:id" element={<p>detail-page</p>} />
+        <Route path="/account/vendors/new" element={<MemberNewPage />} />
+        <Route path="/account/vendors" element={<p>list-page</p>} />
+        <Route path="/account/vendors/:id" element={<p>detail-page</p>} />
       </Routes>
     </MemoryRouter>,
   );

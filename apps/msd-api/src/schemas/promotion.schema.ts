@@ -16,7 +16,7 @@ export const PROMOTION_ROUTE_ALLOW_LIST = [
   '/categories',
   '/products',
   '/therapists',
-  '/become-member',
+  '/become-vendor',
   '/how-it-works',
 ] as const;
 

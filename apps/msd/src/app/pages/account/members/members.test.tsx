@@ -38,7 +38,7 @@ function renderAt(url: string) {
   render(
     <MemoryRouter initialEntries={[url]}>
       <Routes>
-        <Route path="/account/members" element={<MemberManagement />} />
+        <Route path="/account/vendors" element={<MemberManagement />} />
         <Route path="*" element={<Where />} />
       </Routes>
     </MemoryRouter>,
@@ -58,18 +58,18 @@ describe('MemberManagement legacy links', () => {
   });
 
   it('sends an old ?vendorId= link to the member page', async () => {
-    renderAt('/account/members?vendorId=v1');
-    expect(await screen.findByText('at /account/members/v1')).toBeTruthy();
+    renderAt('/account/vendors?vendorId=v1');
+    expect(await screen.findByText('at /account/vendors/v1')).toBeTruthy();
   });
 
   it('forwards an old deal link straight to the deal', async () => {
-    renderAt('/account/members?vendorId=v1&branchId=b1&dealId=d1');
-    expect(await screen.findByText('at /account/members/v1/deals/d1')).toBeTruthy();
+    renderAt('/account/vendors?vendorId=v1&branchId=b1&dealId=d1');
+    expect(await screen.findByText('at /account/vendors/v1/deals/d1')).toBeTruthy();
   });
 
   it('forwards an old branch link to the branch', async () => {
-    renderAt('/account/members?vendorId=v1&branchId=b1&dealId=');
-    expect(await screen.findByText('at /account/members/v1/branches/b1')).toBeTruthy();
+    renderAt('/account/vendors?vendorId=v1&branchId=b1&dealId=');
+    expect(await screen.findByText('at /account/vendors/v1/branches/b1')).toBeTruthy();
   });
 });
 
@@ -83,20 +83,20 @@ describe('MemberManagement self service', () => {
 
   it('lets an active member edit their profile', async () => {
     asMember('ACTIVE');
-    renderAt('/account/members');
+    renderAt('/account/vendors');
     expect(await screen.findByText('profile-form canEdit=true')).toBeTruthy();
   });
 
   it('makes the profile read only for an inactive member', async () => {
     asMember('INACTIVE');
     getMyVendorMock.mockResolvedValue({ data: { ...VENDOR, status: 'INACTIVE' } });
-    renderAt('/account/members');
+    renderAt('/account/vendors');
     expect(await screen.findByText('profile-form canEdit=false')).toBeTruthy();
   });
 
   it('keeps editing on when bootstrap has no member record', async () => {
     asMember(undefined);
-    renderAt('/account/members');
+    renderAt('/account/vendors');
     await waitFor(() => expect(screen.getByText('profile-form canEdit=true')).toBeTruthy());
   });
 });
@@ -111,7 +111,7 @@ describe('MemberManagement list filter', () => {
 
   /** Picks the filter value in the (mocked) table and returns the filter keys of the next list call. */
   async function queryFor(filter: string) {
-    renderAt('/account/members');
+    renderAt('/account/vendors');
     await waitFor(() => expect(listMembers).toHaveBeenCalled());
     const { onParamsChange } = memberListProps.mock.lastCall?.[0] as { onParamsChange: (p: MemberTableParams) => void };
     vi.mocked(listMembers).mockClear();

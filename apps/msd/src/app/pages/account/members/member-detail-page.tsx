@@ -54,7 +54,7 @@ const STATUS_DONE: Record<'ACTIVE' | 'INACTIVE' | 'SUSPENDED', string> = {
 };
 
 /**
- * One member's page: `/account/members/:memberId[/:section]`. Status actions and the customer and
+ * One member's page: `/account/vendors/:memberId[/:section]`. Status actions and the customer and
  * order counts sit in the header, up to eight tabs below (Customers needs `customers:view`).
  * The tab strip is `md-tabs`, which supplies the ARIA tabs pattern (tablist and
  * tab roles, aria-selected, roving tabindex, Arrow, Home and End keys); this page adds the ids,
@@ -123,7 +123,7 @@ export function MemberDetailPage() {
         <p className="error-state" role="alert">
           {loadError || 'Vendor not found.'}
         </p>
-        <Link to="/account/members">Back to all vendors</Link>
+        <Link to="/account/vendors">Back to all vendors</Link>
       </div>
     );
   }
@@ -156,7 +156,7 @@ export function MemberDetailPage() {
     // Delete always archives (item 6): nothing is erased and the member can be restored.
     await deleteMember(token, member.id, reason);
     showSnackbar('Vendor archived. Restore them any time from the Archived filter.');
-    navigate('/account/members', { replace: true });
+    navigate('/account/vendors', { replace: true });
   };
 
   const saveProfile = async (input: Parameters<typeof updateVendor>[2]) => {
@@ -242,7 +242,7 @@ export function MemberDetailPage() {
                 active: t.value === tab,
                 ...(t.value === tab ? { 'aria-controls': panelId } : {}),
                 onClick: () => {
-                  if (t.value !== tab) navigate(`/account/members/${member.id}/${t.value}`);
+                  if (t.value !== tab) navigate(`/account/vendors/${member.id}/${t.value}`);
                 },
               },
               t.label,

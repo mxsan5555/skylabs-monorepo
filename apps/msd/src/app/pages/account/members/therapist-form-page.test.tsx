@@ -127,8 +127,8 @@ function renderAt(url: string) {
   return render(
     <MemoryRouter initialEntries={[url]}>
       <Routes>
-        <Route path="/account/members/:vendorId/therapists/new" element={<TherapistFormPage token="tok" />} />
-        <Route path="/account/members/:vendorId/therapists/:therapistId" element={<TherapistFormPage token="tok" />} />
+        <Route path="/account/vendors/:vendorId/therapists/new" element={<TherapistFormPage token="tok" />} />
+        <Route path="/account/vendors/:vendorId/therapists/:therapistId" element={<TherapistFormPage token="tok" />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -140,7 +140,7 @@ beforeEach(() => {
 
 describe('TherapistFormPage — Add', () => {
   it('offers every branch of the member and every active top-level Therapy category (D10: no grants)', async () => {
-    renderAt('/account/members/v1/therapists/new');
+    renderAt('/account/vendors/v1/therapists/new');
     expect(await screen.findByRole('heading', { name: 'Add therapist' })).toBeTruthy();
     const branchSelect = await waitFor(() => {
       const el = selectByLabel('Branch');
@@ -162,7 +162,7 @@ describe('TherapistFormPage — Add', () => {
   });
 
   it('validates branch/type/name and never calls createVendorTherapist when all are missing', async () => {
-    renderAt('/account/members/v1/therapists/new');
+    renderAt('/account/vendors/v1/therapists/new');
     await screen.findByRole('heading', { name: 'Add therapist' });
     const save = findSaveButton() as HTMLElement;
     fireEvent.click(save);
@@ -172,7 +172,7 @@ describe('TherapistFormPage — Add', () => {
 
   it('creates the therapist with the chosen specialization, and redirects to its own edit page', async () => {
     createVendorTherapistMock.mockResolvedValue({ data: { ...EXISTING_THERAPIST, id: 'new-1' } });
-    renderAt('/account/members/v1/therapists/new');
+    renderAt('/account/vendors/v1/therapists/new');
     await screen.findByRole('heading', { name: 'Add therapist' });
 
     pickOption(selectByLabel('Branch') as HTMLElement, 'b1');
@@ -194,13 +194,13 @@ describe('TherapistFormPage — Add', () => {
         specializationCategoryId: 'c1',
       })),
     );
-    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/account/members/v1/therapists/new-1', { replace: true }));
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/account/vendors/v1/therapists/new-1', { replace: true }));
   });
 });
 
 describe('TherapistFormPage — Edit', () => {
   it('loads the existing therapist: fields prefilled, branch shown as fixed text', async () => {
-    renderAt('/account/members/v1/therapists/t1');
+    renderAt('/account/vendors/v1/therapists/t1');
     expect(await screen.findByRole('heading', { name: 'Edit therapist' })).toBeTruthy();
     expect(selectByLabel('Branch')).toBeUndefined();
     expect(screen.getByText(/Branch: Lower Parel Branch/)).toBeTruthy();
@@ -215,9 +215,9 @@ describe('TherapistFormPage — Edit', () => {
   it('a therapist id not found in the vendor\'s own list shows an error', async () => {
     listVendorTherapistsForAdminMock.mockResolvedValue({ data: [] });
     render(
-      <MemoryRouter initialEntries={['/account/members/v1/therapists/missing']}>
+      <MemoryRouter initialEntries={['/account/vendors/v1/therapists/missing']}>
         <Routes>
-          <Route path="/account/members/:vendorId/therapists/:therapistId" element={<TherapistFormPage token="tok" />} />
+          <Route path="/account/vendors/:vendorId/therapists/:therapistId" element={<TherapistFormPage token="tok" />} />
         </Routes>
       </MemoryRouter>,
     );
@@ -226,7 +226,7 @@ describe('TherapistFormPage — Edit', () => {
 
   it('saves with updateVendorTherapist, not createVendorTherapist', async () => {
     updateVendorTherapistMock.mockResolvedValue({ data: EXISTING_THERAPIST });
-    renderAt('/account/members/v1/therapists/t1');
+    renderAt('/account/vendors/v1/therapists/t1');
     await screen.findByRole('heading', { name: 'Edit therapist' });
     await waitFor(() => expect(fieldByLabel('Person Name')?.value).toBe('Ramesh Kumar'));
     const save = findSaveButton() as HTMLElement;
@@ -237,7 +237,7 @@ describe('TherapistFormPage — Edit', () => {
 
   it('shows the save error inline when updateVendorTherapist rejects', async () => {
     updateVendorTherapistMock.mockRejectedValue(new ApiRequestError('VALIDATION_ERROR', 'Could not save this therapist.', 400));
-    renderAt('/account/members/v1/therapists/t1');
+    renderAt('/account/vendors/v1/therapists/t1');
     await screen.findByRole('heading', { name: 'Edit therapist' });
     await waitFor(() => expect(fieldByLabel('Person Name')?.value).toBe('Ramesh Kumar'));
     const save = findSaveButton() as HTMLElement;

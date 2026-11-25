@@ -99,8 +99,8 @@ function renderAt(url: string) {
   return render(
     <MemoryRouter initialEntries={[url]}>
       <Routes>
-        <Route path="/account/members/:vendorId/products/new" element={<ProductFormPage token="tok" />} />
-        <Route path="/account/members/:vendorId/products/:productId" element={<ProductFormPage token="tok" />} />
+        <Route path="/account/vendors/:vendorId/products/new" element={<ProductFormPage token="tok" />} />
+        <Route path="/account/vendors/:vendorId/products/:productId" element={<ProductFormPage token="tok" />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -112,14 +112,14 @@ beforeEach(() => {
 
 describe('ProductFormPage — Add', () => {
   it('has no branch field at all — Product is vendor-level', async () => {
-    renderAt('/account/members/v1/products/new');
+    renderAt('/account/vendors/v1/products/new');
     expect(await screen.findByRole('heading', { name: 'Add product' })).toBeTruthy();
     expect(selectByLabel('Branch')).toBeUndefined();
     await waitFor(() => expect(selectByLabel('Category')).toBeTruthy());
   });
 
   it('validates name/slug/category/price and never calls createVendorProduct when all are missing', async () => {
-    renderAt('/account/members/v1/products/new');
+    renderAt('/account/vendors/v1/products/new');
     await screen.findByRole('heading', { name: 'Add product' });
     const save = findSaveButton() as HTMLElement;
     fireEvent.click(save);
@@ -129,7 +129,7 @@ describe('ProductFormPage — Add', () => {
 
   it('creates the product and redirects to its own edit page', async () => {
     createVendorProductMock.mockResolvedValue({ data: { ...EXISTING_PRODUCT, id: 'new-1' } });
-    renderAt('/account/members/v1/products/new');
+    renderAt('/account/vendors/v1/products/new');
     await screen.findByRole('heading', { name: 'Add product' });
 
     const categorySelect = await waitFor(() => {
@@ -154,13 +154,13 @@ describe('ProductFormPage — Add', () => {
         price: '299',
       })),
     );
-    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/account/members/v1/products/new-1', { replace: true }));
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/account/vendors/v1/products/new-1', { replace: true }));
   });
 });
 
 describe('ProductFormPage — Edit', () => {
   it('loads the existing product: fields prefilled', async () => {
-    renderAt('/account/members/v1/products/p1');
+    renderAt('/account/vendors/v1/products/p1');
     expect(await screen.findByRole('heading', { name: 'Edit product' })).toBeTruthy();
     const name = await waitFor(() => {
       const el = fieldByLabel('Name');
@@ -174,9 +174,9 @@ describe('ProductFormPage — Edit', () => {
   it('a product id not found in the vendor\'s own list shows an error', async () => {
     listVendorProductsMock.mockResolvedValue({ data: [] });
     render(
-      <MemoryRouter initialEntries={['/account/members/v1/products/missing']}>
+      <MemoryRouter initialEntries={['/account/vendors/v1/products/missing']}>
         <Routes>
-          <Route path="/account/members/:vendorId/products/:productId" element={<ProductFormPage token="tok" />} />
+          <Route path="/account/vendors/:vendorId/products/:productId" element={<ProductFormPage token="tok" />} />
         </Routes>
       </MemoryRouter>,
     );
@@ -185,7 +185,7 @@ describe('ProductFormPage — Edit', () => {
 
   it('saves with updateVendorProduct, not createVendorProduct', async () => {
     updateVendorProductMock.mockResolvedValue({ data: EXISTING_PRODUCT });
-    renderAt('/account/members/v1/products/p1');
+    renderAt('/account/vendors/v1/products/p1');
     await screen.findByRole('heading', { name: 'Edit product' });
     await waitFor(() => expect(fieldByLabel('Name')?.value).toBe('Face Cream'));
     const save = findSaveButton() as HTMLElement;
@@ -196,7 +196,7 @@ describe('ProductFormPage — Edit', () => {
 
   it('shows the save error inline when updateVendorProduct rejects', async () => {
     updateVendorProductMock.mockRejectedValue(new ApiRequestError('VALIDATION_ERROR', 'Could not save this product.', 400));
-    renderAt('/account/members/v1/products/p1');
+    renderAt('/account/vendors/v1/products/p1');
     await screen.findByRole('heading', { name: 'Edit product' });
     await waitFor(() => expect(fieldByLabel('Name')?.value).toBe('Face Cream'));
     const save = findSaveButton() as HTMLElement;

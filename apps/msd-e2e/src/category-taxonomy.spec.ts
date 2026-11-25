@@ -269,7 +269,7 @@ const BRANCH_CATEGORY_ACCESS = [
 ];
 
 /** A trimmed stand-in for the member sub-resources the deal form at
- *  `/account/members/:vendorId/deals/new` calls: the member, its one branch, that branch's
+ *  `/account/vendors/:vendorId/deals/new` calls: the member, its one branch, that branch's
  *  category mapping, its therapists, and the Deal actually submitted. */
 class MemberDealsBackend {
   deals: DealBody[] = [];
@@ -345,7 +345,7 @@ test.describe('Member deal form: a Type-tier pick is submitted as the subcategor
     await mockBootstrap(page, ['dashboard:view', 'members:view', 'members:edit', 'vendors.deals:view', 'vendors.deals:create']);
     await mockMemberDealsBackend(page, backend);
 
-    await page.goto(`/account/members/${MEMBER_ID}/deals/new`);
+    await page.goto(`/account/vendors/${MEMBER_ID}/deals/new`);
     await expect(page.getByRole('heading', { name: 'Add deal', level: 1 })).toBeVisible();
 
     // Branch first: the Category and Subcategory options come from that branch's mapping.
@@ -363,7 +363,7 @@ test.describe('Member deal form: a Type-tier pick is submitted as the subcategor
     await page.getByLabel('Selling price').fill('1499');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
-    await expect(page).toHaveURL(new RegExp(`/account/members/${MEMBER_ID}/deals/deal-1$`));
+    await expect(page).toHaveURL(new RegExp(`/account/vendors/${MEMBER_ID}/deals/deal-1$`));
     expect(backend.deals.length).toBe(1);
     expect(backend.deals[0].categoryId).toBe(TOP_MASSAGE.id);
     // The Type-tier pick is sent as subcategoryId, not the Subcategory-tier id.
@@ -377,7 +377,7 @@ test.describe('Member deal form: a Type-tier pick is submitted as the subcategor
     await mockBootstrap(page, ['dashboard:view', 'members:view', 'members:edit']);
     await mockMemberDealsBackend(page, backend);
 
-    await page.goto(`/account/members/${MEMBER_ID}/deals/new`);
+    await page.goto(`/account/vendors/${MEMBER_ID}/deals/new`);
     await expect(page.getByText('Pick a branch to choose a category.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     expect(backend.deals).toHaveLength(0);

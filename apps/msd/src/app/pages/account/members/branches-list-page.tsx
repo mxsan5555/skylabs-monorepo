@@ -80,7 +80,7 @@ export function BranchesListPage({ token, vendorId, canEdit }: BranchesListPageP
       const detail = (e as CustomEvent<{ action: string; rowIndex: number }>).detail;
       const branch = branches[detail.rowIndex];
       if (!branch) return;
-      if (detail.action === 'edit') navigate(`/account/members/${vendorId}/branches/${branch.id}`);
+      if (detail.action === 'edit') navigate(`/account/vendors/${vendorId}/branches/${branch.id}`);
       else if (detail.action === 'toggle-status') toggleStatus(branch);
     };
     el.addEventListener('sky-dt-row-action', onRowAction);
@@ -97,7 +97,7 @@ export function BranchesListPage({ token, vendorId, canEdit }: BranchesListPageP
         </div>
         {canEdit && (
           <div className="page-head__actions">
-            <FilledButton onClick={() => navigate(`/account/members/${vendorId}/branches/new`)}>
+            <FilledButton onClick={() => navigate(`/account/vendors/${vendorId}/branches/new`)}>
               <Icon slot="icon" aria-hidden="true">add</Icon>
               Add branch
             </FilledButton>

@@ -97,7 +97,7 @@ export function TherapistsListPage({ token, vendorId, canEdit, canDelete }: Ther
       const detail = (e as CustomEvent<{ action: string; rowIndex: number }>).detail;
       const therapist = therapists[detail.rowIndex];
       if (!therapist) return;
-      if (detail.action === 'edit') navigate(`/account/members/${vendorId}/therapists/${therapist.id}`);
+      if (detail.action === 'edit') navigate(`/account/vendors/${vendorId}/therapists/${therapist.id}`);
       else if (detail.action === 'toggle-status') toggleStatus(therapist);
       else if (detail.action === 'delete') remove(therapist);
     };
@@ -115,7 +115,7 @@ export function TherapistsListPage({ token, vendorId, canEdit, canDelete }: Ther
         </div>
         {canEdit && (
           <div className="page-head__actions">
-            <FilledButton onClick={() => navigate(`/account/members/${vendorId}/therapists/new`)}>
+            <FilledButton onClick={() => navigate(`/account/vendors/${vendorId}/therapists/new`)}>
               <Icon slot="icon" aria-hidden="true">add</Icon>
               Add therapist
             </FilledButton>

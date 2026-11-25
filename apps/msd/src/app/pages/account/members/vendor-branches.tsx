@@ -59,7 +59,7 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canDeleteDeal
   const navigate = useNavigate();
   // Deals are added and edited on the shared deal form (PLANNING §2.7).
   const dealFormPath = (dealId?: string) =>
-    isSelf ? `/account/vendor-deals/${dealId ?? 'new'}` : `/account/members/${vendorId}/deals/${dealId ?? 'new'}`;
+    isSelf ? `/account/vendor-deals/${dealId ?? 'new'}` : `/account/vendors/${vendorId}/deals/${dealId ?? 'new'}`;
   // Deep-link support for a "New Deal Pending Approval" notification click (see
   // notification-bell.tsx) — both params are optional and purely additive; this page behaves
   // exactly as before when neither is present.

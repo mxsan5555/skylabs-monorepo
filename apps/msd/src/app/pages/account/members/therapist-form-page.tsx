@@ -110,7 +110,7 @@ const EMPTY_FORM = {
   experienceYears: '',
 };
 
-/** Add/Edit therapist — `/account/members/:vendorId/therapists/new` and
+/** Add/Edit therapist — `/account/vendors/:vendorId/therapists/new` and
  *  `.../therapists/:therapistId`. One page: Branch (any of the member's branches), the therapist's
  *  own fields, and a Specialization picker of every active top-level Therapy category (D10: no
  *  category grants; same picker as `TherapistFormDialog` in `vendor-therapists.tsx`).
@@ -197,7 +197,7 @@ export function TherapistFormPage({ token }: TherapistFormPageProps) {
   const name = therapist?.personName || (isEdit ? 'Therapist' : 'New therapist');
   useSetBreadcrumbs([
     ...memberTrail(vendorId, vendorName),
-    { label: 'Therapists', to: `/account/members/${vendorId}/therapists` },
+    { label: 'Therapists', to: `/account/vendors/${vendorId}/therapists` },
     { label: isEdit ? name : 'Add therapist' },
   ]);
 
@@ -234,7 +234,7 @@ export function TherapistFormPage({ token }: TherapistFormPageProps) {
         isEdit && therapistId
           ? (await updateVendorTherapist(token, vendorId, therapistId, input)).data
           : (await createVendorTherapist(token, vendorId, form.branchId, input)).data;
-      navigate(`/account/members/${vendorId}/therapists/${saved.id}`, { replace: true });
+      navigate(`/account/vendors/${vendorId}/therapists/${saved.id}`, { replace: true });
     } catch (err) {
       setSaveError(err instanceof ApiRequestError ? err.message : 'Could not save this therapist.');
     } finally {

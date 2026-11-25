@@ -118,7 +118,7 @@ export function ProductsListPage({ token, vendorId, canEdit, canDelete }: Produc
       const detail = (e as CustomEvent<{ action: string; rowIndex: number }>).detail;
       const product = products[detail.rowIndex];
       if (!product) return;
-      if (detail.action === 'edit') navigate(`/account/members/${vendorId}/products/${product.id}`);
+      if (detail.action === 'edit') navigate(`/account/vendors/${vendorId}/products/${product.id}`);
       else if (detail.action === 'toggle-status') toggleStatus(product);
       else if (detail.action === 'delete') remove(product);
     };
@@ -140,7 +140,7 @@ export function ProductsListPage({ token, vendorId, canEdit, canDelete }: Produc
         </div>
         {canEdit && (
           <div className="page-head__actions">
-            <FilledButton onClick={() => navigate(`/account/members/${vendorId}/products/new`)}>
+            <FilledButton onClick={() => navigate(`/account/vendors/${vendorId}/products/new`)}>
               <Icon slot="icon" aria-hidden="true">add</Icon>
               Add product
             </FilledButton>

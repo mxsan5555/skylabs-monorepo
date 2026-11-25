@@ -95,7 +95,7 @@ export function MemberNewPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const cancel = () => navigate('/account/members');
+  const cancel = () => navigate('/account/vendors');
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -127,7 +127,7 @@ export function MemberNewPage() {
         ownerEmail: form.ownerEmail.trim(),
         ownerMobile: form.ownerMobile.trim(),
       });
-      navigate(`/account/members/${data.id}`, { replace: true });
+      navigate(`/account/vendors/${data.id}`, { replace: true });
     } catch (err) {
       if (err instanceof ApiRequestError) {
         // A conflict sends `details.fields`; a 400 or 422 sends Zod's `fieldErrors` / `formErrors`.

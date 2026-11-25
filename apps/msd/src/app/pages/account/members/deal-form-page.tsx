@@ -36,7 +36,7 @@ import { CANCELLATION_OPTIONS, fromDateInput, toDateInput } from './deal-format'
 
 interface DealFormPageProps {
   token: string | null;
-  /** `staff`: `/account/members/:vendorId/deals/...`; `member`: `/account/vendor-deals/...`. */
+  /** `staff`: `/account/vendors/:vendorId/deals/...`; `member`: `/account/vendor-deals/...`. */
   surface?: 'staff' | 'member';
 }
 
@@ -188,9 +188,9 @@ export function DealFormPage({ token, surface = 'staff' }: DealFormPageProps) {
   const isEdit = Boolean(dealId);
   const apiSurface: DealSurface = useMemo(() => (isStaff ? { kind: 'staff', vendorId } : { kind: 'member' }), [isStaff, vendorId]);
   const api = useMemo(() => dealApi(token, apiSurface), [token, apiSurface]);
-  const listPath = isStaff ? `/account/members/${vendorId}/deals` : '/account/vendor-deals';
-  const editPath = (id: string) => (isStaff ? `/account/members/${vendorId}/deals/${id}` : `/account/vendor-deals/${id}`);
-  const branchFormPath = isStaff ? `/account/members/${vendorId}/branches/new` : '/account/vendor-branches-deals';
+  const listPath = isStaff ? `/account/vendors/${vendorId}/deals` : '/account/vendor-deals';
+  const editPath = (id: string) => (isStaff ? `/account/vendors/${vendorId}/deals/${id}` : `/account/vendor-deals/${id}`);
+  const branchFormPath = isStaff ? `/account/vendors/${vendorId}/branches/new` : '/account/vendor-branches-deals';
 
   const [vendorName, setVendorName] = useState<string | null>(null);
   const [deal, setDeal] = useState<Deal | null>(null);

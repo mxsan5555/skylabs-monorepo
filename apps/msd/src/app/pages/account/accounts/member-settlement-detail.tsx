@@ -49,7 +49,7 @@ function payable(e: PurchaseEntitlement): number {
 }
 
 /**
- * Super-Admin Member Settlement detail (`/account/accounts/member-settlements/:vendorId`) —
+ * Super-Admin Member Settlement detail (`/account/accounts/vendor-settlements/:vendorId`) —
  * bank details, the order-wise statement, eligible-for-payout selection + "Record Bank Payment",
  * payout history, and the audit trail. Mirrors `vendor-detail-page.tsx`'s Overview-of-cards
  * shape. `POST /settlements/members/:vendorId/payouts` is double-gated server-side
@@ -98,7 +98,7 @@ export function MemberSettlementDetailPage() {
   const name = vendor?.businessName ?? detail?.vendor.businessName ?? 'Vendor';
   useSetBreadcrumbs([
     { label: 'Accounts' },
-    { label: 'Vendor Settlements', to: '/account/accounts/member-settlements' },
+    { label: 'Vendor Settlements', to: '/account/accounts/vendor-settlements' },
     { label: name },
   ]);
 
@@ -207,7 +207,7 @@ export function MemberSettlementDetailPage() {
     return (
       <div className="admin-page admin-page--wide">
         <p className="error-state" role="alert">{loadError || 'Vendor settlement not found.'}</p>
-        <Link to="/account/accounts/member-settlements">Back to Vendor Settlements</Link>
+        <Link to="/account/accounts/vendor-settlements">Back to Vendor Settlements</Link>
       </div>
     );
   }

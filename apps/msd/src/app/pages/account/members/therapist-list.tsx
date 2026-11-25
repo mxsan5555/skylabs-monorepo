@@ -93,7 +93,7 @@ export function TherapistList() {
       const detail = (e as CustomEvent<{ action: string; row: Record<string, unknown> }>).detail;
       if (detail.action !== 'view-vendor') return;
       const vendorId = detail.row['Vendor ID'];
-      if (typeof vendorId === 'string' && vendorId) navigate(`/account/members?vendorId=${vendorId}`);
+      if (typeof vendorId === 'string' && vendorId) navigate(`/account/vendors/${vendorId}`);
     };
 
     el.addEventListener('sky-dt-params-change', onParamsChange);

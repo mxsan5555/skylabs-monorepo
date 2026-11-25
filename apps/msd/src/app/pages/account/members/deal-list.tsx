@@ -122,8 +122,8 @@ export function DealList() {
       const detail = (e as CustomEvent<{ action: string; row: Record<string, unknown> }>).detail;
       const vendorId = detail.row['Vendor ID'];
       if (typeof vendorId !== 'string' || !vendorId) return;
-      if (detail.action === 'edit-deal') navigate(`/account/members/${vendorId}/deals/${String(detail.row['Deal ID'])}`);
-      else if (detail.action === 'view-vendor') navigate(`/account/members?vendorId=${vendorId}`);
+      if (detail.action === 'edit-deal') navigate(`/account/vendors/${vendorId}/deals/${String(detail.row['Deal ID'])}`);
+      else if (detail.action === 'view-vendor') navigate(`/account/vendors/${vendorId}`);
     };
 
     el.addEventListener('sky-dt-params-change', onParamsChange);

@@ -111,9 +111,9 @@ function detailFixture(overrides: Partial<MemberSettlementDetail> = {}): MemberS
 function renderPage() {
   return render(
     <BreadcrumbProvider>
-      <MemoryRouter initialEntries={['/account/accounts/member-settlements/v1']}>
+      <MemoryRouter initialEntries={['/account/accounts/vendor-settlements/v1']}>
         <Routes>
-          <Route path="/account/accounts/member-settlements/:vendorId" element={<MemberSettlementDetailPage />} />
+          <Route path="/account/accounts/vendor-settlements/:vendorId" element={<MemberSettlementDetailPage />} />
         </Routes>
       </MemoryRouter>
       <SnackbarHost />

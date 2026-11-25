@@ -85,7 +85,7 @@ describe('TherapistsListPage', () => {
     renderPage(true);
     const addButton = await screen.findByText('Add therapist');
     fireEvent.click(addButton);
-    expect(navigateMock).toHaveBeenCalledWith('/account/members/v1/therapists/new');
+    expect(navigateMock).toHaveBeenCalledWith('/account/vendors/v1/therapists/new');
   });
 
   it('hides "Add therapist" and row edit/status actions when canEdit is false', async () => {
@@ -107,7 +107,7 @@ describe('TherapistsListPage', () => {
     renderPage();
     await waitFor(() => expect(JSON.parse(table().getAttribute('rows') ?? '[]')).toHaveLength(2));
     fireEvent(table(), new CustomEvent('sky-dt-row-action', { detail: { action: 'edit', rowIndex: 0 } }));
-    expect(navigateMock).toHaveBeenCalledWith('/account/members/v1/therapists/t1');
+    expect(navigateMock).toHaveBeenCalledWith('/account/vendors/v1/therapists/t1');
   });
 
   it('toggle-status flips an active therapist to inactive and reloads', async () => {

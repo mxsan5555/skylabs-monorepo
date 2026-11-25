@@ -103,7 +103,7 @@ describe('ProductsListPage', () => {
     renderPage(true);
     const addButton = await screen.findByText('Add product');
     fireEvent.click(addButton);
-    expect(navigateMock).toHaveBeenCalledWith('/account/members/v1/products/new');
+    expect(navigateMock).toHaveBeenCalledWith('/account/vendors/v1/products/new');
   });
 
   it('hides "Add product" and row edit/status actions when canEdit is false', async () => {
@@ -125,7 +125,7 @@ describe('ProductsListPage', () => {
     renderPage();
     await waitFor(() => expect(JSON.parse(table().getAttribute('rows') ?? '[]')).toHaveLength(2));
     fireEvent(table(), new CustomEvent('sky-dt-row-action', { detail: { action: 'edit', rowIndex: 0 } }));
-    expect(navigateMock).toHaveBeenCalledWith('/account/members/v1/products/p1');
+    expect(navigateMock).toHaveBeenCalledWith('/account/vendors/v1/products/p1');
   });
 
   it('toggle-status flips an active product to inactive and reloads', async () => {

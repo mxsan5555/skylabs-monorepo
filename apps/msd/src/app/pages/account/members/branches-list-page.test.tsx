@@ -87,7 +87,7 @@ describe('BranchesListPage', () => {
     renderPage(true);
     const addButton = await screen.findByText('Add branch');
     fireEvent.click(addButton);
-    expect(navigateMock).toHaveBeenCalledWith('/account/members/v1/branches/new');
+    expect(navigateMock).toHaveBeenCalledWith('/account/vendors/v1/branches/new');
   });
 
   it('hides "Add branch" and every row action when canEdit is false', async () => {
@@ -102,7 +102,7 @@ describe('BranchesListPage', () => {
     renderPage();
     await waitFor(() => expect(JSON.parse(table().getAttribute('rows') ?? '[]')).toHaveLength(2));
     fireEvent(table(), new CustomEvent('sky-dt-row-action', { detail: { action: 'edit', rowIndex: 0 } }));
-    expect(navigateMock).toHaveBeenCalledWith('/account/members/v1/branches/b1');
+    expect(navigateMock).toHaveBeenCalledWith('/account/vendors/v1/branches/b1');
   });
 
   it('toggle-status on an active branch asks for confirmation, then calls setBranchStatus(false) and reloads', async () => {

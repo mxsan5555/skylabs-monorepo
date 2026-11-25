@@ -140,7 +140,7 @@ describe('AccountsOverviewPage — populated state', () => {
     expect(readyBanner).toBeTruthy();
     expect(attr(readyBanner!, 'headline')).toBe('₹400 ready for payout');
     expect(attr(readyBanner!, 'text')).toContain('2 vendors eligible');
-    expect(attr(readyBanner!, 'cta-href')).toBe('/account/accounts/member-settlements?status=ready');
+    expect(attr(readyBanner!, 'cta-href')).toBe('/account/accounts/vendor-settlements?status=ready');
   });
 
   it('shows the disputes-attention CTA banner, with copy clarifying the amount is already counted inside On Hold', async () => {

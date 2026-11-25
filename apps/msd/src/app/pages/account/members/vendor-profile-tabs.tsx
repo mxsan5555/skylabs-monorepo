@@ -23,7 +23,7 @@ const TAB_DEFS: { key: VendorProfileTab; label: string }[] = [
 /**
  * The Business/Owner/Address/KYC/Bank/Profile-Image tabbed editor for an *existing* Vendor row
  * — used by self-service `VendorBusinessProfile` (the caller's own vendor, `/vendors/me/*`).
- * The admin surface (`VendorPipeline`, `/account/members/new` and the Vendor Management
+ * The admin surface (`VendorPipeline`, `/account/vendors/new` and the Vendor Management
  * "Overview" tab) moved off this tabbed layout onto a proper 6-step onboarding wizard
  * (`vendor-pipeline.tsx`) — its Step 1 renders `VendorProfileForm` directly (all sections at
  * once, no tab bar) instead of reusing this component, but exposes the identical section set.

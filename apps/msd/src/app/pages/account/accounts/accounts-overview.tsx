@@ -31,7 +31,7 @@ const READY_COLUMNS = JSON.stringify([
 const READY_ACTIONS = JSON.stringify([{ icon: 'visibility', label: 'View', event: 'view-member' }]);
 
 /** Small, read-only preview of `GET /settlements/members?status=ready` — the full, searchable,
- *  server-paginated list still lives on `/account/accounts/member-settlements`. Row click/"View"
+ *  server-paginated list still lives on `/account/accounts/vendor-settlements`. Row click/"View"
  *  navigates by the real `vendorId` (a non-column field — never the magic `__view_detail__`
  *  action, which `sky-data-table` intercepts natively to open its own generic drawer instead of
  *  ever reaching this row-action handler). */
@@ -64,7 +64,7 @@ function MembersReadyForPayout({ token }: { token: string | null }) {
       const detail = (e as CustomEvent<{ action: string; row: Record<string, unknown> }>).detail;
       const vendorId = detail.row['__vendorId'];
       if (detail.action === 'view-member' && typeof vendorId === 'string') {
-        navigate(`/account/accounts/member-settlements/${vendorId}`);
+        navigate(`/account/accounts/vendor-settlements/${vendorId}`);
       }
     };
     el.addEventListener('sky-dt-row-action', onRowAction);
@@ -140,7 +140,7 @@ export function AccountsOverviewPage() {
         </div>
         <div className="page-head__actions">
           {canReviewPayouts && (
-            <FilledButton onClick={() => navigate('/account/accounts/member-settlements')}>Review Payouts</FilledButton>
+            <FilledButton onClick={() => navigate('/account/accounts/vendor-settlements')}>Review Payouts</FilledButton>
           )}
         </div>
       </header>
@@ -177,7 +177,7 @@ export function AccountsOverviewPage() {
               icon-style="surface"
               headline={formatINR(Number(data.memberLiability))}
               text="Vendor Dues — unpaid vendor share."
-              href="/account/accounts/member-settlements"
+              href="/account/accounts/vendor-settlements"
             />
           </CardGrid>
 
@@ -189,7 +189,7 @@ export function AccountsOverviewPage() {
               headline={`${formatINR(Number(data.readyForPayout))} ready for payout`}
               text={`${data.readyForPayoutMemberCount} vendor${data.readyForPayoutMemberCount === 1 ? '' : 's'} eligible right now — hold period has passed, no open dispute.`}
               cta-label="Review Payouts"
-              cta-href="/account/accounts/member-settlements?status=ready"
+              cta-href="/account/accounts/vendor-settlements?status=ready"
             />
           )}
 
@@ -202,7 +202,7 @@ export function AccountsOverviewPage() {
                 icon-style="surface"
                 headline={formatINR(Number(data.pendingFulfilment))}
                 text="Pending Fulfilment — not yet started, completed, or shipped."
-                href="/account/accounts/member-settlements"
+                href="/account/accounts/vendor-settlements"
               />
               <sky-tile-card
                 color="surface-high"
@@ -210,7 +210,7 @@ export function AccountsOverviewPage() {
                 icon-style="surface"
                 headline={formatINR(Number(data.onHold))}
                 text="On Hold — includes amounts currently blocked by an open dispute; not double-counted elsewhere."
-                href="/account/accounts/member-settlements"
+                href="/account/accounts/vendor-settlements"
               />
               <sky-tile-card
                 color="secondary"
@@ -218,7 +218,7 @@ export function AccountsOverviewPage() {
                 icon-style="surface"
                 headline={formatINR(Number(data.readyForPayout))}
                 text="Ready for Payout — hold period has passed, no open dispute."
-                href="/account/accounts/member-settlements?status=ready"
+                href="/account/accounts/vendor-settlements?status=ready"
               />
             </CardGrid>
           </section>
@@ -229,7 +229,7 @@ export function AccountsOverviewPage() {
             icon-style="surface"
             headline={formatINR(Number(data.paid))}
             text="Already Paid to Vendors — settled via a recorded bank transfer."
-            href="/account/accounts/member-settlements"
+            href="/account/accounts/vendor-settlements"
           />
 
           <section aria-labelledby="members-ready-title">

@@ -76,7 +76,7 @@
     "countLabel": "{label}, {count} items",
     "countLabelOne": "{label}, 1 item",
     "becomeMember": "Become a Vendor",
-    "becomeMemberTo": "/become-member",
+    "becomeMemberTo": "/become-vendor",
     "allCategories": "All categories",
     "categoriesNavLabel": "Categories",
     "accountMenuLabel": "Account menu",
@@ -241,7 +241,7 @@
       "partners": [
         {
           "label": "Partner with Us",
-          "to": "/become-member"
+          "to": "/become-vendor"
         },
         {
           "label": "Partner Sign In",
@@ -465,7 +465,7 @@
       "heading": "Own a spa or salon?",
       "body": "List your services and reach customers near you.",
       "cta": "Partner with Us",
-      "href": "/become-member"
+      "href": "/become-vendor"
     }
   },
   "search": {
@@ -1745,7 +1745,7 @@
       "heading": "Run a spa, salon or wellness brand?",
       "text": "Publish your deals and products on MySpaDeal and manage branches, therapists and orders from one console.",
       "label": "Become a vendor",
-      "href": "/become-member"
+      "href": "/become-vendor"
     }
   },
   "howItWorks": {
@@ -2066,7 +2066,7 @@
     }
   },
   "becomeMember": {
-    "path": "/become-member",
+    "path": "/become-vendor",
     "title": "Become a vendor",
     "breadcrumb": "Become a vendor",
     "metaTitle": "Become a vendor · MSD",

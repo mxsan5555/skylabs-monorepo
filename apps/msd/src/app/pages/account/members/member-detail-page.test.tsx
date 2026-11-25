@@ -137,9 +137,9 @@ function renderAt(path: string) {
     <BreadcrumbProvider>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
-          <Route path="/account/members" element={<p>members-list</p>} />
-          <Route path="/account/members/:memberId" element={<MemberDetailPage />} />
-          <Route path="/account/members/:memberId/:section" element={<MemberDetailPage />} />
+          <Route path="/account/vendors" element={<p>members-list</p>} />
+          <Route path="/account/vendors/:memberId" element={<MemberDetailPage />} />
+          <Route path="/account/vendors/:memberId/:section" element={<MemberDetailPage />} />
         </Routes>
         <Where />
       </MemoryRouter>
@@ -168,7 +168,7 @@ beforeEach(() => {
 
 describe('MemberDetailPage', () => {
   it('shows the status chip, the documents chip and the due date in the header', async () => {
-    renderAt('/account/members/m1');
+    renderAt('/account/vendors/m1');
     await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Vitality Wellness' })).toBeTruthy());
     const badges = Array.from(document.querySelectorAll('sky-badge')).map((b) => b.textContent);
     expect(badges).toContain('Active');
@@ -177,14 +177,14 @@ describe('MemberDetailPage', () => {
   });
 
   it('opens the profile tab by default and the deals tab from the URL', async () => {
-    renderAt('/account/members/m1');
+    renderAt('/account/vendors/m1');
     await waitFor(() => expect(screen.getByText('profile-form')).toBeTruthy());
-    renderAt('/account/members/m1/deals');
+    renderAt('/account/vendors/m1/deals');
     await waitFor(() => expect(screen.getByText('deals-tab')).toBeTruthy());
   });
 
   it('renders the nine tabs wired to one labelled tab panel', async () => {
-    renderAt('/account/members/m1/documents');
+    renderAt('/account/vendors/m1/documents');
     await waitFor(() => expect(screen.getByText('documents-tab')).toBeTruthy());
     expect(tabs().map((t) => t.textContent?.trim())).toEqual(['Profile', 'Logo', 'Documents', 'Branches', 'Deals', 'Therapists', 'Products', 'Customers', 'Activity']);
     expect(document.querySelector('md-tabs')?.getAttribute('aria-label')).toBe('Vendor sections');
@@ -198,7 +198,7 @@ describe('MemberDetailPage', () => {
   });
 
   it('puts an h2 between the page h1 and the documents tab h3', async () => {
-    renderAt('/account/members/m1/documents');
+    renderAt('/account/vendors/m1/documents');
     await waitFor(() => expect(screen.getByText('documents-tab')).toBeTruthy());
     const levels = Array.from(document.querySelectorAll('h1, h2, h3')).map((h) => Number(h.tagName[1]));
     // h1 member name, h2 Overview (item 7), h2 tab title, h3 inside the documents tab.
@@ -207,15 +207,15 @@ describe('MemberDetailPage', () => {
   });
 
   it('changes the URL when a tab is chosen', async () => {
-    renderAt('/account/members/m1');
+    renderAt('/account/vendors/m1');
     await waitFor(() => expect(screen.getByText('profile-form')).toBeTruthy());
     fireEvent.click(tab('Activity'));
-    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/account/members/m1/activity'));
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/account/vendors/m1/activity'));
     expect(screen.getByText(/activity-tab/)).toBeTruthy();
   });
 
   it('does not show Approve, Reject or setup progress', async () => {
-    renderAt('/account/members/m1');
+    renderAt('/account/vendors/m1');
     await waitFor(() => expect(screen.getByText('profile-form')).toBeTruthy());
     const text = document.body.textContent ?? '';
     expect(text).not.toMatch(/Approve|Reject|Setup progress/);
@@ -223,27 +223,27 @@ describe('MemberDetailPage', () => {
 
   it('explains a suspended member', async () => {
     getMemberMock.mockResolvedValue({ data: { ...MEMBER, status: 'SUSPENDED', statusReason: 'Documents not completed' } });
-    renderAt('/account/members/m1');
+    renderAt('/account/vendors/m1');
     await waitFor(() => expect(screen.getByText(/This vendor cannot log in and the website hides their items\./)).toBeTruthy());
     expect(screen.getByText(/Documents not completed/)).toBeTruthy();
   });
 
   it('shows a view-only note for an inactive member', async () => {
     getMemberMock.mockResolvedValue({ data: { ...MEMBER, status: 'INACTIVE' } });
-    renderAt('/account/members/m1');
+    renderAt('/account/vendors/m1');
     await waitFor(() => expect(screen.getByText(/view only/i)).toBeTruthy());
   });
 
   it('shows the review badge and prefills the suspend reason only when flagged', async () => {
     getMemberMock.mockResolvedValue({ data: { ...MEMBER, reviewFlaggedAt: '2026-10-14T00:00:00Z' } });
-    renderAt('/account/members/m1');
+    renderAt('/account/vendors/m1');
     const badge = await screen.findByText(REVIEW_FLAG_LABEL);
     expect(badge.closest('sky-badge')?.getAttribute('status')).toBe(REVIEW_FLAG_TONE);
     expect(headerProps).toHaveBeenLastCalledWith(expect.objectContaining({ reasonPrefill: REVIEW_FLAG_REASON }));
   });
 
   it('passes no reason prefill when the member is not flagged', async () => {
-    renderAt('/account/members/m1');
+    renderAt('/account/vendors/m1');
     await waitFor(() => expect(headerProps).toHaveBeenCalled());
     expect(screen.queryByText(REVIEW_FLAG_LABEL)).toBeNull();
     expect(headerProps).toHaveBeenLastCalledWith(expect.objectContaining({ reasonPrefill: '' }));
@@ -251,13 +251,13 @@ describe('MemberDetailPage', () => {
 
   it('drops the review badge once the flagged member is suspended', async () => {
     getMemberMock.mockResolvedValue({ data: { ...MEMBER, status: 'SUSPENDED', reviewFlaggedAt: '2026-10-14T00:00:00Z' } });
-    renderAt('/account/members/m1');
+    renderAt('/account/vendors/m1');
     await waitFor(() => expect(headerProps).toHaveBeenCalled());
     expect(screen.queryByText(REVIEW_FLAG_LABEL)).toBeNull();
   });
 
   it('refetches the member and bumps the activity key after a status change', async () => {
-    renderAt('/account/members/m1/activity');
+    renderAt('/account/vendors/m1/activity');
     await waitFor(() => expect(screen.getByText('activity-tab 0')).toBeTruthy());
     getMemberMock.mockResolvedValue({ data: { ...MEMBER, status: 'INACTIVE' } });
     fireEvent.click(screen.getByText('stub-change'));
@@ -269,10 +269,10 @@ describe('MemberDetailPage', () => {
   });
 
   it('goes back to the member list after a delete', async () => {
-    renderAt('/account/members/m1');
+    renderAt('/account/vendors/m1');
     await waitFor(() => expect(screen.getByText('stub-delete')).toBeTruthy());
     fireEvent.click(screen.getByText('stub-delete'));
-    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/account/members'));
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/account/vendors'));
     expect(deleteMemberMock).toHaveBeenCalledWith('t', 'm1', 'Closed the business for good');
   });
 
@@ -281,7 +281,7 @@ describe('MemberDetailPage', () => {
       token: 't',
       can: (_menu: string, action: string) => action === 'view' || action === 'approve',
     });
-    renderAt('/account/members/m1');
+    renderAt('/account/vendors/m1');
     await waitFor(() => expect(screen.getByText('profile-form')).toBeTruthy());
     expect(profileProps).toHaveBeenLastCalledWith(expect.objectContaining({ canEdit: false }));
     expect(headerProps).toHaveBeenLastCalledWith(expect.objectContaining({ canStatusChange: false, canDelete: false }));
@@ -305,7 +305,7 @@ describe('MemberDetailPage', () => {
         return false;
       },
     });
-    renderAt('/account/members/m1');
+    renderAt('/account/vendors/m1');
     await waitFor(() => expect(screen.getByText('profile-form')).toBeTruthy());
 
     fireEvent.click(tab('Branches'));
@@ -331,7 +331,7 @@ describe('MemberDetailPage', () => {
       token: 't',
       can: (menuKey: string, action: string) => menuKey === 'members' && (action === 'view' || action === 'edit'),
     });
-    renderAt('/account/members/m1');
+    renderAt('/account/vendors/m1');
     await waitFor(() => expect(screen.getByText('profile-form')).toBeTruthy());
 
     fireEvent.click(tab('Branches'));
@@ -345,14 +345,14 @@ describe('MemberDetailPage', () => {
 
   it('shows an access message without members:view', async () => {
     useAuthMock.mockReturnValue({ token: 't', can: () => false });
-    renderAt('/account/members/m1');
+    renderAt('/account/vendors/m1');
     expect(screen.getByText(/do not have access/i)).toBeTruthy();
     expect(getMemberMock).not.toHaveBeenCalled();
   });
 
   it('shows an error when the member cannot load', async () => {
     getMemberMock.mockRejectedValue(new Error('boom'));
-    renderAt('/account/members/m1');
+    renderAt('/account/vendors/m1');
     expect((await screen.findByRole('alert')).textContent).toMatch(/Could not load this vendor/);
   });
 });
@@ -365,7 +365,7 @@ describe('MemberDetailPage Remind now', () => {
 
   it('offers Remind now to members:status_change while documents are incomplete', async () => {
     asStaff(['view', 'status_change']);
-    renderAt('/account/members/m1');
+    renderAt('/account/vendors/m1');
     await waitFor(() => expect(lastHeader()?.onRemind).toBeTypeOf('function'));
   });
 
@@ -376,7 +376,7 @@ describe('MemberDetailPage Remind now', () => {
   ])('hides Remind now %s', async (_label, granted, found) => {
     asStaff(granted as string[]);
     getMemberMock.mockResolvedValue({ data: found });
-    renderAt('/account/members/m1');
+    renderAt('/account/vendors/m1');
     await waitFor(() => expect(headerProps).toHaveBeenCalled());
     expect(lastHeader()).not.toHaveProperty('onRemind');
   });
@@ -384,7 +384,7 @@ describe('MemberDetailPage Remind now', () => {
   it('sends the reminder, shows what reached the member and refreshes Activity', async () => {
     asStaff(['view', 'status_change']);
     sendReminderMock.mockResolvedValue({ data: { emailStatus: 'SENT', smsStatus: 'SENT', sentAt: '2026-10-17T04:30:00Z' } });
-    renderAt('/account/members/m1/activity');
+    renderAt('/account/vendors/m1/activity');
     await waitFor(() => expect(lastHeader()?.onRemind).toBeTypeOf('function'));
     const before = activityProps.mock.lastCall?.[0].refreshKey;
     await lastHeader().onRemind?.();
@@ -396,7 +396,7 @@ describe('MemberDetailPage Remind now', () => {
   it('shows the server reason when the reminder is refused', async () => {
     asStaff(['view', 'status_change']);
     sendReminderMock.mockRejectedValue(new ApiRequestError('RATE_LIMITED', 'A reminder already went to this member in the last 24 hours.', 429));
-    renderAt('/account/members/m1');
+    renderAt('/account/vendors/m1');
     await waitFor(() => expect(lastHeader()?.onRemind).toBeTypeOf('function'));
     await lastHeader().onRemind?.();
     expect(await screen.findByText('A reminder already went to this member in the last 24 hours.')).toBeTruthy();
@@ -407,15 +407,15 @@ describe('MemberDetailPage Remind now', () => {
  *  staff who can open that list (customers:view, orders:view); plain numbers otherwise. */
 describe('MemberDetailPage customer and order counts', () => {
   it('links the counts to the Customers tab and the filtered Orders list', async () => {
-    renderAt('/account/members/m1');
+    renderAt('/account/vendors/m1');
     const orders = await screen.findByRole('link', { name: /^12 Orders/ });
     expect(orders.getAttribute('href')).toBe('/account/orders?vendorId=m1');
-    expect(screen.getByRole('link', { name: /^1 Customer/ }).getAttribute('href')).toBe('/account/members/m1/customers');
+    expect(screen.getByRole('link', { name: /^1 Customer/ }).getAttribute('href')).toBe('/account/vendors/m1/customers');
   });
 
   it('shows plain numbers and no Customers tab without customers:view or orders:view', async () => {
     useAuthMock.mockReturnValue({ token: 't', can: (key: string) => key !== 'customers' && key !== 'orders' });
-    renderAt('/account/members/m1');
+    renderAt('/account/vendors/m1');
     expect(await screen.findByText('Orders')).toBeTruthy();
     expect(screen.getByText('Customer')).toBeTruthy();
     expect(screen.queryByRole('link', { name: /Orders/ })).toBeNull();
@@ -424,13 +424,13 @@ describe('MemberDetailPage customer and order counts', () => {
   });
 
   it('opens the Customers tab for this member', async () => {
-    renderAt('/account/members/m1/customers');
+    renderAt('/account/vendors/m1/customers');
     expect(await screen.findByText('customers-tab m1')).toBeTruthy();
     expect(screen.getByRole('heading', { level: 2, name: 'Customers' })).toBeTruthy();
   });
 
   it('opens the Logo tab with a single-image admin-on-behalf uploader for this vendor', async () => {
-    renderAt('/account/members/m1/logo');
+    renderAt('/account/vendors/m1/logo');
     expect(await screen.findByText('media-uploader')).toBeTruthy();
     expect(screen.getByRole('heading', { level: 2, name: 'Logo' })).toBeTruthy();
     expect(mediaUploaderProps).toHaveBeenCalledWith(
@@ -449,7 +449,7 @@ describe('MemberDetailPage customer and order counts', () => {
 
   it('falls back to Profile when the Customers tab is not allowed', async () => {
     useAuthMock.mockReturnValue({ token: 't', can: (key: string) => key !== 'customers' });
-    renderAt('/account/members/m1/customers');
+    renderAt('/account/vendors/m1/customers');
     expect(await screen.findByText('profile-form')).toBeTruthy();
     expect(screen.queryByText(/customers-tab/)).toBeNull();
   });

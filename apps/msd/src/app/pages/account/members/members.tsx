@@ -16,9 +16,9 @@ import { MEMBER_STATUS_LABEL } from './member-status';
 import { VendorBranches } from './vendor-branches';
 
 /**
- * Member Management. Two audiences share this one page/route (`/account/members`):
+ * Member Management. Two audiences share this one page/route (`/account/vendors`):
  *  - Staff (`members:view`): the member list with lifecycle filters. Each row opens that
- *    member's own page (`/account/members/:vendorId`).
+ *    member's own page (`/account/vendors/:vendorId`).
  *  - Member (`members:custom` only, never `members:view`): "my business" self-service.
  *    The server resolves ownership from the caller's JWT, never from a client-supplied id.
  */
@@ -43,7 +43,7 @@ function filterToQuery(filter: string): Pick<MemberListFilter, 'status' | 'docum
 function legacyMemberLink(params: URLSearchParams): string | null {
   const vendorId = params.get('vendorId');
   if (!vendorId) return null;
-  const base = `/account/members/${encodeURIComponent(vendorId)}`;
+  const base = `/account/vendors/${encodeURIComponent(vendorId)}`;
   const dealId = params.get('dealId');
   if (dealId) return `${base}/deals/${encodeURIComponent(dealId)}`;
   const branchId = params.get('branchId');
@@ -63,7 +63,7 @@ function AdminMemberManagement({ canCreate }: { canCreate: boolean }) {
   const [listError, setListError] = useState('');
   const [params, setParams] = useState<MemberTableParams>(DEFAULT_PARAMS);
 
-  const openMember = useCallback((id: string) => navigate(`/account/members/${id}`), [navigate]);
+  const openMember = useCallback((id: string) => navigate(`/account/vendors/${id}`), [navigate]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -90,7 +90,7 @@ function AdminMemberManagement({ canCreate }: { canCreate: boolean }) {
     load();
   }, [load]);
 
-  // Old links used `/account/members?vendorId=<id>[&branchId=<id>][&dealId=<id>]`; each member,
+  // Old links used `/account/vendors?vendorId=<id>[&branchId=<id>][&dealId=<id>]`; each member,
   // branch and deal now has its own page.
   const legacyLink = legacyMemberLink(searchParams);
   if (legacyLink) return <Navigate to={legacyLink} replace />;
@@ -105,7 +105,7 @@ function AdminMemberManagement({ canCreate }: { canCreate: boolean }) {
         </div>
         <div className="page-head__actions">
           {canCreate && (
-            <FilledButton onClick={() => navigate('/account/members/new')}>
+            <FilledButton onClick={() => navigate('/account/vendors/new')}>
               <Icon slot="icon" aria-hidden="true">add</Icon>
               Add vendor
             </FilledButton>

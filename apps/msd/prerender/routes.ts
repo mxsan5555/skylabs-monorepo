@@ -26,7 +26,7 @@ export const STATIC_PUBLIC_PATHS = [
   '/contact',
   '/help-center',
   '/careers',
-  '/become-member',
+  '/become-vendor',
   '/privacy',
   '/terms',
   '/return-refund-policy',

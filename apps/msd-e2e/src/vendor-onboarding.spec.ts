@@ -149,7 +149,7 @@ test.describe('Add member, then manage it from the member detail page', () => {
     await mockBootstrap(page, MEMBER_PERMISSIONS);
     await mockMemberBackend(page, backend);
 
-    await page.goto('/account/members/new');
+    await page.goto('/account/vendors/new');
     await expect(page.getByRole('heading', { name: 'Add vendor', level: 1 })).toBeVisible();
 
     await page.getByLabel('Business name').fill('Serenity Spa');
@@ -196,7 +196,7 @@ test.describe('Add member, then manage it from the member detail page', () => {
     await mockBootstrap(page, MEMBER_PERMISSIONS);
     await mockMemberBackend(page, backend);
 
-    await page.goto('/account/members/new');
+    await page.goto('/account/vendors/new');
     await page.getByRole('button', { name: 'Create vendor' }).click();
 
     await expect(page.getByText('Enter the business name.')).toBeVisible();
@@ -212,7 +212,7 @@ test.describe('Add member, then manage it from the member detail page', () => {
     await mockBootstrap(page, MEMBER_PERMISSIONS);
     await mockMemberBackend(page, backend);
 
-    await page.goto('/account/members/missing-member');
+    await page.goto('/account/vendors/missing-member');
     await expect(page.getByText('Member not found.')).toBeVisible();
     await expect(page.getByRole('link', { name: 'Back to all vendors' })).toBeVisible();
   });

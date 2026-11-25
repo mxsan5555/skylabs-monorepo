@@ -63,7 +63,7 @@
       {
         "id": "member-list",
         "title": "All vendors",
-        "route": "/account/members",
+        "route": "/account/vendors",
         "permissionKey": "members",
         "parent": "vendors",
         "order": 1
@@ -210,7 +210,7 @@
       {
         "id": "accounts-member-settlements",
         "title": "Vendor Settlements",
-        "route": "/account/accounts/member-settlements",
+        "route": "/account/accounts/vendor-settlements",
         "permissionKey": "accounts.member-settlements",
         "parent": "accounts",
         "order": 3

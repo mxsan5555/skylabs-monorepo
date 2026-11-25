@@ -84,8 +84,8 @@ function renderAt(url: string, { withTrail = false }: { withTrail?: boolean } = 
   const tree = (
     <MemoryRouter initialEntries={[url]}>
       <Routes>
-        <Route path="/account/members/:vendorId/branches/new" element={<BranchFormPage token="tok" />} />
-        <Route path="/account/members/:vendorId/branches/:branchId" element={<BranchFormPage token="tok" />} />
+        <Route path="/account/vendors/:vendorId/branches/new" element={<BranchFormPage token="tok" />} />
+        <Route path="/account/vendors/:vendorId/branches/:branchId" element={<BranchFormPage token="tok" />} />
       </Routes>
     </MemoryRouter>
   );
@@ -145,7 +145,7 @@ async function getEnabledSaveButton() {
 
 describe('BranchFormPage — Add', () => {
   it('starts with every field but State disabled', async () => {
-    renderAt('/account/members/v1/branches/new');
+    renderAt('/account/vendors/v1/branches/new');
     expect(await screen.findByRole('heading', { name: 'Add branch' })).toBeTruthy();
     const name = branchNameField();
     expect(name?.hasAttribute('disabled')).toBe(true);
@@ -154,7 +154,7 @@ describe('BranchFormPage — Add', () => {
   });
 
   it('enables the rest of Location once a state is picked', async () => {
-    renderAt('/account/members/v1/branches/new');
+    renderAt('/account/vendors/v1/branches/new');
     await screen.findByRole('heading', { name: 'Add branch' });
     const state = stateField() as HTMLElement;
     pickOption(state, 'Maharashtra');
@@ -166,7 +166,7 @@ describe('BranchFormPage — Add', () => {
 
   it('creates the branch and redirects to its own edit page', async () => {
     createBranchMock.mockResolvedValue({ data: { ...EXISTING, id: 'new-1' } });
-    renderAt('/account/members/v1/branches/new');
+    renderAt('/account/vendors/v1/branches/new');
     await screen.findByRole('heading', { name: 'Add branch' });
     const state = stateField() as HTMLElement;
     pickOption(state, 'Maharashtra');
@@ -187,11 +187,11 @@ describe('BranchFormPage — Add', () => {
     const save = await getEnabledSaveButton();
     fireEvent.click(save);
     await waitFor(() => expect(createBranchMock).toHaveBeenCalledWith('tok', 'v1', expect.objectContaining({ name: 'New Branch', state: 'Maharashtra', city: 'Pune' })));
-    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/account/members/v1/branches/new-1', { replace: true }));
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/account/vendors/v1/branches/new-1', { replace: true }));
   });
 
   it('needs a city of the picked state before it saves (PLANNING §2.7)', async () => {
-    renderAt('/account/members/v1/branches/new');
+    renderAt('/account/vendors/v1/branches/new');
     await screen.findByRole('heading', { name: 'Add branch' });
     pickOption(stateField() as HTMLElement, 'Maharashtra');
     const save = await getEnabledSaveButton();
@@ -201,7 +201,7 @@ describe('BranchFormPage — Add', () => {
   });
 
   it('shows a required-name error and never calls createBranch when Branch Name is left empty', async () => {
-    renderAt('/account/members/v1/branches/new');
+    renderAt('/account/vendors/v1/branches/new');
     await screen.findByRole('heading', { name: 'Add branch' });
     const state = stateField() as HTMLElement;
     pickOption(state, 'Maharashtra');
@@ -214,7 +214,7 @@ describe('BranchFormPage — Add', () => {
 
 describe('BranchFormPage — Edit', () => {
   it('loads the existing branch and shows every field already enabled', async () => {
-    renderAt('/account/members/v1/branches/b1');
+    renderAt('/account/vendors/v1/branches/b1');
     expect(await screen.findByRole('heading', { name: 'Edit branch' })).toBeTruthy();
     const name = await waitFor(() => {
       const el = branchNameField();
@@ -227,7 +227,7 @@ describe('BranchFormPage — Edit', () => {
 
   it('saves with updateBranch, not createBranch', async () => {
     updateBranchMock.mockResolvedValue({ data: EXISTING });
-    renderAt('/account/members/v1/branches/b1');
+    renderAt('/account/vendors/v1/branches/b1');
     await screen.findByRole('heading', { name: 'Edit branch' });
     const save = await getEnabledSaveButton();
     fireEvent.click(save);
@@ -236,19 +236,19 @@ describe('BranchFormPage — Edit', () => {
   });
 
   it('has no Category Access section: categories are open to every member (D10)', async () => {
-    renderAt('/account/members/v1/branches/b1');
+    renderAt('/account/vendors/v1/branches/b1');
     await screen.findByRole('heading', { name: 'Edit branch' });
     await waitFor(() => expect(document.querySelectorAll('sky-accordion-item')).toHaveLength(2));
     expect(screen.queryByText('Category Access')).toBeNull();
   });
 
   it('shows the vendor\'s real business name in the breadcrumb, not the literal "Member"', async () => {
-    renderAt('/account/members/v1/branches/b1', { withTrail: true });
+    renderAt('/account/vendors/v1/branches/b1', { withTrail: true });
     await screen.findByRole('heading', { name: 'Edit branch' });
     expect(getVendorMock).toHaveBeenCalledWith('tok', 'v1');
     await waitFor(() =>
       expect(screen.getByTestId('trail').textContent).toBe(
-        'Vendors > All vendors(/account/members) > Vitality Wellness & Beauty(/account/members/v1) > Branches(/account/members/v1/branches) > Lower Parel Branch',
+        'Vendors > All vendors(/account/vendors) > Vitality Wellness & Beauty(/account/vendors/v1) > Branches(/account/vendors/v1/branches) > Lower Parel Branch',
       ),
     );
   });

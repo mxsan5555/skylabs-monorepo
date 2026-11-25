@@ -49,9 +49,9 @@ describe('HeaderActions hydration', () => {
   });
 });
 
-/** ST-01: "Become a Member" opens the public member sign-up page. */
-describe('HeaderActions Become a Member link', () => {
-  it('opens /become-member', () => {
+/** ST-01: "Become a Vendor" opens the public vendor sign-up page. */
+describe('HeaderActions Become a Vendor link', () => {
+  it('opens /become-vendor', () => {
     render(
       <MemoryRouter initialEntries={['/']}>
         <HeaderActions />
@@ -61,12 +61,12 @@ describe('HeaderActions Become a Member link', () => {
       </MemoryRouter>,
     );
     fireEvent.click(screen.getByRole('link', { name: content.header.becomeMember }));
-    expect(screen.getByTestId('path').textContent).toBe('/become-member');
+    expect(screen.getByTestId('path').textContent).toBe('/become-vendor');
   });
 
-  it('points at a route the app serves with the member sign-up page', () => {
+  it('points at a route the app serves with the vendor sign-up page', () => {
     const routes = readFileSync(join(__dirname, '../../routes.tsx'), 'utf8');
-    expect(content.header.becomeMemberTo).toBe('/become-member');
+    expect(content.header.becomeMemberTo).toBe('/become-vendor');
     expect(routes).toContain(`<Route path="${content.header.becomeMemberTo}" element={<BecomeVendor />} />`);
   });
 });

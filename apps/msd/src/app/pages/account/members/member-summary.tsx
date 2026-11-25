@@ -28,7 +28,7 @@ export interface MemberSummaryProps {
  */
 export function MemberSummary({ member, tabs, canOpenOrders }: MemberSummaryProps) {
   const headingId = useId();
-  const tabLink = (tab: string) => (tabs.includes(tab) ? `/account/members/${member.id}/${tab}` : undefined);
+  const tabLink = (tab: string) => (tabs.includes(tab) ? `/account/vendors/${member.id}/${tab}` : undefined);
   const documentsComplete = documentsState(member.documentsSummary) === 'complete';
 
   const cards: (StatTileProps & { key: string })[] = [

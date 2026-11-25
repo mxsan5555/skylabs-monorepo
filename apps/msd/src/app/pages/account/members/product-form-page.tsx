@@ -117,7 +117,7 @@ const EMPTY_FORM = {
   isFeatured: false,
 };
 
-/** Add/Edit product — `/account/members/:vendorId/products/new` and `.../products/:productId`.
+/** Add/Edit product — `/account/vendors/:vendorId/products/new` and `.../products/:productId`.
  *  Product is vendor-level, never branch-scoped (see msd-api's Product schema doc comment), so
  *  unlike `DealFormPage`/`TherapistFormPage` there is no branch step at all — the Category picker
  *  lists every active PRODUCT category (`listCategories({type:'PRODUCT'})`, D10: no per-member
@@ -208,7 +208,7 @@ export function ProductFormPage({ token }: ProductFormPageProps) {
   const name = product?.name || (isEdit ? 'Product' : 'New product');
   useSetBreadcrumbs([
     ...memberTrail(vendorId, vendorName),
-    { label: 'Products', to: `/account/members/${vendorId}/products` },
+    { label: 'Products', to: `/account/vendors/${vendorId}/products` },
     { label: isEdit ? name : 'Add product' },
   ]);
 
@@ -266,7 +266,7 @@ export function ProductFormPage({ token }: ProductFormPageProps) {
         isEdit ? 'Product updated successfully.' : 'Product created successfully.',
         { variant: 'success' },
       );
-      navigate(`/account/members/${vendorId}/products/${saved.id}`, { replace: true });
+      navigate(`/account/vendors/${vendorId}/products/${saved.id}`, { replace: true });
     } catch (err) {
       setSaveError(err instanceof ApiRequestError ? err.message : 'Could not save this product.');
     } finally {

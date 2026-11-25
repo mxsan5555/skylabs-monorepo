@@ -45,9 +45,9 @@ describe('MemberSummary', () => {
 
   it('links each card to its tab, and orders to the filtered order list', () => {
     const overview = renderSummary();
-    expect(overview.getByRole('link', { name: /12 Deals/ }).getAttribute('href')).toBe('/account/members/m1/deals');
-    expect(overview.getByRole('link', { name: /Documents/ }).getAttribute('href')).toBe('/account/members/m1/documents');
-    expect(overview.getByRole('link', { name: /1 Customer/ }).getAttribute('href')).toBe('/account/members/m1/customers');
+    expect(overview.getByRole('link', { name: /12 Deals/ }).getAttribute('href')).toBe('/account/vendors/m1/deals');
+    expect(overview.getByRole('link', { name: /Documents/ }).getAttribute('href')).toBe('/account/vendors/m1/documents');
+    expect(overview.getByRole('link', { name: /1 Customer/ }).getAttribute('href')).toBe('/account/vendors/m1/customers');
     expect(overview.getByRole('link', { name: /12 Orders/ }).getAttribute('href')).toBe('/account/orders?vendorId=m1');
     expect(overview.queryByRole('link', { name: /Status/ })).toBeNull();
   });
