@@ -13,6 +13,7 @@ Apps: `apps/mera-driver` (Angular 21 + Tailwind, port 4400, blue theme) and
 | How it works in code, portals, gaps | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
 | Tables, enums, proposed entities | [`DATABASE.md`](DATABASE.md) |
 | Endpoints and their permissions | [`API.md`](API.md) |
+| API health, endpoint coverage and architecture assessment | [`API-ARCHITECTURE-AUDIT.md`](API-ARCHITECTURE-AUDIT.md) |
 | What is done and what is next | [`TASKS.md`](TASKS.md) |
 | How to test, acceptance scenarios | [`TESTING.md`](TESTING.md) |
 | Env vars and deploy status | [`DEPLOYMENT.md`](DEPLOYMENT.md) |

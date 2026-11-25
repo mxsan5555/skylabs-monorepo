@@ -35,6 +35,15 @@ describe('redactUrl', () => {
     );
     expect(redactUrl('/api/v1/catalog/deals?page=2')).toBe('/api/v1/catalog/deals?page=2');
   });
+
+  it('masks OAuth state and authorization code only on Google OAuth routes', () => {
+    expect(redactUrl('/api/v1/auth/google/callback?state=csrf-state&code=auth-code')).toBe(
+      '/api/v1/auth/google/callback?state=%5Bredacted%5D&code=%5Bredacted%5D',
+    );
+    expect(redactUrl('/api/v1/catalog/deals?state=Uttar%20Pradesh')).toBe(
+      '/api/v1/catalog/deals?state=Uttar+Pradesh',
+    );
+  });
 });
 
 describe('logger', () => {

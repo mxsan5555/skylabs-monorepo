@@ -123,6 +123,10 @@ notices go out after commit and never undo the change.
   Super Admin uses a separate configured mobile/OTP and must already hold `super_admin` in DB.
   Both modes retain request rate limits; dummy verification adds failure limits because there is
   no persisted challenge attempt counter. Fixed OTP values are not logged or returned.
+- Email delivery is in `providers/email/smtp.provider.ts`: Nodemailer 9 has no `family` transport
+  option, so its supported `getSocket` hook creates an SMTP socket with Node's `family: 4` option.
+  SMTP and TLS still use the configured hostname. Connection, greeting and socket timeouts are
+  bounded; failures log masked recipient and redacted error text only.
 - Storefront visibility: `publicVisibleWhere()` in `services/catalog-visibility.ts` (member
   ACTIVE, branch active, deal ACTIVE and in its date window; therapist and product active) is used
   by every `/catalog` query. The deal approval check is still read until P3-15.
@@ -400,16 +404,17 @@ answer production clients without detail); idempotency keys for money; transacti
 names never change, new ones are dotted like `member.status.changed`); private R2 bucket with 5-minute signed
 downloads for documents; malware scan decision; gitleaks and `npm audit` in CI.
 
-**Token transport (P2-16, decided 2026-10-29): bearer only.** The access token goes in
-`Authorization: Bearer`; the refresh token is sent in the `/auth/refresh` body. The API sets no
-cookie (no `res.cookie`, cookie parser or session; Passport runs with `session: false`), so a
-browser never attaches credentials on its own and CSRF does not apply. The apps keep the real
-tokens in `localStorage` (keyed per app) and a "Login As" preview in `sessionStorage`
-(`shared-auth`), so XSS is the risk to guard: React escapes text, no CMS HTML is set raw, the rich
-text editor parses values through Quill (P10-36). Any future cookie must be `HttpOnly`, `Secure`,
-`SameSite=Lax` or stricter, with CSRF protection; `lib/token-transport.test.ts` fails on cookie
-code until then. Known gap: the Google callback returns the tokens as JSON on the API domain, so
-the app never receives them (P2-22).
+**Token transport (implemented).** Access tokens are short-lived (15 minutes) and stored by the
+existing `shared-auth` token store in app-keyed `localStorage`; API calls send them as bearer
+tokens. Refresh tokens stay in an `HttpOnly` cookie and rotate through `/auth/refresh`; a
+separate CSRF cookie/header pair protects refresh and logout. Cookies are host-only, `Secure` in
+production, and use `SameSite=None` in production for the separately hosted Vercel frontend and
+Railway API (`SameSite=Lax` locally). `AuthContext` refreshes before access-token expiry, so the
+15-minute access-token TTL does not end an active refresh session. Google OAuth uses a separate
+short-lived `HttpOnly`, `SameSite=Lax` state cookie, validates it at callback, sets the same
+refresh/CSRF cookies, then redirects to the SPA. The SPA obtains its access token through the
+existing refresh/bootstrap flow; OAuth tokens are never put in redirect URLs. The Google callback
+redirect destination is restricted to `PUBLIC_SITE_URL` when it exactly matches a `CORS_ORIGIN`.
 
 ### 12.3 File storage (decided 2026-10-17)
 
