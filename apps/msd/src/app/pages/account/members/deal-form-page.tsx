@@ -77,7 +77,7 @@ const MISSING_TEXT: Record<string, string> = {
   image: 'Add at least one image',
   package: 'Add an active package',
   branch: 'Activate the branch',
-  member: 'The member must be active',
+  member: 'The vendor must be active',
 };
 
 function formFromDeal(deal: Deal): FormState {

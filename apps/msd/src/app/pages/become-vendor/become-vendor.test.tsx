@@ -37,7 +37,7 @@ describe('BecomeVendor', () => {
   it('renders the hero and every section without requiring authentication', () => {
     render(<BecomeVendor />);
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Become a member' }),
+      screen.getByRole('heading', { level: 1, name: 'Become a vendor' }),
     ).toBeTruthy();
     expect(screen.getByText('Business details')).toBeTruthy();
     expect(screen.getByText('Your details')).toBeTruthy();

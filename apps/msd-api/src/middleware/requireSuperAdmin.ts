@@ -25,7 +25,7 @@ export function requireSuperAdmin() {
     try {
       const isSuperAdmin = await isSuperAdminRoleSet(req.user.roles);
       if (!isSuperAdmin) {
-        sendError(res, 'FORBIDDEN', 'Only a Super Admin may release a member payout');
+        sendError(res, 'FORBIDDEN', 'Only a Super Admin may release a vendor payout');
         return;
       }
       next();

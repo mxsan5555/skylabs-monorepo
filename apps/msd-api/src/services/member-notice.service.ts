@@ -35,11 +35,11 @@ export interface MemberNoticeResult {
 }
 
 function build(kind: MemberNoticeKind, target: MemberNoticeTarget, reason?: string | null) {
-  if (kind === 'SUSPENDED') return { subject: 'Your MSD member account is suspended', text: suspendedMessage(reason ?? null) };
-  if (kind === 'REACTIVATED') return { subject: 'Your MSD member account is active again', text: reactivatedMessage() };
-  if (kind === 'INACTIVE') return { subject: 'Your MSD member account is inactive', text: inactiveMessage(reason ?? null) };
-  if (kind === 'ARCHIVED') return { subject: 'Your MSD member account is archived', text: archivedMessage(reason ?? null) };
-  if (kind === 'RESTORED') return { subject: 'Your MSD member account is restored', text: restoredMessage() };
+  if (kind === 'SUSPENDED') return { subject: 'Your MSD vendor account is suspended', text: suspendedMessage(reason ?? null) };
+  if (kind === 'REACTIVATED') return { subject: 'Your MSD vendor account is active again', text: reactivatedMessage() };
+  if (kind === 'INACTIVE') return { subject: 'Your MSD vendor account is inactive', text: inactiveMessage(reason ?? null) };
+  if (kind === 'ARCHIVED') return { subject: 'Your MSD vendor account is archived', text: archivedMessage(reason ?? null) };
+  if (kind === 'RESTORED') return { subject: 'Your MSD vendor account is restored', text: restoredMessage() };
   return { subject: 'Welcome to MSD', text: welcomeMessage(target.name) };
 }
 

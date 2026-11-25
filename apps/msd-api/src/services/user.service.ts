@@ -54,7 +54,7 @@ async function assertEligibleStaffRole(roleId: string) {
   if (!role) throw new ApiError('NOT_FOUND', 'Role not found');
   if (!role.isActive) throw new ApiError('VALIDATION_ERROR', 'Role is not active');
   if (INELIGIBLE_STAFF_ROLE_KEYS.includes(role.key)) {
-    throw new ApiError('VALIDATION_ERROR', 'Customer and Member roles cannot be assigned through staff user management');
+    throw new ApiError('VALIDATION_ERROR', 'Customer and Vendor roles cannot be assigned through staff user management');
   }
   return role;
 }

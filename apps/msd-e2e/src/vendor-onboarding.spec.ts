@@ -150,14 +150,14 @@ test.describe('Add member, then manage it from the member detail page', () => {
     await mockMemberBackend(page, backend);
 
     await page.goto('/account/members/new');
-    await expect(page.getByRole('heading', { name: 'Add member', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Add vendor', level: 1 })).toBeVisible();
 
     await page.getByLabel('Business name').fill('Serenity Spa');
     await page.getByLabel('Owner first name').fill('Priya');
     await page.getByLabel('Owner last name').fill('Shah');
     await page.getByLabel('Owner email').fill('priya@example.com');
     await page.getByLabel('Owner mobile number').fill('9876500000');
-    await page.getByRole('button', { name: 'Create member' }).click();
+    await page.getByRole('button', { name: 'Create vendor' }).click();
 
     // The form posts the five fields and lands on the new member's detail page.
     await expect(page).toHaveURL(/\/account\/members\/member-1$/);
@@ -180,10 +180,10 @@ test.describe('Add member, then manage it from the member detail page', () => {
     await page.getByLabel('Reason (10 to 500 characters)').fill(reason);
     await page.getByRole('button', { name: 'Confirm make inactive' }).click();
 
-    await expect(page.getByText('Member is inactive and view only.')).toBeVisible();
+    await expect(page.getByText('Vendor is inactive and view only.')).toBeVisible();
     expect(backend.statusChanges).toEqual([{ status: 'INACTIVE', reason }]);
     await expect(statusBadge(page, 'Inactive')).toBeVisible();
-    await expect(page.getByText(/This member is inactive and view only\./)).toBeVisible();
+    await expect(page.getByText(/This vendor is inactive and view only\./)).toBeVisible();
     // An inactive member offers Reactivate instead of Make inactive.
     await expect(page.getByRole('button', { name: 'Reactivate' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Make inactive' })).toHaveCount(0);
@@ -197,7 +197,7 @@ test.describe('Add member, then manage it from the member detail page', () => {
     await mockMemberBackend(page, backend);
 
     await page.goto('/account/members/new');
-    await page.getByRole('button', { name: 'Create member' }).click();
+    await page.getByRole('button', { name: 'Create vendor' }).click();
 
     await expect(page.getByText('Enter the business name.')).toBeVisible();
     await expect(page.getByText('Enter a valid 10-digit mobile number.')).toBeVisible();
@@ -214,7 +214,7 @@ test.describe('Add member, then manage it from the member detail page', () => {
 
     await page.goto('/account/members/missing-member');
     await expect(page.getByText('Member not found.')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Back to all members' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Back to all vendors' })).toBeVisible();
   });
 });
 

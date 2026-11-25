@@ -13,7 +13,7 @@ import { CardGrid } from '../../../components/card-grid/card-grid';
  *  the detail page needs. */
 function toReadyRow(row: MemberSettlementRow): Record<string, string | number> {
   return {
-    Member: row.businessName ?? 'Draft member',
+    Member: row.businessName ?? 'Draft vendor',
     'Bank Reference': row.bankReferenceMasked ?? 'Not on file',
     'Branch / City': [row.primaryBranchName, row.primaryBranchCity].filter(Boolean).join(' · ') || '—',
     'Ready for Payout': formatINR(Number(row.readyForPayout)),
@@ -22,7 +22,7 @@ function toReadyRow(row: MemberSettlementRow): Record<string, string | number> {
 }
 
 const READY_COLUMNS = JSON.stringify([
-  { key: 'Member', label: 'Member' },
+  { key: 'Member', label: 'Vendor' },
   { key: 'Bank Reference', label: 'Bank Reference' },
   { key: 'Branch / City', label: 'Branch / City' },
   { key: 'Ready for Payout', label: 'Ready for Payout' },
@@ -47,7 +47,7 @@ function MembersReadyForPayout({ token }: { token: string | null }) {
     setError('');
     listMemberSettlements(token, { status: 'ready', pageSize: 10 })
       .then(({ data }) => setRows(data))
-      .catch((err) => setError(err instanceof ApiRequestError ? err.message : 'Could not load members ready for payout.'))
+      .catch((err) => setError(err instanceof ApiRequestError ? err.message : 'Could not load vendors ready for payout.'))
       .finally(() => setLoading(false));
   }, [token]);
 
@@ -79,13 +79,13 @@ function MembersReadyForPayout({ token }: { token: string | null }) {
     );
   }
   if (!loading && rows.length === 0) {
-    return <p className="empty-state">No member is currently ready for payout.</p>;
+    return <p className="empty-state">No vendor is currently ready for payout.</p>;
   }
 
   return (
     <sky-data-table
       ref={tableRef as RefObject<HTMLElement>}
-      caption="Members ready for payout"
+      caption="Vendors ready for payout"
       columns={READY_COLUMNS}
       rows={tableRows}
       total={rows.length}
@@ -136,7 +136,7 @@ export function AccountsOverviewPage() {
       <header className="page-head">
         <div>
           <h1>Accounts Overview</h1>
-          <p>Customer collections, MSD commission and member payments.</p>
+          <p>Customer collections, MSD commission and vendor payments.</p>
         </div>
         <div className="page-head__actions">
           {canReviewPayouts && (
@@ -176,7 +176,7 @@ export function AccountsOverviewPage() {
               icon="account_balance_wallet"
               icon-style="surface"
               headline={formatINR(Number(data.memberLiability))}
-              text="Member Dues — unpaid member share."
+              text="Vendor Dues — unpaid vendor share."
               href="/account/accounts/member-settlements"
             />
           </CardGrid>
@@ -187,14 +187,14 @@ export function AccountsOverviewPage() {
               icon="task_alt"
               icon-style="surface"
               headline={`${formatINR(Number(data.readyForPayout))} ready for payout`}
-              text={`${data.readyForPayoutMemberCount} member${data.readyForPayoutMemberCount === 1 ? '' : 's'} eligible right now — hold period has passed, no open dispute.`}
+              text={`${data.readyForPayoutMemberCount} vendor${data.readyForPayoutMemberCount === 1 ? '' : 's'} eligible right now — hold period has passed, no open dispute.`}
               cta-label="Review Payouts"
               cta-href="/account/accounts/member-settlements?status=ready"
             />
           )}
 
           <section aria-labelledby="member-dues-breakdown-title">
-            <h2 id="member-dues-breakdown-title" className="section-title">Member dues breakdown</h2>
+            <h2 id="member-dues-breakdown-title" className="section-title">Vendor dues breakdown</h2>
             <CardGrid layout="compact">
               <sky-tile-card
                 color="surface-high"
@@ -228,12 +228,12 @@ export function AccountsOverviewPage() {
             icon="account_balance"
             icon-style="surface"
             headline={formatINR(Number(data.paid))}
-            text="Already Paid to Members — settled via a recorded bank transfer."
+            text="Already Paid to Vendors — settled via a recorded bank transfer."
             href="/account/accounts/member-settlements"
           />
 
           <section aria-labelledby="members-ready-title">
-            <h2 id="members-ready-title" className="section-title">Members ready for payout</h2>
+            <h2 id="members-ready-title" className="section-title">Vendors ready for payout</h2>
             <MembersReadyForPayout token={token} />
           </section>
 

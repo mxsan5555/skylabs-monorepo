@@ -37,7 +37,7 @@ export interface RbacResourceDefinition {
 export const RBAC_RESOURCE_CATALOG: RbacResourceDefinition[] = [
   {
     key: 'members',
-    title: 'Members',
+    title: 'Vendors',
     actions: ['view', 'create', 'edit', 'delete'],
   },
   {

@@ -21,32 +21,32 @@ const COPY: Record<StatusAction, { button: string; confirm: string; title: strin
   deactivate: {
     button: 'Make inactive',
     confirm: 'Confirm make inactive',
-    title: 'Make this member inactive',
-    body: 'The member can still log in and look at everything, but cannot change anything. Their items are hidden from the website. They get an email and an SMS with this reason.',
+    title: 'Make this vendor inactive',
+    body: 'The vendor can still log in and look at everything, but cannot change anything. Their items are hidden from the website. They get an email and an SMS with this reason.',
   },
   suspend: {
     button: 'Suspend',
     confirm: 'Confirm suspend',
-    title: 'Suspend this member',
-    body: 'The member cannot log in and everything they own disappears from the website. They get an email and an SMS with this reason and the steps to come back.',
+    title: 'Suspend this vendor',
+    body: 'The vendor cannot log in and everything they own disappears from the website. They get an email and an SMS with this reason and the steps to come back.',
   },
   reactivate: {
     button: 'Reactivate',
     confirm: 'Confirm reactivate',
-    title: 'Reactivate this member',
-    body: 'The member can log in again and everything on the website comes back as it was. They get an email and an SMS.',
+    title: 'Reactivate this vendor',
+    body: 'The vendor can log in again and everything on the website comes back as it was. They get an email and an SMS.',
   },
   delete: {
     button: 'Delete',
     confirm: 'Confirm delete',
-    title: 'Delete this member',
-    body: 'Nothing is erased: the member, their listings and files are archived and hidden everywhere. Find them under the Archived filter to restore them later. They get an email and an SMS.',
+    title: 'Delete this vendor',
+    body: 'Nothing is erased: the vendor, their listings and files are archived and hidden everywhere. Find them under the Archived filter to restore them later. They get an email and an SMS.',
   },
   restore: {
     button: 'Restore',
     confirm: 'Confirm restore',
-    title: 'Restore this member',
-    body: 'The member comes back as Inactive: they can log in and look at everything, and nothing shows on the website until you reactivate them. They get an email and an SMS.',
+    title: 'Restore this vendor',
+    body: 'The vendor comes back as Inactive: they can log in and look at everything, and nothing shows on the website until you reactivate them. They get an email and an SMS.',
   },
 };
 

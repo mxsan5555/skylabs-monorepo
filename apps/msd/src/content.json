@@ -75,7 +75,7 @@
     "searchAction": "Search",
     "countLabel": "{label}, {count} items",
     "countLabelOne": "{label}, 1 item",
-    "becomeMember": "Become a Member",
+    "becomeMember": "Become a Vendor",
     "becomeMemberTo": "/become-member",
     "allCategories": "All categories",
     "categoriesNavLabel": "Categories",
@@ -1202,7 +1202,7 @@
       "cart": "Cart",
       "support": "Support"
     },
-    "switchToMember": "Switch to member dashboard",
+    "switchToMember": "Switch to vendor dashboard",
     "logout": "Logout",
     "loggedOut": "You have been logged out successfully."
   },
@@ -1385,7 +1385,7 @@
       "pathTemplate": "/orders/{id}/invoice"
     },
     "chooseExperience": {
-      "description": "Choose how to use MSD today: book wellness deals as a customer or manage your business as a member.",
+      "description": "Choose how to use MSD today: book wellness deals as a customer or manage your business as a vendor.",
       "path": "/choose-experience"
     },
     "wishlist": {
@@ -1744,7 +1744,7 @@
       "icon": "storefront",
       "heading": "Run a spa, salon or wellness brand?",
       "text": "Publish your deals and products on MySpaDeal and manage branches, therapists and orders from one console.",
-      "label": "Become a member",
+      "label": "Become a vendor",
       "href": "/become-member"
     }
   },
@@ -1810,7 +1810,7 @@
       },
       {
         "question": "How do I list my spa or products on MySpaDeal?",
-        "answer": "Choose Become a member and share your business details. Our partner team reviews your KYC before your deals and products go live."
+        "answer": "Choose Become a vendor and share your business details. Our partner team reviews your KYC before your deals and products go live."
       }
     ],
     "cta": {
@@ -2067,15 +2067,15 @@
   },
   "becomeMember": {
     "path": "/become-member",
-    "title": "Become a member",
-    "breadcrumb": "Become a member",
-    "metaTitle": "Become a member · MSD",
+    "title": "Become a vendor",
+    "breadcrumb": "Become a vendor",
+    "metaTitle": "Become a vendor · MSD",
     "description": "List your spa, salon or wellness business on MySpaDeal. Tell us about your business and our partner team follows up to complete onboarding.",
     "asideHeading": "Talk to our partner team",
-    "asideText": "Member accounts are set up by our team. Reach us directly and we will help you get listed.",
-    "formLabel": "Membership application",
+    "asideText": "Vendor accounts are set up by our team. Reach us directly and we will help you get listed.",
+    "formLabel": "Vendor application",
     "notice": {
-      "before": "Member accounts are created by our team. Please ",
+      "before": "Vendor accounts are created by our team. Please ",
       "link": "contact us",
       "after": " and we will set up your account."
     },
@@ -2112,7 +2112,7 @@
     "success": {
       "metaTitle": "Application received · MSD",
       "heading": "Application received",
-      "text": "Thanks for applying to become a member on MySpaDeal. Our team reviews your business details and contacts you by email or phone once they are verified. You do not need to do anything else right now."
+      "text": "Thanks for applying to become a vendor on MySpaDeal. Our team reviews your business details and contacts you by email or phone once they are verified. You do not need to do anything else right now."
     }
   },
   "listingPages": {

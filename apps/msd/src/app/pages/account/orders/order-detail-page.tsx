@@ -63,7 +63,7 @@ const ACTIVITY_LABEL: Record<string, string> = {
   'dispute.resolve': 'Dispute resolved',
   'dispute.status_change': 'Dispute status changed',
   'refund.create': 'Refund recorded',
-  'settlement.payout.recorded': 'Member payout recorded',
+  'settlement.payout.recorded': 'Vendor payout recorded',
 };
 
 function humanizeAction(action: string): string {
@@ -290,7 +290,7 @@ export function OrderDetailPage() {
         <sky-info-card
           icon="error"
           heading="Needs Review"
-          subheading="This order is marked Completed but has no confirmed (PAID) payment on record. Voucher completion and member payout for this order remain subject to the usual restrictions — completing the order never marks it Paid on its own."
+          subheading="This order is marked Completed but has no confirmed (PAID) payment on record. Voucher completion and vendor payout for this order remain subject to the usual restrictions — completing the order never marks it Paid on its own."
         />
       )}
 

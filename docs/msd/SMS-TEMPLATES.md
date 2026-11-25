@@ -6,33 +6,33 @@
 
 Your overseas education lane registration OTP is {#var#}
 
-### Member account welcome
+### Vendor account welcome
 
-Welcome to MSD{#var#}. Your member account is ready. Log in with this mobile number or email address using a one-time password.
+Welcome to MSD{#var#}. Your vendor account is ready. Log in with this mobile number or email address using a one-time password.
 
-### Member account suspended
+### Vendor account suspended
 
-Your member account is suspended. Reason: {#var#}. {#var#}, resolve the reason above, and our team will reactivate your account.
+Your vendor account is suspended. Reason: {#var#}. {#var#}, resolve the reason above, and our team will reactivate your account.
 
-### Member account reactivated
+### Vendor account reactivated
 
-Your member account is active again. You can log in and manage your branches, deals, therapists and products.
+Your vendor account is active again. You can log in and manage your branches, deals, therapists and products.
 
-### Manual member document reminder
+### Manual vendor document reminder
 
-Reminder: please upload your missing member documents: {#var#}. {#var#} if you need help.
+Reminder: please upload your missing vendor documents: {#var#}. {#var#} if you need help.
 
-### Manual member document reminder with due date
+### Manual vendor document reminder with due date
 
-Reminder: please upload your missing member documents: {#var#}. They were due on {#var#}. {#var#} if you need help.
+Reminder: please upload your missing vendor documents: {#var#}. They were due on {#var#}. {#var#} if you need help.
 
-### Scheduled member document reminder
+### Scheduled vendor document reminder
 
-Reminder {#var#}: please upload your missing member documents: {#var#}. They were due on {#var#}. {#var#} if you need help.
+Reminder {#var#}: please upload your missing vendor documents: {#var#}. They were due on {#var#}. {#var#} if you need help.
 
-### Final scheduled member document reminder
+### Final scheduled vendor document reminder
 
-Reminder 3 of 3: please upload your missing member documents: {#var#}. They were due on {#var#}. This is the final reminder. If they are not received, an admin may suspend your account. {#var#} if you need help.
+Reminder 3 of 3: please upload your missing vendor documents: {#var#}. They were due on {#var#}. This is the final reminder. If they are not received, an admin may suspend your account. {#var#} if you need help.
 
 ## Customer account and sign-in
 
@@ -100,7 +100,7 @@ MSD: We received your support request "{#var#}". Reference: {#var#}. Our team wi
 
 MSD Support has an update on request {#var#}: {#var#}. Reply or contact us at {#var#} if you need more help.
 
-## Member and vendor account
+## Vendor account
 
 ### Admin account ready
 
@@ -118,31 +118,31 @@ Welcome to MSD, {#var#}. Your marketing account is ready. Sign in with your regi
 
 Welcome to MSD, {#var#}. Your support account is ready. Sign in with your registered mobile number or email using a one-time password.
 
-### Member account inactive
+### Vendor account inactive
 
-Your MSD member account is now inactive and read-only. You can view your account but cannot make changes. Contact MSD Support at {#var#} for help.
+Your MSD vendor account is now inactive and read-only. You can view your account but cannot make changes. Contact MSD Support at {#var#} for help.
 
-### Member documents received
+### Vendor documents received
 
-MSD: We received your member documents for {#var#}. Our team will review them and update your account.
+MSD: We received your vendor documents for {#var#}. Our team will review them and update your account.
 
-### Member document approved
+### Vendor document approved
 
 MSD: Your {#var#} document has been approved. {#var#}
 
-### Member document rejected
+### Vendor document rejected
 
 MSD: Your {#var#} document needs correction. Reason: {#var#}. Please upload a replacement in your MSD account.
 
-### Member KYC approved
+### Vendor KYC approved
 
-MSD: Verification for {#var#} is complete. Your member account can continue onboarding.
+MSD: Verification for {#var#} is complete. Your vendor account can continue onboarding.
 
-### Member KYC rejected
+### Vendor KYC rejected
 
 MSD: Verification for {#var#} needs correction. Reason: {#var#}. Please update your details or documents in your MSD account.
 
-## Member catalog and orders
+## Vendor catalog and orders
 
 ### Deal submitted for approval
 
@@ -156,19 +156,19 @@ MSD: Your deal "{#var#}" has been approved and is now active on MSD.
 
 MSD: Your deal "{#var#}" was not approved. Reason: {#var#}. Update it in your MSD account and resubmit for review.
 
-### New member order received
+### New vendor order received
 
-MSD: You received order {#var#} for {#var#}. Sign in to your member account to view the order and fulfilment details.
+MSD: You received order {#var#} for {#var#}. Sign in to your vendor account to view the order and fulfilment details.
 
-### Member order cancelled
+### Vendor order cancelled
 
-MSD: Order {#var#} has been cancelled. Reason: {#var#}. Sign in to your member account for details.
+MSD: Order {#var#} has been cancelled. Reason: {#var#}. Sign in to your vendor account for details.
 
 ## Staff and operations alerts
 
-### New member account created
+### New vendor account created
 
-MSD: A new member account has been created for {#var#}. Sign in to the admin console to view the member details.
+MSD: A new vendor account has been created for {#var#}. Sign in to the admin console to view the vendor details.
 
 ### New deal awaiting approval
 

@@ -40,10 +40,10 @@ interface RoleSeed {
 export const ROLES: RoleSeed[] = [
   { key: 'super_admin', name: 'Super Admin', description: 'Full unrestricted access to every module.', isSystem: true, isSuperAdmin: true },
   { key: 'admin', name: 'Admin', description: 'MSD staff. Same as Super Admin except delete.', isSystem: true, isSuperAdmin: false },
-  { key: 'marketing', name: 'Marketing', description: 'View members and catalog. Manages website content.', isSystem: true, isSuperAdmin: false },
-  { key: 'sales', name: 'Sales', description: 'Creates members and their catalog.', isSystem: true, isSuperAdmin: false },
-  { key: 'member', name: 'Member', description: 'Deal company that manages its own profile and catalog.', isSystem: true, isSuperAdmin: false },
-  { key: 'support', name: 'Support', description: 'Contacts customers and members. View only.', isSystem: true, isSuperAdmin: false },
+  { key: 'marketing', name: 'Marketing', description: 'View vendors and catalog. Manages website content.', isSystem: true, isSuperAdmin: false },
+  { key: 'sales', name: 'Sales', description: 'Creates vendors and their catalog.', isSystem: true, isSuperAdmin: false },
+  { key: 'member', name: 'Vendor', description: 'Deal company that manages its own profile and catalog.', isSystem: true, isSuperAdmin: false },
+  { key: 'support', name: 'Support', description: 'Contacts customers and vendors. View only.', isSystem: true, isSuperAdmin: false },
   { key: 'customer', name: 'Customer', description: 'Consumer-facing base role.', isSystem: true, isSuperAdmin: false },
 ];
 

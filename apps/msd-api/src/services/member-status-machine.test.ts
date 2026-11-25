@@ -28,7 +28,7 @@ describe('member status machine', () => {
   });
 
   it('explains the journey when an active member is suspended (item 6)', () => {
-    expect(() => assertTransition('ACTIVE', 'SUSPENDED')).toThrowError(/Make the member inactive first/);
+    expect(() => assertTransition('ACTIVE', 'SUSPENDED')).toThrowError(/Make the vendor inactive first/);
   });
 
   it('exposes the reason length limits', () => {

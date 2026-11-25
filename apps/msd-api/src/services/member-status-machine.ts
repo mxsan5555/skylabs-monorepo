@@ -20,8 +20,8 @@ const ALLOWED: Record<MemberStatusValue, readonly MemberStatusValue[]> = {
 
 /** Why a step is refused, when the journey has a clear next step to point at. */
 const NEXT_STEP: Partial<Record<`${MemberStatusValue}>${MemberStatusValue}`, string>> = {
-  'ACTIVE>SUSPENDED': 'Make the member inactive first. The order is Active, Inactive, Suspended, then Delete.',
-  'ARCHIVED>ACTIVE': 'Restore the member to Inactive first, then reactivate.',
+  'ACTIVE>SUSPENDED': 'Make the vendor inactive first. The order is Active, Inactive, Suspended, then Delete.',
+  'ARCHIVED>ACTIVE': 'Restore the vendor to Inactive first, then reactivate.',
 };
 
 const LABEL: Record<MemberStatusValue, string> = {
@@ -37,6 +37,6 @@ export function canTransition(from: MemberStatusValue, to: MemberStatusValue): b
 
 export function assertTransition(from: MemberStatusValue, to: MemberStatusValue): void {
   if (!canTransition(from, to)) {
-    throw new ApiError('CONFLICT', NEXT_STEP[`${from}>${to}`] ?? `A member cannot move from ${LABEL[from]} to ${LABEL[to]}.`);
+    throw new ApiError('CONFLICT', NEXT_STEP[`${from}>${to}`] ?? `A vendor cannot move from ${LABEL[from]} to ${LABEL[to]}.`);
   }
 }

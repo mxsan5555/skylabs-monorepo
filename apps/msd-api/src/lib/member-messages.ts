@@ -13,19 +13,19 @@ export function contactLine(): string {
 /** One text for the login error, the email and the SMS, so a member always reads the same steps. */
 export function suspendedMessage(reason: string | null): string {
   return (
-    `Your member account is suspended. Reason: ${reason?.trim() || 'not recorded'}. ` +
+    `Your vendor account is suspended. Reason: ${reason?.trim() || 'not recorded'}. ` +
     `${contactLine()}, resolve the reason above, and our team will reactivate your account.`
   );
 }
 
 export function reactivatedMessage(): string {
-  return 'Your member account is active again. You can log in and manage your branches, deals, therapists and products.';
+  return 'Your vendor account is active again. You can log in and manage your branches, deals, therapists and products.';
 }
 
 /** Notice when an admin makes a member inactive (item 6). */
 export function inactiveMessage(reason: string | null): string {
   return (
-    `Your member account is now inactive. Reason: ${reason?.trim() || 'not recorded'}. ` +
+    `Your vendor account is now inactive. Reason: ${reason?.trim() || 'not recorded'}. ` +
     `You can still log in and view everything, but you cannot make changes and your listings are hidden from the website. ${contactLine()} to reactivate it.`
   );
 }
@@ -33,7 +33,7 @@ export function inactiveMessage(reason: string | null): string {
 /** Notice when a suspended member is deleted: archived, never erased (item 6, Q2). */
 export function archivedMessage(reason: string | null): string {
   return (
-    `Your member account has been closed and archived. Reason: ${reason?.trim() || 'not recorded'}. ` +
+    `Your vendor account has been closed and archived. Reason: ${reason?.trim() || 'not recorded'}. ` +
     `Your records are kept. ${contactLine()} if you want to come back.`
   );
 }
@@ -41,18 +41,18 @@ export function archivedMessage(reason: string | null): string {
 /** Notice when an archived member is restored to inactive (item 6). */
 export function restoredMessage(): string {
   return (
-    'Your member account has been restored. It is inactive for now: you can log in and view everything, ' +
+    'Your vendor account has been restored. It is inactive for now: you can log in and view everything, ' +
     'and our team will reactivate it once your details are confirmed.'
   );
 }
 
 export function inactiveReadOnlyMessage(): string {
-  return 'Your member account is inactive and view only. You can look at your orders, customers, branches, deals, therapists and products, but you cannot change anything. Please contact our support team to reactivate it.';
+  return 'Your vendor account is inactive and view only. You can look at your orders, customers, branches, deals, therapists and products, but you cannot change anything. Please contact our support team to reactivate it.';
 }
 
 export function welcomeMessage(name: string | null | undefined): string {
   const who = name?.trim() ? `, ${name.trim()}` : '';
-  return `Welcome to MSD${who}. Your member account is ready. Log in with this mobile number or email address using a one-time password.`;
+  return `Welcome to MSD${who}. Your vendor account is ready. Log in with this mobile number or email address using a one-time password.`;
 }
 
 /** Activity and notification wording for the flag set after the final warning. */
@@ -74,7 +74,7 @@ export function isFinalWarning(sequence: number | null): boolean {
 }
 
 export function documentsReminderSubject(sequence: number | null): string {
-  return isFinalWarning(sequence) ? 'Final reminder: upload your MSD member documents' : 'Reminder: upload your MSD member documents';
+  return isFinalWarning(sequence) ? 'Final reminder: upload your MSD vendor documents' : 'Reminder: upload your MSD vendor documents';
 }
 
 /** One text for the email and the SMS. Lists the exact documents still needed. */
@@ -82,5 +82,5 @@ export function documentsReminderMessage({ sequence, missing, dueAt }: Documents
   const step = sequence === null ? 'Reminder' : `Reminder ${sequence} of ${REMINDER_COUNT}`;
   const due = dueAt ? ` They were due on ${formatDueDate(dueAt)}.` : '';
   const final = isFinalWarning(sequence) ? ' This is the final reminder. If they are not received, an admin may suspend your account.' : '';
-  return `${step}: please upload your missing member documents: ${documentTypeList(missing)}.${due}${final} ${contactLine()} if you need help.`;
+  return `${step}: please upload your missing vendor documents: ${documentTypeList(missing)}.${due}${final} ${contactLine()} if you need help.`;
 }

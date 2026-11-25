@@ -26,7 +26,7 @@ export function MemberManagement() {
   const { token, can } = useAuth();
   if (can('members', 'view')) return <AdminMemberManagement canCreate={can('members', 'create')} />;
   if (can('members', 'custom')) return <SelfVendorManagement token={token} />;
-  return <p className="empty-state">You do not have access to Member Management.</p>;
+  return <p className="empty-state">You do not have access to Vendor Management.</p>;
 }
 
 const isFilterableStatus = (value: string): value is (typeof FILTERABLE_STATUSES)[number] =>
@@ -80,7 +80,7 @@ function AdminMemberManagement({ canCreate }: { canCreate: boolean }) {
       setMembers(data);
       setTotal(meta?.total ?? data.length);
     } catch (err) {
-      setListError(err instanceof ApiRequestError ? err.message : 'Could not load members.');
+      setListError(err instanceof ApiRequestError ? err.message : 'Could not load vendors.');
     } finally {
       setLoading(false);
     }
@@ -97,23 +97,23 @@ function AdminMemberManagement({ canCreate }: { canCreate: boolean }) {
 
   return (
     <div className="admin-page admin-page--wide">
-      <title>Member Management · MSD</title>
+      <title>Vendor Management · MSD</title>
       <header className="page-head">
         <div>
-          <h1>Member Management</h1>
-          <p>Open a member to review their profile, documents and catalog.</p>
+          <h1>Vendor Management</h1>
+          <p>Open a vendor to review their profile, documents and catalog.</p>
         </div>
         <div className="page-head__actions">
           {canCreate && (
             <FilledButton onClick={() => navigate('/account/members/new')}>
               <Icon slot="icon" aria-hidden="true">add</Icon>
-              Add member
+              Add vendor
             </FilledButton>
           )}
         </div>
       </header>
 
-      <section className="" aria-label="Members">
+      <section className="" aria-label="Vendors">
         {listError && <p className="error-state" role="alert">{listError}</p>}
         <MemberList
           members={members}
@@ -222,7 +222,7 @@ function SelfVendorManagement({ token }: { token: string | null }) {
       {error && <p className="error-state" role="alert">{error}</p>}
       {notFound && (
         <p className="error-state" role="alert">
-          Your member profile was not found. Please contact support.
+          Your vendor profile was not found. Please contact support.
         </p>
       )}
 

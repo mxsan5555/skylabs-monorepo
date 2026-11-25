@@ -48,7 +48,7 @@ describe('MemberActivityTab', () => {
     render(<MemberActivityTab token="t" memberId="m1" refreshKey={0} />);
     expect(await screen.findByText('Status changed from Active to Suspended by Priya')).toBeTruthy();
     expect(screen.getByText('Status changed from Suspended to Active')).toBeTruthy();
-    expect(screen.getByText('Aadhaar card uploaded by staff for the member')).toBeTruthy();
+    expect(screen.getByText('Aadhaar card uploaded by staff for the vendor')).toBeTruthy();
     expect(screen.getByText('GST number rejected')).toBeTruthy();
     expect(screen.getByText('PAN card approved')).toBeTruthy();
     expect(screen.queryByText('ignored')).toBeNull();

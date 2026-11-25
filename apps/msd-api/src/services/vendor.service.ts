@@ -499,7 +499,7 @@ export async function createMember(input: MemberCreateInput, createdByUserId: st
         data: { name: ownerName, email: input.ownerEmail, phone: input.ownerMobile },
       });
       const memberRole = await tx.role.findUnique({ where: { key: ROLE_KEYS.member } });
-      if (!memberRole) throw new ApiError('SERVER_ERROR', 'The member role is missing. Run the seed.');
+      if (!memberRole) throw new ApiError('SERVER_ERROR', 'The vendor role is missing. Run the seed.');
       await tx.userRole.upsert({
         where: { userId_roleId: { userId: owner.id, roleId: memberRole.id } },
         update: {},
@@ -591,7 +591,7 @@ async function syncOwnerUserFromVendorFields(
   const nextEmail = 'ownerEmail' in input ? (email ?? null) : owner.email;
   const nextPhone = 'ownerMobile' in input ? (phone ?? null) : owner.phone;
   if (!nextEmail && !nextPhone) {
-    throw new ApiError('VALIDATION_ERROR', 'The member user needs at least one of email or mobile — clearing both is not allowed.');
+    throw new ApiError('VALIDATION_ERROR', 'The vendor user needs at least one of email or mobile — clearing both is not allowed.');
   }
 
   await prisma.user.update({
@@ -662,7 +662,7 @@ export async function getMyVendorOrThrow(ownerUserId: string) {
   const vendor = await getVendorByOwnerUserId(ownerUserId);
   if (!vendor) throw new ApiError('NOT_FOUND', 'Complete your business profile first');
   if (vendor.status === 'SUSPENDED') {
-    throw new ApiError('FORBIDDEN', 'Your member account is suspended. Please contact support.');
+    throw new ApiError('FORBIDDEN', 'Your vendor account is suspended. Please contact support.');
   }
   return vendor;
 }
@@ -1222,7 +1222,7 @@ export async function addVendorImage(vendorId: string, file: MediaFile) {
   await getVendorOrThrow(vendorId);
   const existingCount = await prisma.vendorImage.count({ where: { vendorId } });
   if (existingCount >= 1) {
-    throw new ApiError('VALIDATION_ERROR', 'A member can only have one profile image — remove the current one before adding a new one.');
+    throw new ApiError('VALIDATION_ERROR', 'A vendor can only have one profile image — remove the current one before adding a new one.');
   }
   return mediaService.addImage('vendor', vendorId, file);
 }
