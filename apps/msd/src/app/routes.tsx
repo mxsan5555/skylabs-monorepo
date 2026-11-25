@@ -12,6 +12,7 @@ import Showcase from './pages/showcase/showcase';
 import Blog, { BlogCategory } from './pages/blog/blog';
 import BlogDetail from './pages/blog-detail/blog-detail';
 import SignIn from './pages/sign-in/sign-in';
+import GoogleOAuthCallback from './pages/google-oauth-callback/google-oauth-callback';
 import Otp from './pages/otp/otp';
 import { ChooseExperience } from './pages/choose-experience/choose-experience';
 import Profile from './pages/account/profile';
@@ -348,6 +349,7 @@ export function AppRoutes() {
         <Route element={<AuthLayout />}>
           <Route path="/sign-in" element={<SignIn />} />
           <Route path="/otp" element={<Otp />} />
+          <Route path="/auth/google/callback" element={<GoogleOAuthCallback />} />
           <Route
             path="/choose-experience"
             element={

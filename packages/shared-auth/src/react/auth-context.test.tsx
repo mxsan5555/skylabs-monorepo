@@ -3,9 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider, useAuth, type AuthContextValue } from './auth-context';
 
 /**
- * P10-38: sign-out clears every token and the bootstrap and revokes the refresh token on the
- * server; a "Login As" preview token lives only in this tab (sessionStorage) and never replaces
- * the real token in localStorage.
+ * Sign-out clears app state and revokes the HttpOnly refresh-cookie session; a "Login As" preview
+ * token lives only in this tab (sessionStorage) and never replaces the real access token.
  */
 const API = 'http://api.test';
 const KEYS = {
@@ -44,6 +43,7 @@ beforeEach(() => {
   sessionStorage.clear();
   fetchMock.mockReset();
   fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+    if (url.endsWith('/auth/csrf')) return ok({ csrfToken: 'csrf-token' });
     if (url.endsWith('/rbac/bootstrap')) {
       const bearer = new Headers(init?.headers).get('Authorization');
       return bearer?.includes('.') ? ok(BOOTSTRAP) : Promise.resolve(new Response('', { status: 401 }));
@@ -70,9 +70,14 @@ describe('AuthProvider sign-out (P10-38)', () => {
     expect(auth.bootstrap).toBeNull();
     for (const key of [KEYS.token, KEYS.refresh, KEYS.real]) expect(localStorage.getItem(key)).toBeNull();
     expect(sessionStorage.getItem(KEYS.preview)).toBeNull();
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/auth/logout'))).toBe(true),
+    );
     const logout = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/auth/logout'));
-    expect(logout?.[1]).toMatchObject({ method: 'POST', body: JSON.stringify({ refreshToken: 'refresh-1' }) });
-    expect(new Headers(logout?.[1]?.headers).get('Authorization')).toBe(`Bearer ${REAL}`);
+    expect(logout?.[1]).toMatchObject({ method: 'POST', credentials: 'include' });
+    expect(new Headers(logout?.[1]?.headers).get('X-CSRF-Token')).toBe('csrf-token');
+    expect(logout?.[1]?.body).toBeUndefined();
+    expect(new Headers(logout?.[1]?.headers).get('Authorization')).toBeNull();
   });
 
   it('still signs out locally when the server call fails', async () => {

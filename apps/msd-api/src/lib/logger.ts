@@ -47,7 +47,12 @@ export function redactUrl(url: string): string {
   const [path, query] = url.split('?', 2);
   if (!query) return url;
   const params = new URLSearchParams(query);
-  for (const key of [...params.keys()]) if (isSensitive(key)) params.set(key, REDACTED);
+  const isGoogleOAuthRoute = path.startsWith('/api/v1/auth/google');
+  for (const key of [...params.keys()]) {
+    if (isSensitive(key) || (isGoogleOAuthRoute && ['state', 'code'].includes(key.toLowerCase()))) {
+      params.set(key, REDACTED);
+    }
+  }
   return `${path}?${params.toString()}`;
 }
 

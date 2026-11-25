@@ -52,6 +52,7 @@ export function createApp() {
 
   // Bounded public website lookup; no credentials or provider payload are returned.
   const lookupWindows=new Map<string,{started:number;count:number}>();
+  
   app.get('/location/search',async(req,res,next)=>{try{
     const ip=req.ip??'unknown',now=Date.now();let window=lookupWindows.get(ip);
     if(!window||now-window.started>60000){if(lookupWindows.size>=1000&&!lookupWindows.has(ip)){for(const [key,value] of lookupWindows)if(now-value.started>60000)lookupWindows.delete(key);if(lookupWindows.size>=1000){res.status(429).json({data:null,error:{code:'LOCATION_RATE_LIMIT',message:'Address lookup is busy. Please try again later or enter the address manually.'}});return;}}window={started:now,count:0};lookupWindows.set(ip,window);}

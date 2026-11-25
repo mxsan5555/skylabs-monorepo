@@ -44,7 +44,7 @@ const WishlistContext =
 
 export function WishlistProvider({
   children,
-}: {
+}: { 
   children: ReactNode;
 }) {
   const { token, isAuthenticated } = useAuth();

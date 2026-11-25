@@ -13,6 +13,7 @@ one permission-driven console. Apps: `apps/msd` (React 19 + Vite, port 4200, gre
 | How a module works in code | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
 | Tables, enums, migrations | [`DATABASE.md`](DATABASE.md) |
 | Endpoints and their permissions | [`API.md`](API.md) |
+| API design, SEO implementation and industry-standard gaps | [`API-DESIGN-SEO-STANDARDS.md`](API-DESIGN-SEO-STANDARDS.md) |
 | What is done and what is next | [`TASKS.md`](TASKS.md) |
 | How to test it and what "works" means | [`TESTING.md`](TESTING.md) |
 | Env vars, scheduled jobs, release checks | [`DEPLOYMENT.md`](DEPLOYMENT.md) |

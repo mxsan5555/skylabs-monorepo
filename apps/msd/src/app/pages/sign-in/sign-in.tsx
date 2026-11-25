@@ -26,7 +26,9 @@ export function SignIn() {
   const [method, setMethod] = useState<Method>('phone');
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(() =>
+    new URLSearchParams(location.search).get('error') === 'google' ? content.auth.signIn.googleError : '',
+  );
   const auth = content.auth.signIn;
   const validation = content.validation;
   const isPhone = method === 'phone';
@@ -147,7 +149,7 @@ export function SignIn() {
         <span>{auth.divider}</span>
       </div>
 
-      <OutlinedButton className="auth-google" href={googleSignInUrl(API_BASE_URL)}>
+      <OutlinedButton className="auth-google" href={googleSignInUrl(API_BASE_URL, extractReturnUrl(location))}>
         <Icon slot="icon" aria-hidden="true">
           {auth.googleIcon}
         </Icon>
