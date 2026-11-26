@@ -1,4 +1,4 @@
-import './member-portal.css';
+import './vendor-portal.css';
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
@@ -157,7 +157,7 @@ export function EarningsPayouts() {
   const statementRows = useMemo(() => JSON.stringify(detail?.statement.map(toStatementRow) ?? []), [detail]);
 
   return (
-    <div className="admin-page admin-page--wide member-portal">
+    <div className="admin-page admin-page--wide vendor-portal">
       <title>Earnings &amp; Payouts · MSD</title>
       <meta name="robots" content="noindex" />
       <header className="page-head">
@@ -178,7 +178,7 @@ export function EarningsPayouts() {
         <p className="loading-state">Loading your earnings…</p>
       ) : detail && totals ? (
         <>
-          <div className="member-payment-cards">
+          <div className="vendor-payment-cards">
             {[
               { label: 'Service Pending', amount: totals.pending, note: 'Your share awaiting service completion.' },
               { label: 'On Hold', amount: totals.onHold, note: 'Within the hold period or under dispute.' },
@@ -186,8 +186,8 @@ export function EarningsPayouts() {
               { label: 'Received', amount: totals.received, note: 'Already paid to your bank account.' },
             ].map((card) => (
               <sky-card key={card.label} variant="outlined">
-                <h2 className="member-card-label">{card.label}</h2>
-                <p className="member-card-amount">{formatINR(card.amount)}</p>
+                <h2 className="vendor-card-label">{card.label}</h2>
+                <p className="vendor-card-amount">{formatINR(card.amount)}</p>
                 <p className="field-hint">{card.note}</p>
               </sky-card>
             ))}
@@ -216,7 +216,7 @@ export function EarningsPayouts() {
             )}
           </section>
 
-          <details className="member-disclosure">
+          <details className="vendor-disclosure">
             <summary>Payout History</summary>
             {detail.payoutHistory.length === 0 ? (
               <p className="empty-state">No payouts received yet.</p>

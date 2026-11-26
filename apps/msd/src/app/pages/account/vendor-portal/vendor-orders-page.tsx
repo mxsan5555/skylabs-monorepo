@@ -1,4 +1,4 @@
-import './member-portal.css';
+import './vendor-portal.css';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FilledButton, Icon, OutlinedButton } from '@skylabs-monorepo/shared-ui/react';
@@ -97,7 +97,7 @@ export function VendorOrdersPage() {
   };
 
   return (
-    <div className="admin-page admin-page--wide member-portal">
+    <div className="admin-page admin-page--wide vendor-portal">
       <title>Orders · MSD</title>
       <meta name="robots" content="noindex" />
       <header className="page-head">

@@ -8,7 +8,7 @@ export function ScanQrPage() {
   const navigate = useNavigate();
 
   return (
-    <div className="admin-page admin-page--wide member-portal">
+    <div className="admin-page admin-page--wide vendor-portal">
       <title>Scan QR · MSD</title>
       <meta name="robots" content="noindex" />
       <header className="page-head">

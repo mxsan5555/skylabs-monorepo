@@ -1,4 +1,4 @@
-import './member-portal.css';
+import './vendor-portal.css';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Icon, OutlinedButton } from '@skylabs-monorepo/shared-ui/react';
@@ -68,7 +68,7 @@ export function VendorCustomerDetailPage() {
 
   if (loading) {
     return (
-      <div className="admin-page admin-page--wide member-portal">
+      <div className="admin-page admin-page--wide vendor-portal">
         <meta name="robots" content="noindex" />
         <p className="loading-state">Loading customer…</p>
       </div>
@@ -77,7 +77,7 @@ export function VendorCustomerDetailPage() {
 
   if (loadError || !customer) {
     return (
-      <div className="admin-page admin-page--wide member-portal">
+      <div className="admin-page admin-page--wide vendor-portal">
         <meta name="robots" content="noindex" />
         <p className="error-state" role="alert">{loadError || 'Customer not found.'}</p>
         <Link to="/account/vendor-customers">Back to all customers</Link>
@@ -86,7 +86,7 @@ export function VendorCustomerDetailPage() {
   }
 
   return (
-    <div className="admin-page admin-page--wide member-portal">
+    <div className="admin-page admin-page--wide vendor-portal">
       <title>{`${name} · MSD`}</title>
       <meta name="robots" content="noindex" />
       <header className="page-head">
@@ -102,10 +102,10 @@ export function VendorCustomerDetailPage() {
         </div>
       </header>
 
-      <div className="member-summary-grid">
+      <div className="vendor-summary-grid">
         <sky-card variant="outlined">
           <h2 className="section-title">Customer Details</h2>
-          <dl className="member-facts">
+          <dl className="vendor-facts">
             <div><dt>Name</dt><dd>{name}</dd></div>
             <div><dt>Phone</dt><dd>{customer.phone ?? '?'}</dd></div>
             <div><dt>Email</dt><dd>{customer.email ?? '?'}</dd></div>
@@ -113,7 +113,7 @@ export function VendorCustomerDetailPage() {
         </sky-card>
         <sky-card variant="outlined">
           <h2 id="vendor-customer-stats-title" className="section-title">With My Business</h2>
-          <dl className="member-facts">
+          <dl className="vendor-facts">
             <div><dt>Total Orders</dt><dd>{customer.totalOrders}</dd></div>
             <div><dt>Confirmed Payments</dt><dd>{formatINR(customer.confirmedPaymentsTotal)}</dd></div>
           </dl>

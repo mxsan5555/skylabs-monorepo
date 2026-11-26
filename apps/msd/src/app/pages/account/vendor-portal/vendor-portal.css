@@ -1,0 +1,74 @@
+/* Vendor workflow layout. Shared UI owns surfaces, typography tokens, controls and tables. */
+.vendor-portal {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+.vendor-portal > .page-head { margin-bottom: 0; }
+.vendor-portal .section-title { margin: 0 0 12px; }
+.vendor-portal .admin-tabs-wrap { margin-bottom: 0; }
+.vendor-portal .admin-tab-panel { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.vendor-portal .admin-tab-panel > .admin-page { padding: 0; margin: 0; width: 100%; min-width: 0; }
+.vendor-payment-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.vendor-card-label { margin: 0; font-size: 0.875rem; font-weight: 600; color: var(--md-sys-color-on-surface-variant); }
+.vendor-card-amount { margin: 10px 0 6px; font-size: 1.75rem; font-weight: 700; color: var(--md-sys-color-primary); overflow-wrap: anywhere; }
+.vendor-portal .field-hint { margin: 4px 0; }
+.vendor-payment-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
+.vendor-summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.vendor-summary-grid > *, .vendor-portal .summary-layout > * { min-width: 0; }
+.vendor-facts { margin: 0; display: flex; flex-direction: column; gap: 12px; }
+.vendor-facts > div { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+.vendor-facts dt { color: var(--md-sys-color-on-surface-variant); }
+.vendor-facts dd { margin: 0; text-align: right; overflow-wrap: anywhere; min-width: 0; }
+/* Checkout adds its own card padding and full-width actions; these summaries are already in sky-card. */
+.vendor-portal .cart-summary { padding: 0; gap: 12px; }
+.vendor-portal .cart-summary__row { gap: 16px; }
+.vendor-portal .cart-summary__row > :last-child { text-align: right; overflow-wrap: anywhere; min-width: 0; }
+.vendor-portal .cart-summary__actions { flex-direction: row; flex-wrap: wrap; gap: 8px; }
+.vendor-portal .cart-summary__actions > * { width: auto; }
+.vendor-portal .voucher-lookup-row { margin-bottom: 0; }
+.vendor-action-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.vendor-action-row md-outlined-text-field { width: min(100%, 320px); min-width: 0; flex: 0 1 320px; }
+.vendor-action-row md-filled-button, .vendor-action-row md-outlined-button { flex: 0 0 auto; }
+.vendor-next-action { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.vendor-next-action > .panel { padding: 0; width: 100%; }
+.vendor-portal .wizard-steps { padding: 0; margin: 0; gap: 8px; }
+.vendor-portal .wizard-steps__item { cursor: default; min-height: 40px; padding: 6px 12px; box-sizing: border-box; }
+.vendor-disclosure { padding: 16px 20px; border: 1px solid var(--md-sys-color-outline-variant); border-radius: var(--md-sys-shape-corner-large); }
+.vendor-disclosure > summary { font-weight: 600; cursor: pointer; }
+.vendor-disclosure[open] > summary { margin-bottom: 12px; }
+@media (max-width: 1100px) {
+  .vendor-payment-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  .vendor-summary-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 480px) {
+  .vendor-portal { gap: 16px; }
+  .vendor-payment-cards { gap: 12px; }
+  .vendor-payment-cards sky-card { padding: 14px; }
+  .vendor-portal .page-head__actions { width: 100%; }
+  .vendor-facts > div { flex-wrap: wrap; gap: 4px 12px; }
+}
+@media (max-width: 340px) {
+  .vendor-payment-cards { grid-template-columns: minmax(0, 1fr); }
+}
+.vendor-items-card { padding: 0; overflow: hidden; }
+.vendor-table-scroll { overflow-x: auto; }
+.vendor-items-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.875rem; }
+.vendor-items-table th { background: var(--md-sys-color-surface-container-low); font-weight: 600; }
+.vendor-items-table th, .vendor-items-table td { padding: 14px 16px; border-bottom: 1px solid var(--md-sys-color-outline-variant); vertical-align: middle; }
+.vendor-items-table tbody tr:last-child td { border-bottom: 0; }
+.vendor-items-table a { color: var(--md-sys-color-primary); white-space: nowrap; font-weight: 500; }
+/* D40 — vendor "Scan QR" panel. */
+.scan-qr-video { display: block; width: 100%; max-width: 360px; aspect-ratio: 1 / 1; object-fit: cover; border-radius: var(--md-sys-shape-corner-large); background-color: var(--md-sys-color-surface-container-highest); }
+.vendor-table-secondary { display: block; margin-top: 4px; color: var(--md-sys-color-on-surface-variant); }
+/* Vendor Orders page (no-tabs redesign): the big scan entry point + pending lists. */
+.vendor-orders-scan { display: block; inline-size: 100%; }
+.pending-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.pending-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; padding: 16px; border-radius: 16px; background-color: var(--md-sys-color-surface-container); }
+.pending-row__info { flex: 1 1 240px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.pending-row__info p { margin: 0; }
+.pending-row__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pending-row__ship-form { flex-basis: 100%; }

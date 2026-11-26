@@ -21,7 +21,7 @@ export function ShipForm({ onShip, busy }: ShipFormProps) {
   };
 
   return (
-    <div className="pending-row__ship-form member-action-row">
+    <div className="pending-row__ship-form vendor-action-row">
       <OutlinedTextField label="Carrier" value={carrier} onInput={(e: Event) => setCarrier((e.target as HTMLInputElement).value)} />
       <OutlinedTextField label="Tracking number" value={trackingNumber} onInput={(e: Event) => setTrackingNumber((e.target as HTMLInputElement).value)} />
       <FilledButton onClick={submit} disabled={busy || !carrier.trim() || !trackingNumber.trim()}>Ship</FilledButton>

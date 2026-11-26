@@ -1,4 +1,4 @@
-import './member-portal.css';
+import './vendor-portal.css';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { FilledButton, Icon, OutlinedButton } from '@skylabs-monorepo/shared-ui/react';
@@ -71,7 +71,7 @@ export function VoucherFulfilmentPage() {
     }, 'Service done.');
 
   const page = (children: ReactNode) => (
-    <div className="admin-page admin-page--wide member-portal">
+    <div className="admin-page admin-page--wide vendor-portal">
       <title>{`Voucher ${code} · MSD`}</title>
       <meta name="robots" content="noindex" />
       {children}
@@ -118,7 +118,7 @@ export function VoucherFulfilmentPage() {
           headline="Service completed"
           text={`Finished ${entitlement.completedAt ? new Date(entitlement.completedAt).toLocaleString() : ''}. Your payout of ${formatINR(Number(entitlement.memberShareAmount))} is now eligible.`}
         />
-        <div className="member-action-row">
+        <div className="vendor-action-row">
           <FilledButton onClick={() => navigate('/account/vendor-orders/scan')}>
             <Icon slot="icon" aria-hidden="true">qr_code_scanner</Icon>
             Scan next customer
@@ -140,7 +140,7 @@ export function VoucherFulfilmentPage() {
         <>
           <sky-feature-card color="primary" variant="outlined" icon="check_circle" icon-style="surface" headline="Valid voucher" text={entitlement.itemName} />
           <sky-card variant="outlined">
-            <dl className="member-facts">
+            <dl className="vendor-facts">
               <div><dt>Customer phone</dt><dd>{entitlement.customerPhone ?? 'Not on file'}</dd></div>
               {entitlement.branchName && <div><dt>Branch</dt><dd>{entitlement.branchName}</dd></div>}
               <div><dt>Order</dt><dd>{entitlement.orderNumber} · {formatLongDate(entitlement.purchasedAt)}</dd></div>

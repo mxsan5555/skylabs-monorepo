@@ -22,25 +22,25 @@ import { UserManagement } from './pages/account/users/users';
 import { UserDetailPage } from './pages/account/users/user-detail-page';
 import { RoleConflictsPage } from './pages/account/users/role-conflicts-page';
 import { AuditLogs } from './pages/account/audit-logs/audit-logs';
-import { MemberManagement } from './pages/account/members/members';
-import { MemberNewPage } from './pages/account/members/member-new-page';
-import { MemberDetailPage } from './pages/account/members/member-detail-page';
-import { BranchFormPage } from './pages/account/members/branch-form-page';
-import { DealFormPage } from './pages/account/members/deal-form-page';
-import { TherapistFormPage } from './pages/account/members/therapist-form-page';
-import { ProductFormPage } from './pages/account/members/product-form-page';
+import { VendorManagement } from './pages/account/vendors/vendors';
+import { VendorNewPage } from './pages/account/vendors/vendor-new-page';
+import { VendorDetailPage } from './pages/account/vendors/vendor-detail-page';
+import { BranchFormPage } from './pages/account/vendors/branch-form-page';
+import { DealFormPage } from './pages/account/vendors/deal-form-page';
+import { TherapistFormPage } from './pages/account/vendors/therapist-form-page';
+import { ProductFormPage } from './pages/account/vendors/product-form-page';
 import { CustomerManagement } from './pages/account/customers/customers';
 import { CustomerDetailPage } from './pages/account/customers/customer-detail-page';
 import { CustomerOrderInvoicePage } from './pages/account/customers/customer-order-invoice-page';
-import { BranchList } from './pages/account/members/branch-list';
-import { DealList } from './pages/account/members/deal-list';
-import { TherapistList } from './pages/account/members/therapist-list';
-import { VendorBusinessProfile } from './pages/account/members/vendor-business-profile';
-import { VendorBranchesDeals } from './pages/account/members/vendor-branches-deals';
-import { VendorCustomers } from './pages/account/members/vendor-customers';
-import { VendorTherapists } from './pages/account/members/vendor-therapists';
-import { VendorDeals } from './pages/account/members/vendor-deals';
-import { VendorProducts } from './pages/account/members/vendor-products';
+import { BranchList } from './pages/account/vendors/branch-list';
+import { DealList } from './pages/account/vendors/deal-list';
+import { TherapistList } from './pages/account/vendors/therapist-list';
+import { VendorBusinessProfile } from './pages/account/vendors/vendor-business-profile';
+import { VendorBranchesDeals } from './pages/account/vendors/vendor-branches-deals';
+import { VendorCustomers } from './pages/account/vendors/vendor-customers';
+import { VendorTherapists } from './pages/account/vendors/vendor-therapists';
+import { VendorDeals } from './pages/account/vendors/vendor-deals';
+import { VendorProducts } from './pages/account/vendors/vendor-products';
 import { CategoryManagement } from './pages/account/masters/categories';
 import { PopularTagManagement } from './pages/account/masters/popular-tags';
 import { PopularTreatmentManagement } from './pages/account/masters/popular-treatments';
@@ -66,8 +66,8 @@ import { OrderDetailPage } from './pages/account/orders/order-detail-page';
 import { Reports } from './pages/account/reports/reports';
 import { AccountsOverviewPage } from './pages/account/accounts/accounts-overview';
 import { CustomerPaymentsPage } from './pages/account/accounts/customer-payments';
-import { MemberSettlementsPage } from './pages/account/accounts/member-settlements';
-import { MemberSettlementDetailPage } from './pages/account/accounts/member-settlement-detail';
+import { VendorSettlementsPage } from './pages/account/accounts/vendor-settlements';
+import { VendorSettlementDetailPage } from './pages/account/accounts/vendor-settlement-detail';
 import { RefundsDisputesPage } from './pages/account/accounts/refunds-disputes';
 import { VendorOrdersPage } from './pages/account/vendor-portal/vendor-orders-page';
 import { ScanQrPage } from './pages/account/vendor-portal/scan-qr-page';
@@ -447,31 +447,31 @@ export function AppRoutes() {
             path="/account/vendors"
             element={
               <VendorsRouteGuard>
-                <MemberManagement />
+                <VendorManagement />
               </VendorsRouteGuard>
             }
           />
-          {/* Add vendor: the short form. Same route guard as /account/vendors; MemberNewPage itself
+          {/* Add vendor: the short form. Same route guard as /account/vendors; VendorNewPage itself
             checks the finer-grained `members:create` action and shows an empty state otherwise
             (the backend route is the real enforcement either way). */}
           <Route
             path="/account/vendors/new"
             element={
               <VendorsRouteGuard>
-                <MemberNewPage />
+                <VendorNewPage />
               </VendorsRouteGuard>
             }
           />
           {/* One vendor's own page: status actions in the header and seven tabs, each tab its
             own URL (`:section`) so the back button and shared links land on the same tab.
-            Admin only: MemberDetailPage checks `members:view` itself, and every API call it
+            Admin only: VendorDetailPage checks `members:view` itself, and every API call it
             makes is permission-gated server-side. The static `new` route above wins over this
             dynamic segment. */}
           <Route
             path="/account/vendors/:memberId"
             element={
               <VendorsRouteGuard>
-                <MemberDetailPage />
+                <VendorDetailPage />
               </VendorsRouteGuard>
             }
           />
@@ -479,7 +479,7 @@ export function AppRoutes() {
             path="/account/vendors/:memberId/:section"
             element={
               <VendorsRouteGuard>
-                <MemberDetailPage />
+                <VendorDetailPage />
               </VendorsRouteGuard>
             }
           />
@@ -706,7 +706,7 @@ export function AppRoutes() {
           />
           {/* "Earnings & Payouts" — repurposes the old "Payments" stub (see settlements.routes.ts
             / accounts routing for the Super-Admin equivalent); read-only for the member, no
-            payout controls (those are super-admin-only, see member-settlement-detail.tsx). */}
+            payout controls (those are super-admin-only, see vendor-settlement-detail.tsx). */}
           <Route
             path="/account/vendor-payments"
             element={
@@ -748,7 +748,7 @@ export function AppRoutes() {
             path="/account/accounts/vendor-settlements"
             element={
               <RequirePermission menuKey="accounts.member-settlements">
-                <MemberSettlementsPage />
+                <VendorSettlementsPage />
               </RequirePermission>
             }
           />
@@ -756,7 +756,7 @@ export function AppRoutes() {
             path="/account/accounts/vendor-settlements/:vendorId"
             element={
               <RequirePermission menuKey="accounts.member-settlements">
-                <MemberSettlementDetailPage />
+                <VendorSettlementDetailPage />
               </RequirePermission>
             }
           />

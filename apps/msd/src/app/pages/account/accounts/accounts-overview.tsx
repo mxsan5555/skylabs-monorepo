@@ -193,8 +193,8 @@ export function AccountsOverviewPage() {
             />
           )}
 
-          <section aria-labelledby="member-dues-breakdown-title">
-            <h2 id="member-dues-breakdown-title" className="section-title">Vendor dues breakdown</h2>
+          <section aria-labelledby="vendor-dues-breakdown-title">
+            <h2 id="vendor-dues-breakdown-title" className="section-title">Vendor dues breakdown</h2>
             <CardGrid layout="compact">
               <sky-tile-card
                 color="surface-high"

@@ -1,4 +1,4 @@
-import '../vendor-portal/member-portal.css';
+import '../vendor-portal/vendor-portal.css';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { CircularProgress, Divider, FilledButton, Icon, OutlinedButton } from '@skylabs-monorepo/shared-ui/react';
@@ -242,7 +242,7 @@ export function OrderDetailPage() {
 
   if (error || !order) {
     return (
-      <div className="admin-page admin-page--wide member-portal">
+      <div className="admin-page admin-page--wide vendor-portal">
         <meta name="robots" content="noindex" />
         <p className="error-state" role="alert">{error || 'Order not found.'}</p>
         <Link to={backTo}>Back to Orders</Link>
@@ -251,7 +251,7 @@ export function OrderDetailPage() {
   }
 
   return (
-    <div className="admin-page admin-page--wide member-portal">
+    <div className="admin-page admin-page--wide vendor-portal">
       <title>{`Order #${shortOrderNumber(order.id)} · MSD`}</title>
       <meta name="robots" content="noindex" />
 
@@ -351,9 +351,9 @@ export function OrderDetailPage() {
 
       <section aria-labelledby="order-items-title">
         <h2 id="order-items-title" className="section-title">Purchased Items</h2>
-        <sky-card variant="outlined" className="member-items-card">
-          <div className="member-table-scroll">
-            <table className="member-items-table">
+        <sky-card variant="outlined" className="vendor-items-card">
+          <div className="vendor-table-scroll">
+            <table className="vendor-items-table">
               <caption className="sr-only">Purchased Items</caption>
               <thead><tr><th scope="col">Item</th><th scope="col">Qty</th><th scope="col">Amount</th><th scope="col">Voucher / Status</th><th scope="col">Action</th></tr></thead>
               <tbody>
@@ -362,7 +362,7 @@ export function OrderDetailPage() {
                     <td>{item.itemName}</td>
                     <td>{index === 0 ? item.quantity : '?'}</td>
                     <td>{index === 0 ? formatINR(Number(item.lineTotal)) : '?'}</td>
-                    <td>{ent ? <>{ent.voucherCode}<span className="member-table-secondary">{ENTITLEMENT_STATUS_LABEL[ent.entitlementStatus] ?? ent.entitlementStatus}</span></> : 'No voucher'}</td>
+                    <td>{ent ? <>{ent.voucherCode}<span className="vendor-table-secondary">{ENTITLEMENT_STATUS_LABEL[ent.entitlementStatus] ?? ent.entitlementStatus}</span></> : 'No voucher'}</td>
                     <td>{ent && canActOnVouchers && <Link to={`/account/vendor-orders/verify/${encodeURIComponent(ent.voucherCode)}`}>{voucherActionLabel(ent.entitlementStatus)}</Link>}</td>
                   </tr>
                 )))}
@@ -372,7 +372,7 @@ export function OrderDetailPage() {
         </sky-card>
       </section>
 
-      <details className="member-disclosure">
+      <details className="vendor-disclosure">
         <summary>Activity History</summary>
         {activityError && <p className="error-state" role="alert">{activityError}</p>}
         {activityLoading ? (

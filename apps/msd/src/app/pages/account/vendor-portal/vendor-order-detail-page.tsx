@@ -1,4 +1,4 @@
-import './member-portal.css';
+import './vendor-portal.css';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { FilledButton, Icon, OutlinedButton, OutlinedTextField } from '@skylabs-monorepo/shared-ui/react';
@@ -125,7 +125,7 @@ export function VendorOrderDetailPage() {
 
   if (loading) {
     return (
-      <div className="admin-page admin-page--wide member-portal">
+      <div className="admin-page admin-page--wide vendor-portal">
         <p className="loading-state" role="status">Loading…</p>
       </div>
     );
@@ -133,7 +133,7 @@ export function VendorOrderDetailPage() {
 
   if (error || !order) {
     return (
-      <div className="admin-page admin-page--wide member-portal">
+      <div className="admin-page admin-page--wide vendor-portal">
         <p className="error-state" role="alert">{error || 'Order not found.'}</p>
         <OutlinedButton onClick={() => navigate('/account/vendor-orders')}>Back to orders</OutlinedButton>
       </div>
@@ -143,7 +143,7 @@ export function VendorOrderDetailPage() {
   const paidAmount = order.payments.filter((p) => p.status === 'PAID').reduce((sum, p) => sum + Number(p.amount), 0);
 
   return (
-    <div className="admin-page admin-page--wide member-portal">
+    <div className="admin-page admin-page--wide vendor-portal">
       <title>{`Order ${shortOrderNumber(order.id)} · MSD`}</title>
       <meta name="robots" content="noindex" />
       <header className="page-head">
@@ -192,7 +192,7 @@ export function VendorOrderDetailPage() {
                       </OutlinedButton>
                     </div>
                     {evidenceEntId === ent.id && (
-                      <div className="pending-row__ship-form member-action-row">
+                      <div className="pending-row__ship-form vendor-action-row">
                         <label className="field-hint" htmlFor={`evidence-file-${ent.id}`}>Evidence photo</label>
                         <input
                           id={`evidence-file-${ent.id}`}
@@ -216,7 +216,7 @@ export function VendorOrderDetailPage() {
 
       <section aria-labelledby="order-payment-title" className="panel">
         <h2 id="order-payment-title" className="section-title">Payment</h2>
-        <dl className="member-facts">
+        <dl className="vendor-facts">
           <div><dt>Customer paid</dt><dd>{formatINR(paidAmount)}</dd></div>
         </dl>
       </section>

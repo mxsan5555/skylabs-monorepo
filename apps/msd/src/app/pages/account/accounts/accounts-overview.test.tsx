@@ -7,7 +7,7 @@ import { AccountsOverviewPage } from './accounts-overview';
 
 // Full-suite runs under worker-pool load can push jsdom async resolution past testing-library's
 // default 1000ms waitFor/findBy timeout even though every assertion here is otherwise correct —
-// the same class of flake `member-settlement-detail.test.tsx`/`orders-and-verify.test.tsx` widen
+// the same class of flake `vendor-settlement-detail.test.tsx`/`orders-and-verify.test.tsx` widen
 // for. Widen the timeout rather than chase a race that isn't actually here.
 const LONG = { timeout: 5000 };
 

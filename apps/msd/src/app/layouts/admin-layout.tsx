@@ -24,8 +24,8 @@ export function AdminLayout() {
   );
 }
 
-/** Shown on every console screen while the signed in member's account is inactive. */
-export function MemberStatusBanner({ status }: { status?: string }) {
+/** Shown on every console screen while the signed in vendor's account is inactive. */
+export function VendorStatusBanner({ status }: { status?: string }) {
   if (status !== 'INACTIVE') return null;
   return (
     <p className="preview-banner" role="status">
@@ -70,7 +70,7 @@ function AdminShell() {
               <FilledButton onClick={() => returnToSuperAdmin()}>Return to SuperAdmin</FilledButton>
             </div>
           )}
-          <MemberStatusBanner status={bootstrap?.member?.status} />
+          <VendorStatusBanner status={bootstrap?.member?.status} />
           <div className="admin-topbar">
             <IconButton
               className="admin-sidebar-toggle"
