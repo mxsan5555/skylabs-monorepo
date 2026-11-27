@@ -4,47 +4,51 @@
 
 Description 
 
-● Business Purpose:Why is KYC Verification required?
+● Business Purpose: Why is KYC Verification required?
 
-&#x09;:- to review driver's KYC details and documents, record verification decisions, and track pending or completed cases. 
+&#x09;:- To review each driver's submitted KYC details and documents item by item, and record every decision.
 
-&#x09;:- to review drivers' submitted KYC information and supporting documents, verify their completeness and consistency, record verification decisions. 	:- track pending, approved, rejected, or resubmission cases.
+&#x09;:- To let verifiers raise issues that the driver must correct, and let an Admin give final approval once every item has passed.
 
-&#x09;:- It helps maintain accurate driver records and ensures that verification decisions are properly documented.
+&#x09;:- To track cases as Unassigned, Assigned, Issues Raised or Completed.
 
-
-
-● User Journey Entry Point: where the KYC Verification journey starts? who initiates it? and how verification processes?
+&#x09;:- To keep driver records accurate and every verification decision documented.
 
 
 
-&#x09;:- flow-> Driver Registration->  KYC Info/Doc Submission-> Verification request creation-> Verification team Login \& Access-> 
+● User Journey Entry Point: where does the KYC Verification journey start? who initiates it? and how does verification proceed?
 
-&#x09;	  Review Driver Info \& Docs-> Verification decision(Approve/ Reject/Request Resubmission)-> Status update-> Driver Notification.
 
-&#x20;	
 
-&#x09;:> Entry Point-> login using their credentials-> verifier access the request->  review submitted info/docs->action based on outcome.
+&#x09;:- Flow-> Driver Registration-> KYC Info/Doc Submission-> Admin assigns a validator-> validator reviews each item and marks it Pass or Issue->
+
+&#x09;	  Issue: driver is notified, corrects the item and it is reviewed again-> All items Pass: driver becomes eligible for final approval->
+
+&#x09;	  Admin performs the separate final approval action-> Driver status becomes Active.
+
+&#x09;:- Initiated by: the driver submits KYC; an Admin starts the review by assigning a validator.
+
+&#x09;:- Entry Point-> staff login using their credentials-> open KYC Assignments (/account/kyc-assignments)-> a validator sees only the drivers assigned to them, an Admin sees all drivers-> review submitted info/docs-> mark each item Pass or Issue.
 
 
 
 ● In Scope: everything that the KYC Verification module is responsible for handling.
 
-&#x09;			 
+
 
 |Feature|Description|
 |-|-|
-|KYC Application Review|View submitted applications|
-|Driver Information|Review name, contact details and other submitted info|
-|Document Review|review uploaded identity and address documents|
-|Document Validation|Check readability, completeness, expiry where applicable|
-|Approve Application|Mark an eligible application as verified|
-|Reject Application|Reject an application with an appropriate reason.|
-|Request Resubmission|Ask the applicant to correct or upload missing information|
-|Status Management|pending, approved, rejected and Resubmission Required|
-|Verification History|Maintain records of previous verification decisions(date/time)|
-|Search and Filtering|Find applications using relevant information and statuses|
-|Audit Trail|Record who performed verification actions and when.|
+|KYC Application Review|View assigned drivers in a queue, with search and state filter|
+|Driver Information|Review name, contact, address, education, health, licence and other submitted info|
+|Document Review|Preview uploaded documents (personal, health, education, police) and earlier versions|
+|Document Validation|Automatic check is limited to the driving licence expiry/readiness check. Completeness and legibility of documents are manual reviewer checks. Other document expiry dates are not validated automatically.|
+|Item Review|Verifier marks each item Pass or Issue (a reason is required for Issue). The verifier does not approve the driver.|
+|Request Correction|An Issue notifies the driver, who corrects the item so it can be reviewed again|
+|Final Approval|When all items Pass, the driver becomes eligible for final approval. The driver becomes Active only after an Admin performs the separate final approval action.|
+|Status Management|Item status (Pending / Pass / Issue), queue state (Unassigned / Assigned / Issues Raised / Completed) and driver KYC status|
+|Verification History|Keep every earlier item decision with reviewer, date and time|
+|Search and Filtering|Find drivers by name or details, and filter by queue state|
+|Audit Trail|Record who performed verification actions and when. **Known implementation gap:** the current item review API (`PATCH /drivers/:id/pill-review`) does not create an AuditLog entry; it records only the Verification History. Final approval does create an AuditLog entry.|
 
 
 
@@ -60,7 +64,19 @@ Description
 
 &#x09;	\* Sales, marketing and customer activities.
 
-&#x09;	\* customer support and complaint
+&#x09;	\* Customer support and complaint
+
+&#x09;	\* Verifier assignment (handled in the Drivers module)
+
+&#x09;	\* Reject Application (future enhancement, not implemented)
 
 
+
+● Related Information (proposed):
+
+&#x09;:- Routes: staff review queue /account/kyc-assignments; driver KYC status /driver/kyc.
+
+&#x09;:- Permission keys: kyc-assignments:view, kyc-assignments:edit. Final approval also needs drivers:edit and drivers:assign.
+
+&#x09;:- Related modules: Drivers, Documents, DL Verification.
 
