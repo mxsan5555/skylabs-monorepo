@@ -40,7 +40,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 1 | Admin and staff | 4 | 31 | 13 |
 | 2 | Members | 54 | 101 | 53 |
 | 3 | Customers and orders | 3 | 12 | 25 |
-| 4 | Storefront | 30 | 48 | 63 |
+| 4 | Storefront | 30 | 57 | 53 |
 | 5 | Static content | 2 | 5 | 40 |
 | 6 | CTA banners | 4 | 5 | 80 |
 | 7 | Home slider | 13 | 14 | 93 |
@@ -49,7 +49,7 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
 | 12 | Platform, security and release | 15 | 71 | 21 |
-| | **Total** | **119** | **297** | **40** |
+| | **Total** | **119** | **306** | **39** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -290,6 +290,15 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | ST-49 | BIZ | Owner decisions from the cart, checkout and account rebuild: outline and corners on the payment method cards, `--sky-space-*` spacing tokens or the 4/8 px grid, removal of the dashboard Orders / Profile / Sign out cards | S | - | Decisions recorded in PLANNING.md §4 |
 | [x] | ST-51 | BE | Count only paid order lines when computing Hot deal/product tags; confirmed COD orders are unpaid until collection | S | ST-40 | Done: `catalog.service.test.ts` asserts Hot queries require `payments.some(status: PAID)`; `offer-tag.test.ts` passes |
 | [ ] | ST-50 | QA | Manual browser checks of the rebuilt pages: Razorpay test card (paid; failed then window closed), Back to cart, Edit details and Cash on delivery at checkout, `/products` Business filter and business name on cards, dark mode on cart, checkout, order and account pages | S | - | Each check passes at desktop and phone width |
+| [ ] | ST-52 | OPS | Google Maps Platform for D40: billing account, a server key (Places + Geocoding) and a browser key (Maps JavaScript, site domains only), budget alert and daily quota | S | - | `GOOGLE_MAPS_API_KEY` on Railway, `VITE_GOOGLE_MAPS_API_KEY` on Vercel; alert set |
+| [ ] | ST-53 | BE | Geo routes: `GET /geo/autocomplete`, `GET /geo/places/:placeId`, `GET /geo/reverse` (1 km server cache), session tokens, per-IP rate limit, OpenAPI (PLANNING §4 Location) | M | ST-52 | API reviewed first; route tests with Google mocked; `API.md` §4 updated |
+| [ ] | ST-54 | BE | `cities` counts (city, state, slug, count) in `GET /catalog/deals/facets` and `/catalog/therapists/facets`, ignoring location and radius | S | - | `catalog.routes.test.ts` cases; `API.md` §4 updated |
+| [ ] | ST-55 | FE | Rewrite `LocationProvider`: exact point plus city and state in `localStorage`, browser prompt on load while unanswered, silent IP fallback, state matched to the India list with aliases; remove `nearestCity` / `NEAREST_CITY_MAX_KM` | M | ST-53 | `location-context.test.tsx` rewritten; hydration test clean |
+| [ ] | ST-56 | FE | `LocationSearch` control (Google suggestions, Use my current location, current place) replaces `CityPicker` in the header dialog, header search panel and sidebar "Your location" | M | ST-53, ST-55 | Tests for typing, keyboard, pick, refused browser; `CityPicker` deleted; checked at 1366 and 390 px |
+| [ ] | ST-57 | FE | 20 km default radius, Distance as the default sort with a location, and the "No deals" panel (Show within 50 km, then 100 km, then the search inline) on home, header search, explore, category, `/deals`, `/therapists` | M | ST-55 | Page tests for each step; URL `radius` respected |
+| [ ] | ST-58 | FE | Available cities filter section (links to city pages, current city marked) on category, explore, `/deals`, `/therapists` | S | ST-54 | `filter-panel.test.tsx` cases; links crawlable in prerendered HTML |
+| [ ] | ST-59 | BE | Geocode a branch address on save when it has no coordinates; one-off backfill for existing branches | M | ST-52 | Service test; backfill report lists branches it could not place |
+| [ ] | ST-60 | FE | `DealMap` defaults to Google (`VITE_MAP_PROVIDER=google`), Leaflet kept as fallback; manual check of the full location flow (allow, block, typed place, no deals) | S | ST-52, ST-57 | Map loads with the browser key; manual checks pass at desktop and phone width |
 
 Removed 2026-10-24: ST-17 (therapist city filter is in ST-40; products are not location bound, D29), ST-23 (explore filter panel is ST-43), ST-24 (products have no Business filter, D29).
 

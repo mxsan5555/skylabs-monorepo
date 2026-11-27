@@ -619,6 +619,28 @@ transform doesn't type-check, which is why these don't block `msd-api:test`.
   members without the customer role go to `/account/dashboard`, customers to `/my-dashboard`. Staff who open a
   customer account URL directly (`/my-dashboard`, `/my-account/*`, `/orders`) land on
   `/account/dashboard`; customer + member users keep the customer layout.
+- Visitor location (D40, ST-52 to ST-60; acceptance written before code):
+  - A saved location in `localStorage` wins on load and survives a new tab; no prompt shows.
+  - With nothing saved and the permission unanswered, the browser prompt shows on load. Allowed:
+    the exact point is reverse geocoded, saved, and the header shows "{label}, {city}". Blocked or
+    failed: the IP location applies with no message; the next load does not ask again.
+  - Typing 3+ characters shows Google suggestions after 300 ms, nearest first; arrows, Enter and
+    Escape work; picking one saves its point, city and state and reloads the results. The same
+    control appears in the header dialog, the search panel and the sidebar.
+  - Deal and therapist results use a 20 km radius from the point, nearest first; the Distance
+    filter changes it and writes `radius` to the URL.
+  - Nothing within 20 km: "No deals within 20 km of {place}" with Show within 50 km, then 100 km;
+    nothing within 100 km: "No deals available near {place}" with the location control inline.
+    Header and footer stay; no dialog opens.
+  - Available cities lists each city with its count, links to its city page, marks the current
+    city page, and its counts do not change with the visitor's location.
+  - City pages (`/deals/:city`, `/category/:slug/:city`, `/therapists/:city`) still prerender and
+    stay in the sitemap.
+  - Home slider, tag sections and banners follow the saved point's state; "NCT of Delhi" maps to
+    "Delhi"; an unknown state shows Global.
+  - Geo routes: invalid input 422; rate limit returns 429; a Google failure returns 502 and the
+    key never appears in a response or log; a second reverse lookup within about 1 km is served
+    from cache.
 
 ### 4.5 Static content to 4.11 Social media
 

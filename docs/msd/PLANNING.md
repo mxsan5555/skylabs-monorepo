@@ -511,7 +511,7 @@ A member who opens another member's deal, branch, package or therapist gets 404.
 
 ## 4. Storefront
 
-- **Shell:** desktop two-row header (logo, city chip, search, wishlist, cart, account; then
+- **Shell:** desktop two-row header (logo, location chip, search, wishlist, cart, account; then
   category links and an "All categories" panel); phone header plus a bottom tab bar (Home,
   Categories, Wishlist, Cart, Account), no hamburger. Footer: trust strip, newsletter band (UI
   only until task ST-28), link columns, popular searches ("{Category} in {City}", built from the
@@ -519,27 +519,86 @@ A member who opens another member's deal, branch, package or therapist gets 404.
   after hydration), legal bar, theme switch.
 - **Trust claims:** verified spas and therapists, secure payments via Razorpay, instant booking
   confirmation. No rating badge until reviews exist (task ST-22).
-- **Location:** saved choice, then browser location (only if already granted or on user action),
-  then Vercel IP, then none. Coordinates map to the nearest partner city within 75 km
-  (`NEAREST_CITY_MAX_KM`). "Use my current location" keeps the picker open with a message when
-  the browser refuses or fails, and when no partner city is within 75 km (the coordinates still
-  sort by distance; the visitor picks a city).
+- **Location (D40, decided 2026-11-20, tasks ST-52 to ST-60; replaces the "nearest partner city
+  within 75 km" rule and `NEAREST_CITY_MAX_KM`):** the visitor's location is always an **exact
+  point plus its city and state**, never a partner city centre. Deals are found by distance from
+  that point, not by "all deals in a city".
+  - **Where it comes from, on every page load, first match wins:**
+    1. Saved location (`localStorage`, key `msd.location`): `{ label, latitude, longitude, city,
+       state, source }`. Kept until the visitor picks another place.
+    2. Browser location: while the browser permission is still unanswered (`prompt`) and nothing
+       is saved, the page asks for it on load. Allowed: exact coordinates, turned into city and
+       state by reverse geocoding, then saved.
+    3. IP location (Vercel headers via `/api/geo`: city, state, rough coordinates), used
+       silently when the visitor blocks or the lookup fails. The browser remembers a block, so
+       the site never asks again and shows no hint; the visitor can still type a place.
+    4. None: pages show the location search (see "No deals" below).
+  - **One location control** (`LocationSearch`, replaces `CityPicker` everywhere): the header
+    "Set location" dialog, the header search panel's location step, the sidebar "Your location"
+    section and the "No deals" panel. It shows the current place ("{label}, {city}", Change), a
+    field labelled "Search your location" and a "Use my current location" button.
+    - Suggestions come from **Google Places Autocomplete**, India only, biased towards the
+      current point so nearby places rank first, then localities, cities and states. They start
+      at 3 characters, 300 ms after typing stops. Combobox keyboard path: arrows, Enter picks,
+      Escape closes.
+    - Picking a suggestion fetches its details (coordinates, city, state), saves it and reloads
+      the results on the current page.
+  - **Deal results** (home, header search, explore, category pages, `/deals`, `/therapists`):
+    deals and therapists within a **20 km** radius of the point, **nearest first** by default.
+    The sidebar Distance filter (1, 5, 10, 20, 50, 100 km) changes the radius; with no `radius`
+    in the URL it is 20 km. Relevance and price sorts stay selectable. Products stay not location
+    bound (D29).
+  - **No deals** (inline panel in place of the cards, never a popup; header and footer stay):
+    1. Nothing within the radius: "No deals within {km} km of {place}" with "Show within 50 km",
+       then "Show within 100 km" (each sets `radius`).
+    2. Nothing within 100 km: "No deals available near {place}. Try another location." with the
+       location control inline.
+  - **City pages stay for search engines** (`/deals/:city`, `/category/:slug/:city`,
+    `/therapists/:city`, prerendered, in the sitemap). They list that city's deals as today. The
+    visitor's point only sorts them by distance.
+  - **Available cities filter** (new sidebar section on search results, category pages, `/deals`
+    and `/therapists`, for deal and therapist kinds): every city with matching deals and its
+    count, each a link to that city page; on a city page that city is marked current. Counts
+    ignore the visitor's location and radius.
+  - **State-based content** (home slider, home tag sections, CTA banners) uses the state of the
+    saved point. Google's state name is matched to the India location list (aliases such as
+    "NCT of Delhi" → "Delhi"); an unknown state falls back to Global as today.
+  - **Map:** `DealMap` defaults to Google Maps (`VITE_MAP_PROVIDER=google`), since Google's terms
+    expect Places results on a Google map; Leaflet stays as the fallback setting.
+  - **Cost control:** Google calls go through msd-api so the key stays on the server; one session
+    token per search, so a finished search bills as one Place Details call; reverse geocoding is
+    cached on the server by coordinates rounded to 2 decimals (about 1 km); a Google Cloud budget
+    alert and daily quota are set. At 1 lakh visits a month this stays inside Google's India free
+    usage (70,000 per product).
+  - **Branches need coordinates:** radius search only finds branches with latitude and
+    longitude. A branch saved without them is geocoded from its address on save; existing
+    branches are backfilled once (ST-59).
+  - **Proposed API (stop for review before building, then record in `API.md` §4):**
+    - `GET /api/v1/geo/autocomplete?q=&sessionToken=&latitude=&longitude=` →
+      `[{ placeId, primary, secondary }]`
+    - `GET /api/v1/geo/places/:placeId?sessionToken=` → `{ label, latitude, longitude, city,
+      state }`
+    - `GET /api/v1/geo/reverse?latitude=&longitude=` → `{ label, city, state }`
+    - All public, Zod `.strict()`, rate-limited per IP; Google errors map to 502 with no key in
+      logs.
+    - `cities: [{ city, state, slug, count }]` added to `GET /catalog/deals/facets` and
+      `GET /catalog/therapists/facets`.
+    - Env: `GOOGLE_MAPS_API_KEY` on msd-api (Places + Geocoding only); `VITE_GOOGLE_MAPS_API_KEY`
+      in msd (Maps JavaScript only, restricted to the site's domains).
 - **Header search** (`SearchPanel` under the header field, task ST-38): focusing the field opens
-  a panel. Its first row names the visitor's location ("Near {city}", Change) or asks for one
+  a panel. Its first row names the visitor's location ("Near {label}", Change) or asks for one
   ("Set your location to see what's near you"). With no query it lists the top categories. From 2
   characters it shows, in order: matching categories and subcategories (text rows), Deals
-  (nearest first with distance when there are coordinates, else the visitor's city; when the
-  city has none, deals from other cities, nearest first, under "No deals in {city} yet. These are
-  from other states.", and Show all then has no count),
+  (within the radius of the visitor's point, nearest first with distance; none within it: the
+  "No deals" text of the Location rule with its wider radius link),
   Therapists (nearest first), Products (not location bound); each a row with image, member, title,
   place, distance and price, 4 per group. The footer "Show all results" opens `/explore?q=` and
-  carries the result count from the API. Change switches the panel to a location step: filter
-  the partner cities, pick one, or "Use my current location"; when the browser refuses or fails,
-  an error says so and points to the browser's location setting and the city list. Picking a
-  location re-runs the search for it and returns to the results. Combobox keyboard path: arrows
+  carries the result count from the API. Change switches the panel to a location step holding
+  the location control (`LocationSearch`, Location rule above). Picking a location re-runs the
+  search for it and returns to the results. Combobox keyboard path: arrows
   move through result rows, Enter opens one, Escape closes, Tab reaches Change and Show all. No
   new API: existing `/catalog/deals`, `/catalog/therapists`, `/catalog/products`.
-- **Home:** hero with search, deals by category (5x2 tile grid from 840px, 2 columns below), deals near you (category tabs, distance sorted),
+- **Home:** hero with search, deals by category (5x2 tile grid from 840px, 2 columns below), deals near you (category tabs, within the radius, nearest first),
   how it works, therapists, offers, products, popular treatments, FAQ, partner banner.
 - **Offer card** (`sky-product-card price-first`, showcase "Offer card", to replace listing cards
   page by page in task ST-31): tag on the image (New, Deal, Hot, Expire soon, each a theme role
@@ -562,7 +621,8 @@ A member who opens another member's deal, branch, package or therapist gets 404.
   to cart from its own page with the chosen package, never through a deal.
 - **Category page** (`/category/:slug`, `/category/:slug/:city`): h1, clamped description,
   subcategory pills with the total at the end of their row, Filters, List/Grid/Map, sort
-  (Relevance, Price low to high, high to low, Distance when the visitor has coordinates), filter
+  (Distance, the default when the visitor has a location; Relevance; Price low to high, high to
+  low), filter
   panel per category type (table below) with Clear all, 12 cards per page with infinite scroll.
   All view state is in the URL.
 - **Listing pages share the category layout** (D29, tasks ST-40 to ST-43): `/deals`,
@@ -585,10 +645,10 @@ A member who opens another member's deal, branch, package or therapist gets 404.
   - **Filters per kind** (`FilterPanel kind`):
     | Kind | Sections | Sort |
     |---|---|---|
-    | Deals (`/deals`, SERVICE category) | Your location, Distance, Price, Tags, Business, Branches | Relevance, Price low-high / high-low, Distance (with coordinates) |
+    | Deals (`/deals`, SERVICE category) | Your location, Distance, Available cities (D40), Price, Tags, Business, Branches | Distance (default with a location), Relevance, Price low-high / high-low |
     | Products (`/products`, PRODUCT category) | Category (`/products` only), Price, Tags, Business (D39); no location, distance or branches | Relevance, Newest, Price low-high / high-low, Discount |
-    | Therapists (`/therapists`, THERAPY category) | Your location, Distance, Price ("From" price), Business, Branches | Relevance, Price low-high / high-low, Distance (with coordinates) |
-    | Explore | the selected kind's sections; "All" shows Your location, Distance, Price | the selected kind's sorts |
+    | Therapists (`/therapists`, THERAPY category) | Your location, Distance, Available cities (D40), Price ("From" price), Business, Branches | Distance (default with a location), Relevance, Price low-high / high-low |
+    | Explore | the selected kind's sections; "All" shows Your location, Distance, Available cities, Price | the selected kind's sorts |
     No Reviews filter until a review system exists (ST-22).
   - **Selections stay visible** (ST-25): a checked facet option is always shown, past "Show
     more" or outside the facet search (after the list, in its order), and one the facet stops
@@ -838,6 +898,7 @@ expire after 5 minutes (ARCHITECTURE.md §12.3).
 | D38 | Order and status SMS (2026-10-29, Q3) | Email for every notice now; an SMS goes out only for notice types whose DLT template id is set in env |
 | D39 | Product business (2026-10-29, item 4) | Overrides D29's "products have no Business filter": product cards show the member's business name and product listings (`/products`, product categories) get a Business filter; `GET /catalog/products` takes `vendorIds`, `/products/facets` returns `vendors` counts |
 | D40 | Deal/Therapist QR redemption (2026-11-21); scan-only, no-OTP redesign (D40.1, 2026-11-23) | Section 3; a dedicated 30-day QR expiry on `PurchaseEntitlement`, independent of `Deal.validityDays`. D40.1 retired the manual-code/OTP wizard entirely — scanning is now the only way a service voucher is identified; vendor screens are 6 single-purpose, no-tab, no-stepper pages (`finishService`/`markProductPickedUp` replace `completeVoucher`/`requestCompletionOtp`) |
+| D40 | Visitor location (2026-11-20) | Exact point plus city and state, never a city centre: saved in `localStorage`, else the browser prompt on load, else IP silently; one `LocationSearch` control on Google Places; deals within 20 km nearest first, then offer 50 and 100 km, then "No deals available" with the search inline; city pages stay for SEO plus an Available cities filter; Google for search, reverse geocoding and the map (§4 Location) |
 | B2 | Vendor rename | Prisma `Vendor` → `Member`, `VendorDocument` → `MemberDocument` with `@@map`; FK columns stay `vendorId` |
 | B5 | Permission key | `vendors` → `members`; role `vendor` → `member`; role `support` added |
 | N1 | Reminder decisions (2026-10-17) | Clear the flag when documents complete; bell alert to `members:status_change` holders; Remind now in this release |
