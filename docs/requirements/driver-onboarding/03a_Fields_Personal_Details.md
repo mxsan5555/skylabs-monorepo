@@ -4,7 +4,7 @@
 
 ## Category 1: Personal Details
 
-*Note: All fields and mandatory requirements are aligned with the live portal (`/account/drivers`).*
+*Note: Mandatory requirements represent the verified onboarding compliance criteria for driver registration.*
 
 This category captures the driver's core identity, contact information, residential address, physical attributes, and demographics:
 
@@ -21,10 +21,10 @@ This category captures the driver's core identity, contact information, resident
 | **Phone** | Tel Field (`inputmode="numeric"`) | **Yes** | Empty | Regex: `/^\d{10}$/` (Exactly 10 digits, unique) | Empty: `"Phone number is required"`<br>Invalid: `"Enter a valid 10-digit mobile number"` |
 | **Email** | Email Field (`type="email"`) | **Yes** | Empty | Regex: `/^[^\s@]+@[^\s@]+\.[^\s@]+$/` (Unique) | Empty: `"Email address is required"`<br>Invalid: `"Enter a valid email address"` |
 | **Emergency Number** | Tel Field (`inputmode="numeric"`) | No | Empty | If entered, must be 10 digits (`/^\d{10}$/`) | `"Enter a valid 10-digit emergency number"` |
-| **Address** | Text Field | No | Empty | address | — |
-| **City** | Text Field | No | Empty | City name | — |
-| **State** | Text Field | No | Empty | State name | — |
-| **Pincode** | Tel Field (`inputmode="numeric"`) | No | Empty | If entered, must be 6 numeric digits (`/^\d{6}$/`) | `"Enter a valid 6-digit pincode"` |
+| **Address** | Text Field | **Yes** | Empty | Permanent or residential street address | `"Address is required"` |
+| **City** | Text Field | **Yes** | Empty | City name (min 2 chars) | `"City is required"` |
+| **State** | Text Field | **Yes** | Empty | State name | `"State is required"` |
+| **Pincode** | Tel Field (`inputmode="numeric"`) | **Yes** | Empty | Exactly 6 numeric digits (`/^\d{6}$/`) | Empty: `"Pincode is required"`<br>Invalid: `"Enter a valid 6-digit pincode"` |
 | **Religion** | Select Dropdown | No | Empty | Standard dropdown options | — |
 | **Color** | Select Dropdown | No | Empty | Standard dropdown options | — |
 | **Height** | Text Field (`inputmode="decimal"`) | No | Empty | Numeric height value | — |

@@ -20,7 +20,7 @@
 ## 8. Acceptance Criteria (QA Sign-Off)
 
 * [ ] **AC-1:** Data Operator can open `/account/drivers` and launch the **"Add Driver"** form.
-* [ ] **AC-2:** Validation blocks form submission if First Name, Mobile Number, or Email is missing.
+* [ ] **AC-2:** Validation blocks form submission if mandatory fields (First Name, Gender, Phone, Email, Address, City, State, Pincode, Profile Image, or Driver Type) are missing or invalid.
 * [ ] **AC-3:** Data Operator can fill details across the 4 categories and click **"Save draft"** at any stage to safely persist partial progress.
 * [ ] **AC-4:** Clicking **"Save & Register Driver"** creates the record with initial status `Non-Verified` and Onboarding status `Completed`.
 * [ ] **AC-5:** The **"Assign Verifier"** option is visible to Admin but strictly hidden from Data Operator.

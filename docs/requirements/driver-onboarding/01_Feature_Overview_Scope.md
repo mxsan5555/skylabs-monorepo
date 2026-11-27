@@ -44,8 +44,8 @@ To provide a centralized administrative workflow allowing company staff (Data Op
 - Capturing data across the 4 functional categories:
   1. Personal Details
   2. Document Types (DL, PCC, ID proofs)
-  3. Employment Type (Education, Insurance, Bank/UPI details)
-  4. Job Preferences (Driver type, Vehicle choices, Work location)
+  3. Employment Type (Bank/UPI payout details, Insurance, Fee status)
+  4. Job Preferences (Driver types, shift timings, vehicle choices, work location, expected salary)
 - Driver Registry table with server-side pagination, search by name/phone, filters (City, KYC Status, Fee Status), and export.
 - Generating driver app login credentials via **"Create Driver User"**.
 - Allocating KYC review tasks to staff via **"Assign Verifier"** with mandatory reassignment audit reasoning.

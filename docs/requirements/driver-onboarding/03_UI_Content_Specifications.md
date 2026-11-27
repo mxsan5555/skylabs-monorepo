@@ -19,13 +19,13 @@
 * **Form Name:** Add Driver Form
 * **Form Structure:** Divided across 4 Functional Categories:
   1. **Category 1: Personal Details (22 Fields)** — Detailed in `03a_Fields_Personal_Details.md`
-  2. **Category 2: Document Type (11 Fields + Upload/Delete)** — Detailed in `03b_Fields_Document_Type.md`
-  3. **Category 3: Employment Type (11 Fields)** — Detailed in `03c_Fields_Employment_Type.md`
-  4. **Category 4: Job Preference (8 Fields)** — Detailed in `03d_Fields_Job_Preference.md`
+  2. **Category 2: Document Type (Personal, Education, Health, Police Verification)** — Detailed in `03b_Fields_Document_Type.md`
+  3. **Category 3: Employment Type (10 Fields)** — Detailed in `03c_Fields_Employment_Type.md`
+  4. **Category 4: Job Preference (Driver Types, Shifts, Job Choices, Work Locations, Vehicles, Experience, Salary)** — Detailed in `03d_Fields_Job_Preference.md`
 * **Form Actions:**
   * **Primary Action:** `"Save & Register Driver"` (completes driver registration).
   * **Secondary Action:** `"Save draft"` (persists partial entered data safely to database).
-  * **Cancel Action:** `"Cancel"` (closes the form and returns to registry table).
+  * **Cancel Action:** `"Cancel"` (closes the form and prompts confirmation modal: *"Discard unsaved changes?"* before returning to the registry table).
 
 ---
 
