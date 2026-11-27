@@ -116,8 +116,8 @@ export interface StatusActionOption {
 }
 
 /** Why the next step is not available yet (item 6). Mirrors the msd-api status machine. */
-export const MAKE_INACTIVE_FIRST = 'Make the vendor inactive first.';
-export const SUSPEND_FIRST = 'Suspend the vendor first.';
+export const MAKE_INACTIVE_FIRST = 'Make the member inactive first.';
+export const SUSPEND_FIRST = 'Suspend the member first.';
 
 /**
  * Header actions for a member's status (item 6): Active, then Inactive, then Suspended, then

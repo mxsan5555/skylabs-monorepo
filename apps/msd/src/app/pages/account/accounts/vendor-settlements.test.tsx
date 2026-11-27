@@ -117,7 +117,7 @@ describe('VendorSettlementsPage — ?status=ready round-trip', () => {
 
     await waitFor(() => expect(listMemberSettlementsMock).toHaveBeenCalled(), LONG);
     expect(listMemberSettlementsMock).toHaveBeenCalledWith('test-token', expect.objectContaining({ status: 'ready' }));
-    expect(await findByText(/Showing only vendors ready for payout/, {}, LONG)).toBeTruthy();
+    expect(await findByText(/Showing only members ready for payout/, {}, LONG)).toBeTruthy();
   });
 
   it('never passes status at all when the URL has no ?status=ready', async () => {
@@ -133,7 +133,7 @@ describe('VendorSettlementsPage — ?status=ready round-trip', () => {
     const { findByText } = renderAt('/account/accounts/vendor-settlements?status=ready');
     await waitFor(() => expect(listMemberSettlementsMock).toHaveBeenCalled(), LONG);
 
-    const clearButton = await findByText('Show all vendors', {}, LONG);
+    const clearButton = await findByText('Show all members', {}, LONG);
     fireEvent.click(clearButton);
 
     await waitFor(() => {

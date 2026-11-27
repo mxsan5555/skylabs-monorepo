@@ -195,7 +195,7 @@ describe('AccountsOverviewPage — Members ready for payout preview', () => {
     getAccountsOverviewMock.mockResolvedValue({ data: POPULATED_OVERVIEW });
     listMemberSettlementsMock.mockResolvedValue({ data: [] });
     renderPage();
-    expect(await screen.findByText('No vendor is currently ready for payout.', {}, LONG)).toBeTruthy();
+    expect(await screen.findByText('No member is currently ready for payout.', {}, LONG)).toBeTruthy();
   });
 
   it('shows an error state with Retry when the preview table fails to load', async () => {

@@ -115,7 +115,7 @@ export function VendorSettlementsPage() {
       setRows(data);
       setTotal(meta?.total ?? data.length);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not load vendor settlements.');
+      setError(err instanceof ApiRequestError ? err.message : 'Could not load member settlements.');
     } finally {
       setLoading(false);
     }
@@ -149,18 +149,18 @@ export function VendorSettlementsPage() {
 
   return (
     <div className="admin-page admin-page--wide">
-      <title>Vendor Settlements · MSD</title>
+      <title>Member Settlements · MSD</title>
       <meta name="robots" content="noindex" />
       <header className="page-head">
         <div>
-          <h1>Vendor Settlements</h1>
-          <p>Each vendor's pending, on-hold, ready-for-payout, and paid balances.</p>
+          <h1>Member Settlements</h1>
+          <p>Each member's pending, on-hold, ready-for-payout, and paid balances.</p>
         </div>
       </header>
 
       {readyOnly && (
         <p className="field-hint" role="status">
-          Showing only vendors ready for payout. <TextButton onClick={clearReadyFilter}>Show all vendors</TextButton>
+          Showing only members ready for payout. <TextButton onClick={clearReadyFilter}>Show all members</TextButton>
         </p>
       )}
 
@@ -168,7 +168,7 @@ export function VendorSettlementsPage() {
 
       <sky-data-table
         ref={tableRef as RefObject<HTMLElement>}
-        caption="Vendor Settlements"
+        caption="Member Settlements"
         columns={COLUMNS}
         rows={tableRows}
         total={total}
@@ -176,7 +176,7 @@ export function VendorSettlementsPage() {
         page-size={params.pageSize}
         loading={loading}
         searchable
-        search-placeholder="Search by vendor name…"
+        search-placeholder="Search by member name…"
         actions={ACTIONS}
       />
     </div>

@@ -131,7 +131,7 @@ describe('VendorSettlementDetailPage — loading/error/empty states', () => {
     getMemberSettlementDetailMock.mockReturnValue(new Promise(vi.fn()));
     useAuthMock.mockReturnValue({ token: 'tok', can: () => true, bootstrap: { roles: [{ isSuperAdmin: true }] } });
     renderPage();
-    expect(screen.getByText(/Loading vendor settlement/)).toBeTruthy();
+    expect(screen.getByText(/Loading member settlement/)).toBeTruthy();
   });
 
   it('shows an error state when the detail fails to load', async () => {
@@ -148,7 +148,7 @@ describe('VendorSettlementDetailPage — loading/error/empty states', () => {
     useAuthMock.mockReturnValue({ token: 'tok', can: () => true, bootstrap: { roles: [{ isSuperAdmin: true }] } });
     renderPage();
     expect(await screen.findByText('Nothing is eligible for payout right now.', {}, LONG)).toBeTruthy();
-    expect(screen.getByText('No vouchers yet for this vendor.')).toBeTruthy();
+    expect(screen.getByText('No vouchers yet for this member.')).toBeTruthy();
     expect(screen.getByText('No payouts recorded yet.')).toBeTruthy();
     expect(screen.getByText('No payout audit entries yet.')).toBeTruthy();
   });

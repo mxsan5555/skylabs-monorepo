@@ -104,7 +104,7 @@ export function RoleConflictsPage() {
                 <p className="field-hint">{[account.phone, account.email].filter(Boolean).join(' · ') || 'No contact on file'}</p>
                 <p className="field-hint">
                   Currently holds: {account.roles.map((r) => r.name).join(', ')}
-                  {account.vendorProfile && ` · Owns a Vendor business: ${account.vendorProfile.businessName ?? '(unnamed)'}`}
+                  {account.vendorProfile && ` · Owns a Member business: ${account.vendorProfile.businessName ?? '(unnamed)'}`}
                 </p>
               </div>
               <div className="form-grid" style={{ gridTemplateColumns: 'auto auto', alignItems: 'end' }}>

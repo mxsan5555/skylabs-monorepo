@@ -27,14 +27,14 @@ function type(label: string, value: string) {
 
 function clickCreate() {
   const button = Array.from(document.querySelectorAll('md-filled-button')).find(
-    (el) => el.textContent?.includes('Create vendor') && !el.closest('md-dialog'),
+    (el) => el.textContent?.includes('Create member') && !el.closest('md-dialog'),
   );
-  if (!button) throw new Error('Create vendor button not found');
+  if (!button) throw new Error('Create member button not found');
   fireEvent.click(button);
 }
 
-/** Answer the "Create this vendor?" dialog. */
-async function answerDialog(label: 'Create vendor' | 'Discard') {
+/** Answer the "Create this member?" dialog. */
+async function answerDialog(label: 'Create member' | 'Discard') {
   const dialog = await waitFor(() => {
     const found = document.querySelector('md-dialog');
     if (!found) throw new Error('dialog not open');
@@ -115,7 +115,7 @@ describe('VendorNewPage', () => {
     renderPage();
     fillValid();
     clickCreate();
-    await answerDialog('Create vendor');
+    await answerDialog('Create member');
     await waitFor(() => expect(screen.getByText('detail-page')).toBeTruthy());
     expect(createMemberMock).toHaveBeenCalledWith('t', {
       businessName: 'Glow Studio',
@@ -133,7 +133,7 @@ describe('VendorNewPage', () => {
     renderPage();
     fillValid();
     clickCreate();
-    await answerDialog('Create vendor');
+    await answerDialog('Create member');
     expect(await screen.findByText(/email already belongs/i)).toBeTruthy();
   });
 
@@ -145,7 +145,7 @@ describe('VendorNewPage', () => {
     if (!form) throw new Error('form not found');
     const notCancelled = fireEvent.submit(form);
     expect(notCancelled).toBe(false);
-    await answerDialog('Create vendor');
+    await answerDialog('Create member');
     await waitFor(() => expect(createMemberMock).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(screen.getByText('detail-page')).toBeTruthy());
   });
@@ -155,7 +155,7 @@ describe('VendorNewPage', () => {
     renderPage();
     fillValid();
     fireEvent.keyDown(fieldFor('Owner mobile number'), { key: 'Enter' });
-    await answerDialog('Create vendor');
+    await answerDialog('Create member');
     await waitFor(() => expect(createMemberMock).toHaveBeenCalledTimes(1));
   });
 
@@ -168,7 +168,7 @@ describe('VendorNewPage', () => {
       if (!found) throw new Error('dialog not open');
       return found;
     });
-    expect(dialog.textContent).toContain('Create "Glow Studio" as a new vendor?');
+    expect(dialog.textContent).toContain('Create "Glow Studio" as a new member?');
     expect(createMemberMock).not.toHaveBeenCalled();
   });
 
@@ -183,7 +183,7 @@ describe('VendorNewPage', () => {
 
   it('is one labelled form in a feature card with a Cancel button', () => {
     renderPage();
-    const card = document.querySelector('form[aria-label="Vendor details"] sky-feature-card') as (HTMLElement & Record<string, string>) | null;
+    const card = document.querySelector('form[aria-label="Member details"] sky-feature-card') as (HTMLElement & Record<string, string>) | null;
     if (!card) throw new Error('feature card not found');
     expect([card.color, card.variant, card.shape]).toEqual(['surface', 'filled', 'medium']);
     const headings = Array.from(document.querySelectorAll('section > h2')).map((h) => h.textContent);
@@ -214,7 +214,7 @@ describe('VendorNewPage', () => {
     renderPage();
     fillValid();
     clickCreate();
-    await answerDialog('Create vendor');
+    await answerDialog('Create member');
     const mobile = await screen.findByText('Mobile number is not valid.');
     expect(fieldFor('Owner mobile number').getAttribute('aria-describedby')).toBe(mobile.id);
     expect(screen.getByText('Name is taken.')).toBeTruthy();
@@ -229,7 +229,7 @@ describe('VendorNewPage', () => {
     renderPage();
     fillValid();
     clickCreate();
-    await answerDialog('Create vendor');
+    await answerDialog('Create member');
     expect(await screen.findByText('Send the owner email or mobile.')).toBeTruthy();
   });
 
@@ -238,7 +238,7 @@ describe('VendorNewPage', () => {
     renderPage();
     fillValid();
     clickCreate();
-    await answerDialog('Create vendor');
+    await answerDialog('Create member');
     expect(await screen.findByText(/something broke/i)).toBeTruthy();
   });
 });

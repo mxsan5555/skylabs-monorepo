@@ -184,10 +184,20 @@ describe('VendorDetailPage', () => {
   });
 
   it('renders the nine tabs wired to one labelled tab panel', async () => {
+<<<<<<< HEAD:apps/msd/src/app/pages/account/vendors/vendor-detail-page.test.tsx
     renderAt('/account/vendors/m1/documents');
     await waitFor(() => expect(screen.getByText('documents-tab')).toBeTruthy());
+=======
+    renderAt('/account/members/m1/documents');
+    await waitFor(() => expect(screen.getByText('documents-tab')).toBeTruthy());
+<<<<<<< HEAD
+>>>>>>> b837f39b8b611dffd32e160528df383241329576:apps/msd/src/app/pages/account/members/member-detail-page.test.tsx
     expect(tabs().map((t) => t.textContent?.trim())).toEqual(['Profile', 'Logo', 'Documents', 'Branches', 'Deals', 'Therapists', 'Products', 'Customers', 'Activity']);
     expect(document.querySelector('md-tabs')?.getAttribute('aria-label')).toBe('Vendor sections');
+=======
+    expect(tabs().map((t) => t.textContent?.trim())).toEqual(['Profile', 'Documents', 'Branches', 'Deals', 'Therapists', 'Products', 'Customers', 'Activity']);
+    expect(document.querySelector('md-tabs')?.getAttribute('aria-label')).toBe('Member sections');
+>>>>>>> parent of 26122574 (feat(A1): rename "member" to "vendor" in user-visible labels)
     const active = tab('Documents');
     const panel = screen.getByRole('tabpanel');
     expect(active.getAttribute('aria-controls')).toBe(panel.id);
@@ -223,8 +233,13 @@ describe('VendorDetailPage', () => {
 
   it('explains a suspended member', async () => {
     getMemberMock.mockResolvedValue({ data: { ...MEMBER, status: 'SUSPENDED', statusReason: 'Documents not completed' } });
+<<<<<<< HEAD:apps/msd/src/app/pages/account/vendors/vendor-detail-page.test.tsx
     renderAt('/account/vendors/m1');
     await waitFor(() => expect(screen.getByText(/This vendor cannot log in and the website hides their items\./)).toBeTruthy());
+=======
+    renderAt('/account/members/m1');
+    await waitFor(() => expect(screen.getByText(/This member cannot log in and the website hides their items\./)).toBeTruthy());
+>>>>>>> b837f39b8b611dffd32e160528df383241329576:apps/msd/src/app/pages/account/members/member-detail-page.test.tsx
     expect(screen.getByText(/Documents not completed/)).toBeTruthy();
   });
 
@@ -263,7 +278,7 @@ describe('VendorDetailPage', () => {
     fireEvent.click(screen.getByText('stub-change'));
     await waitFor(() => expect(screen.getByText('activity-tab 1')).toBeTruthy());
     expect(changeStatusMock).toHaveBeenCalledWith('t', 'm1', 'INACTIVE', 'Owner asked for a pause');
-    expect(document.querySelector('sky-snackbar')?.textContent).toContain('Vendor is inactive and view only.');
+    expect(document.querySelector('sky-snackbar')?.textContent).toContain('Member is inactive and view only.');
     expect(getMemberMock).toHaveBeenCalledTimes(2);
     await waitFor(() => expect(Array.from(document.querySelectorAll('sky-badge')).map((b) => b.textContent)).toContain('Inactive'));
   });
@@ -352,8 +367,13 @@ describe('VendorDetailPage', () => {
 
   it('shows an error when the member cannot load', async () => {
     getMemberMock.mockRejectedValue(new Error('boom'));
+<<<<<<< HEAD:apps/msd/src/app/pages/account/vendors/vendor-detail-page.test.tsx
     renderAt('/account/vendors/m1');
     expect((await screen.findByRole('alert')).textContent).toMatch(/Could not load this vendor/);
+=======
+    renderAt('/account/members/m1');
+    expect((await screen.findByRole('alert')).textContent).toMatch(/Could not load this member/);
+>>>>>>> b837f39b8b611dffd32e160528df383241329576:apps/msd/src/app/pages/account/members/member-detail-page.test.tsx
   });
 });
 
@@ -430,7 +450,11 @@ describe('VendorDetailPage customer and order counts', () => {
   });
 
   it('opens the Logo tab with a single-image admin-on-behalf uploader for this vendor', async () => {
+<<<<<<< HEAD:apps/msd/src/app/pages/account/vendors/vendor-detail-page.test.tsx
     renderAt('/account/vendors/m1/logo');
+=======
+    renderAt('/account/members/m1/logo');
+>>>>>>> b837f39b8b611dffd32e160528df383241329576:apps/msd/src/app/pages/account/members/member-detail-page.test.tsx
     expect(await screen.findByText('media-uploader')).toBeTruthy();
     expect(screen.getByRole('heading', { level: 2, name: 'Logo' })).toBeTruthy();
     expect(mediaUploaderProps).toHaveBeenCalledWith(

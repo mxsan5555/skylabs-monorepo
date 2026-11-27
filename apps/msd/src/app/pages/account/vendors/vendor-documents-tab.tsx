@@ -123,7 +123,7 @@ export function VendorDocumentsTab({ token, memberId, canEdit, canApprove, canRe
       setError(`That file is larger than ${DOCUMENT_MAX_MB} MB. Choose a smaller file.`);
       return;
     }
-    void run('Document uploaded for the vendor.', () => uploadMemberDocument(token, memberId, type, file, file.name, numbers[type]?.trim() || undefined));
+    void run('Document uploaded for the member.', () => uploadMemberDocument(token, memberId, type, file, file.name, numbers[type]?.trim() || undefined));
   };
 
   const cancelReject = (type: VendorDocumentType) => {
@@ -174,7 +174,7 @@ export function VendorDocumentsTab({ token, memberId, canEdit, canApprove, canRe
                 <h3>{label}</h3>
                 <sky-badge status={STATUS_TONE[state]}>{STATUS_LABEL[state]}</sky-badge>
                 {row?.numberMasked && <p>{row.numberMasked}</p>}
-                {row?.uploadedOnBehalf && <p className="field-hint">{`Uploaded by ${row.uploadedByName || 'staff'} for the vendor`}</p>}
+                {row?.uploadedOnBehalf && <p className="field-hint">{`Uploaded by ${row.uploadedByName || 'staff'} for the member`}</p>}
                 {row?.status === 'REJECTED' && row.rejectionReason && <p className="error-state">Rejected: {row.rejectionReason}</p>}
                 {row?.originalFilename && <p className="field-hint">{row.originalFilename}</p>}
                 {/* Signed link (P5-14), new tab without opener or referrer (P10-37). */}

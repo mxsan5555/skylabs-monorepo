@@ -127,7 +127,7 @@ export function DashboardGroups({ stats, loading, widgetKeys }: DashboardGroupsP
   return (
     <>
       <div className="dashboard-pair">
-        <StatGroup title="Vendors" cards={MEMBER_CARDS.filter(visible)} stats={stats} loading={loading} />
+        <StatGroup title="Members" cards={MEMBER_CARDS.filter(visible)} stats={stats} loading={loading} />
         <StatGroup title="Customers" cards={CUSTOMER_CARDS.filter(visible)} stats={stats} loading={loading} />
       </div>
       {(quick.length > 0 || admin.length > 0) && (

@@ -67,6 +67,10 @@ export function useListingParams() {
     branchIds: toIds(searchParams.get('branch')),
     tags: toTags(searchParams.get('tag')),
     categoryIds: toIds(searchParams.get('cat')),
+    // The search bar's city/area selector (item F4) — a location *scope*, like the header's own
+    // state picker, not a transient filter; deliberately NOT in `FILTER_PARAMS`, so "Clear all"
+    // never resets it out from under the chip that's still showing it selected.
+    city: searchParams.get('city') || undefined,
   };
 }
 

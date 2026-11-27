@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import {
   getCatalogDealFacets,
@@ -78,9 +78,35 @@ export function Search() {
     : category
       ? kindOfCategoryType(category.type)
       : 'all';
-  const { coords } = useVisitorLocation();
+  const { coords, state: visitorState, searchCity, setSearchCity } = useVisitorLocation();
   const hasCoords = coords?.latitude != null && coords?.longitude != null;
   const sort = kind === 'all' ? undefined : pickSort(params.sortParam, sortValuesFor(kind, hasCoords));
+
+  // The search bar's own city/area selector (item F4): the URL's `?city=` is authoritative for
+  // this page (shareable, survives refresh); reconciled with the header's global search-city
+  // selector once on arrival (an incoming shared link wins; a fresh visit pins the visitor's
+  // current search city into the URL instead), then kept in sync afterward — changing the
+  // header's chip while already here updates these results too.
+  const cityParam = params.city;
+  // Normalizes a nullish `searchCity` to `null` before comparing — defends against a context
+  // value that is `undefined` (not yet resolved, or simply absent from an incomplete test mock)
+  // ever being treated as "different from no city" and triggering a spurious URL rewrite.
+  const normalizedSearchCity = searchCity ?? null;
+  const reconciledFromUrl = useRef(false);
+  useEffect(() => {
+    if (reconciledFromUrl.current) return;
+    reconciledFromUrl.current = true;
+    if (cityParam && cityParam !== normalizedSearchCity) setSearchCity(cityParam);
+    else if (!cityParam && normalizedSearchCity) setParams({ city: normalizedSearchCity });
+    // One-time reconciliation only — intentionally ignores later changes to its own inputs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (reconciledFromUrl.current && normalizedSearchCity !== (cityParam ?? null)) {
+      setParams({ city: normalizedSearchCity ?? undefined });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [normalizedSearchCity]);
 
   // Filters every kind understands, then each kind's own.
   const shared = {
@@ -90,10 +116,11 @@ export function Search() {
     ...(category && (kind === 'all' || kindOfCategoryType(category.type) === kind) ? { categoryId: category.id } : {}),
   };
   const near = { latitude: coords?.latitude ?? undefined, longitude: coords?.longitude ?? undefined, radiusKm: hasCoords ? radius : undefined };
+  const locationFilter = { city: cityParam, state: visitorState ?? undefined };
   const members = kind === 'all' ? {} : { vendorIds, branchIds };
-  const dealOpts = { ...shared, ...near, ...members, ...(kind === 'deals' ? { tags } : {}) };
+  const dealOpts = { ...shared, ...near, ...locationFilter, ...members, ...(kind === 'deals' ? { tags } : {}) };
   const productOpts = { ...shared, ...(kind === 'products' ? { tags, vendorIds } : {}) };
-  const therapistOpts = { ...shared, ...near, ...members };
+  const therapistOpts = { ...shared, ...near, ...locationFilter, ...members };
   const base = kind === 'products' ? productOpts : kind === 'therapists' ? therapistOpts : dealOpts;
   const listKey = JSON.stringify([kind, dealOpts, productOpts, therapistOpts, sort]);
   const loadError = listingLoadError(kind);
@@ -138,10 +165,11 @@ export function Search() {
   const categoryId = category?.id;
   const categoryKind = category ? kindOfCategoryType(category.type) : undefined;
   const { latitude, longitude, radiusKm } = near;
+  const { city: cityFilter, state: stateFilter } = locationFilter;
   useEffect(() => {
     let cancelled = false;
     const where = { search: q, minPrice, maxPrice, pageSize: 1 };
-    const located = { latitude, longitude, radiusKm };
+    const located = { latitude, longitude, radiusKm, city: cityFilter, state: stateFilter };
     const inCategory = (k: ListingKind) => (categoryId && categoryKind === k ? { categoryId } : {});
     Promise.allSettled([
       listCatalogDeals({ ...where, ...located, ...inCategory('deals') }),
@@ -155,7 +183,7 @@ export function Search() {
     return () => {
       cancelled = true;
     };
-  }, [q, minPrice, maxPrice, latitude, longitude, radiusKm, categoryId, categoryKind]);
+  }, [q, minPrice, maxPrice, latitude, longitude, radiusKm, categoryId, categoryKind, cityFilter, stateFilter]);
 
   const facets = useListingFacets<object>(FACETS[kind], base, kind);
 

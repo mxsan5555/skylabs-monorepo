@@ -8,8 +8,9 @@ import { beforeEach, describe, it, expect, vi } from 'vitest';
 import '@skylabs-monorepo/shared-ui';
 import { SiteHeader } from './site-header';
 
-const { setCity, requestBrowser, shell, listCatalogDealsMock, listCatalogProductsMock, listCatalogTherapistsMock } = vi.hoisted(() => ({
+const { setCity, setState, requestBrowser, shell, listCatalogDealsMock, listCatalogProductsMock, listCatalogTherapistsMock } = vi.hoisted(() => ({
   setCity: vi.fn(),
+  setState: vi.fn(),
   requestBrowser: vi.fn(),
   shell: {
     locations: [] as Array<{ state: string; city: string }>,
@@ -49,6 +50,7 @@ vi.mock('../../../location/location-context', () => ({
     state: 'Maharashtra',
     coords: null,
     setCity,
+    setState,
     requestBrowser,
   }),
 }));
@@ -123,6 +125,7 @@ beforeEach(() => {
   ];
   shell.links = [{ id: 'c1', label: 'Massage', to: '/category/massage' }];
   setCity.mockClear();
+  setState.mockClear();
   requestBrowser.mockReset();
   listCatalogDealsMock.mockReset().mockResolvedValue({ data: [] });
   listCatalogProductsMock.mockReset().mockResolvedValue({ data: [] });
@@ -222,28 +225,28 @@ describe('SiteHeader', () => {
 
   it('shows the resolved city in the city chip', () => {
     renderHeader();
-    expect(screen.getByRole('button', { name: 'Change city: Pune' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Change state: Pune' })).toBeTruthy();
   });
 
-  it('opens a city dialog, sets the chosen city and returns focus to the chip', () => {
+  it('opens a state dialog, sets the chosen state and returns focus to the chip', () => {
     renderHeader();
-    const chip = screen.getByRole('button', { name: 'Change city: Pune' });
+    const chip = screen.getByRole('button', { name: 'Change state: Pune' });
     fireEvent.click(chip);
-    const list = screen.getByRole('list', { name: 'Cities with partner spas' });
-    fireEvent.click(within(list).getByRole('button', { name: /Pune/ }));
-    expect(setCity).toHaveBeenCalledWith({ state: 'Maharashtra', city: 'Pune' });
+    const list = screen.getByRole('list', { name: 'States with partner spas' });
+    fireEvent.click(within(list).getByRole('button', { name: 'Maharashtra' }));
+    expect(setState).toHaveBeenCalledWith('Maharashtra');
     expect(document.querySelector('md-dialog')).toBeNull();
     expect(document.activeElement).toBe(chip);
   });
 
-  it('marks only the current state and city as current in the city dialog', () => {
+  it('marks only the current state as current in the state dialog', () => {
     shell.locations = [
       { state: 'Maharashtra', city: 'Pune' },
-      { state: 'Other', city: 'Pune' },
+      { state: 'Other', city: 'Nashik' },
     ];
     renderHeader();
-    fireEvent.click(screen.getByRole('button', { name: 'Change city: Pune' }));
-    const options = within(screen.getByRole('list', { name: 'Cities with partner spas' })).getAllByRole('button');
+    fireEvent.click(screen.getByRole('button', { name: 'Change state: Pune' }));
+    const options = within(screen.getByRole('list', { name: 'States with partner spas' })).getAllByRole('button');
     expect(options.map((o) => o.getAttribute('aria-current'))).toEqual(['true', null]);
   });
 });
@@ -385,14 +388,14 @@ describe('SiteHeader — search suggestions', () => {
     expect(screen.queryByRole('listbox')).toBeNull();
   });
 
-  it('Change opens the location step; picking a city sets it and returns to the results', async () => {
+  it('Change opens the location step; picking a state sets it and returns to the results', async () => {
     renderHeader();
     await typeQuery('swed');
     fireEvent.click(screen.getByRole('button', { name: 'Change' }));
     expect(screen.queryByRole('listbox')).toBeNull();
     const step = screen.getByRole('region', { name: 'Choose your location' });
-    fireEvent.click(within(within(step).getByRole('list')).getByRole('button', { name: /Pune/ }));
-    expect(setCity).toHaveBeenCalledWith({ state: 'Maharashtra', city: 'Pune' });
+    fireEvent.click(within(within(step).getByRole('list')).getByRole('button', { name: 'Maharashtra' }));
+    expect(setState).toHaveBeenCalledWith('Maharashtra');
     expect(screen.getByRole('listbox')).toBeTruthy();
   });
 

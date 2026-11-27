@@ -83,7 +83,7 @@ export function VendorSettlementDetailPage() {
         setVendor(v);
         setLoadError('');
       } catch (err) {
-        if (!silent) setLoadError(err instanceof ApiRequestError ? err.message : 'Could not load this vendor’s settlement.');
+        if (!silent) setLoadError(err instanceof ApiRequestError ? err.message : 'Could not load this member’s settlement.');
       } finally {
         if (!silent) setLoading(false);
       }
@@ -95,7 +95,7 @@ export function VendorSettlementDetailPage() {
     load();
   }, [load]);
 
-  const name = vendor?.businessName ?? detail?.vendor.businessName ?? 'Vendor';
+  const name = vendor?.businessName ?? detail?.vendor.businessName ?? 'Member';
   useSetBreadcrumbs([
     { label: 'Accounts' },
     { label: 'Vendor Settlements', to: '/account/accounts/vendor-settlements' },
@@ -199,7 +199,7 @@ export function VendorSettlementDetailPage() {
   if (loading) {
     return (
       <div className="admin-page admin-page--wide">
-        <p className="loading-state">Loading vendor settlement…</p>
+        <p className="loading-state">Loading member settlement…</p>
       </div>
     );
   }
@@ -216,7 +216,7 @@ export function VendorSettlementDetailPage() {
 
   return (
     <div className="admin-page admin-page--wide">
-      <title>{`${name} · Vendor Settlement · MSD`}</title>
+      <title>{`${name} · Member Settlement · MSD`}</title>
       <header className="page-head">
         <div>
           <h1>{name}</h1>
@@ -272,7 +272,7 @@ export function VendorSettlementDetailPage() {
       <section aria-labelledby="statement-title">
         <h2 id="statement-title" className="section-title">Order-wise statement ({detail.statement.length})</h2>
         {detail.statement.length === 0 ? (
-          <p className="empty-state">No vouchers yet for this vendor.</p>
+          <p className="empty-state">No vouchers yet for this member.</p>
         ) : (
           <div className="data-table-wrap">
             <table className="data-table">
@@ -284,7 +284,7 @@ export function VendorSettlementDetailPage() {
                   <th scope="col">Status</th>
                   <th scope="col">Gross</th>
                   <th scope="col">Commission</th>
-                  <th scope="col">Vendor share</th>
+                  <th scope="col">Member share</th>
                   <th scope="col">Settlement</th>
                 </tr>
               </thead>

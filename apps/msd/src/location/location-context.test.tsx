@@ -333,4 +333,134 @@ describe('LocationProvider', () => {
       await waitFor(() => expect(out()).toBe('-|Aurangabad'));
     });
   });
+
+  describe('setState (header state picker)', () => {
+    function PickStateProbe() {
+      const { status, source, city, state, coords, setState } = useVisitorLocation();
+      return (
+        <>
+          <p data-testid="out">{`${status}|${source}|${state ?? '-'}|${city ?? '-'}|${coords ? `${coords.latitude.toFixed(2)},${coords.longitude.toFixed(2)}` : '-'}`}</p>
+          <button onClick={() => setState('Maharashtra')}>pick-state</button>
+        </>
+      );
+    }
+
+    it('saves a state-only choice: city stays null, coords average that state\'s cities, and it is never resolved back to one of them', async () => {
+      render(<LocationProvider><PickStateProbe /></LocationProvider>);
+      await waitFor(() => expect(out()).toBe('none|none|-|-|-'));
+      act(() => screen.getByText('pick-state').click());
+      expect(out()).toBe('ready|state|Maharashtra|-|19.84,76.47');
+      const saved = JSON.parse(localStorage.getItem('msd.location') ?? '{}');
+      expect(saved).toEqual({ state: 'Maharashtra', city: null, latitude: 19.835, longitude: 76.47 });
+    });
+
+    it('restores a saved state-only choice on reload with city still null', async () => {
+      localStorage.setItem('msd.location', JSON.stringify({ state: 'Maharashtra', city: null, latitude: 19.835, longitude: 76.47 }));
+      render(<LocationProvider><PickStateProbe /></LocationProvider>);
+      await waitFor(() => expect(out()).toBe('ready|state|Maharashtra|-|19.84,76.47'));
+    });
+
+    it('requestBrowser failure after a state pick keeps the state (not "none")', async () => {
+      function Probe2() {
+        const { status, source, state, setState, requestBrowser } = useVisitorLocation();
+        return (
+          <>
+            <p data-testid="out">{`${status}|${source}|${state ?? '-'}`}</p>
+            <button onClick={() => setState('Maharashtra')}>pick-state</button>
+            <button onClick={() => requestBrowser()}>locate</button>
+          </>
+        );
+      }
+      render(<LocationProvider><Probe2 /></LocationProvider>);
+      await waitFor(() => expect(out()).toBe('none|none|-'));
+      act(() => screen.getByText('pick-state').click());
+      expect(out()).toBe('ready|state|Maharashtra');
+
+      getCurrentPosition.mockImplementation((_ok: PositionCallback, err?: PositionErrorCallback) => err?.({} as GeolocationPositionError));
+      act(() => {
+        screen.getByText('locate').click();
+      });
+      await waitFor(() => expect(out()).toBe('ready|state|Maharashtra'));
+    });
+  });
+
+  describe('searchCity (search bar city/area selector, item F4)', () => {
+    function SearchCityProbe() {
+      const { city, searchCity, setSearchCity, setState } = useVisitorLocation();
+      return (
+        <>
+          <p data-testid="out">{`${city ?? '-'}|${searchCity ?? '-'}`}</p>
+          <button onClick={() => setSearchCity('Nagpur')}>pick-nagpur</button>
+          <button onClick={() => setSearchCity(null)}>clear</button>
+          <button onClick={() => setState('Goa')}>pick-goa</button>
+        </>
+      );
+    }
+
+    it('defaults once from the resolved city (browser-located), never overwritten afterwards', async () => {
+      permissionState = 'granted';
+      getCurrentPosition.mockImplementation((ok: PositionCallback) =>
+        ok({ coords: { latitude: 18.6, longitude: 73.8 } } as GeolocationPosition),
+      );
+      render(<LocationProvider><SearchCityProbe /></LocationProvider>);
+      await waitFor(() => expect(out()).toBe('Pune|Pune'));
+      expect(localStorage.getItem('msd.searchCity')).toBe('Pune');
+    });
+
+    it('never defaults when a search city is already persisted from a previous visit', async () => {
+      localStorage.setItem('msd.searchCity', 'Nagpur');
+      permissionState = 'granted';
+      getCurrentPosition.mockImplementation((ok: PositionCallback) =>
+        ok({ coords: { latitude: 18.6, longitude: 73.8 } } as GeolocationPosition),
+      );
+      render(<LocationProvider><SearchCityProbe /></LocationProvider>);
+      await waitFor(() => expect(out()).toBe('Pune|Nagpur'));
+    });
+
+    it('persists an explicit pick, and an explicit clear to "all cities" is never re-defaulted', async () => {
+      permissionState = 'granted';
+      getCurrentPosition.mockImplementation((ok: PositionCallback) =>
+        ok({ coords: { latitude: 18.6, longitude: 73.8 } } as GeolocationPosition),
+      );
+      render(<LocationProvider><SearchCityProbe /></LocationProvider>);
+      await waitFor(() => expect(out()).toBe('Pune|Pune'));
+
+      act(() => screen.getByText('pick-nagpur').click());
+      expect(out()).toBe('Pune|Nagpur');
+      expect(localStorage.getItem('msd.searchCity')).toBe('Nagpur');
+
+      act(() => screen.getByText('clear').click());
+      expect(out()).toBe('Pune|-');
+      expect(localStorage.getItem('msd.searchCity')).toBeNull();
+    });
+
+    it('clears a search city that no longer belongs to a newly-picked state', async () => {
+      render(<LocationProvider><SearchCityProbe /></LocationProvider>);
+      await waitFor(() => expect(out()).toBe('-|-'));
+      act(() => screen.getByText('pick-nagpur').click());
+      expect(out()).toBe('-|Nagpur');
+
+      act(() => screen.getByText('pick-goa').click());
+      expect(out()).toBe('-|-');
+    });
+
+    it('keeps a search city that still belongs to the newly-picked state', async () => {
+      function Probe() {
+        const { searchCity, setSearchCity, setState } = useVisitorLocation();
+        return (
+          <>
+            <p data-testid="out">{searchCity ?? '-'}</p>
+            <button onClick={() => setSearchCity('Pune')}>pick-pune</button>
+            <button onClick={() => setState('Maharashtra')}>pick-maharashtra</button>
+          </>
+        );
+      }
+      render(<LocationProvider><Probe /></LocationProvider>);
+      await waitFor(() => expect(out()).toBe('-'));
+      act(() => screen.getByText('pick-pune').click());
+      expect(out()).toBe('Pune');
+      act(() => screen.getByText('pick-maharashtra').click());
+      expect(out()).toBe('Pune');
+    });
+  });
 });

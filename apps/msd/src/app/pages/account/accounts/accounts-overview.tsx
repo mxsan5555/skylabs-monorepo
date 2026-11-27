@@ -47,7 +47,7 @@ function MembersReadyForPayout({ token }: { token: string | null }) {
     setError('');
     listMemberSettlements(token, { status: 'ready', pageSize: 10 })
       .then(({ data }) => setRows(data))
-      .catch((err) => setError(err instanceof ApiRequestError ? err.message : 'Could not load vendors ready for payout.'))
+      .catch((err) => setError(err instanceof ApiRequestError ? err.message : 'Could not load members ready for payout.'))
       .finally(() => setLoading(false));
   }, [token]);
 
@@ -79,13 +79,13 @@ function MembersReadyForPayout({ token }: { token: string | null }) {
     );
   }
   if (!loading && rows.length === 0) {
-    return <p className="empty-state">No vendor is currently ready for payout.</p>;
+    return <p className="empty-state">No member is currently ready for payout.</p>;
   }
 
   return (
     <sky-data-table
       ref={tableRef as RefObject<HTMLElement>}
-      caption="Vendors ready for payout"
+      caption="Members ready for payout"
       columns={READY_COLUMNS}
       rows={tableRows}
       total={rows.length}
@@ -136,7 +136,7 @@ export function AccountsOverviewPage() {
       <header className="page-head">
         <div>
           <h1>Accounts Overview</h1>
-          <p>Customer collections, MSD commission and vendor payments.</p>
+          <p>Customer collections, MSD commission and member payments.</p>
         </div>
         <div className="page-head__actions">
           {canReviewPayouts && (
@@ -187,7 +187,7 @@ export function AccountsOverviewPage() {
               icon="task_alt"
               icon-style="surface"
               headline={`${formatINR(Number(data.readyForPayout))} ready for payout`}
-              text={`${data.readyForPayoutMemberCount} vendor${data.readyForPayoutMemberCount === 1 ? '' : 's'} eligible right now — hold period has passed, no open dispute.`}
+              text={`${data.readyForPayoutMemberCount} member${data.readyForPayoutMemberCount === 1 ? '' : 's'} eligible right now — hold period has passed, no open dispute.`}
               cta-label="Review Payouts"
               cta-href="/account/accounts/vendor-settlements?status=ready"
             />
@@ -233,7 +233,7 @@ export function AccountsOverviewPage() {
           />
 
           <section aria-labelledby="members-ready-title">
-            <h2 id="members-ready-title" className="section-title">Vendors ready for payout</h2>
+            <h2 id="members-ready-title" className="section-title">Members ready for payout</h2>
             <MembersReadyForPayout token={token} />
           </section>
 

@@ -24,7 +24,7 @@ const DEAL_COLUMNS = JSON.stringify([
 /** Edit opens the one deal form (PLANNING §2.7); View member opens the member page. */
 const DEAL_ACTIONS = JSON.stringify([
   { icon: 'edit', label: 'Edit deal', event: 'edit-deal' },
-  { icon: 'open_in_new', label: 'View vendor', event: 'view-vendor' },
+  { icon: 'open_in_new', label: 'View member', event: 'view-vendor' },
 ]);
 
 /** "From ₹X" for a deal with 2+ active packages, the single package's price for exactly one, or

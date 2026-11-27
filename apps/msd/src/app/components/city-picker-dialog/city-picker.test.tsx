@@ -4,8 +4,8 @@ import '@skylabs-monorepo/shared-ui';
 import { CityPicker } from './city-picker';
 import content from '../../../content.json';
 
-const { setCity, requestBrowser, shell } = vi.hoisted(() => ({
-  setCity: vi.fn(),
+const { setState, requestBrowser, shell } = vi.hoisted(() => ({
+  setState: vi.fn(),
   requestBrowser: vi.fn(),
   shell: {
     locations: [
@@ -19,7 +19,7 @@ vi.mock('../../../catalog/catalog-shell', () => ({
   useCatalogShell: () => ({ locations: shell.locations }),
 }));
 vi.mock('../../../location/location-context', () => ({
-  useVisitorLocation: () => ({ status: 'ready', city: 'Pune', state: 'Maharashtra', setCity, requestBrowser }),
+  useVisitorLocation: () => ({ status: 'ready', state: 'Maharashtra', setState, requestBrowser }),
 }));
 
 const t = content.header.city;
@@ -43,28 +43,28 @@ const locate = async () => {
 };
 
 beforeEach(() => {
-  setCity.mockClear();
+  setState.mockClear();
   requestBrowser.mockReset();
 });
 
 describe('CityPicker', () => {
-  it('filters the partner cities by city or state and says when nothing matches', async () => {
+  it('filters the partner states and says when nothing matches', async () => {
     render(<CityPicker onDone={vi.fn()} />);
-    await typeFilter('gorak');
+    await typeFilter('uttar');
     const list = screen.getByRole('list', { name: t.listLabel });
-    expect(within(list).getAllByRole('button').map((b) => b.textContent)).toEqual(['GorakhpurUttar Pradesh']);
+    expect(within(list).getAllByRole('button').map((b) => b.textContent)).toEqual(['Uttar Pradesh']);
     await typeFilter('maharash');
-    expect(within(screen.getByRole('list', { name: t.listLabel })).getByRole('button', { name: /Pune/ })).toBeTruthy();
+    expect(within(screen.getByRole('list', { name: t.listLabel })).getByRole('button', { name: 'Maharashtra' })).toBeTruthy();
     await typeFilter('zzz');
-    expect(screen.getByRole('status')).toHaveTextContent('No partner city matches “zzz”');
+    expect(screen.getByRole('status')).toHaveTextContent('No partner state matches “zzz”');
   });
 
   it('Enter in the filter picks the first match', async () => {
     const onDone = vi.fn();
     render(<CityPicker onDone={onDone} />);
-    await typeFilter('gorak');
-    fireEvent(filterField(), new CustomEvent('sky-submit', { detail: { value: 'gorak' } }));
-    expect(setCity).toHaveBeenCalledWith({ state: 'Uttar Pradesh', city: 'Gorakhpur' });
+    await typeFilter('uttar');
+    fireEvent(filterField(), new CustomEvent('sky-submit', { detail: { value: 'uttar' } }));
+    expect(setState).toHaveBeenCalledWith('Uttar Pradesh');
     expect(onDone).toHaveBeenCalled();
   });
 

@@ -54,7 +54,7 @@
   },
   {
     "id": "vendors",
-    "title": "Vendors",
+    "title": "Members",
     "icon": "storefront",
     "permissionKey": "members.group",
     "parent": null,

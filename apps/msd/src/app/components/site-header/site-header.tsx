@@ -7,6 +7,7 @@ import { useCatalogShell } from '../../../catalog/catalog-shell';
 import { useVisitorLocation } from '../../../location/location-context';
 import { CategoryStrip } from './category-strip';
 import { CityChip } from './city-chip';
+import { SearchCitySelect } from './search-city-select';
 import { HeaderActions } from './header-actions';
 import { SearchPanel, flattenSuggestions, type SearchPanelMode } from './search-suggestions';
 import { MIN_QUERY_LENGTH, useSearchSuggestions, type SearchSuggestionItem } from './use-search-suggestions';
@@ -35,16 +36,20 @@ export function SiteHeader() {
   const [listbox, setListbox] = useState<HTMLDivElement | null>(null);
 
   const { categories } = useCatalogShell();
-  const { city, state, coords } = useVisitorLocation();
+  const { city, state, coords, searchCity } = useVisitorLocation();
+  // The search bar's own city/area selector (item F4) overrides the visitor's auto-resolved
+  // city for search specifically, once they've explicitly picked one — everywhere search results
+  // are shown (this live dropdown and /explore) stay consistent with that one effective value.
+  const effectiveCity = searchCity ?? city;
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<SearchPanelMode>('results');
   const [activeOptionId, setActiveOptionId] = useState<string | null>(null);
 
-  const { groups, loading, total } = useSearchSuggestions(query, categories, { city, state, coords });
+  const { groups, loading, total } = useSearchSuggestions(query, categories, { city: effectiveCity, state, coords });
   const flat = useMemo(() => flattenSuggestions(groups), [groups]);
   const searching = query.trim().length >= MIN_QUERY_LENGTH;
-  const locationLabel = city ? fillTemplate(t.near, { city }) : coords ? t.nearYou : null;
+  const locationLabel = effectiveCity ? fillTemplate(t.near, { city: effectiveCity }) : coords ? t.nearYou : null;
   const activeOption = open && activeOptionId ? document.getElementById(`${listboxId}-${activeOptionId}`) : null;
 
   const close = useCallback(() => {
@@ -84,7 +89,11 @@ export function SiteHeader() {
 
   const showAll = (value = query.trim()) => {
     close();
-    navigate(value ? `/explore?q=${encodeURIComponent(value)}` : '/explore');
+    const params = new URLSearchParams();
+    if (value) params.set('q', value);
+    if (searchCity) params.set('city', searchCity);
+    const qs = params.toString();
+    navigate(qs ? `/explore?${qs}` : '/explore');
   };
 
   useEffect(() => {
@@ -145,6 +154,7 @@ export function SiteHeader() {
           </Link>
           <CityChip />
           <div ref={wrapRef} className="site-header__search-wrap" onBlur={onBlur}>
+            <SearchCitySelect />
             <sky-action-field
               ref={fieldRef}
               className="site-header__search"

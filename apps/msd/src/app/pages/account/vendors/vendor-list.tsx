@@ -84,7 +84,7 @@ const COLUMNS = JSON.stringify([
   { key: 'Product Count', label: 'Products' },
 ]);
 
-const ACTIONS = JSON.stringify([{ icon: 'chevron_right', label: 'Open vendor', event: 'select' }]);
+const ACTIONS = JSON.stringify([{ icon: 'chevron_right', label: 'Open member', event: 'select' }]);
 
 /** Flat row for sky-data-table. 'Vendor ID' is not a column; the row action reads it. */
 function toRow(member: Vendor): Record<string, string | number> {
@@ -140,7 +140,7 @@ export function VendorList({ members, onSelect, total, page, pageSize, loading, 
   return (
     <sky-data-table
       ref={tableRef as RefObject<HTMLElement>}
-      caption={`Vendors (${total})`}
+      caption={`Members (${total})`}
       columns={COLUMNS}
       rows={rows}
       total={total}

@@ -43,12 +43,12 @@ describe('vendor status helpers', () => {
     const all = { canStatusChange: true, canDelete: true };
     expect(availableStatusActions('ACTIVE', all)).toEqual([
       { action: 'deactivate' },
-      { action: 'suspend', blockedBy: 'Make the vendor inactive first.' },
+      { action: 'suspend', blockedBy: 'Make the member inactive first.' },
     ]);
     expect(availableStatusActions('INACTIVE', all)).toEqual([
       { action: 'reactivate' },
       { action: 'suspend' },
-      { action: 'delete', blockedBy: 'Suspend the vendor first.' },
+      { action: 'delete', blockedBy: 'Suspend the member first.' },
     ]);
     expect(availableStatusActions('SUSPENDED', all)).toEqual([{ action: 'reactivate' }, { action: 'delete' }]);
     expect(availableStatusActions('ARCHIVED', all)).toEqual([{ action: 'restore' }]);
